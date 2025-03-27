@@ -89,7 +89,7 @@
                             <td>{{ record.employee.employee_id }}</td>
                             <td>{{ record.employee.name }}</td>
                             <td>{{ record.process.process_code if record.process else '无' }}</td>
-                            <td>{{ record.process.name if record.process else '无' }}</td>
+                            <td>{{ record.process.process_name if record.process else '无' }}</td>
                             <td>{{ "%.2f"|format(record.amount) }}</td>
                             <td>{{ record.reason }}</td>
                             <td>
