@@ -408,56 +408,61 @@ def process_prices():
 def add_process_price():
     """添加工序价格"""
     if current_user.role not in ['admin', 'hr']:
-        return jsonify({'success': False, 'message': '权限不足'}), 403
+        flash('权限不足', 'danger')
+        return redirect(url_for('main.index'))
     
-    try:
-        data = request.get_json()
-        
-        # 创建新的工序价格记录
-        process_price = ProcessPrice(
-            serial_number=SerialNumber.get_next_number(),
-            process_code=data.get('process_code'),
-            process_name=data.get('process_name'),
-            component=data.get('component'),
-            drawing_no=data.get('drawing_no'),
-            model_no=data.get('model_no'),
-            price=data.get('price'),
-            version=data.get('version'),
-            notes=data.get('notes')
-        )
-        db.session.add(process_price)
-        db.session.flush()
-        
-        log = AuditLog(
-            user_id=current_user.id,
-            action='添加工序价格',
-            details=f'添加工序：{process_price.process_name}，编号：{process_price.process_code}',
-            can_rollback=True,
-            rollback_type='add',
-            target_model='ProcessPrice',
-            target_id=process_price.id,
-            new_data={
-                'process_code': process_price.process_code,
-                'process_name': process_price.process_name,
-                'component': process_price.component,
-                'drawing_no': process_price.drawing_no,
-                'model_no': process_price.model_no,
-                'price': process_price.price,
-                'version': process_price.version,
-                'effective_date': process_price.effective_date.isoformat() if process_price.effective_date else None,
-                'notes': process_price.notes,
-                'is_current': process_price.is_current
-            }
-        )
-        db.session.add(log)
-        db.session.commit()
-        flash('工序价格添加成功', 'success')
-        return redirect(url_for('main.process_prices'))
-    except Exception as e:
-        db.session.rollback()
-        flash(f'添加失败：{str(e)}', 'danger')
-        current_app.logger.error(f'添加工序价格失败: {str(e)}')
-        return redirect(url_for('main.process_prices'))
+    form = ProcessPriceForm()
+    if form.validate_on_submit():
+        try:
+            # 创建新的工序价格记录
+            process_price = ProcessPrice(
+                serial_number=SerialNumber.get_next_number(),
+                process_code=form.process_code.data,
+                process_name=form.process_name.data,
+                component=form.component.data,
+                drawing_no=form.drawing_no.data,
+                model_no=form.model_no.data,
+                price=form.price.data,
+                effective_date=form.effective_date.data,
+                notes=form.notes.data,
+                version=1,  # 新工序的初始版本为1
+                is_current=True  # 新工序默认为当前生效
+            )
+            db.session.add(process_price)
+            db.session.flush()
+            
+            log = AuditLog(
+                user_id=current_user.id,
+                action='添加工序价格',
+                details=f'添加工序：{process_price.process_name}，编号：{process_price.process_code}',
+                can_rollback=True,
+                rollback_type='add',
+                target_model='ProcessPrice',
+                target_id=process_price.id,
+                new_data={
+                    'process_code': process_price.process_code,
+                    'process_name': process_price.process_name,
+                    'component': process_price.component,
+                    'drawing_no': process_price.drawing_no,
+                    'model_no': process_price.model_no,
+                    'price': process_price.price,
+                    'version': process_price.version,
+                    'effective_date': process_price.effective_date.isoformat() if process_price.effective_date else None,
+                    'notes': process_price.notes,
+                    'is_current': process_price.is_current
+                }
+            )
+            db.session.add(log)
+            db.session.commit()
+            flash('工序价格添加成功', 'success')
+            return redirect(url_for('main.process_prices'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'添加失败：{str(e)}', 'danger')
+            current_app.logger.error(f'添加工序价格失败: {str(e)}')
+            return render_template('main/process_price_form.html', form=form, title='新增工序价格')
+    
+    return render_template('main/process_price_form.html', form=form, title='新增工序价格')
 
 @bp.route('/process_prices/<int:id>/edit', methods=['GET', 'POST'])
 @login_required
