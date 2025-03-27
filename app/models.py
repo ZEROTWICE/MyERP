@@ -2,6 +2,7 @@ from datetime import datetime
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 from app import db, login
+from sqlalchemy.exc import SQLAlchemyError
 
 @login.user_loader
 def load_user(id):
@@ -19,8 +20,36 @@ class User(UserMixin, db.Model):
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
 
+class SerialNumber(db.Model):
+    """全局流水号管理表"""
+    __tablename__ = 'serial_numbers'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    current_number = db.Column(db.Integer, nullable=False, default=1)
+    last_updated = db.Column(db.DateTime, nullable=False, default=datetime.now)
+
+    @classmethod
+    def get_next_number(cls):
+        """获取下一个流水号"""
+        while True:
+            try:
+                with db.session.begin_nested():
+                    serial = cls.query.with_for_update().first()
+                    if not serial:
+                        serial = cls(current_number=1)
+                        db.session.add(serial)
+                    else:
+                        serial.current_number += 1
+                        serial.last_updated = datetime.now()
+                    db.session.flush()
+                    return f"{serial.current_number:08d}"
+            except SQLAlchemyError:
+                db.session.rollback()
+                continue
+
 class ProcessPrice(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    serial_number = db.Column(db.String(8), unique=True, nullable=False)
     process_code = db.Column(db.String(50), nullable=False, index=True)  # 工序编号
     process_name = db.Column(db.String(100), nullable=False)
     component = db.Column(db.String(100))  # 部件
@@ -34,6 +63,7 @@ class ProcessPrice(db.Model):
 
 class Employee(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    serial_number = db.Column(db.String(8), unique=True, nullable=False)
     employee_id = db.Column(db.String(50), unique=True, nullable=False, index=True)  # 工号
     name = db.Column(db.String(100), nullable=False)
     position = db.Column(db.String(50), nullable=False, default='普通员工')
@@ -57,6 +87,7 @@ class Employee(db.Model):
 
 class ProductionRecord(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    serial_number = db.Column(db.String(8), unique=True, nullable=False)
     employee_id = db.Column(db.Integer, db.ForeignKey('employee.id'))
     process_id = db.Column(db.Integer, db.ForeignKey('process_price.id'))
     quantity = db.Column(db.Integer)
@@ -65,6 +96,7 @@ class ProductionRecord(db.Model):
 
 class BonusPenalty(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    serial_number = db.Column(db.String(8), unique=True, nullable=False)
     employee_id = db.Column(db.Integer, db.ForeignKey('employee.id'))
     amount = db.Column(db.Float)
     reason = db.Column(db.Text)
@@ -101,6 +133,7 @@ class AuditLog(db.Model):
 class TaskAssignment(db.Model):
     """生产任务分配"""
     id = db.Column(db.Integer, primary_key=True)
+    serial_number = db.Column(db.String(8), unique=True, nullable=False)
     employee_id = db.Column(db.Integer, db.ForeignKey('employee.id'), nullable=False)
     process_id = db.Column(db.Integer, db.ForeignKey('process_price.id'), nullable=False)
     assigned_date = db.Column(db.DateTime, default=datetime.utcnow)  # 分配时间

@@ -2,7 +2,7 @@ from flask import render_template, redirect, url_for, flash, request, jsonify, c
 from sqlalchemy.exc import SQLAlchemyError
 from flask_login import login_required, current_user
 from app import db
-from app.models import Employee, ProcessPrice, ProductionRecord, BonusPenalty, AuditLog, ProcessPrice, User, TaskAssignment
+from app.models import Employee, ProcessPrice, ProductionRecord, BonusPenalty, AuditLog, ProcessPrice, User, TaskAssignment, SerialNumber
 from datetime import datetime, timedelta
 from . import bp
 from app.main.forms import (
@@ -193,6 +193,7 @@ def add_employee():
         
         # 创建员工记录
         employee = Employee(
+            serial_number=SerialNumber.get_next_number(),
             employee_id=form.employee_id.data,
             name=form.name.data,
             position=form.position.data,
@@ -233,6 +234,7 @@ def add_employee():
             db.session.rollback()
             current_app.logger.error(f'添加员工失败: {str(e)}')
             flash('操作失败，请重试', 'danger')
+            return render_template('main/employee_form.html', form=form, title='新增员工')
     
     return render_template('main/employee_form.html', form=form, title='新增员工')
 
@@ -404,60 +406,58 @@ def process_prices():
 @bp.route('/add_process_price', methods=['GET', 'POST'])
 @login_required
 def add_process_price():
-    if not current_user.role in ['admin', 'hr']:
-        flash('权限不足', 'danger')
-        return redirect(url_for('main.index'))
+    """添加工序价格"""
+    if current_user.role not in ['admin', 'hr']:
+        return jsonify({'success': False, 'message': '权限不足'}), 403
     
-    form = ProcessPriceForm()
-    if form.validate_on_submit():
-        try:
-            process = ProcessPrice(
-            process_code=form.process_code.data,
-            process_name=form.process_name.data,
-            component=form.component.data,
-            drawing_no=form.drawing_no.data,
-            model_no=form.model_no.data,
-            price=form.price.data,
-            version=1,
-            effective_date=form.effective_date.data,
-                        notes=form.notes.data,
-                        is_current=True
-        )
-            db.session.add(process)
-            db.session.flush()
+    try:
+        data = request.get_json()
         
-            log = AuditLog(
+        # 创建新的工序价格记录
+        process_price = ProcessPrice(
+            serial_number=SerialNumber.get_next_number(),
+            process_code=data.get('process_code'),
+            process_name=data.get('process_name'),
+            component=data.get('component'),
+            drawing_no=data.get('drawing_no'),
+            model_no=data.get('model_no'),
+            price=data.get('price'),
+            version=data.get('version'),
+            notes=data.get('notes')
+        )
+        db.session.add(process_price)
+        db.session.flush()
+        
+        log = AuditLog(
             user_id=current_user.id,
             action='添加工序价格',
-                        details=f'添加工序：{process.process_name}，编号：{process.process_code}',
-                        can_rollback=True,
-                        rollback_type='add',
-                        target_model='ProcessPrice',
-                        target_id=process.id,
-                        new_data={
-                            'process_code': process.process_code,
-                            'process_name': process.process_name,
-                            'component': process.component,
-                            'drawing_no': process.drawing_no,
-                            'model_no': process.model_no,
-                            'price': process.price,
-                            'version': process.version,
-                            'effective_date': process.effective_date.isoformat() if process.effective_date else None,
-                            'notes': process.notes,
-                            'is_current': process.is_current
-                        }
+            details=f'添加工序：{process_price.process_name}，编号：{process_price.process_code}',
+            can_rollback=True,
+            rollback_type='add',
+            target_model='ProcessPrice',
+            target_id=process_price.id,
+            new_data={
+                'process_code': process_price.process_code,
+                'process_name': process_price.process_name,
+                'component': process_price.component,
+                'drawing_no': process_price.drawing_no,
+                'model_no': process_price.model_no,
+                'price': process_price.price,
+                'version': process_price.version,
+                'effective_date': process_price.effective_date.isoformat() if process_price.effective_date else None,
+                'notes': process_price.notes,
+                'is_current': process_price.is_current
+            }
         )
-            db.session.add(log)
-            db.session.commit()
-            flash('工序价格添加成功', 'success')
-            return redirect(url_for('main.process_prices'))
-        except Exception as e:
-            db.session.rollback()
-            flash(f'添加失败：{str(e)}', 'danger')
-            current_app.logger.error(f'添加工序价格失败: {str(e)}')
-            return redirect(url_for('main.process_prices'))
-    
-    return render_template('main/process_price_form.html', form=form, title='添加工序价格')
+        db.session.add(log)
+        db.session.commit()
+        flash('工序价格添加成功', 'success')
+        return redirect(url_for('main.process_prices'))
+    except Exception as e:
+        db.session.rollback()
+        flash(f'添加失败：{str(e)}', 'danger')
+        current_app.logger.error(f'添加工序价格失败: {str(e)}')
+        return redirect(url_for('main.process_prices'))
 
 @bp.route('/process_prices/<int:id>/edit', methods=['GET', 'POST'])
 @login_required
@@ -635,40 +635,24 @@ def manage_production_records():
             target_date = form.date.data
             start_of_day = datetime.combine(target_date, datetime.min.time())
             end_of_day = datetime.combine(target_date, datetime.max.time())
-                
+            
             process_price = ProcessPrice.query.filter(
             ProcessPrice.process_code == form.process_code.data,
                 ProcessPrice.effective_date <= end_of_day + timedelta(days=1)
-            ).order_by(ProcessPrice.effective_date.desc()).first()
+        ).order_by(ProcessPrice.effective_date.desc()).first()
 
             if not process_price:
                 flash('未找到该日期下的工序价格', 'danger')
                 return redirect(url_for('main.manage_production_records'))
 
             record = ProductionRecord(
-            employee_id=form.employee_id.data,
-            process_id=process_price.id,
-            quantity=form.quantity.data,
-                    date=form.date.data)
-            db.session.add(record)
-            db.session.flush()
-
-            log = AuditLog(
-            user_id=current_user.id,
-            action='添加生产记录',
-                    details=f'员工ID：{record.employee_id}，工序：{process_price.process_name}，数量：{record.quantity}',
-                    can_rollback=True,
-                    rollback_type='add',
-                    target_model='ProductionRecord',
-                    target_id=record.id,
-                    new_data={
-                        'employee_id': record.employee_id,
-                        'process_id': record.process_id,
-                        'quantity': record.quantity,
-                        'date': record.date.isoformat() if record.date else None
-                    }
+                    serial_number=SerialNumber.get_next_number(),
+                employee_id=form.employee_id.data,
+                process_id=process_price.id,
+                quantity=form.quantity.data,
+                date=form.date.data
             )
-            db.session.add(log)
+            db.session.add(record)
             db.session.commit()
             flash('生产记录添加成功', 'success')
             return redirect(url_for('main.manage_production_records'))
@@ -747,7 +731,7 @@ def delete_production_record(id):
         }
         
         log = AuditLog(
-        user_id=current_user.id,
+            user_id=current_user.id,
         action='删除生产记录',
         details=f'删除生产记录：员工 {record.employee.name}，工序 {record.process.process_name}，数量 {record.quantity}',
         can_rollback=True,
@@ -755,7 +739,7 @@ def delete_production_record(id):
         target_model='ProductionRecord',
         target_id=record.id,
         old_data=old_data
-            )
+        )
         db.session.add(log)
         db.session.delete(record)
         db.session.commit()
@@ -971,86 +955,53 @@ def edit_bonus_penalty(id):
 @bp.route('/bonus_penalties/add', methods=['POST'])
 @login_required
 def add_bonus_penalty():
+    """添加奖金/罚款记录"""
     if current_user.role not in ['admin', 'hr']:
-        flash('权限不足', 'danger')
-        return redirect(url_for('main.index'))
+        return jsonify({'success': False, 'message': '权限不足'}), 403
     
-    form = BonusPenaltyForm()
-    
-    # 获取所有员工，并格式化显示选项
-    employees = Employee.query.all()
-    form.employee_id.choices = [(e.id, f"{e.employee_id} - {e.name} ({e.department})") for e in employees]
-    
-    # 获取所有当前生效的工序
-    today = datetime.now().date()
-    
-    # 创建子查询，获取每个工序编号的最新生效版本
-    latest_versions = db.session.query(
-        ProcessPrice.process_code,
-        db.func.max(ProcessPrice.effective_date).label('max_date')
-    ).filter(ProcessPrice.effective_date <= today)\
-     .group_by(ProcessPrice.process_code)\
-     .subquery()
-    
-    # 获取当前生效的工序
-    current_processes = ProcessPrice.query.join(
-        latest_versions,
-        db.and_(
-            ProcessPrice.process_code == latest_versions.c.process_code,
-            ProcessPrice.effective_date == latest_versions.c.max_date
-        )
-    ).order_by(ProcessPrice.process_code).all()
-    
-    # 设置工序选项，添加一个"无"选项
-    form.process_id.choices = [(0, '无')] + [(p.id, f"{p.process_code} - {p.process_name} ({p.component or ''} {p.drawing_no or ''} {p.model_no or ''})".strip()) for p in current_processes]
-    
-    if form.validate_on_submit():
-        try:
-            record = BonusPenalty(
-                employee_id=form.employee_id.data,
-                type=form.type.data,
-                amount=form.amount.data,
-                reason=form.reason.data,
-                date=form.date.data,
-                process_id=form.process_id.data if form.process_id.data != 0 else None
-            )
-            db.session.add(record)
-            db.session.flush()  # 获取record.id
-            
-            # 记录可回滚的审计日志
-            log = AuditLog(
-                user_id=current_user.id,
-                action='添加奖金/罚款记录',
-                details=f'添加{"奖金" if record.type == "bonus" else "罚款"}记录：员工ID {record.employee_id}，金额 {record.amount}',
-                can_rollback=True,
-                rollback_type='add',
-                target_model='BonusPenalty',
-                target_id=record.id,
-                new_data={
-                    'employee_id': record.employee_id,
-                    'type': record.type,
-                    'amount': record.amount,
-                    'reason': record.reason,
-                    'date': record.date.isoformat() if record.date else None,
-                    'process_id': record.process_id
-                }
-            )
-            db.session.add(log)
-            
-            db.session.commit()
-            flash('记录添加成功', 'success')
-        except Exception as e:
-            db.session.rollback()
-            flash('添加失败，请重试', 'danger')
-            current_app.logger.error(f'添加奖金/罚款记录失败: {str(e)}')
+    try:
+        data = request.get_json()
         
+        # 创建新的奖金/罚款记录
+        bonus_penalty = BonusPenalty(
+            serial_number=SerialNumber.get_next_number(),
+            employee_id=data.get('employee_id'),
+            amount=data.get('amount'),
+            reason=data.get('reason'),
+            date=datetime.strptime(data.get('date'), '%Y-%m-%d').date(),
+            type=data.get('type'),
+            process_id=data.get('process_id')
+        )
+        db.session.add(bonus_penalty)
+        db.session.flush()  # 获取bonus_penalty.id
+        
+        # 记录可回滚的审计日志
+        log = AuditLog(
+            user_id=current_user.id,
+            action='添加奖金/罚款记录',
+            details=f'添加{"奖金" if bonus_penalty.type == "bonus" else "罚款"}记录：员工ID {bonus_penalty.employee_id}，金额 {bonus_penalty.amount}',
+            can_rollback=True,
+            rollback_type='add',
+            target_model='BonusPenalty',
+            target_id=bonus_penalty.id,
+            new_data={
+                'employee_id': bonus_penalty.employee_id,
+                'type': bonus_penalty.type,
+                'amount': bonus_penalty.amount,
+                'reason': bonus_penalty.reason,
+                'date': bonus_penalty.date.isoformat() if bonus_penalty.date else None,
+                'process_id': bonus_penalty.process_id
+            }
+        )
+        db.session.add(log)
+        db.session.commit()
+        flash('记录添加成功', 'success')
         return redirect(url_for('main.manage_bonus_penalties'))
-    
-    for field, errors in form.errors.items():
-        for error in errors:
-            flash(f'{getattr(form, field).label.text}: {error}', 'danger')
-    
-    return redirect(url_for('main.manage_bonus_penalties'))
+    except Exception as e:
+        db.session.rollback()
+        flash('添加失败，请重试', 'danger')
+        current_app.logger.error(f'添加奖金/罚款记录失败: {str(e)}')
+        return redirect(url_for('main.manage_bonus_penalties'))
 
 @bp.route('/salary_calculation', methods=['GET', 'POST'])
 @login_required
@@ -1268,6 +1219,7 @@ def import_employees():
                 
                 # 创建员工记录
                 employee = Employee(
+                    serial_number=SerialNumber.get_next_number(),
                     employee_id=data['employee_id'],
                     name=data['name'],
                     position=data['position'],
@@ -1458,15 +1410,15 @@ def import_process_prices():
             try:
                 # 创建新工序价格记录
                 process = ProcessPrice(
+                    serial_number=SerialNumber.get_next_number(),
                     process_code=data['process_code'],
                     process_name=data['process_name'],
                     component=data['component'],
                     drawing_no=data['drawing_no'],
                     model_no=data['model_no'],
                     price=data['price'],
-                    effective_date=data['effective_date'],
-                    notes=data['notes'],
-                    version=1
+                    version=data['version'],
+                    notes=data['notes']
                 )
                 db.session.add(process)
                 success_count += 1
@@ -1642,10 +1594,12 @@ def import_production_records():
                 
                 # 创建生产记录
                 record = ProductionRecord(
+                    serial_number=SerialNumber.get_next_number(),
                     employee_id=employee.id,
                     process_id=process_price.id,
                     quantity=data['quantity'],
-                    date=data['date']
+                    date=data['date'],
+                    notes=data['notes']
                 )
                 db.session.add(record)
                 success_count += 1
@@ -1889,11 +1843,14 @@ def manage_tasks():
             
             # 创建任务分配记录
             task = TaskAssignment(
+                serial_number=SerialNumber.get_next_number(),
                 employee_id=form.employee_id.data,
                 process_id=process_price.id,
                 quantity=form.quantity.data,
                 target_date=form.target_date.data,
-                notes=form.notes.data
+                notes=form.notes.data,
+                status='pending',  # 设置初始状态为待处理
+                assigned_date=datetime.now().date()  # 设置分配日期
             )
             db.session.add(task)
             db.session.flush()  # 获取task.id
@@ -2151,6 +2108,7 @@ def import_bonus_penalties():
                 
                 # 创建奖惩记录
                 record = BonusPenalty(
+                    serial_number=SerialNumber.get_next_number(),
                     employee_id=employee.id,
                     type=data['type'],
                     amount=data['amount'],
@@ -2274,6 +2232,7 @@ def import_tasks():
                 
                 # 创建任务记录
                 task = TaskAssignment(
+                    serial_number=SerialNumber.get_next_number(),
                     employee_id=employee.id,
                     process_id=process.id,
                     quantity=data['quantity'],
@@ -2309,168 +2268,159 @@ def import_tasks():
     except Exception as e:
         return jsonify({'success': False, 'message': f'导入失败：{str(e)}'})
 
-@bp.route('/tasks/export', methods=['GET', 'POST'])
+@bp.route('/export_tasks', methods=['POST'])
 @login_required
 def export_tasks():
+    if current_user.role not in ['admin', 'hr']:
+        flash('权限不足', 'danger')
+        return redirect(url_for('main.index'))
+    
     form = ExportTaskForm()
     if form.validate_on_submit():
-        query = TaskAssignment.query
-        if form.employee_id.data:
-            query = query.join(Employee).filter(Employee.employee_id == form.employee_id.data)
-        if form.process_code.data:
-            query = query.join(ProcessPrice).filter(ProcessPrice.process_code == form.process_code.data)
-        if form.status.data:
-            query = query.filter(TaskAssignment.status == form.status.data)
-        if form.start_date.data:
-            query = query.filter(TaskAssignment.assigned_date >= form.start_date.data)
-        if form.end_date.data:
-            query = query.filter(TaskAssignment.assigned_date <= form.end_date.data)
-        
-        tasks = query.all()
-        wb = ExcelGenerator.export_tasks(tasks)
-        
-        temp_path = None
         try:
+            # 构建查询
+            query = TaskAssignment.query.join(Employee)
+            
+            # 处理搜索条件
+            if form.employee_id.data:
+                query = query.filter(TaskAssignment.employee_id == form.employee_id.data)
+            
+            if form.process_id.data:
+                query = query.filter(TaskAssignment.process_id == form.process_id.data)
+            
+            if form.status.data:
+                query = query.filter(TaskAssignment.status == form.status.data)
+            
+            if form.start_date.data:
+                query = query.filter(TaskAssignment.target_date >= form.start_date.data)
+            
+            if form.end_date.data:
+                query = query.filter(TaskAssignment.target_date <= form.end_date.data)
+            
+            # 获取数据
+            tasks = query.all()
+            
+            # 生成Excel文件
+            excel_generator = ExcelGenerator()
+            excel_file = excel_generator.generate_tasks_excel(tasks)
+            
             # 创建临时文件
-            fd, temp_path = tempfile.mkstemp(suffix='.xlsx')
-            # 关闭文件描述符
-            os.close(fd)
-            # 保存Excel文件
-            wb.save(temp_path)
-            # 发送文件
+            temp_dir = tempfile.mkdtemp()
+            temp_file = os.path.join(temp_dir, '生产任务数据.xlsx')
+            excel_file.save(temp_file)
+            
+            @after_this_request
+            def remove_file(response):
+                try:
+                    os.remove(temp_file)
+                    os.rmdir(temp_dir)
+                except Exception as e:
+                    current_app.logger.error(f'删除临时文件失败: {str(e)}')
+                return response
+            
             return send_file(
-                temp_path,
-                mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                temp_file,
                 as_attachment=True,
-                download_name=f'tasks_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
+                download_name='生产任务数据.xlsx',
+                mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
             )
         except Exception as e:
-            if temp_path and os.path.exists(temp_path):
-                try:
-                    os.remove(temp_path)
-                except:
-                    pass
-            flash(f'导出失败：{str(e)}', 'danger')
+            current_app.logger.error(f'导出任务数据失败: {str(e)}')
+            flash('导出失败，请重试', 'danger')
             return redirect(url_for('main.manage_tasks'))
-        finally:
-            # 确保在请求结束后删除临时文件
-            if temp_path and os.path.exists(temp_path):
-                try:
-                    os.remove(temp_path)
-                except:
-                    pass
     
-    return render_template('main/export_form.html', form=form, title='导出任务数据')
+    flash('表单验证失败', 'danger')
+    return redirect(url_for('main.manage_tasks'))
 
 @bp.route('/audit_logs/rollback/<int:log_id>', methods=['POST'])
 @login_required
-def rollback_operation(log_id):
-    if current_user.role != 'admin':
+def rollback_audit_log(log_id):
+    if not current_user.role == 'admin':
         return jsonify({'success': False, 'message': '权限不足'}), 403
     
     try:
         log = AuditLog.query.get_or_404(log_id)
         
         if not log.can_rollback:
-            return jsonify({'success': False, 'message': '该操作不支持回滚'}), 400
+            return jsonify({'success': False, 'message': '此记录不支持回滚'}), 400
         
-        if log.rolled_back:
-            return jsonify({'success': False, 'message': '该操作已被回滚'}), 400
-        
-        # 根据不同的操作类型执行回滚
-        model_mapping = {
-            'Employee': Employee,
-            'ProcessPrice': ProcessPrice,
-            'ProductionRecord': ProductionRecord,
-            'BonusPenalty': BonusPenalty,
-            'TaskAssignment': TaskAssignment
-        }
-        
-        if log.target_model not in model_mapping:
-            return jsonify({'success': False, 'message': '不支持的操作类型'}), 400
-        
-        model = model_mapping[log.target_model]
-        
-        def parse_date(date_str):
-            """解析日期字符串为datetime对象"""
-            if not date_str:
-                return None
-            try:
-                # 移除可能的时区信息
-                date_str = str(date_str).split('+')[0].split('Z')[0].strip()
-                # 尝试不同的日期格式
-                for fmt in ['%Y-%m-%dT%H:%M:%S.%f', '%Y-%m-%dT%H:%M:%S', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d']:
-                    try:
-                        return datetime.strptime(date_str, fmt)
-                    except ValueError:
-                        continue
-                return None
-            except Exception as e:
-                current_app.logger.error(f'日期解析错误: {str(e)}, 日期字符串: {date_str}')
-                return None
-        
-        def set_attribute(obj, key, value):
-            """安全地设置对象属性"""
-            try:
-                if value is None:
-                    setattr(obj, key, None)
-                elif key.endswith('_date') or key == 'date' or key == 'effective_date' or key == 'assigned_date' or key == 'target_date':
-                    date_value = parse_date(value)
-                    if date_value:
-                        setattr(obj, key, date_value)
-                elif key.endswith('_id') and value:
-                    try:
-                        setattr(obj, key, int(value))
-                    except (ValueError, TypeError):
-                        setattr(obj, key, None)
-                elif isinstance(value, (int, float, str, bool)):
-                    setattr(obj, key, value)
-            except Exception as e:
-                current_app.logger.error(f'设置字段 {key} 失败: {str(e)}')
-        
+        # 根据不同的回滚类型执行不同的操作
         if log.rollback_type == 'add':
-            # 如果是添加操作，则删除记录
-            record = model.query.get(log.target_id)
-            if record:
-                db.session.delete(record)
-        
+            # 删除新增的记录
+            model_class = globals()[log.target_model]
+            target = model_class.query.get(log.target_id)
+            if target:
+                db.session.delete(target)
+                
+                # 记录回滚操作
+                rollback_log = AuditLog(
+                    user_id=current_user.id,
+                    action=f'回滚{log.action}',
+                    details=f'回滚操作：{log.details}',
+                    can_rollback=False,
+                    timestamp=datetime.now()  # 使用本地时间
+                )
+                db.session.add(rollback_log)
+                db.session.commit()
+                return jsonify({'success': True, 'message': '回滚成功'})
+            else:
+                return jsonify({'success': False, 'message': '目标记录不存在'}), 404
+                
         elif log.rollback_type == 'edit':
-            # 如果是编辑操作，则恢复旧数据
-            record = model.query.get(log.target_id)
-            if record and log.old_data:
+            # 恢复编辑前的数据
+            model_class = globals()[log.target_model]
+            target = model_class.query.get(log.target_id)
+            if target:
                 for key, value in log.old_data.items():
-                    set_attribute(record, key, value)
-        
+                    if hasattr(target, key):
+                        if key.endswith('_date') and value:
+                            value = datetime.fromisoformat(value).date()
+                        setattr(target, key, value)
+                
+                # 记录回滚操作
+                rollback_log = AuditLog(
+                    user_id=current_user.id,
+                    action=f'回滚{log.action}',
+                    details=f'回滚操作：{log.details}',
+                    can_rollback=False,
+                    timestamp=datetime.now()  # 使用本地时间
+                )
+                db.session.add(rollback_log)
+                db.session.commit()
+                return jsonify({'success': True, 'message': '回滚成功'})
+            else:
+                return jsonify({'success': False, 'message': '目标记录不存在'}), 404
+                
         elif log.rollback_type == 'delete':
-            # 如果是删除操作，则恢复记录
-            if log.old_data:
-                new_record = model()
-                for key, value in log.old_data.items():
-                    if key != 'id':  # 跳过id字段
-                        set_attribute(new_record, key, value)
-                db.session.add(new_record)
+            # 恢复被删除的记录
+            model_class = globals()[log.target_model]
+            new_record = model_class()
+            for key, value in log.old_data.items():
+                if hasattr(new_record, key):
+                    if key.endswith('_date') and value:
+                        value = datetime.fromisoformat(value).date()
+                    setattr(new_record, key, value)
+            
+            db.session.add(new_record)
+            
+            # 记录回滚操作
+            rollback_log = AuditLog(
+                user_id=current_user.id,
+                action=f'回滚{log.action}',
+                details=f'回滚操作：{log.details}',
+                can_rollback=False,
+                timestamp=datetime.now()  # 使用本地时间
+            )
+            db.session.add(rollback_log)
+            db.session.commit()
+            return jsonify({'success': True, 'message': '回滚成功'})
         
-        # 标记日志为已回滚
-        log.rolled_back = True
-        log.rolled_back_by = current_user.id
-        log.rolled_back_at = datetime.now()  # 使用本地时间
-        
-        # 记录回滚操作的审计日志
-        rollback_log = AuditLog(
-            user_id=current_user.id,
-            action='回滚操作',
-            details=f'回滚了操作：{log.action}（ID：{log.id}）',
-            can_rollback=False,
-            timestamp=datetime.now()  # 使用本地时间
-        )
-        db.session.add(rollback_log)
-        
-        db.session.commit()
-        return jsonify({'success': True, 'message': '回滚成功'})
-        
+        else:
+            return jsonify({'success': False, 'message': '不支持的回滚类型'}), 400
+            
     except Exception as e:
         db.session.rollback()
-        current_app.logger.error(f'回滚操作失败: {str(e)}')
+        current_app.logger.error(f'回滚失败: {str(e)}')
         return jsonify({'success': False, 'message': f'回滚失败：{str(e)}'}), 500
 
 @bp.route('/add_production_record', methods=['GET', 'POST'])
@@ -2490,8 +2440,7 @@ def add_production_record():
             # 获取当前生效的工序价格
             process_price = ProcessPrice.query.filter(
                 ProcessPrice.process_code == form.process_code.data,
-                ProcessPrice.effective_date <= end_of_day,
-                ProcessPrice.is_current == True
+                ProcessPrice.effective_date <= end_of_day + timedelta(days=1)
             ).order_by(ProcessPrice.effective_date.desc()).first()
             
             if not process_price:
@@ -2499,6 +2448,7 @@ def add_production_record():
                 return redirect(url_for('main.manage_production_records'))
             
             record = ProductionRecord(
+                serial_number=SerialNumber.get_next_number(),
                 employee_id=form.employee_id.data,
                 process_code=form.process_code.data,
                 quantity=form.quantity.data,
@@ -2652,12 +2602,14 @@ def add_task():
         
         # 创建任务分配记录
         task = TaskAssignment(
+            serial_number=SerialNumber.get_next_number(),
             employee_id=data.get('employee_id'),
             process_id=data.get('process_id'),
             quantity=data.get('quantity'),
             target_date=datetime.strptime(data.get('target_date'), '%Y-%m-%d').date() if data.get('target_date') else None,
             notes=data.get('notes'),
-            status='pending'  # 设置初始状态为待处理
+            status='pending',  # 设置初始状态为待处理
+            assigned_date=datetime.now().date()  # 设置分配日期
         )
         db.session.add(task)
         db.session.flush()  # 获取task.id
@@ -2727,12 +2679,15 @@ def get_task_assignment(id):
 @bp.route('/tasks/<int:id>/edit', methods=['POST'])
 @login_required
 def edit_task(id):
-    """编辑任务"""
+    if not current_user.role in ['admin', 'hr']:
+        return jsonify({'success': False, 'message': '权限不足'}), 403
+    
     try:
-        task = TaskAssignment.query.get_or_404(id)
         data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'message': '无效的请求数据'}), 400
         
-        # 验证员工和工序
+        task = TaskAssignment.query.get_or_404(id)
         employee = Employee.query.get(data.get('employee_id'))
         process = ProcessPrice.query.get(data.get('process_id'))
         
