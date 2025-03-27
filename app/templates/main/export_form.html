@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">{{ title }}</h5>
+        </div>
+        <div class="card-body">
+            <form method="post">
+                {{ form.csrf_token }}
+                
+                {% for field in form if field.name != 'csrf_token' and field.name != 'submit' %}
+                <div class="form-group mb-3">
+                    {{ field.label(class="form-label") }}
+                    {% if field.type == "SelectField" %}
+                        {{ field(class="form-select") }}
+                    {% else %}
+                        {{ field(class="form-control") }}
+                    {% endif %}
+                    {% if field.errors %}
+                        {% for error in field.errors %}
+                            <div class="invalid-feedback d-block">{{ error }}</div>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+                {% endfor %}
+                
+                <div class="text-center mt-4">
+                    <button type="button" class="btn btn-secondary me-2" onclick="window.history.back()">返回</button>
+                    {{ form.submit(class="btn btn-primary") }}
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %} 

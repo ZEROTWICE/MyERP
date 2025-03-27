@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <!-- 欢迎信息和员工基本信息 -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-body">
+                    <h4 class="card-title">欢迎，{{ employee.name }}</h4>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <p><strong>工号：</strong>{{ employee.employee_id }}</p>
+                            <p><strong>部门：</strong>{{ employee.department }}</p>
+                        </div>
+                        <div class="col-md-4">
+                            <p><strong>职位：</strong>{{ employee.position }}</p>
+                            <p><strong>基本工资：</strong>{{ employee.base_salary }}</p>
+                        </div>
+                        <div class="col-md-4">
+                            <p><strong>系数：</strong>{{ employee.coefficient }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 最近任务 -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">最近任务</h5>
+                    <a href="{{ url_for('main.my_tasks') }}" class="btn btn-sm btn-primary">查看全部</a>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>分配时间</th>
+                                    <th>工序</th>
+                                    <th>数量</th>
+                                    <th>已完成</th>
+                                    <th>完成率</th>
+                                    <th>目标日期</th>
+                                    <th>状态</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for task in recent_tasks %}
+                                <tr class="{% if task.is_overdue %}table-danger{% endif %}">
+                                    <td>{{ task.assigned_date.strftime('%Y-%m-%d %H:%M') }}</td>
+                                    <td>{{ task.process.process_name }}</td>
+                                    <td>{{ task.quantity }}</td>
+                                    <td>{{ task.completed_quantity }}</td>
+                                    <td>{{ "%.1f"|format(task.completion_rate) }}%</td>
+                                    <td>{{ task.target_date.strftime('%Y-%m-%d') }}</td>
+                                    <td>
+                                        {% if task.status == 'pending' %}
+                                            <span class="badge bg-warning">待开始</span>
+                                        {% elif task.status == 'in_progress' %}
+                                            <span class="badge bg-primary">进行中</span>
+                                        {% elif task.status == 'completed' %}
+                                            <span class="badge bg-success">已完成</span>
+                                        {% elif task.status == 'cancelled' %}
+                                            <span class="badge bg-secondary">已取消</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="7" class="text-center">暂无任务</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 最近生产记录 -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">最近生产记录</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>日期</th>
+                                    <th>工序</th>
+                                    <th>数量</th>
+                                    <th>单价</th>
+                                    <th>金额</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for record in recent_records %}
+                                <tr>
+                                    <td>{{ record.date.strftime('%Y-%m-%d') }}</td>
+                                    <td>{{ record.process.process_name }}</td>
+                                    <td>{{ record.quantity }}</td>
+                                    <td>{{ "%.2f"|format(record.process.price) }}</td>
+                                    <td>{{ "%.2f"|format(record.quantity * record.process.price) }}</td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="5" class="text-center">暂无生产记录</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 最近奖惩记录 -->
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">最近奖惩记录</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>日期</th>
+                                    <th>类型</th>
+                                    <th>金额</th>
+                                    <th>原因</th>
+                                    <th>相关工序</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for bonus in recent_bonuses %}
+                                <tr>
+                                    <td>{{ bonus.date.strftime('%Y-%m-%d') }}</td>
+                                    <td>
+                                        {% if bonus.type == 'bonus' %}
+                                            <span class="text-success">奖金</span>
+                                        {% else %}
+                                            <span class="text-danger">罚款</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ "%.2f"|format(bonus.amount) }}</td>
+                                    <td>{{ bonus.reason }}</td>
+                                    <td>{{ bonus.process.process_name if bonus.process else '无' }}</td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="5" class="text-center">暂无奖惩记录</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

@@ -1,0 +1,493 @@
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from datetime import datetime
+
+class ExcelGenerator:
+    @staticmethod
+    def _apply_header_style(cell):
+        """应用表头样式"""
+        cell.font = Font(bold=True)
+        cell.fill = PatternFill(start_color="CCCCCC", end_color="CCCCCC", fill_type="solid")
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+        cell.border = Border(
+            left=Side(style='thin'),
+            right=Side(style='thin'),
+            top=Side(style='thin'),
+            bottom=Side(style='thin')
+        )
+
+    @staticmethod
+    def _apply_cell_style(cell):
+        """应用单元格样式"""
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+        cell.border = Border(
+            left=Side(style='thin'),
+            right=Side(style='thin'),
+            top=Side(style='thin'),
+            bottom=Side(style='thin')
+        )
+
+    @staticmethod
+    def create_employee_template():
+        """创建员工导入模板"""
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "员工信息"
+        
+        # 设置表头
+        headers = ['工号*', '姓名*', '职位*', '部门*', '基本工资*', '系数*']
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col, value=header)
+            ExcelGenerator._apply_header_style(cell)
+            
+        # 添加说明行
+        ws.cell(row=2, column=1, value='示例：EMP001')
+        ws.cell(row=2, column=2, value='张三')
+        ws.cell(row=2, column=3, value='技术员')
+        ws.cell(row=2, column=4, value='生产部')
+        ws.cell(row=2, column=5, value=5000)
+        ws.cell(row=2, column=6, value=1.0)
+        
+        # 调整列宽
+        for col in ws.columns:
+            max_length = 0
+            for cell in col:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            ws.column_dimensions[col[0].column_letter].width = max_length + 2
+        
+        return wb
+
+    @staticmethod
+    def create_process_price_template():
+        """创建工序价格导入模板"""
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "工序价格"
+        
+        # 设置表头
+        headers = ['工序编号*', '工序名称*', '部件', '图号', '型号', '单价*', '生效日期*', '备注']
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col, value=header)
+            ExcelGenerator._apply_header_style(cell)
+            
+        # 添加说明行
+        ws.cell(row=2, column=1, value='P001')
+        ws.cell(row=2, column=2, value='车削')
+        ws.cell(row=2, column=3, value='轴承')
+        ws.cell(row=2, column=4, value='DWG001')
+        ws.cell(row=2, column=5, value='M001')
+        ws.cell(row=2, column=6, value=10.5)
+        ws.cell(row=2, column=7, value='2024-01-01')
+        ws.cell(row=2, column=8, value='标准工序')
+        
+        # 调整列宽
+        for col in ws.columns:
+            max_length = 0
+            for cell in col:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            ws.column_dimensions[col[0].column_letter].width = max_length + 2
+        
+        return wb
+
+    @staticmethod
+    def create_production_record_template():
+        """创建生产记录导入模板"""
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "生产记录"
+        
+        # 设置表头
+        headers = ['日期*', '员工工号*', '工序编号*', '数量*']
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col, value=header)
+            ExcelGenerator._apply_header_style(cell)
+            
+        # 添加说明行
+        ws.cell(row=2, column=1, value='2024-01-01')
+        ws.cell(row=2, column=2, value='EMP001')
+        ws.cell(row=2, column=3, value='P001')
+        ws.cell(row=2, column=4, value=100)
+        
+        # 调整列宽
+        for col in ws.columns:
+            max_length = 0
+            for cell in col:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            ws.column_dimensions[col[0].column_letter].width = max_length + 2
+        
+        return wb
+
+    @staticmethod
+    def create_bonus_penalty_template():
+        """创建奖惩记录导入模板"""
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "奖惩记录"
+        
+        # 设置表头
+        headers = ['日期*', '员工工号*', '类型*', '金额*', '工序编号', '原因']
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col, value=header)
+            ExcelGenerator._apply_header_style(cell)
+            
+        # 添加说明行
+        ws.cell(row=2, column=1, value='2024-01-01')
+        ws.cell(row=2, column=2, value='EMP001')
+        ws.cell(row=2, column=3, value='bonus')  # 或 penalty
+        ws.cell(row=2, column=4, value=100)
+        ws.cell(row=2, column=5, value='P001')  # 可选
+        ws.cell(row=2, column=6, value='优秀表现奖励')
+        
+        # 调整列宽
+        for col in ws.columns:
+            max_length = 0
+            for cell in col:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            ws.column_dimensions[col[0].column_letter].width = max_length + 2
+        
+        return wb
+
+    @staticmethod
+    def create_task_template():
+        """创建任务导入模板"""
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "任务分配"
+        
+        # 设置表头
+        headers = ['员工工号*', '工序编号*', '数量*', '目标日期*', '备注']
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col, value=header)
+            ExcelGenerator._apply_header_style(cell)
+            
+        # 添加说明行
+        ws.cell(row=2, column=1, value='EMP001')
+        ws.cell(row=2, column=2, value='P001')
+        ws.cell(row=2, column=3, value=100)
+        ws.cell(row=2, column=4, value='2024-01-31')
+        ws.cell(row=2, column=5, value='紧急任务')
+        
+        # 调整列宽
+        for col in ws.columns:
+            max_length = 0
+            for cell in col:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            ws.column_dimensions[col[0].column_letter].width = max_length + 2
+        
+        return wb
+
+    @staticmethod
+    def parse_employee_data(file_path):
+        """解析员工导入数据"""
+        from openpyxl import load_workbook
+        wb = load_workbook(file_path)
+        ws = wb.active
+        data = []
+        
+        for row in ws.iter_rows(min_row=2):  # 跳过表头
+            if not any(cell.value for cell in row):  # 跳过空行
+                continue
+            data.append({
+                'employee_id': str(row[0].value).strip(),
+                'name': str(row[1].value).strip(),
+                'position': str(row[2].value).strip(),
+                'department': str(row[3].value).strip(),
+                'base_salary': float(row[4].value),
+                'coefficient': float(row[5].value)
+            })
+        
+        return data
+
+    @staticmethod
+    def parse_process_price_data(file_path):
+        """解析工序价格导入数据"""
+        from openpyxl import load_workbook
+        wb = load_workbook(file_path)
+        ws = wb.active
+        data = []
+        
+        for row in ws.iter_rows(min_row=2):  # 跳过表头
+            if not any(cell.value for cell in row):  # 跳过空行
+                continue
+            data.append({
+                'process_code': str(row[0].value).strip(),
+                'process_name': str(row[1].value).strip(),
+                'component': str(row[2].value).strip() if row[2].value else None,
+                'drawing_no': str(row[3].value).strip() if row[3].value else None,
+                'model_no': str(row[4].value).strip() if row[4].value else None,
+                'price': float(row[5].value),
+                'effective_date': row[6].value,
+                'notes': str(row[7].value).strip() if row[7].value else None
+            })
+        
+        return data
+
+    @staticmethod
+    def parse_production_record_data(file_path):
+        """解析生产记录导入数据"""
+        from openpyxl import load_workbook
+        wb = load_workbook(file_path)
+        ws = wb.active
+        data = []
+        
+        for row in ws.iter_rows(min_row=2):  # 跳过表头
+            if not any(cell.value for cell in row):  # 跳过空行
+                continue
+            data.append({
+                'date': row[0].value,
+                'employee_id': str(row[1].value).strip(),
+                'process_code': str(row[2].value).strip(),
+                'quantity': int(row[3].value)
+            })
+        
+        return data
+
+    @staticmethod
+    def parse_bonus_penalty_data(file_path):
+        """解析奖惩记录导入数据"""
+        from openpyxl import load_workbook
+        wb = load_workbook(file_path)
+        ws = wb.active
+        data = []
+        
+        for row in ws.iter_rows(min_row=2):  # 跳过表头
+            if not any(cell.value for cell in row):  # 跳过空行
+                continue
+            data.append({
+                'date': row[0].value,
+                'employee_id': str(row[1].value).strip(),
+                'type': str(row[2].value).strip(),
+                'amount': float(row[3].value),
+                'process_code': str(row[4].value).strip() if row[4].value else None,
+                'reason': str(row[5].value).strip() if row[5].value else None
+            })
+        
+        return data
+
+    @staticmethod
+    def parse_task_data(file_path):
+        """解析任务导入数据"""
+        from openpyxl import load_workbook
+        wb = load_workbook(file_path)
+        ws = wb.active
+        data = []
+        
+        for row in ws.iter_rows(min_row=2):  # 跳过表头
+            if not any(cell.value for cell in row):  # 跳过空行
+                continue
+            data.append({
+                'employee_id': str(row[0].value).strip(),
+                'process_code': str(row[1].value).strip(),
+                'quantity': int(row[2].value),
+                'target_date': row[3].value,
+                'notes': str(row[4].value).strip() if row[4].value else None
+            })
+        
+        return data
+
+    @staticmethod
+    def export_employees(employees):
+        """导出员工信息"""
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "员工信息"
+
+        # 设置表头
+        headers = ['工号', '姓名', '职位', '基本工资', '系数', '部门', '是否管理员']
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col, value=header)
+            ExcelGenerator._apply_header_style(cell)
+
+        # 写入数据
+        for row, employee in enumerate(employees, 2):
+            ws.cell(row=row, column=1, value=employee.employee_id)
+            ws.cell(row=row, column=2, value=employee.name)
+            ws.cell(row=row, column=3, value=employee.position)
+            ws.cell(row=row, column=4, value=employee.base_salary)
+            ws.cell(row=row, column=5, value=employee.coefficient)
+            ws.cell(row=row, column=6, value=employee.department)
+            ws.cell(row=row, column=7, value='是' if employee.user and employee.user.role == 'admin' else '否')
+
+        # 调整列宽
+        for col in ws.columns:
+            max_length = 0
+            for cell in col:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            ws.column_dimensions[col[0].column_letter].width = max_length + 2
+
+        return wb
+
+    @staticmethod
+    def export_process_prices(process_prices):
+        """导出工序价格"""
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "工序价格"
+
+        # 设置表头
+        headers = ['工序编号', '工序名称', '部件', '图号', '型号', '单价', '生效日期', '备注']
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col, value=header)
+            ExcelGenerator._apply_header_style(cell)
+
+        # 写入数据
+        for row, process in enumerate(process_prices, 2):
+            ws.cell(row=row, column=1, value=process.process_code)
+            ws.cell(row=row, column=2, value=process.process_name)
+            ws.cell(row=row, column=3, value=process.component)
+            ws.cell(row=row, column=4, value=process.drawing_no)
+            ws.cell(row=row, column=5, value=process.model_no)
+            ws.cell(row=row, column=6, value=process.price)
+            ws.cell(row=row, column=7, value=process.effective_date.strftime('%Y-%m-%d'))
+            ws.cell(row=row, column=8, value=process.notes)
+
+        # 调整列宽
+        for col in ws.columns:
+            max_length = 0
+            for cell in col:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            ws.column_dimensions[col[0].column_letter].width = max_length + 2
+
+        return wb
+
+    @staticmethod
+    def export_production_records(records):
+        """导出生产记录"""
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "生产记录"
+
+        # 设置表头
+        headers = ['日期', '员工工号', '员工姓名', '工序编号', '工序名称', '部件', '图号', '型号', '数量']
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col, value=header)
+            ExcelGenerator._apply_header_style(cell)
+
+        # 写入数据
+        for row, record in enumerate(records, 2):
+            ws.cell(row=row, column=1, value=record.date.strftime('%Y-%m-%d'))
+            ws.cell(row=row, column=2, value=record.employee.employee_id)
+            ws.cell(row=row, column=3, value=record.employee.name)
+            ws.cell(row=row, column=4, value=record.process.process_code)
+            ws.cell(row=row, column=5, value=record.process.process_name)
+            ws.cell(row=row, column=6, value=record.process.component)
+            ws.cell(row=row, column=7, value=record.process.drawing_no)
+            ws.cell(row=row, column=8, value=record.process.model_no)
+            ws.cell(row=row, column=9, value=record.quantity)
+
+        # 调整列宽
+        for col in ws.columns:
+            max_length = 0
+            for cell in col:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            ws.column_dimensions[col[0].column_letter].width = max_length + 2
+
+        return wb
+
+    @staticmethod
+    def export_bonus_penalties(records):
+        """导出奖惩记录"""
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "奖惩记录"
+
+        # 设置表头
+        headers = ['日期', '员工工号', '员工姓名', '类型', '金额', '工序编号', '原因']
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col, value=header)
+            ExcelGenerator._apply_header_style(cell)
+
+        # 写入数据
+        for row, record in enumerate(records, 2):
+            ws.cell(row=row, column=1, value=record.date.strftime('%Y-%m-%d'))
+            ws.cell(row=row, column=2, value=record.employee.employee_id)
+            ws.cell(row=row, column=3, value=record.employee.name)
+            ws.cell(row=row, column=4, value='奖金' if record.type == 'bonus' else '罚款')
+            ws.cell(row=row, column=5, value=record.amount)
+            ws.cell(row=row, column=6, value=record.process.process_code if record.process else '')
+            ws.cell(row=row, column=7, value=record.reason)
+
+        # 调整列宽
+        for col in ws.columns:
+            max_length = 0
+            for cell in col:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            ws.column_dimensions[col[0].column_letter].width = max_length + 2
+
+        return wb
+
+    @staticmethod
+    def export_tasks(tasks):
+        """导出任务记录"""
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "任务记录"
+
+        # 设置表头
+        headers = ['任务编号', '员工工号', '员工姓名', '工序编号', '工序名称', '数量', '目标日期', '状态', '分配日期', '完成日期', '备注']
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col, value=header)
+            ExcelGenerator._apply_header_style(cell)
+
+        # 写入数据
+        for row, task in enumerate(tasks, 2):
+            ws.cell(row=row, column=1, value=task.id)
+            ws.cell(row=row, column=2, value=task.employee.employee_id)
+            ws.cell(row=row, column=3, value=task.employee.name)
+            ws.cell(row=row, column=4, value=task.process.process_code)
+            ws.cell(row=row, column=5, value=task.process.process_name)
+            ws.cell(row=row, column=6, value=task.quantity)
+            ws.cell(row=row, column=7, value=task.target_date.strftime('%Y-%m-%d'))
+            ws.cell(row=row, column=8, value=task.status)
+            ws.cell(row=row, column=9, value=task.assignment_date.strftime('%Y-%m-%d'))
+            ws.cell(row=row, column=10, value=task.completion_date.strftime('%Y-%m-%d') if task.completion_date else '')
+            ws.cell(row=row, column=11, value=task.notes)
+
+        # 调整列宽
+        for col in ws.columns:
+            max_length = 0
+            for cell in col:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            ws.column_dimensions[col[0].column_letter].width = max_length + 2
+
+        return wb 

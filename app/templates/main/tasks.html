@@ -1,0 +1,392 @@
+{% extends "base.html" %}
+{% from 'bootstrap5/form.html' import render_form %}
+{% from 'bootstrap5/pagination.html' import render_pagination %}
+
+{% block title %}任务管理{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>任务管理</h2>
+
+    {% if current_user.role in ['admin', 'manager'] %}
+    <div class="mb-3">
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addModal">
+            <i class="fas fa-plus"></i> 添加任务
+        </button>
+        <a href="{{ url_for('main.download_task_template') }}" class="btn btn-info">
+            <i class="fas fa-download"></i> 下载导入模板
+        </a>
+        <button type="button" class="btn btn-success" onclick="document.getElementById('importFile').click()">
+            <i class="fas fa-file-import"></i> 导入任务
+        </button>
+        <a href="{{ url_for('main.export_tasks') }}" class="btn btn-warning">
+            <i class="fas fa-file-export"></i> 导出任务
+        </a>
+        <input type="file" id="importFile" style="display: none" accept=".xlsx" onchange="importTasks(this)">
+    </div>
+    {% endif %}
+
+    <!-- 搜索表单 -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="get" action="{{ url_for('main.manage_tasks') }}" class="row g-3" id="searchForm">
+                <div class="col-md-10">
+                    {{ search_form.search.label(class="form-label") }}
+                    {{ search_form.search(class="form-control", value=request.args.get('search', '')) }}
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    {{ search_form.submit(class="btn btn-primary") }}
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 任务列表 -->
+    <div class="card">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            {% macro sort_link(column, text) %}
+                                {% if current_sort == column %}
+                                    {% if current_direction == 'asc' %}
+                                        <a href="{{ url_for('main.manage_tasks', sort=column, direction='desc', search=search_form.search.data, per_page=request.args.get('per_page', 20)) }}" class="text-dark text-decoration-none">
+                                            {{ text }} <i class="bi bi-arrow-up"></i>
+                                        </a>
+                                    {% else %}
+                                        <a href="{{ url_for('main.manage_tasks', sort=column, direction='asc', search=search_form.search.data, per_page=request.args.get('per_page', 20)) }}" class="text-dark text-decoration-none">
+                                            {{ text }} <i class="bi bi-arrow-down"></i>
+                                        </a>
+                                    {% endif %}
+                                {% else %}
+                                    <a href="{{ url_for('main.manage_tasks', sort=column, direction='asc', search=search_form.search.data, per_page=request.args.get('per_page', 20)) }}" class="text-dark text-decoration-none">
+                                        {{ text }}
+                                    </a>
+                                {% endif %}
+                            {% endmacro %}
+
+                            <th>{{ sort_link('target_date', '分配日期') }}</th>
+                            <th>{{ sort_link('employee_id', '工号') }}</th>
+                            <th>{{ sort_link('employee_name', '姓名') }}</th>
+                            <th>{{ sort_link('process_code', '工序代码') }}</th>
+                            <th>{{ sort_link('process_name', '工序名称') }}</th>
+                            <th>{{ sort_link('quantity', '数量') }}</th>
+                            <th>{{ sort_link('status', '状态') }}</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for task in tasks %}
+                        <tr>
+                            <td>{{ task.target_date.strftime('%Y-%m-%d') }}</td>
+                            <td>{{ task.employee.employee_id }}</td>
+                            <td>{{ task.employee.name }}</td>
+                            <td>{{ task.process.process_code }}</td>
+                            <td>{{ task.process.name }}</td>
+                            <td>{{ task.quantity }}</td>
+                            <td>
+                                {% if task.status == 'pending' %}
+                                <span class="badge bg-warning">待完成</span>
+                                {% elif task.status == 'completed' %}
+                                <span class="badge bg-success">已完成</span>
+                                {% elif task.status == 'cancelled' %}
+                                <span class="badge bg-danger">已取消</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if current_user.role in ['admin', 'manager'] %}
+                                <button class="btn btn-primary btn-sm edit-task" data-id="{{ task.id }}" data-bs-toggle="modal" data-bs-target="#editModal">
+                                    编辑
+                                </button>
+                                <button class="btn btn-danger btn-sm delete-task" data-id="{{ task.id }}" data-bs-toggle="modal" data-bs-target="#deleteModal">
+                                    删除
+                                </button>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- 分页 -->
+            <div class="d-flex flex-column align-items-center mt-3">
+                <div class="d-flex align-items-center mb-3">
+                    <span class="me-2">每页显示：</span>
+                    <select class="form-select" id="per_page" name="per_page" style="width: auto;">
+                        <option value="20" {% if request.args.get('per_page', '20') == '20' %}selected{% endif %}>20条</option>
+                        <option value="50" {% if request.args.get('per_page') == '50' %}selected{% endif %}>50条</option>
+                        <option value="100" {% if request.args.get('per_page') == '100' %}selected{% endif %}>100条</option>
+                    </select>
+                </div>
+                <nav aria-label="Page navigation">
+                    <ul class="pagination mb-0">
+                        {% if pagination.has_prev %}
+                        <li class="page-item">
+                            <a class="page-link" href="{{ url_for('main.manage_tasks', page=pagination.prev_num, sort=current_sort, direction=current_direction, search=search_form.search.data, per_page=request.args.get('per_page', 20)) }}">上一页</a>
+                        </li>
+                        {% endif %}
+                        
+                        {% for page in pagination.iter_pages() %}
+                            {% if page %}
+                                <li class="page-item {% if page == pagination.page %}active{% endif %}">
+                                    <a class="page-link" href="{{ url_for('main.manage_tasks', page=page, sort=current_sort, direction=current_direction, search=search_form.search.data, per_page=request.args.get('per_page', 20)) }}">{{ page }}</a>
+                                </li>
+                            {% else %}
+                                <li class="page-item disabled"><span class="page-link">...</span></li>
+                            {% endif %}
+                        {% endfor %}
+                        
+                        {% if pagination.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="{{ url_for('main.manage_tasks', page=pagination.next_num, sort=current_sort, direction=current_direction, search=search_form.search.data, per_page=request.args.get('per_page', 20)) }}">下一页</a>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            </div>
+        </div>
+    </div>
+
+    <!-- 添加任务对话框 -->
+    <div class="modal fade" id="addModal" tabindex="-1" aria-labelledby="addModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="addModalLabel">添加任务</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form method="POST" action="{{ url_for('main.manage_tasks') }}">
+                        {{ form.csrf_token }}
+                        <div class="mb-3">
+                            {{ form.target_date.label(class="form-label") }}
+                            {{ form.target_date(class="form-control", type="date") }}
+                        </div>
+                        <div class="mb-3">
+                            {{ form.employee_id.label(class="form-label") }}
+                            {{ form.employee_id(class="form-control select2") }}
+                        </div>
+                        <div class="mb-3">
+                            {{ form.process_id.label(class="form-label") }}
+                            {{ form.process_id(class="form-control select2") }}
+                        </div>
+                        <div class="mb-3">
+                            {{ form.quantity.label(class="form-label") }}
+                            {{ form.quantity(class="form-control", type="number", step="1") }}
+                        </div>
+                        <div class="mb-3">
+                            {{ form.notes.label(class="form-label") }}
+                            {{ form.notes(class="form-control", rows="3") }}
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                            {{ form.submit(class="btn btn-primary") }}
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 编辑任务对话框 -->
+    <div class="modal fade" id="editModal" tabindex="-1" aria-labelledby="editModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editModalLabel">编辑任务</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="editForm">
+                        <input type="hidden" id="edit_id" name="id">
+                        <div class="mb-3">
+                            {{ form.target_date.label(class="form-label") }}
+                            {{ form.target_date(class="form-control", type="date", id="edit_target_date") }}
+                        </div>
+                        <div class="mb-3">
+                            {{ form.employee_id.label(class="form-label") }}
+                            {{ form.employee_id(class="form-control select2", id="edit_employee_id") }}
+                        </div>
+                        <div class="mb-3">
+                            {{ form.process_id.label(class="form-label") }}
+                            {{ form.process_id(class="form-control select2", id="edit_process_id") }}
+                        </div>
+                        <div class="mb-3">
+                            {{ form.quantity.label(class="form-label") }}
+                            {{ form.quantity(class="form-control", type="number", step="1", id="edit_quantity") }}
+                        </div>
+                        <div class="mb-3">
+                            <label for="edit_status" class="form-label">状态</label>
+                            <select class="form-select" id="edit_status" name="status" required>
+                                <option value="pending">待完成</option>
+                                <option value="completed">已完成</option>
+                                <option value="cancelled">已取消</option>
+                            </select>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                            <button type="button" class="btn btn-primary" id="saveEdit">保存</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 删除确认对话框 -->
+    <div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="deleteModalLabel">确认删除</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    确定要删除这个任务吗？此操作不可恢复。
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-danger" id="confirmDelete">删除</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let taskToDelete = null;
+
+$(document).ready(function() {
+    // 点击删除按钮时保存要删除的任务ID
+    $('.delete-task').click(function() {
+        taskToDelete = $(this).data('id');
+    });
+
+    // 点击编辑按钮时加载任务数据
+    $('.edit-task').click(function() {
+        const id = $(this).data('id');
+        $.ajax({
+            url: '{{ url_for("main.get_task", id=0) }}'.replace('0', id),
+            type: 'GET',
+            success: function(result) {
+                if (result.success) {
+                    const task = result.data;
+                    $('#edit_id').val(task.id);
+                    $('#edit_target_date').val(task.target_date);
+                    $('#edit_employee_id').val(task.employee_id).trigger('change');
+                    $('#edit_process_id').val(task.process_id).trigger('change');
+                    $('#edit_quantity').val(task.quantity);
+                    $('#edit_status').val(task.status);
+                } else {
+                    alert(result.message || '加载数据失败');
+                }
+            },
+            error: function(xhr) {
+                alert(xhr.responseJSON?.message || '加载数据失败');
+            }
+        });
+    });
+
+    // 保存编辑
+    $('#saveEdit').click(function() {
+        const formData = {
+            target_date: $('#edit_target_date').val(),
+            employee_id: $('#edit_employee_id').val(),
+            process_id: $('#edit_process_id').val(),
+            quantity: parseInt($('#edit_quantity').val()),
+            status: $('#edit_status').val()
+        };
+
+        $.ajax({
+            url: '{{ url_for("main.edit_task", id=0) }}'.replace('0', $('#edit_id').val()),
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify(formData),
+            headers: {
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
+            },
+            success: function(result) {
+                if (result.success) {
+                    $('#editModal').modal('hide');
+                    location.reload();
+                } else {
+                    alert(result.message || '更新失败');
+                }
+            },
+            error: function(xhr) {
+                alert(xhr.responseJSON?.message || '更新失败');
+            }
+        });
+    });
+
+    // 确认删除
+    $('#confirmDelete').click(function() {
+        if (taskToDelete) {
+            $.ajax({
+                url: '{{ url_for("main.delete_task", id=0) }}'.replace('0', taskToDelete),
+                type: 'DELETE',
+                headers: {
+                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
+                },
+                success: function(result) {
+                    if (result.success) {
+                        $('#deleteModal').modal('hide');
+                        location.reload();
+                    } else {
+                        alert(result.message || '删除失败');
+                    }
+                },
+                error: function(xhr) {
+                    alert(xhr.responseJSON?.message || '删除失败');
+                }
+            });
+        }
+    });
+
+    // 点击更改每页显示数量时自动提交表单
+    $('#per_page').change(function() {
+        var form = $('#searchForm');
+        form.submit();
+    });
+
+    // 初始化Select2
+    $('#employee_id, #process_id, #edit_employee_id, #edit_process_id').select2({
+        theme: 'bootstrap-5',
+        width: '100%'
+    });
+});
+
+function importTasks(input) {
+    if (input.files && input.files[0]) {
+        var formData = new FormData();
+        formData.append('file', input.files[0]);
+
+        $.ajax({
+            url: '{{ url_for("main.import_tasks") }}',
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            headers: {
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
+            },
+            success: function(response) {
+                if (response.success) {
+                    alert(response.message);
+                    location.reload();
+                } else {
+                    alert(response.message);
+                }
+            },
+            error: function() {
+                alert('导入失败，请重试');
+            }
+        });
+    }
+}
+</script>
+{% endblock %} 

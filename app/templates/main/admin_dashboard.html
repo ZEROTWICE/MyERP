@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <h2 class="mb-4">综合管理系统 - 管理控制台</h2>
+        </div>
+    </div>
+
+    <!-- 快速访问卡片 -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <i class="fas fa-users fa-3x mb-3 text-primary"></i>
+                    <h5 class="card-title">员工管理</h5>
+                    <p class="card-text">管理员工信息、工资系数等</p>
+                    <a href="{{ url_for('main.manage_employees') }}" class="btn btn-primary">进入管理</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <i class="fas fa-cogs fa-3x mb-3 text-success"></i>
+                    <h5 class="card-title">工序管理</h5>
+                    <p class="card-text">管理工序价格、生效日期等</p>
+                    <a href="{{ url_for('main.process_prices') }}" class="btn btn-success">进入管理</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <i class="fas fa-tasks fa-3x mb-3 text-info"></i>
+                    <h5 class="card-title">任务管理</h5>
+                    <p class="card-text">分配和跟踪生产任务</p>
+                    <a href="{{ url_for('main.manage_tasks') }}" class="btn btn-info">进入管理</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <i class="fas fa-calculator fa-3x mb-3 text-warning"></i>
+                    <h5 class="card-title">工资计算</h5>
+                    <p class="card-text">计算和查看工资明细</p>
+                    <a href="{{ url_for('main.salary_calculation') }}" class="btn btn-warning">进入计算</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <i class="fas fa-clipboard-list fa-3x mb-3 text-secondary"></i>
+                    <h5 class="card-title">生产记录</h5>
+                    <p class="card-text">管理员工生产记录</p>
+                    <a href="{{ url_for('main.manage_production_records') }}" class="btn btn-secondary">查看记录</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <i class="fas fa-trophy fa-3x mb-3 text-danger"></i>
+                    <h5 class="card-title">奖惩管理</h5>
+                    <p class="card-text">管理奖金和处罚记录</p>
+                    <a href="{{ url_for('main.manage_bonus_penalties') }}" class="btn btn-danger">进入管理</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <i class="fas fa-history fa-3x mb-3 text-primary"></i>
+                    <h5 class="card-title">审计日志</h5>
+                    <p class="card-text">查看系统操作记录</p>
+                    <a href="{{ url_for('main.view_audit_logs') }}" class="btn btn-primary">查看日志</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 引入Font Awesome图标库 -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+
+<style>
+.card {
+    transition: transform 0.2s;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+.card-body {
+    padding: 2rem 1rem;
+}
+
+.btn {
+    width: 100%;
+    margin-top: 1rem;
+}
+
+.fas {
+    margin-bottom: 1rem;
+}
+</style>
+{% endblock %} 

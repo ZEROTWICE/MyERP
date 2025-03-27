@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    {% block head %}
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>综合管理系统 - {% block title %}{% endblock %}</title>
+    {{ bootstrap.load_css() }}
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.0/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="icon" href="data:,"> <!-- 禁用favicon请求 -->
+    <style>
+        /* Alert 基础样式 */
+        .alert {
+            border-radius: 4px;
+            padding: 0.5rem 0.75rem;
+            margin: 0.5rem 0;
+            border: 1px solid transparent;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+            position: relative;
+            font-size: 0.85rem;
+            line-height: 1.3;
+            max-width: 400px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        /* Alert 类型样式 */
+        .alert-success {
+            background-color: rgba(40, 167, 69, 0.06);
+            border-color: rgba(40, 167, 69, 0.12);
+            color: #1e7e34;
+        }
+
+        .alert-danger {
+            background-color: rgba(220, 53, 69, 0.06);
+            border-color: rgba(220, 53, 69, 0.12);
+            color: #b21f2d;
+        }
+
+        .alert-warning {
+            background-color: rgba(255, 193, 7, 0.06);
+            border-color: rgba(255, 193, 7, 0.12);
+            color: #d39e00;
+        }
+
+        .alert-info {
+            background-color: rgba(23, 162, 184, 0.06);
+            border-color: rgba(23, 162, 184, 0.12);
+            color: #117a8b;
+        }
+
+        /* Alert 图标样式 */
+        .alert i {
+            font-size: 0.9rem;
+            margin-right: 0.4rem;
+            opacity: 0.8;
+        }
+
+        .alert-success i { color: #28a745; }
+        .alert-danger i { color: #dc3545; }
+        .alert-warning i { color: #ffc107; }
+        .alert-info i { color: #17a2b8; }
+
+        /* Alert 关闭按钮样式 */
+        .alert-dismissible {
+            padding-right: 2.5rem;
+        }
+
+        .alert-dismissible .btn-close {
+            position: absolute;
+            top: 50%;
+            right: 0.75rem;
+            transform: translateY(-50%);
+            padding: 0.4rem;
+            width: 1.2rem;
+            height: 1.2rem;
+        }
+
+        .alert-success .btn-close {
+            filter: invert(32%) sepia(98%) saturate(369%) hue-rotate(93deg) brightness(92%) contrast(86%);
+        }
+
+        .alert-danger .btn-close {
+            filter: invert(21%) sepia(66%) saturate(2237%) hue-rotate(334deg) brightness(87%) contrast(84%);
+        }
+
+        .alert-warning .btn-close {
+            filter: invert(72%) sepia(89%) saturate(489%) hue-rotate(353deg) brightness(99%) contrast(108%);
+        }
+
+        .alert-info .btn-close {
+            filter: invert(48%) sepia(42%) saturate(1149%) hue-rotate(151deg) brightness(87%) contrast(86%);
+        }
+
+        .alert-dismissible .btn-close:hover {
+            opacity: 0.75;
+        }
+
+        /* Alert 内容布局 */
+        .alert .alert-content {
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+        }
+
+        .table th { 
+            white-space: nowrap; 
+        }
+        .btn-group-xs > .btn, .btn-xs {
+            padding: .25rem .4rem;
+            font-size: .875rem;
+            line-height: .5;
+            border-radius: .2rem;
+        }
+    </style>
+    {% endblock %}
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('main.index') }}">综合管理系统</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    {% if current_user.is_authenticated %}
+                        {% if current_user.role in ['admin', 'hr'] %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('main.manage_employees') }}">员工管理</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('main.process_prices') }}">工序管理</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('main.manage_production_records') }}">生产记录</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('main.manage_bonus_penalties') }}">奖惩管理</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('main.manage_tasks') }}">任务管理</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('main.salary_calculation') }}">工资计算</a>
+                        </li>
+                        {% endif %}
+                        {% if current_user.role == 'admin' %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('main.view_audit_logs') }}">审计日志</a>
+                        </li>
+                        {% endif %}
+                        {% if current_user.role == 'user' %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('main.my_tasks') }}">我的任务</a>
+                        </li>
+                        {% endif %}
+                    {% endif %}
+                </ul>
+                <ul class="navbar-nav ms-auto">
+                    {% if current_user.is_authenticated %}
+                        <li class="nav-item d-flex align-items-center">
+                            <span class="navbar-text me-3">欢迎，{{ current_user.username }}</span>
+                            <a class="nav-link" href="{{ url_for('auth.logout') }}">退出</a>
+                        </li>
+                    {% else %}
+                        <li class="nav-item"><a class="nav-link" href="{{ url_for('auth.login') }}">登录</a></li>
+                        <li class="nav-item"><a class="nav-link" href="{{ url_for('auth.register') }}">注册</a></li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                        <div class="alert-content">
+                            {% if category == 'success' %}
+                                <i class="bi bi-check-circle-fill"></i>
+                            {% elif category == 'danger' %}
+                                <i class="bi bi-exclamation-circle-fill"></i>
+                            {% elif category == 'warning' %}
+                                <i class="bi bi-exclamation-triangle-fill"></i>
+                            {% elif category == 'info' %}
+                                <i class="bi bi-info-circle-fill"></i>
+                            {% endif %}
+                            <span>{{ message }}</span>
+                        </div>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        
+        {% block content %}{% endblock %}
+    </div>
+
+    <!-- JavaScript依赖 -->
+    {{ bootstrap.load_js() }}
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
+    <script>
+        // 设置CSRF令牌
+        $.ajaxSetup({
+            beforeSend: function(xhr, settings) {
+                if (!/^(GET|HEAD|OPTIONS|TRACE)$/i.test(settings.type) && !this.crossDomain) {
+                    xhr.setRequestHeader("X-CSRFToken", $('meta[name="csrf-token"]').attr('content'));
+                }
+            }
+        });
+
+        // 配置toastr
+        toastr.options = {
+            "closeButton": true,
+            "progressBar": true,
+            "positionClass": "toast-top-right",
+            "timeOut": "3000"
+        };
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

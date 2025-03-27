@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>{{ employee.name }} 工资明细</h2>
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="card-title">基本信息</h5>
+            <p>职位：{{ employee.position }}</p>
+            <p>基本工资：￥{{ employee.base_salary }}</p>
+            <p>系数：{{ employee.coefficient }}</p>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="card-title">计件记录</h5>
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>工序名称</th>
+                        <th>单价</th>
+                        <th>数量</th>
+                        <th>日期</th>
+                        <th>小计</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for record in production_records %}
+                    <tr>
+                        <td>{{ record.process.process_name }}</td>
+                        <td>￥{{ record.process.price }}</td>
+                        <td>{{ record.quantity }}</td>
+                        <td>{{ record.date.strftime('%Y-%m-%d') }}</td>
+                        <td>￥{{ record.process.price * record.quantity }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="card-title">奖金/罚款记录</h5>
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>类型</th>
+                        <th>金额</th>
+                        <th>原因</th>
+                        <th>日期</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for bp in bonuses_penalties %}
+                    <tr>
+                        <td class="{{ 'text-success' if bp.type == 'bonus' else 'text-danger' }}">
+                            {{ '奖金' if bp.type == 'bonus' else '罚款' }}
+                        </td>
+                        <td>￥{{ bp.amount }}</td>
+                        <td>{{ bp.reason }}</td>
+                        <td>{{ bp.date.strftime('%Y-%m-%d') }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="alert alert-success">
+        <h4>总工资：￥{{ total_salary }}</h4>
+    </div>
+</div>
+{% endblock %}

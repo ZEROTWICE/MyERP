@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>{{ title }}</h2>
+    <form method="post" class="mt-4">
+        {{ form.hidden_tag() }}
+        <div class="row g-3">
+            <div class="col-md-6">
+                <div class="form-group">
+                    {{ form.process_code.label(class="form-label") }}
+                    {{ form.process_code(class="form-control") }}
+                    {% for error in form.process_code.errors %}
+                    <span class="text-danger">{{ error }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="form-group">
+                    {{ form.process_name.label(class="form-label") }}
+                    {{ form.process_name(class="form-control") }}
+                    {% for error in form.process_name.errors %}
+                    <span class="text-danger">{{ error }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="form-group">
+                    {{ form.component.label(class="form-label") }}
+                    {{ form.component(class="form-control") }}
+                    {% for error in form.component.errors %}
+                    <span class="text-danger">{{ error }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="form-group">
+                    {{ form.drawing_no.label(class="form-label") }}
+                    {{ form.drawing_no(class="form-control") }}
+                    {% for error in form.drawing_no.errors %}
+                    <span class="text-danger">{{ error }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="form-group">
+                    {{ form.model_no.label(class="form-label") }}
+                    {{ form.model_no(class="form-control") }}
+                    {% for error in form.model_no.errors %}
+                    <span class="text-danger">{{ error }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="form-group">
+                    {{ form.price.label(class="form-label") }}
+                    {{ form.price(class="form-control") }}
+                    {% for error in form.price.errors %}
+                    <span class="text-danger">{{ error }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="form-group">
+                    {{ form.effective_date.label(class="form-label") }}
+                    {{ form.effective_date(class="form-control", type="date") }}
+                    {% for error in form.effective_date.errors %}
+                    <span class="text-danger">{{ error }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="col-12">
+                <div class="form-group">
+                    {{ form.notes.label(class="form-label") }}
+                    {{ form.notes(class="form-control", rows=3) }}
+                    {% for error in form.notes.errors %}
+                    <span class="text-danger">{{ error }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="col-12">
+                {{ form.submit(class="btn btn-primary") }}
+                <a href="{{ url_for('main.process_prices') }}" class="btn btn-secondary">返回</a>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}

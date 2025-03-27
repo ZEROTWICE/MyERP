@@ -1,0 +1,229 @@
+{% extends "base.html" %}
+
+{% block title %}员工管理{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>员工管理</h2>
+
+    {% if current_user.role in ['admin', 'hr'] %}
+    <div class="mb-3">
+        <a href="{{ url_for('main.add_employee') }}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> 添加员工
+        </a>
+        <a href="{{ url_for('main.download_employee_template') }}" class="btn btn-info">
+            <i class="fas fa-download"></i> 下载导入模板
+        </a>
+        <button type="button" class="btn btn-success" onclick="document.getElementById('importFile').click()">
+            <i class="fas fa-file-import"></i> 导入员工
+        </button>
+        <a href="{{ url_for('main.export_employees') }}" class="btn btn-warning">
+            <i class="fas fa-file-export"></i> 导出员工
+        </a>
+        <input type="file" id="importFile" style="display: none" accept=".xlsx" onchange="importEmployees(this)">
+    </div>
+    {% endif %}
+
+    <!-- 搜索表单 -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="get" action="{{ url_for('main.manage_employees') }}" class="row g-3" id="searchForm">
+                <div class="col-md-10">
+                    {{ search_form.search.label(class="form-label") }}
+                    {{ search_form.search(class="form-control", value=request.args.get('search', '')) }}
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    {{ search_form.submit(class="btn btn-primary") }}
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 员工列表 -->
+    <div class="card">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            {% macro sort_link(column, text) %}
+                                {% if current_sort == column %}
+                                    {% if current_direction == 'asc' %}
+                                        <a href="{{ url_for('main.manage_employees', sort=column, direction='desc', search=search_form.search.data, per_page=request.args.get('per_page', 20)) }}" class="text-dark text-decoration-none">
+                                            {{ text }} <i class="bi bi-arrow-up"></i>
+                                        </a>
+                                    {% else %}
+                                        <a href="{{ url_for('main.manage_employees', sort=column, direction='asc', search=search_form.search.data, per_page=request.args.get('per_page', 20)) }}" class="text-dark text-decoration-none">
+                                            {{ text }} <i class="bi bi-arrow-down"></i>
+                                        </a>
+                                    {% endif %}
+                                {% else %}
+                                    <a href="{{ url_for('main.manage_employees', sort=column, direction='asc', search=search_form.search.data, per_page=request.args.get('per_page', 20)) }}" class="text-dark text-decoration-none">
+                                        {{ text }}
+                                    </a>
+                                {% endif %}
+                            {% endmacro %}
+
+                            <th>{{ sort_link('employee_id', '工号') }}</th>
+                            <th>{{ sort_link('name', '姓名') }}</th>
+                            <th>{{ sort_link('department', '部门') }}</th>
+                            <th>{{ sort_link('position', '职位') }}</th>
+                            <th>{{ sort_link('base_salary', '基本工资') }}</th>
+                            <th>{{ sort_link('coefficient', '系数') }}</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for employee in employees %}
+                        <tr>
+                            <td>{{ employee.employee_id }}</td>
+                            <td>{{ employee.name }}</td>
+                            <td>{{ employee.department }}</td>
+                            <td>{{ employee.position }}</td>
+                            <td>{{ "%.2f"|format(employee.base_salary) }}</td>
+                            <td>{{ "%.2f"|format(employee.coefficient) }}</td>
+                            <td>
+                                {% if current_user.role in ['admin', 'hr'] %}
+                                <a href="{{ url_for('main.edit_employee', id=employee.id) }}" class="btn btn-primary btn-sm">编辑</a>
+                                <button class="btn btn-danger btn-sm delete-employee" data-id="{{ employee.id }}" data-bs-toggle="modal" data-bs-target="#deleteModal">
+                                    删除
+                                </button>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- 分页 -->
+            <div class="d-flex flex-column align-items-center mt-3">
+                <div class="d-flex align-items-center mb-3">
+                    <span class="me-2">每页显示：</span>
+                    <select class="form-select" id="per_page" name="per_page" style="width: auto;">
+                        <option value="20" {% if request.args.get('per_page', '20') == '20' %}selected{% endif %}>20条</option>
+                        <option value="50" {% if request.args.get('per_page') == '50' %}selected{% endif %}>50条</option>
+                        <option value="100" {% if request.args.get('per_page') == '100' %}selected{% endif %}>100条</option>
+                    </select>
+                </div>
+                <nav aria-label="Page navigation">
+                    <ul class="pagination mb-0">
+                        {% if pagination.has_prev %}
+                        <li class="page-item">
+                            <a class="page-link" href="{{ url_for('main.manage_employees', page=pagination.prev_num, sort=current_sort, direction=current_direction, search=search_form.search.data, per_page=request.args.get('per_page', 20)) }}">上一页</a>
+                        </li>
+                        {% endif %}
+                        
+                        {% for page in pagination.iter_pages() %}
+                            {% if page %}
+                                <li class="page-item {% if page == pagination.page %}active{% endif %}">
+                                    <a class="page-link" href="{{ url_for('main.manage_employees', page=page, sort=current_sort, direction=current_direction, search=search_form.search.data, per_page=request.args.get('per_page', 20)) }}">{{ page }}</a>
+                                </li>
+                            {% else %}
+                                <li class="page-item disabled"><span class="page-link">...</span></li>
+                            {% endif %}
+                        {% endfor %}
+                        
+                        {% if pagination.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="{{ url_for('main.manage_employees', page=pagination.next_num, sort=current_sort, direction=current_direction, search=search_form.search.data, per_page=request.args.get('per_page', 20)) }}">下一页</a>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            </div>
+        </div>
+    </div>
+
+    <!-- 删除确认对话框 -->
+    <div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="deleteModalLabel">确认删除</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    确定要删除这名员工吗？此操作不可恢复。
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-danger" id="confirmDelete">删除</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let employeeToDelete = null;
+
+$(document).ready(function() {
+    // 点击删除按钮时保存要删除的员工ID
+    $('.delete-employee').click(function() {
+        employeeToDelete = $(this).data('id');
+    });
+
+    // 确认删除
+    $('#confirmDelete').click(function() {
+        if (employeeToDelete) {
+            $.ajax({
+                url: '{{ url_for("main.delete_employee", id=0) }}'.replace('0', employeeToDelete),
+                type: 'DELETE',
+                headers: {
+                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
+                },
+                success: function(result) {
+                    if (result.success) {
+                        $('#deleteModal').modal('hide');
+                        location.reload();
+                    } else {
+                        alert(result.message || '删除失败');
+                    }
+                },
+                error: function(xhr) {
+                    alert(xhr.responseJSON?.message || '删除失败');
+                }
+            });
+        }
+    });
+
+    // 点击更改每页显示数量时自动提交表单
+    $('#per_page').change(function() {
+        var form = $('#searchForm');
+        form.submit();
+    });
+});
+
+function importEmployees(input) {
+    if (input.files && input.files[0]) {
+        var formData = new FormData();
+        formData.append('file', input.files[0]);
+
+        $.ajax({
+            url: '{{ url_for("main.import_employees") }}',
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            headers: {
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
+            },
+            success: function(response) {
+                if (response.success) {
+                    alert(response.message);
+                    location.reload();
+                } else {
+                    alert(response.message);
+                }
+            },
+            error: function() {
+                alert('导入失败，请重试');
+            }
+        });
+    }
+}
+</script>
+{% endblock %}
