@@ -2,7 +2,7 @@ from flask import render_template, redirect, url_for, flash, request, jsonify, c
 from sqlalchemy.exc import SQLAlchemyError
 from flask_login import login_required, current_user
 from app import db
-from app.models import Employee, ProcessPrice, ProductionRecord, BonusPenalty, AuditLog, ProcessPrice, User, TaskAssignment, SerialNumber
+from app.models import Employee, ProcessPrice, ProductionRecord, BonusPenalty, AuditLog, ProcessPrice, User, TaskAssignment, SerialNumber, SalaryChange, CoefficientChange
 from datetime import datetime, timedelta
 from . import bp
 from app.main.forms import (
@@ -20,6 +20,7 @@ from werkzeug.utils import secure_filename
 from flask import after_this_request
 from functools import wraps
 import tempfile
+from flask_paginate import Pagination
 
 def handle_pagination_args(f):
     @wraps(f)
@@ -269,6 +270,10 @@ def edit_employee(id):
                 'department': employee.department
             }
             
+            # 检查工资是否变更
+            salary_changed = employee.base_salary != form.base_salary.data
+            coefficient_changed = employee.coefficient != form.coefficient.data
+            
             # 更新数据
             employee.employee_id = form.employee_id.data
             employee.name = form.name.data
@@ -297,6 +302,57 @@ def edit_employee(id):
                 }
             )
             db.session.add(log)
+            
+            # 如果工资变更，添加工资变更记录
+            if salary_changed:
+                salary_change = SalaryChange(
+                    employee_id=employee.id,
+                    old_salary=old_data['base_salary'],
+                    new_salary=employee.base_salary,
+                    effective_date=datetime.now().date(),
+                    reason=f'通过员工编辑页面更新',
+                    creator_id=current_user.id,
+                    serial_number=SerialNumber.get_next_number()
+                )
+                db.session.add(salary_change)
+                
+                # 记录工资变更审计日志
+                salary_log = AuditLog(
+                    user_id=current_user.id,
+                    action='添加工资变更记录',
+                    details=f'为员工 {employee.name}（工号：{employee.employee_id}）添加工资变更记录，从 {old_data["base_salary"]} 变更为 {employee.base_salary}',
+                    can_rollback=True,
+                    rollback_type='add',
+                    target_model='SalaryChange',
+                    target_id=salary_change.id
+                )
+                db.session.add(salary_log)
+            
+            # 如果系数变更，添加系数变更记录
+            if coefficient_changed:
+                coefficient_change = CoefficientChange(
+                    employee_id=employee.id,
+                    old_coefficient=old_data['coefficient'],
+                    new_coefficient=employee.coefficient,
+                    effective_date=datetime.now().date(),
+                    reason=f'通过员工编辑页面更新',
+                    creator_id=current_user.id,
+                    serial_number=SerialNumber.get_next_number()
+                )
+                db.session.add(coefficient_change)
+                
+                # 记录系数变更审计日志
+                coefficient_log = AuditLog(
+                    user_id=current_user.id,
+                    action='添加工资系数变更记录',
+                    details=f'为员工 {employee.name}（工号：{employee.employee_id}）添加工资系数变更记录，从 {old_data["coefficient"]} 变更为 {employee.coefficient}',
+                    can_rollback=True,
+                    rollback_type='add',
+                    target_model='CoefficientChange',
+                    target_id=coefficient_change.id
+                )
+                db.session.add(coefficient_log)
+            
             db.session.commit()
             
             flash('员工信息更新成功', 'success')
@@ -417,40 +473,40 @@ def add_process_price():
             # 创建新的工序价格记录
             process_price = ProcessPrice(
                 serial_number=SerialNumber.get_next_number(),
-                process_code=form.process_code.data,
-                process_name=form.process_name.data,
-                component=form.component.data,
-                drawing_no=form.drawing_no.data,
-                model_no=form.model_no.data,
-                price=form.price.data,
-                effective_date=form.effective_date.data,
+            process_code=form.process_code.data,
+            process_name=form.process_name.data,
+            component=form.component.data,
+            drawing_no=form.drawing_no.data,
+            model_no=form.model_no.data,
+            price=form.price.data,
+            effective_date=form.effective_date.data,
                 notes=form.notes.data,
                 version=1,  # 新工序的初始版本为1
                 is_current=True  # 新工序默认为当前生效
-            )
+        )
             db.session.add(process_price)
             db.session.flush()
-            
+        
             log = AuditLog(
                 user_id=current_user.id,
                 action='添加工序价格',
-                details=f'添加工序：{process_price.process_name}，编号：{process_price.process_code}',
-                can_rollback=True,
-                rollback_type='add',
-                target_model='ProcessPrice',
-                target_id=process_price.id,
-                new_data={
-                    'process_code': process_price.process_code,
-                    'process_name': process_price.process_name,
-                    'component': process_price.component,
-                    'drawing_no': process_price.drawing_no,
-                    'model_no': process_price.model_no,
-                    'price': process_price.price,
-                    'version': process_price.version,
-                    'effective_date': process_price.effective_date.isoformat() if process_price.effective_date else None,
-                    'notes': process_price.notes,
-                    'is_current': process_price.is_current
-                }
+                    details=f'添加工序：{process_price.process_name}，编号：{process_price.process_code}',
+                    can_rollback=True,
+                    rollback_type='add',
+                    target_model='ProcessPrice',
+                    target_id=process_price.id,
+                    new_data={
+                        'process_code': process_price.process_code,
+                        'process_name': process_price.process_name,
+                        'component': process_price.component,
+                        'drawing_no': process_price.drawing_no,
+                        'model_no': process_price.model_no,
+                        'price': process_price.price,
+                        'version': process_price.version,
+                        'effective_date': process_price.effective_date.isoformat() if process_price.effective_date else None,
+                        'notes': process_price.notes,
+                        'is_current': process_price.is_current
+                    }
             )
             db.session.add(log)
             db.session.commit()
@@ -642,16 +698,16 @@ def manage_production_records():
             end_of_day = datetime.combine(target_date, datetime.max.time())
             
             process_price = ProcessPrice.query.filter(
-            ProcessPrice.process_code == form.process_code.data,
-                ProcessPrice.effective_date <= end_of_day + timedelta(days=1)
-        ).order_by(ProcessPrice.effective_date.desc()).first()
+                ProcessPrice.process_code == form.process_code.data,
+                            ProcessPrice.effective_date <= end_of_day + timedelta(days=1)
+            ).order_by(ProcessPrice.effective_date.desc()).first()
 
             if not process_price:
                 flash('未找到该日期下的工序价格', 'danger')
                 return redirect(url_for('main.manage_production_records'))
 
             record = ProductionRecord(
-                    serial_number=SerialNumber.get_next_number(),
+                            serial_number=SerialNumber.get_next_number(),
                 employee_id=form.employee_id.data,
                 process_id=process_price.id,
                 quantity=form.quantity.data,
@@ -744,7 +800,7 @@ def delete_production_record(id):
         target_model='ProductionRecord',
         target_id=record.id,
         old_data=old_data
-        )
+            )
         db.session.add(log)
         db.session.delete(record)
         db.session.commit()
@@ -1067,8 +1123,9 @@ def salary_calculation():
             ).all()
             
             # 计算工资
-            base_salary = employee.base_salary * employee.coefficient
+            base_salary = employee.base_salary
             piecework = sum(record.quantity * record.process.price for record in production_records)
+            piecework = piecework * employee.coefficient
             bonus = sum(bp.amount for bp in bonus_penalty_records if bp.type == 'bonus')
             penalty = sum(bp.amount for bp in bonus_penalty_records if bp.type == 'penalty')
             total_salary = base_salary + piecework + bonus - penalty
@@ -2765,3 +2822,199 @@ def edit_task(id):
         db.session.rollback()
         current_app.logger.error(f'更新任务失败: {str(e)}')
         return jsonify({'success': False, 'message': f'更新失败：{str(e)}'}), 500
+
+@bp.route('/employee_salary_changes/<int:employee_id>')
+@login_required
+def employee_salary_changes(employee_id):
+    page = request.args.get('page', 1, type=int)
+    per_page = 20
+    
+    # 获取员工信息
+    employee = Employee.query.get_or_404(employee_id)
+    
+    # 直接查询对象而不是字段
+    salary_changes = SalaryChange.query.filter_by(employee_id=employee_id).all()
+    coefficient_changes = CoefficientChange.query.filter_by(employee_id=employee_id).all()
+    
+    # 合并两种变更记录并添加类型标记
+    records = []
+    for change in salary_changes:
+        records.append({
+            'id': change.id,
+            'serial_number': change.serial_number,
+            'change_type': 'salary',
+            'old_value': change.old_salary,
+            'new_value': change.new_salary,
+            'effective_date': change.effective_date,
+            'reason': change.reason,
+            'created_at': change.created_at,
+            'creator': User.query.get(change.created_by) if change.created_by else None
+        })
+    
+    for change in coefficient_changes:
+        records.append({
+            'id': change.id,
+            'serial_number': change.serial_number,
+            'change_type': 'coefficient',
+            'old_value': change.old_coefficient,
+            'new_value': change.new_coefficient,
+            'effective_date': change.effective_date,
+            'reason': change.reason,
+            'created_at': change.created_at,
+            'creator': User.query.get(change.created_by) if change.created_by else None
+        })
+    
+    # 按创建时间倒序排序
+    records.sort(key=lambda x: x['created_at'], reverse=True)
+    
+    # 手动分页
+    total = len(records)
+    start = (page - 1) * per_page
+    end = min(start + per_page, total)
+    paged_records = records[start:end]
+    
+    # 创建分页对象
+    pagination = Pagination(page=page, per_page=per_page, total=total, items=paged_records)
+    
+    # 为添加表单创建员工JSON数据
+    employee_json = {
+        'id': employee.id,
+        'employee_id': employee.employee_id,
+        'name': employee.name,
+        'base_salary': employee.base_salary,
+        'coefficient': employee.coefficient
+    }
+    
+    return render_template('main/employee_salary_changes.html',
+                          employee=employee,
+                          employee_json=employee_json,
+                          records=paged_records,
+                          pagination=pagination,
+                          now=datetime.now())
+
+@bp.route('/add_salary_change', methods=['POST'])
+@login_required
+def add_salary_change():
+    if current_user.role not in ['admin', 'hr']:
+        return jsonify({'success': False, 'message': '权限不足'})
+    
+    data = request.get_json()
+    employee_id = data.get('employee_id')
+    change_type = data.get('change_type')
+    old_value = float(data.get('old_value'))
+    new_value = float(data.get('new_value'))
+    effective_date = datetime.strptime(data.get('effective_date'), '%Y-%m-%d')
+    reason = data.get('reason')
+    
+    try:
+        if change_type == 'salary':
+            change = SalaryChange(
+                employee_id=employee_id,
+                old_salary=old_value,
+                new_salary=new_value,
+                effective_date=effective_date,
+                reason=reason,
+                creator_id=current_user.id,
+                serial_number=SerialNumber.get_next_number()
+            )
+        else:
+            change = CoefficientChange(
+                employee_id=employee_id,
+                old_coefficient=old_value,
+                new_coefficient=new_value,
+                effective_date=effective_date,
+                reason=reason,
+                creator_id=current_user.id,
+                serial_number=SerialNumber.get_next_number()
+            )
+        
+        db.session.add(change)
+        db.session.commit()
+        
+        # 添加审计日志
+        log = AuditLog(
+            user_id=current_user.id,
+            action=f"添加{'工资' if change_type == 'salary' else '工资系数'}变更记录",
+            details=f"为员工ID {employee_id} 添加{'工资' if change_type == 'salary' else '工资系数'}变更记录，从 {old_value} 变更为 {new_value}，生效日期 {data.get('effective_date')}",
+            can_rollback=True,
+            rollback_type='add',
+            target_model='SalaryChange' if change_type == 'salary' else 'CoefficientChange',
+            target_id=change.id
+        )
+        db.session.add(log)
+        db.session.commit()
+        
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"添加工资变更记录失败: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)})
+
+@bp.route('/delete_salary_change', methods=['POST'])
+@login_required
+def delete_salary_change():
+    if current_user.role not in ['admin', 'hr']:
+        return jsonify({'success': False, 'message': '权限不足'})
+    
+    change_id = request.form.get('id')
+    
+    try:
+        # 尝试删除工资变更记录
+        salary_change = SalaryChange.query.get(change_id)
+        if salary_change and salary_change.effective_date >= datetime.now().date():
+            # 添加审计日志
+            log = AuditLog(
+                user_id=current_user.id,
+                action="删除工资变更记录",
+                details=f"删除工资变更记录ID {change_id}，员工ID {salary_change.employee_id}，从 {salary_change.old_salary} 变更为 {salary_change.new_salary}，生效日期 {salary_change.effective_date}",
+                can_rollback=True,
+                rollback_type='delete',
+                target_model='SalaryChange',
+                target_id=salary_change.id,
+                old_data={
+                    'employee_id': salary_change.employee_id,
+                    'old_salary': salary_change.old_salary,
+                    'new_salary': salary_change.new_salary,
+                    'effective_date': salary_change.effective_date.strftime('%Y-%m-%d'),
+                    'reason': salary_change.reason,
+                    'creator_id': salary_change.created_by
+                }
+            )
+            db.session.add(log)
+            
+            db.session.delete(salary_change)
+            db.session.commit()
+            return jsonify({'success': True})
+        
+        # 尝试删除系数变更记录
+        coefficient_change = CoefficientChange.query.get(change_id)
+        if coefficient_change and coefficient_change.effective_date >= datetime.now().date():
+            # 添加审计日志
+            log = AuditLog(
+                user_id=current_user.id,
+                action="删除工资系数变更记录",
+                details=f"删除工资系数变更记录ID {change_id}，员工ID {coefficient_change.employee_id}，从 {coefficient_change.old_coefficient} 变更为 {coefficient_change.new_coefficient}，生效日期 {coefficient_change.effective_date}",
+                can_rollback=True,
+                rollback_type='delete',
+                target_model='CoefficientChange',
+                target_id=coefficient_change.id,
+                old_data={
+                    'employee_id': coefficient_change.employee_id,
+                    'old_coefficient': coefficient_change.old_coefficient,
+                    'new_coefficient': coefficient_change.new_coefficient,
+                    'effective_date': coefficient_change.effective_date.strftime('%Y-%m-%d'),
+                    'reason': coefficient_change.reason,
+                    'creator_id': coefficient_change.created_by
+                }
+            )
+            db.session.add(log)
+            
+            db.session.delete(coefficient_change)
+            db.session.commit()
+            return jsonify({'success': True})
+        
+        return jsonify({'success': False, 'message': '记录不存在或已生效'})
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"删除工资变更记录失败: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)})

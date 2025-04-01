@@ -152,7 +152,7 @@
                                     <td>{{ record.process.process_name }}</td>
                                     <td>{{ record.quantity }}</td>
                                     <td>{{ "%.2f"|format(record.process.price) }}</td>
-                                    <td>{{ "%.2f"|format(record.quantity * record.process.price) }}</td>
+                                    <td>{{ "%.2f"|format(record.quantity * record.process.price * data.employee.coefficient) }}</td>
                                 </tr>
                                 {% endfor %}
                             </tbody>

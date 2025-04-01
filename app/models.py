@@ -60,6 +60,10 @@ class ProcessPrice(db.Model):
     effective_date = db.Column(db.DateTime, default=datetime.utcnow)
     is_current = db.Column(db.Boolean, default=True)
     notes = db.Column(db.Text)  # 备注
+    
+    __table_args__ = (
+        db.UniqueConstraint('serial_number', name='uq_process_price_serial_number'),
+    )
 
 class Employee(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -72,6 +76,10 @@ class Employee(db.Model):
     department = db.Column(db.String(50))
     user_id = db.Column(db.Integer, db.ForeignKey('user.id', name='fk_employee_user_id'))
     user = db.relationship('User', backref=db.backref('employee', uselist=False))
+    
+    __table_args__ = (
+        db.UniqueConstraint('serial_number', name='uq_employee_serial_number'),
+    )
 
     @property
     def total_salary(self):
@@ -79,8 +87,8 @@ class Employee(db.Model):
         piecework = sum(record.quantity * record.process.price for record in self.production_records)
         # 奖金/罚款计算
         adjustments = sum(bp.amount if bp.type == 'bonus' else -bp.amount for bp in self.bonuses_penalties)
-        # 总工资 = 基本工资 * 系数 + 计件工资 + 调整金额
-        return self.base_salary * self.coefficient + piecework + adjustments
+        # 总工资 = 基本工资 + 计件工资 * 系数 + 调整金额
+        return self.base_salary + piecework * self.coefficient + adjustments
 
     production_records = db.relationship('ProductionRecord', backref='employee', lazy='dynamic')
     bonuses_penalties = db.relationship('BonusPenalty', backref='employee', lazy='dynamic')
@@ -93,6 +101,10 @@ class ProductionRecord(db.Model):
     quantity = db.Column(db.Integer)
     date = db.Column(db.DateTime, default=datetime.utcnow)
     process = db.relationship('ProcessPrice', backref='production_records', lazy='joined')
+    
+    __table_args__ = (
+        db.UniqueConstraint('serial_number', name='uq_production_record_serial_number'),
+    )
 
 class BonusPenalty(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -104,6 +116,10 @@ class BonusPenalty(db.Model):
     type = db.Column(db.String(10))  # bonus/penalty
     process_id = db.Column(db.Integer, db.ForeignKey('process_price.id', name='fk_bp_process_id'))
     process = db.relationship('ProcessPrice', backref='bonus_penalties')
+    
+    __table_args__ = (
+        db.UniqueConstraint('serial_number', name='uq_bonus_penalty_serial_number'),
+    )
 
 class AuditLog(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -143,6 +159,10 @@ class TaskAssignment(db.Model):
     status = db.Column(db.String(20), default='pending')  # pending, in_progress, completed, cancelled
     notes = db.Column(db.Text)  # 备注
     
+    __table_args__ = (
+        db.UniqueConstraint('serial_number', name='uq_task_assignment_serial_number'),
+    )
+
     # 关系
     employee = db.relationship('Employee', backref='task_assignments')
     process = db.relationship('ProcessPrice', backref='task_assignments')
@@ -161,3 +181,67 @@ class TaskAssignment(db.Model):
     def is_overdue(self):
         """是否逾期"""
         return self.target_date < datetime.now().date() and self.status != 'completed'
+
+class EmployeeSalaryHistory(db.Model):
+    """员工工资变更历史"""
+    __tablename__ = 'employee_salary_history'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    serial_number = db.Column(db.String(8), unique=True, nullable=False)
+    employee_id = db.Column(db.Integer, db.ForeignKey('employee.id', ondelete='CASCADE', name='fk_salary_history_employee_id'), nullable=False)
+    old_salary = db.Column(db.Float, nullable=False)
+    new_salary = db.Column(db.Float, nullable=False)
+    effective_date = db.Column(db.Date, nullable=False)
+    reason = db.Column(db.String(200))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_by = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='SET NULL', name='fk_salary_history_creator_id'), nullable=True)
+    
+    __table_args__ = (
+        db.UniqueConstraint('serial_number', name='uq_salary_history_serial_number'),
+    )
+    
+    employee = db.relationship('Employee', backref=db.backref('salary_history', lazy=True))
+    creator = db.relationship('User', backref=db.backref('salary_history_created', lazy=True))
+    
+    def __init__(self, **kwargs):
+        if 'creator_id' in kwargs:
+            kwargs['created_by'] = kwargs.pop('creator_id')
+        super(EmployeeSalaryHistory, self).__init__(**kwargs)
+        
+        # 如果没有设置流水号，自动生成一个
+        if not self.serial_number:
+            self.serial_number = SerialNumber.get_next_number()
+
+class EmployeeCoefficientHistory(db.Model):
+    """员工工资系数变更历史"""
+    __tablename__ = 'employee_coefficient_history'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    serial_number = db.Column(db.String(8), unique=True, nullable=False)
+    employee_id = db.Column(db.Integer, db.ForeignKey('employee.id', ondelete='CASCADE', name='fk_coefficient_history_employee_id'), nullable=False)
+    old_coefficient = db.Column(db.Float, nullable=False)
+    new_coefficient = db.Column(db.Float, nullable=False)
+    effective_date = db.Column(db.Date, nullable=False)
+    reason = db.Column(db.String(200))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_by = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='SET NULL', name='fk_coefficient_history_creator_id'), nullable=True)
+    
+    __table_args__ = (
+        db.UniqueConstraint('serial_number', name='uq_coefficient_history_serial_number'),
+    )
+    
+    employee = db.relationship('Employee', backref=db.backref('coefficient_history', lazy=True))
+    creator = db.relationship('User', backref=db.backref('coefficient_history_created', lazy=True))
+    
+    def __init__(self, **kwargs):
+        if 'creator_id' in kwargs:
+            kwargs['created_by'] = kwargs.pop('creator_id')
+        super(EmployeeCoefficientHistory, self).__init__(**kwargs)
+        
+        # 如果没有设置流水号，自动生成一个
+        if not self.serial_number:
+            self.serial_number = SerialNumber.get_next_number()
+
+# 为与路由函数保持一致，创建别名
+SalaryChange = EmployeeSalaryHistory
+CoefficientChange = EmployeeCoefficientHistory

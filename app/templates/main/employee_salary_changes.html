@@ -1,0 +1,223 @@
+{% extends "base.html" %}
+
+{% block title %}员工工资变更历史{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">{{ employee.name }} - 工资变更历史</h3>
+                    <div class="card-tools">
+                        <a href="{{ url_for('main.manage_employees') }}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left"></i> 返回员工列表
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <strong>员工工号:</strong> {{ employee.employee_id }}<br>
+                            <strong>员工姓名:</strong> {{ employee.name }}<br>
+                            <strong>当前工资:</strong> {{ "%.2f"|format(employee.base_salary) }}<br>
+                            <strong>当前系数:</strong> {{ "%.2f"|format(employee.coefficient) }}
+                        </div>
+                        <div class="col-md-6 text-end">
+                            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addModal">
+                                <i class="fas fa-plus"></i> 添加工资变更
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 工资变更列表 -->
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-hover">
+                            <thead>
+                                <tr>
+                                    <th>流水号</th>
+                                    <th>变更类型</th>
+                                    <th>原值</th>
+                                    <th>新值</th>
+                                    <th>生效日期</th>
+                                    <th>变更原因</th>
+                                    <th>操作人</th>
+                                    <th>操作时间</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for record in records %}
+                                <tr>
+                                    <td>{{ record.serial_number }}</td>
+                                    <td>{{ '工资' if record.change_type == 'salary' else '工资系数' }}</td>
+                                    <td>{{ "%.2f"|format(record.old_value) }}</td>
+                                    <td>{{ "%.2f"|format(record.new_value) }}</td>
+                                    <td>{{ record.effective_date.strftime('%Y-%m-%d') }}</td>
+                                    <td>{{ record.reason }}</td>
+                                    <td>{{ record.creator.username if record.creator else '未知' }}</td>
+                                    <td>{{ record.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                                    <td>
+                                        {% if record.effective_date >= now.date() %}
+                                        <button class="btn btn-danger btn-sm delete-record" data-id="{{ record.id }}" data-bs-toggle="modal" data-bs-target="#deleteModal">
+                                            删除
+                                        </button>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- 分页 -->
+                    <div class="d-flex justify-content-center mt-3">
+                        {{ pagination.links }}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 添加工资变更对话框 -->
+<div class="modal fade" id="addModal" tabindex="-1" aria-labelledby="addModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addModalLabel">添加工资变更</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addForm">
+                    <input type="hidden" id="employee_id" name="employee_id" value="{{ employee.id }}">
+                    <div class="mb-3">
+                        <label for="change_type" class="form-label">变更类型</label>
+                        <select class="form-select" id="change_type" name="change_type" required>
+                            <option value="salary">工资</option>
+                            <option value="coefficient">工资系数</option>
+                        </select>
+                    </div>
+                    <div class="mb-3" id="old_value_group">
+                        <label for="old_value" class="form-label">原值</label>
+                        <input type="number" class="form-control" id="old_value" name="old_value" step="0.01" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="new_value" class="form-label">新值</label>
+                        <input type="number" class="form-control" id="new_value" name="new_value" step="0.01" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="effective_date" class="form-label">生效日期</label>
+                        <input type="date" class="form-control" id="effective_date" name="effective_date" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="reason" class="form-label">变更原因</label>
+                        <textarea class="form-control" id="reason" name="reason" rows="3" required></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" id="saveAdd">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 删除确认对话框 -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteModalLabel">确认删除</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="delete_id" name="id">
+                确定要删除这条工资变更记录吗？此操作不可恢复。
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-danger" id="confirmDelete">删除</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+$(document).ready(function() {
+    // 员工信息JSON
+    var employeeData = {{ employee_json|tojson|safe }};
+    
+    // 变更类型切换时更新原值
+    $('#change_type').change(function() {
+        var changeType = $(this).val();
+        
+        if (changeType === 'salary') {
+            $('#old_value').val(employeeData.base_salary);
+        } else {
+            $('#old_value').val(employeeData.coefficient);
+        }
+    });
+    
+    // 初始化原值
+    $('#change_type').trigger('change');
+    
+    // 保存添加
+    $('#saveAdd').click(function() {
+        var formData = {
+            employee_id: $('#employee_id').val(),
+            change_type: $('#change_type').val(),
+            old_value: $('#old_value').val(),
+            new_value: $('#new_value').val(),
+            effective_date: $('#effective_date').val(),
+            reason: $('#reason').val()
+        };
+        
+        $.ajax({
+            url: '{{ url_for("main.add_salary_change") }}',
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify(formData),
+            success: function(response) {
+                if (response.success) {
+                    location.reload();
+                } else {
+                    alert(response.message || '添加失败');
+                }
+            },
+            error: function() {
+                alert('添加失败');
+            }
+        });
+    });
+    
+    // 删除记录
+    $('.delete-record').click(function() {
+        $('#delete_id').val($(this).data('id'));
+    });
+    
+    $('#confirmDelete').click(function() {
+        var id = $('#delete_id').val();
+        $.ajax({
+            url: '{{ url_for("main.delete_salary_change") }}',
+            type: 'POST',
+            data: { id: id },
+            success: function(response) {
+                if (response.success) {
+                    location.reload();
+                } else {
+                    alert(response.message || '删除失败');
+                }
+            },
+            error: function() {
+                alert('删除失败');
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

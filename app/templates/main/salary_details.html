@@ -32,7 +32,7 @@
                         <td>￥{{ record.process.price }}</td>
                         <td>{{ record.quantity }}</td>
                         <td>{{ record.date.strftime('%Y-%m-%d') }}</td>
-                        <td>￥{{ record.process.price * record.quantity }}</td>
+                        <td>￥{{ record.process.price * record.quantity * employee.coefficient }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
