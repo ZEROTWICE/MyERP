@@ -1,5 +1,5 @@
 from flask_wtf import FlaskForm
-from wtforms import StringField, FloatField, IntegerField, SelectField, TextAreaField, DateField, SubmitField, BooleanField, PasswordField, DecimalField
+from wtforms import StringField, FloatField, IntegerField, SelectField, TextAreaField, DateField, SubmitField, BooleanField, PasswordField, DecimalField, SelectMultipleField
 from wtforms.validators import DataRequired, NumberRange, Optional, Length, ValidationError
 
 class EmployeeForm(FlaskForm):
@@ -9,9 +9,15 @@ class EmployeeForm(FlaskForm):
     base_salary = FloatField('基本工资', validators=[DataRequired(), NumberRange(min=0)])
     coefficient = FloatField('系数', validators=[DataRequired(), NumberRange(min=0)])
     department = StringField('部门', validators=[DataRequired()])
+    hire_date = DateField('入职时间', validators=[DataRequired()])
+    termination_date = DateField('离职时间', validators=[Optional()])
     is_admin = BooleanField('设为管理员')
     password = PasswordField('密码', validators=[Optional()])
     submit = SubmitField('提交')
+
+    def validate_termination_date(self, field):
+        if field.data and self.hire_date.data and field.data < self.hire_date.data:
+            raise ValidationError('离职时间不能早于入职时间')
 
 class ProcessPriceForm(FlaskForm):
     process_id = None  # 用于存储编辑时的工序ID
@@ -20,10 +26,22 @@ class ProcessPriceForm(FlaskForm):
     component = StringField('部件', validators=[Optional(), Length(max=100)])
     drawing_no = StringField('图号', validators=[Optional(), Length(max=100)])
     model_no = StringField('型号', validators=[Optional(), Length(max=100)])
-    price = FloatField('单价', validators=[DataRequired()])
+    price = FloatField('单价', validators=[Optional()])  # 修改为可选，因为小计时会自动计算
     effective_date = DateField('生效日期', format='%Y-%m-%d', validators=[DataRequired()])
     notes = TextAreaField('备注')
+    price_type = SelectField('价格类型', choices=[('normal', '普通工价'), ('subtotal', '小计')], default='normal')
+    included_processes = SelectMultipleField('包含的工序', coerce=int, validators=[Optional()])
     submit = SubmitField('提交')
+
+    def validate_included_processes(self, field):
+        if self.price_type.data == 'subtotal' and not field.data:
+            raise ValidationError('小计必须包含至少一个工序')
+
+    def validate_price(self, field):
+        if self.price_type.data == 'normal' and not field.data:
+            raise ValidationError('普通工价必须填写单价')
+        elif self.price_type.data == 'normal' and field.data <= 0:
+            raise ValidationError('单价必须大于0')
 
 class ProcessPriceSearchForm(FlaskForm):
     search = StringField('搜索', render_kw={"placeholder": "输入工序编号、部件、图号或型号进行搜索"})

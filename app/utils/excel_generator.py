@@ -69,7 +69,7 @@ class ExcelGenerator:
         ws.title = "工序价格"
         
         # 设置表头
-        headers = ['工序编号*', '工序名称*', '部件', '图号', '型号', '单价*', '生效日期*', '备注']
+        headers = ['工序编号*', '工序名称*', '部件', '图号', '型号', '单价*', '生效日期*', '备注', '价格类型*', '包含工序']
         for col, header in enumerate(headers, 1):
             cell = ws.cell(row=1, column=col, value=header)
             ExcelGenerator._apply_header_style(cell)
@@ -83,6 +83,26 @@ class ExcelGenerator:
         ws.cell(row=2, column=6, value=10.5)
         ws.cell(row=2, column=7, value='2024-01-01')
         ws.cell(row=2, column=8, value='标准工序')
+        ws.cell(row=2, column=9, value='normal')
+        ws.cell(row=2, column=10, value='')
+        
+        ws.cell(row=3, column=1, value='P002')
+        ws.cell(row=3, column=2, value='小计工序')
+        ws.cell(row=3, column=3, value='轴承')
+        ws.cell(row=3, column=4, value='DWG002')
+        ws.cell(row=3, column=5, value='M002')
+        ws.cell(row=3, column=6, value='') # 小计会自动计算
+        ws.cell(row=3, column=7, value='2024-01-01')
+        ws.cell(row=3, column=8, value='小计工序')
+        ws.cell(row=3, column=9, value='subtotal')
+        ws.cell(row=3, column=10, value='P001,P003') # 指定要包含的工序编号，用逗号分隔
+        
+        # 添加说明
+        ws.cell(row=5, column=1, value='说明')
+        ws.cell(row=6, column=1, value='价格类型')
+        ws.cell(row=6, column=2, value='normal - 普通工价；subtotal - 小计')
+        ws.cell(row=7, column=1, value='包含工序')
+        ws.cell(row=7, column=2, value='当价格类型为subtotal时，填写包含的工序编号，用逗号分隔。小计价格将自动计算为包含工序价格的总和。')
         
         # 调整列宽
         for col in ws.columns:
@@ -229,15 +249,35 @@ class ExcelGenerator:
         for row in ws.iter_rows(min_row=2):  # 跳过表头
             if not any(cell.value for cell in row):  # 跳过空行
                 continue
+            
+            # 检查行中是否有足够的单元格
+            if len(row) < 9:
+                continue
+            
+            price_type = 'normal'
+            included_processes = []
+            
+            # 获取价格类型
+            if len(row) >= 9 and row[8].value:
+                price_type = str(row[8].value).strip().lower()
+                if price_type not in ['normal', 'subtotal']:
+                    price_type = 'normal'
+            
+            # 获取包含工序
+            if price_type == 'subtotal' and len(row) >= 10 and row[9].value:
+                included_processes = [code.strip() for code in str(row[9].value).split(',') if code.strip()]
+            
             data.append({
                 'process_code': str(row[0].value).strip(),
                 'process_name': str(row[1].value).strip(),
                 'component': str(row[2].value).strip() if row[2].value else None,
                 'drawing_no': str(row[3].value).strip() if row[3].value else None,
                 'model_no': str(row[4].value).strip() if row[4].value else None,
-                'price': float(row[5].value),
+                'price': float(row[5].value) if row[5].value else 0,
                 'effective_date': row[6].value,
-                'notes': str(row[7].value).strip() if row[7].value else None
+                'notes': str(row[7].value).strip() if row[7].value else None,
+                'price_type': price_type,
+                'included_processes': included_processes
             })
         
         return data
@@ -349,7 +389,7 @@ class ExcelGenerator:
         ws.title = "工序价格"
 
         # 设置表头
-        headers = ['工序编号', '工序名称', '部件', '图号', '型号', '单价', '生效日期', '备注']
+        headers = ['工序编号', '工序名称', '部件', '图号', '型号', '单价', '生效日期', '备注', '价格类型', '包含工序']
         for col, header in enumerate(headers, 1):
             cell = ws.cell(row=1, column=col, value=header)
             ExcelGenerator._apply_header_style(cell)
@@ -364,6 +404,16 @@ class ExcelGenerator:
             ws.cell(row=row, column=6, value=process.price)
             ws.cell(row=row, column=7, value=process.effective_date.strftime('%Y-%m-%d'))
             ws.cell(row=row, column=8, value=process.notes)
+            ws.cell(row=row, column=9, value=process.price_type)
+            
+            # 如果是小计，添加包含的工序
+            if process.price_type == 'subtotal':
+                included_process_codes = []
+                for group in ProcessPriceGroup.query.filter_by(subtotal_id=process.id).all():
+                    included_process = ProcessPrice.query.get(group.process_id)
+                    if included_process:
+                        included_process_codes.append(included_process.process_code)
+                ws.cell(row=row, column=10, value=','.join(included_process_codes))
 
         # 调整列宽
         for col in ws.columns:

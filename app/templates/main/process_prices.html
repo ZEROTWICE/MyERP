@@ -75,9 +75,9 @@
                         <th>{{ sort_link('drawing_no', '图号') }}</th>
                         <th>{{ sort_link('model_no', '型号') }}</th>
                         <th>{{ sort_link('price', '单价') }}</th>
-                        <th>版本</th>
                         <th>{{ sort_link('effective_date', '生效日期') }}</th>
-                        <th>备注</th>
+                        <th>类型</th>
+                        <th>包含工序</th>
                         <th>操作</th>
                     </tr>
                 </thead>
@@ -90,14 +90,59 @@
                         <td>{{ process.drawing_no }}</td>
                         <td>{{ process.model_no }}</td>
                         <td>{{ "%.2f"|format(process.price) }}</td>
+                        <td>{{ process.effective_date.strftime('%Y-%m-%d') }}</td>
                         <td>
-                            {{ process.version }}
-                            {% if latest_versions.get(process.process_code) == process.id %}
-                            <span class="badge bg-success">当前生效</span>
+                            <span class="badge {% if process.price_type == 'subtotal' %}bg-info{% else %}bg-primary{% endif %}">
+                                {{ '小计' if process.price_type == 'subtotal' else '普通工价' }}
+                            </span>
+                        </td>
+                        <td>
+                            {% if process.price_type == 'subtotal' %}
+                            <button type="button" class="btn btn-sm btn-outline-info" data-bs-toggle="modal" data-bs-target="#includedProcessesModal{{ process.id }}">
+                                查看包含工序
+                            </button>
+                            <!-- 包含工序详情模态框 -->
+                            <div class="modal fade" id="includedProcessesModal{{ process.id }}" tabindex="-1" aria-labelledby="includedProcessesModalLabel{{ process.id }}" aria-hidden="true">
+                                <div class="modal-dialog modal-lg">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title" id="includedProcessesModalLabel{{ process.id }}">包含的工序</h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <div class="table-responsive">
+                                                <table class="table table-striped">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>工序编号</th>
+                                                            <th>工序名称</th>
+                                                            <th>部件</th>
+                                                            <th>单价</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {% for group in process.included_processes %}
+                                                        <tr>
+                                                            <td>{{ group.process.process_code }}</td>
+                                                            <td>{{ group.process.process_name }}</td>
+                                                            <td>{{ group.process.component }}</td>
+                                                            <td>{{ "%.2f"|format(group.process.price) }}</td>
+                                                        </tr>
+                                                        {% endfor %}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% else %}
+                            -
                             {% endif %}
                         </td>
-                        <td>{{ process.effective_date.strftime('%Y-%m-%d') }}</td>
-                        <td>{{ process.notes }}</td>
                         <td>
                             {% if current_user.role in ['admin', 'hr'] %}
                             <a href="{{ url_for('main.edit_process_price', id=process.id) }}" class="btn btn-sm btn-primary">编辑</a>

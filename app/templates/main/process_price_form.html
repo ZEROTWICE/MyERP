@@ -1,88 +1,246 @@
 {% extends "base.html" %}
 
+{% block title %}{{ title }}{% endblock %}
+
 {% block content %}
-<div class="container mt-4">
+<div class="container">
     <h2>{{ title }}</h2>
-    <form method="post" class="mt-4">
-        {{ form.hidden_tag() }}
-        <div class="row g-3">
-            <div class="col-md-6">
-                <div class="form-group">
-                    {{ form.process_code.label(class="form-label") }}
-                    {{ form.process_code(class="form-control") }}
-                    {% for error in form.process_code.errors %}
-                    <span class="text-danger">{{ error }}</span>
-                    {% endfor %}
+    
+    <div class="card">
+        <div class="card-body">
+            <form method="POST">
+                {{ form.csrf_token }}
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            {{ form.process_code.label }}
+                            {{ form.process_code(class="form-control") }}
+                            {% if form.process_code.errors %}
+                            <div class="invalid-feedback d-block">
+                                {% for error in form.process_code.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            {{ form.process_name.label }}
+                            {{ form.process_name(class="form-control") }}
+                            {% if form.process_name.errors %}
+                            <div class="invalid-feedback d-block">
+                                {% for error in form.process_name.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            {{ form.component.label }}
+                            {{ form.component(class="form-control") }}
+                            {% if form.component.errors %}
+                            <div class="invalid-feedback d-block">
+                                {% for error in form.component.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            {{ form.drawing_no.label }}
+                            {{ form.drawing_no(class="form-control") }}
+                            {% if form.drawing_no.errors %}
+                            <div class="invalid-feedback d-block">
+                                {% for error in form.drawing_no.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            {{ form.model_no.label }}
+                            {{ form.model_no(class="form-control") }}
+                            {% if form.model_no.errors %}
+                            <div class="invalid-feedback d-block">
+                                {% for error in form.model_no.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            {{ form.price_type.label }}
+                            {{ form.price_type(class="form-control") }}
+                            <small>字段ID: {{ form.price_type.id }}</small>
+                            {% if form.price_type.errors %}
+                            <div class="invalid-feedback d-block">
+                                {% for error in form.price_type.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-6" id="price_div">
+                        <div class="form-group">
+                            {{ form.price.label }}
+                            {{ form.price(class="form-control") }}
+                            <small>字段ID: {{ form.price.id }}</small>
+                            {% if form.price.errors %}
+                            <div class="invalid-feedback d-block">
+                                {% for error in form.price.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                            <small class="form-text text-muted" id="price_hint" style="display: none;">
+                                小计价格将根据包含的工序自动计算
+                            </small>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            {{ form.effective_date.label }}
+                            {{ form.effective_date(class="form-control", type="date") }}
+                            {% if form.effective_date.errors %}
+                            <div class="invalid-feedback d-block">
+                                {% for error in form.effective_date.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-12" id="included_processes_div" style="display: none;">
+                        <div class="form-group">
+                            {{ form.included_processes.label }}
+                            {{ form.included_processes(class="form-control", multiple="multiple", style="width: 100%") }}
+                            <small>字段ID: {{ form.included_processes.id }}</small>
+                            {% if form.included_processes.errors %}
+                            <div class="invalid-feedback d-block">
+                                {% for error in form.included_processes.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                            <small class="form-text text-muted">
+                                <ul class="mb-0">
+                                    <li>按住Ctrl键可以选择多个工序</li>
+                                    <li>可以在下拉框中输入工序编号或名称进行搜索</li>
+                                    <li>选择工序后会自动计算总价</li>
+                                </ul>
+                            </small>
+                        </div>
+                    </div>
+                    <div class="col-md-12">
+                        <div class="form-group">
+                            {{ form.notes.label }}
+                            {{ form.notes(class="form-control", rows=3) }}
+                            {% if form.notes.errors %}
+                            <div class="invalid-feedback d-block">
+                                {% for error in form.notes.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
                 </div>
-            </div>
-            <div class="col-md-6">
-                <div class="form-group">
-                    {{ form.process_name.label(class="form-label") }}
-                    {{ form.process_name(class="form-control") }}
-                    {% for error in form.process_name.errors %}
-                    <span class="text-danger">{{ error }}</span>
-                    {% endfor %}
+                <div class="mt-3">
+                    {{ form.submit(class="btn btn-primary") }}
+                    <a href="{{ url_for('main.process_prices') }}" class="btn btn-secondary">返回</a>
                 </div>
-            </div>
-            <div class="col-md-6">
-                <div class="form-group">
-                    {{ form.component.label(class="form-label") }}
-                    {{ form.component(class="form-control") }}
-                    {% for error in form.component.errors %}
-                    <span class="text-danger">{{ error }}</span>
-                    {% endfor %}
-                </div>
-            </div>
-            <div class="col-md-6">
-                <div class="form-group">
-                    {{ form.drawing_no.label(class="form-label") }}
-                    {{ form.drawing_no(class="form-control") }}
-                    {% for error in form.drawing_no.errors %}
-                    <span class="text-danger">{{ error }}</span>
-                    {% endfor %}
-                </div>
-            </div>
-            <div class="col-md-6">
-                <div class="form-group">
-                    {{ form.model_no.label(class="form-label") }}
-                    {{ form.model_no(class="form-control") }}
-                    {% for error in form.model_no.errors %}
-                    <span class="text-danger">{{ error }}</span>
-                    {% endfor %}
-                </div>
-            </div>
-            <div class="col-md-6">
-                <div class="form-group">
-                    {{ form.price.label(class="form-label") }}
-                    {{ form.price(class="form-control") }}
-                    {% for error in form.price.errors %}
-                    <span class="text-danger">{{ error }}</span>
-                    {% endfor %}
-                </div>
-            </div>
-            <div class="col-md-6">
-                <div class="form-group">
-                    {{ form.effective_date.label(class="form-label") }}
-                    {{ form.effective_date(class="form-control", type="date") }}
-                    {% for error in form.effective_date.errors %}
-                    <span class="text-danger">{{ error }}</span>
-                    {% endfor %}
-                </div>
-            </div>
-            <div class="col-12">
-                <div class="form-group">
-                    {{ form.notes.label(class="form-label") }}
-                    {{ form.notes(class="form-control", rows=3) }}
-                    {% for error in form.notes.errors %}
-                    <span class="text-danger">{{ error }}</span>
-                    {% endfor %}
-                </div>
-            </div>
-            <div class="col-12">
-                {{ form.submit(class="btn btn-primary") }}
-                <a href="{{ url_for('main.process_prices') }}" class="btn btn-secondary">返回</a>
-            </div>
+            </form>
         </div>
-    </form>
+    </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+$(document).ready(function() {
+    console.log("Document ready");
+    
+    // 字段ID
+    var priceTypeId = "{{ form.price_type.id }}";
+    var priceId = "{{ form.price.id }}";
+    var includedProcessesId = "{{ form.included_processes.id }}";
+    
+    console.log("Field IDs:", priceTypeId, priceId, includedProcessesId);
+    
+    // 初始化select2，添加搜索功能
+    $('#' + includedProcessesId).select2({
+        theme: 'bootstrap4',
+        width: '100%',
+        language: {
+            noResults: function() {
+                return "没有找到匹配的工序";
+            },
+            searching: function() {
+                return "搜索中...";
+            }
+        },
+        placeholder: '请选择要包含的工序',
+        allowClear: true
+    });
+    
+    console.log("Select2 initialized");
+
+    // 根据价格类型显示/隐藏相关字段
+    function toggleFields() {
+        console.log("Toggle fields called, price_type:", $('#' + priceTypeId).val());
+        if ($('#' + priceTypeId).val() === 'subtotal') {
+            $('#included_processes_div').show();
+            $('#' + priceId).prop('readonly', true);
+            $('#price_hint').show();
+        } else {
+            $('#included_processes_div').hide();
+            $('#' + priceId).prop('readonly', false);
+            $('#price_hint').hide();
+        }
+    }
+
+    // 初始化时执行一次
+    toggleFields();
+
+    // 当价格类型改变时执行
+    $('#' + priceTypeId).change(function() {
+        console.log("Price type changed:", $(this).val());
+        toggleFields();
+        if ($(this).val() === 'subtotal') {
+            $('#' + priceId).val('');
+        }
+    });
+
+    // 当包含的工序改变时，重新计算总价
+    $('#' + includedProcessesId).on('change', function() {
+        console.log("Included processes changed");
+        if ($('#' + priceTypeId).val() === 'subtotal') {
+            let total = 0;
+            const selectedOptions = $(this).find('option:selected');
+            console.log("Selected options:", selectedOptions.length);
+            selectedOptions.each(function() {
+                const processText = $(this).text();
+                console.log("Processing text:", processText);
+                const match = processText.match(/单价: (\d+(\.\d+)?)元/);
+                if (match && match[1]) {
+                    console.log("Found price:", match[1]);
+                    total += parseFloat(match[1]);
+                }
+            });
+            console.log("Total price:", total);
+            $('#' + priceId).val(total.toFixed(2));
+        }
+    });
+});
+</script>
 {% endblock %}

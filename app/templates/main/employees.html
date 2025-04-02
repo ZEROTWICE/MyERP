@@ -70,6 +70,9 @@
                             <th>{{ sort_link('position', '职位') }}</th>
                             <th>{{ sort_link('base_salary', '基本工资') }}</th>
                             <th>{{ sort_link('coefficient', '系数') }}</th>
+                            <th>{{ sort_link('hire_date', '入职时间') }}</th>
+                            <th>{{ sort_link('termination_date', '离职时间') }}</th>
+                            <th>{{ sort_link('status', '状态') }}</th>
                             <th>操作</th>
                         </tr>
                     </thead>
@@ -82,6 +85,13 @@
                             <td>{{ employee.position }}</td>
                             <td>{{ "%.2f"|format(employee.base_salary) }}</td>
                             <td>{{ "%.2f"|format(employee.coefficient) }}</td>
+                            <td>{{ employee.hire_date.strftime('%Y-%m-%d') if employee.hire_date }}</td>
+                            <td>{{ employee.termination_date.strftime('%Y-%m-%d') if employee.termination_date else '-' }}</td>
+                            <td>
+                                <span class="badge {% if employee.is_active %}bg-success{% else %}bg-danger{% endif %}">
+                                    {{ employee.status }}
+                                </span>
+                            </td>
                             <td>
                                 <div class="mb-3">
                                     <a href="{{ url_for('main.edit_employee', id=employee.id) }}" class="btn btn-primary btn-sm">

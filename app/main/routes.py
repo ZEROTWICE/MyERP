@@ -2,7 +2,7 @@ from flask import render_template, redirect, url_for, flash, request, jsonify, c
 from sqlalchemy.exc import SQLAlchemyError
 from flask_login import login_required, current_user
 from app import db
-from app.models import Employee, ProcessPrice, ProductionRecord, BonusPenalty, AuditLog, ProcessPrice, User, TaskAssignment, SerialNumber, SalaryChange, CoefficientChange
+from app.models import Employee, ProcessPrice, ProductionRecord, BonusPenalty, AuditLog, ProcessPrice, User, TaskAssignment, SerialNumber, SalaryChange, CoefficientChange, EmployeeSalaryHistory, EmployeeCoefficientHistory, ProcessPriceGroup
 from datetime import datetime, timedelta
 from . import bp
 from app.main.forms import (
@@ -189,7 +189,7 @@ def add_employee():
             username=form.employee_id.data,
             role='admin' if form.is_admin.data else 'user'
         )
-        user.set_password(form.employee_id.data)  # 初始密码与工号相同
+        user.set_password(form.password.data or form.employee_id.data)  # 如果没有设置密码，使用工号作为密码
         db.session.add(user)
         
         # 创建员工记录
@@ -201,10 +201,13 @@ def add_employee():
             base_salary=form.base_salary.data,
             coefficient=form.coefficient.data,
             department=form.department.data,
+            hire_date=form.hire_date.data,
+            termination_date=form.termination_date.data,
             user=user
         )
+        employee.update_active_status()  # 根据入职和离职时间更新状态
         db.session.add(employee)
-        db.session.flush()  # 获取employee.id
+        db.session.flush()
         
         try:
             # 记录可回滚的审计日志
@@ -223,6 +226,9 @@ def add_employee():
                     'base_salary': employee.base_salary,
                     'coefficient': employee.coefficient,
                     'department': employee.department,
+                    'hire_date': employee.hire_date.strftime('%Y-%m-%d'),
+                    'termination_date': employee.termination_date.strftime('%Y-%m-%d') if employee.termination_date else None,
+                    'is_active': employee.is_active,
                     'user_id': user.id
                 }
             )
@@ -267,7 +273,10 @@ def edit_employee(id):
                 'position': employee.position,
                 'base_salary': employee.base_salary,
                 'coefficient': employee.coefficient,
-                'department': employee.department
+                'department': employee.department,
+                'hire_date': employee.hire_date.strftime('%Y-%m-%d') if employee.hire_date else None,
+                'termination_date': employee.termination_date.strftime('%Y-%m-%d') if employee.termination_date else None,
+                'is_active': employee.is_active
             }
             
             # 检查工资是否变更
@@ -281,12 +290,49 @@ def edit_employee(id):
             employee.position = form.position.data
             employee.base_salary = form.base_salary.data
             employee.coefficient = form.coefficient.data
+            employee.hire_date = form.hire_date.data
+            employee.termination_date = form.termination_date.data
+            employee.update_active_status()  # 根据入职和离职时间更新状态
             
-            # 记录可回滚的审计日志
+            # 如果设置了新密码
+            if form.password.data:
+                employee.user.set_password(form.password.data)
+            
+            # 更新用户角色
+            if current_user.role == 'admin':
+                employee.user.role = 'admin' if form.is_admin.data else 'user'
+            
+            # 记录工资变更历史
+            if salary_changed:
+                salary_history = EmployeeSalaryHistory(
+                    serial_number=SerialNumber.get_next_number(),
+                    employee_id=employee.id,
+                    old_salary=old_data['base_salary'],
+                    new_salary=employee.base_salary,
+                    effective_date=datetime.now().date(),
+                    reason='员工信息更新',
+                    created_by=current_user.id
+                )
+                db.session.add(salary_history)
+            
+            # 记录系数变更历史
+            if coefficient_changed:
+                coefficient_history = EmployeeCoefficientHistory(
+                    serial_number=SerialNumber.get_next_number(),
+                    employee_id=employee.id,
+                    old_coefficient=old_data['coefficient'],
+                    new_coefficient=employee.coefficient,
+                    effective_date=datetime.now().date(),
+                    reason='员工信息更新',
+                    created_by=current_user.id
+                )
+                db.session.add(coefficient_history)
+            
+            # 记录审计日志
             log = AuditLog(
                 user_id=current_user.id,
-                action='修改员工信息',
-                details=f'修改员工 {employee.name}（工号：{employee.employee_id}）的信息',
+                action='编辑员工信息',
+                details=f'编辑员工：{employee.name}（工号：{employee.employee_id}）',
                 can_rollback=True,
                 rollback_type='edit',
                 target_model='Employee',
@@ -298,69 +344,21 @@ def edit_employee(id):
                     'position': employee.position,
                     'base_salary': employee.base_salary,
                     'coefficient': employee.coefficient,
-                    'department': employee.department
+                    'department': employee.department,
+                    'hire_date': employee.hire_date.strftime('%Y-%m-%d'),
+                    'termination_date': employee.termination_date.strftime('%Y-%m-%d') if employee.termination_date else None,
+                    'is_active': employee.is_active
                 }
             )
             db.session.add(log)
-            
-            # 如果工资变更，添加工资变更记录
-            if salary_changed:
-                salary_change = SalaryChange(
-                    employee_id=employee.id,
-                    old_salary=old_data['base_salary'],
-                    new_salary=employee.base_salary,
-                    effective_date=datetime.now().date(),
-                    reason=f'通过员工编辑页面更新',
-                    creator_id=current_user.id,
-                    serial_number=SerialNumber.get_next_number()
-                )
-                db.session.add(salary_change)
-                
-                # 记录工资变更审计日志
-                salary_log = AuditLog(
-                    user_id=current_user.id,
-                    action='添加工资变更记录',
-                    details=f'为员工 {employee.name}（工号：{employee.employee_id}）添加工资变更记录，从 {old_data["base_salary"]} 变更为 {employee.base_salary}',
-                    can_rollback=True,
-                    rollback_type='add',
-                    target_model='SalaryChange',
-                    target_id=salary_change.id
-                )
-                db.session.add(salary_log)
-            
-            # 如果系数变更，添加系数变更记录
-            if coefficient_changed:
-                coefficient_change = CoefficientChange(
-                    employee_id=employee.id,
-                    old_coefficient=old_data['coefficient'],
-                    new_coefficient=employee.coefficient,
-                    effective_date=datetime.now().date(),
-                    reason=f'通过员工编辑页面更新',
-                    creator_id=current_user.id,
-                    serial_number=SerialNumber.get_next_number()
-                )
-                db.session.add(coefficient_change)
-                
-                # 记录系数变更审计日志
-                coefficient_log = AuditLog(
-                    user_id=current_user.id,
-                    action='添加工资系数变更记录',
-                    details=f'为员工 {employee.name}（工号：{employee.employee_id}）添加工资系数变更记录，从 {old_data["coefficient"]} 变更为 {employee.coefficient}',
-                    can_rollback=True,
-                    rollback_type='add',
-                    target_model='CoefficientChange',
-                    target_id=coefficient_change.id
-                )
-                db.session.add(coefficient_log)
-            
             db.session.commit()
             
             flash('员工信息更新成功', 'success')
             return redirect(url_for('main.manage_employees'))
-        except Exception as e:
+        except SQLAlchemyError as e:
             db.session.rollback()
-            flash(f'更新失败：{str(e)}', 'danger')
-            return redirect(url_for('main.manage_employees'))
+            current_app.logger.error(f'更新员工信息失败: {str(e)}')
+            flash('操作失败，请重试', 'danger')
     
     # GET请求时，填充表单数据
     if request.method == 'GET':
@@ -370,6 +368,8 @@ def edit_employee(id):
         form.position.data = employee.position
         form.base_salary.data = employee.base_salary
         form.coefficient.data = employee.coefficient
+        form.hire_date.data = employee.hire_date
+        form.termination_date.data = employee.termination_date
         if employee.user:
             form.is_admin.data = employee.user.role == 'admin'
     
@@ -468,8 +468,22 @@ def add_process_price():
         return redirect(url_for('main.index'))
     
     form = ProcessPriceForm()
+    
+    # 获取所有普通工序供小计选择
+    normal_processes = ProcessPrice.query.filter_by(price_type='normal', is_current=True).all()
+    form.included_processes.choices = [(p.id, f"{p.process_code} - {p.process_name} (单价: {p.price}元)") for p in normal_processes]
+    
     if form.validate_on_submit():
         try:
+            # 如果是小计类型，计算总价
+            price = form.price.data
+            if form.price_type.data == 'subtotal':
+                price = 0
+                for process_id in form.included_processes.data:
+                    process = ProcessPrice.query.get(process_id)
+                    if process:
+                        price += process.price
+
             # 创建新的工序价格记录
             process_price = ProcessPrice(
                 serial_number=SerialNumber.get_next_number(),
@@ -478,35 +492,47 @@ def add_process_price():
             component=form.component.data,
             drawing_no=form.drawing_no.data,
             model_no=form.model_no.data,
-            price=form.price.data,
+                price=price,
             effective_date=form.effective_date.data,
                 notes=form.notes.data,
                 version=1,  # 新工序的初始版本为1
-                is_current=True  # 新工序默认为当前生效
-        )
+                is_current=True,  # 新工序默认为当前生效
+                price_type=form.price_type.data
+            )
             db.session.add(process_price)
-            db.session.flush()
-        
+            db.session.flush()  # 获取process_price.id
+            
+            # 如果是小计类型，创建与普通工序的关联
+            if form.price_type.data == 'subtotal' and form.included_processes.data:
+                for process_id in form.included_processes.data:
+                    group = ProcessPriceGroup(
+                        subtotal_id=process_price.id,
+                        process_id=process_id
+                    )
+                    db.session.add(group)
+            
+                # 记录可回滚的审计日志
             log = AuditLog(
                 user_id=current_user.id,
                 action='添加工序价格',
-                    details=f'添加工序：{process_price.process_name}，编号：{process_price.process_code}',
-                    can_rollback=True,
-                    rollback_type='add',
-                    target_model='ProcessPrice',
-                    target_id=process_price.id,
-                    new_data={
-                        'process_code': process_price.process_code,
-                        'process_name': process_price.process_name,
-                        'component': process_price.component,
-                        'drawing_no': process_price.drawing_no,
-                        'model_no': process_price.model_no,
-                        'price': process_price.price,
-                        'version': process_price.version,
-                        'effective_date': process_price.effective_date.isoformat() if process_price.effective_date else None,
-                        'notes': process_price.notes,
-                        'is_current': process_price.is_current
-                    }
+                details=f'添加工序：{process_price.process_name}，编号：{process_price.process_code}',
+                can_rollback=True,
+                rollback_type='add',
+                target_model='ProcessPrice',
+                target_id=process_price.id,
+                new_data={
+                    'process_code': process_price.process_code,
+                    'process_name': process_price.process_name,
+                    'component': process_price.component,
+                    'drawing_no': process_price.drawing_no,
+                    'model_no': process_price.model_no,
+                    'price': process_price.price,
+                    'version': process_price.version,
+                    'effective_date': process_price.effective_date.isoformat() if process_price.effective_date else None,
+                    'notes': process_price.notes,
+                    'is_current': process_price.is_current,
+                    'price_type': process_price.price_type
+                }
             )
             db.session.add(log)
             db.session.commit()
@@ -530,6 +556,14 @@ def edit_process_price(id):
     process_price = ProcessPrice.query.get_or_404(id)
     form = ProcessPriceForm()
     
+    # 获取所有普通工序供小计选择（排除当前工序）
+    normal_processes = ProcessPrice.query.filter(
+        ProcessPrice.price_type == 'normal',
+        ProcessPrice.id != id,
+        ProcessPrice.is_current == True
+    ).all()
+    form.included_processes.choices = [(p.id, f"{p.process_code} - {p.process_name} (单价: {p.price}元)") for p in normal_processes]
+    
     if form.validate_on_submit():
         try:
             # 保存旧数据用于回滚
@@ -543,8 +577,18 @@ def edit_process_price(id):
                 'effective_date': process_price.effective_date.isoformat() if process_price.effective_date else None,
                 'notes': process_price.notes,
                 'version': process_price.version,
-                'is_current': process_price.is_current
+                'is_current': process_price.is_current,
+                'price_type': process_price.price_type
             }
+            
+            # 如果是小计类型，计算总价
+            price = form.price.data
+            if form.price_type.data == 'subtotal':
+                price = 0
+                for process_id in form.included_processes.data:
+                    process = ProcessPrice.query.get(process_id)
+                    if process:
+                        price += process.price
             
             # 更新数据
             process_price.process_code = form.process_code.data
@@ -552,9 +596,22 @@ def edit_process_price(id):
             process_price.component = form.component.data
             process_price.drawing_no = form.drawing_no.data
             process_price.model_no = form.model_no.data
-            process_price.price = form.price.data
+            process_price.price = price
             process_price.effective_date = form.effective_date.data
             process_price.notes = form.notes.data
+            process_price.price_type = form.price_type.data
+            
+            # 更新小计关联
+            if form.price_type.data == 'subtotal':
+                # 删除旧的关联
+                ProcessPriceGroup.query.filter_by(subtotal_id=id).delete()
+                # 创建新的关联
+                for process_id in form.included_processes.data:
+                    group = ProcessPriceGroup(
+                        subtotal_id=id,
+                        process_id=process_id
+                    )
+                    db.session.add(group)
             
             # 记录可回滚的审计日志
             log = AuditLog(
@@ -576,7 +633,8 @@ def edit_process_price(id):
                     'effective_date': process_price.effective_date.isoformat() if process_price.effective_date else None,
                     'notes': process_price.notes,
                     'version': process_price.version,
-                    'is_current': process_price.is_current
+                    'is_current': process_price.is_current,
+                    'price_type': process_price.price_type
                 }
             )
             db.session.add(log)
@@ -598,6 +656,12 @@ def edit_process_price(id):
         form.price.data = process_price.price
         form.effective_date.data = process_price.effective_date
         form.notes.data = process_price.notes
+        form.price_type.data = process_price.price_type
+        
+        # 如果是小计，填充已包含的工序
+        if process_price.price_type == 'subtotal':
+            included_process_ids = [group.process_id for group in ProcessPriceGroup.query.filter_by(subtotal_id=id).all()]
+            form.included_processes.data = included_process_ids
     
     return render_template('main/process_price_form.html', form=form, title='编辑工序价格')
 
@@ -699,7 +763,7 @@ def manage_production_records():
             
             process_price = ProcessPrice.query.filter(
                 ProcessPrice.process_code == form.process_code.data,
-                            ProcessPrice.effective_date <= end_of_day + timedelta(days=1)
+                                ProcessPrice.effective_date <= end_of_day + timedelta(days=1)
             ).order_by(ProcessPrice.effective_date.desc()).first()
 
             if not process_price:
@@ -707,7 +771,7 @@ def manage_production_records():
                 return redirect(url_for('main.manage_production_records'))
 
             record = ProductionRecord(
-                            serial_number=SerialNumber.get_next_number(),
+                                serial_number=SerialNumber.get_next_number(),
                 employee_id=form.employee_id.data,
                 process_id=process_price.id,
                 quantity=form.quantity.data,
@@ -792,7 +856,7 @@ def delete_production_record(id):
         }
         
         log = AuditLog(
-            user_id=current_user.id,
+        user_id=current_user.id,
         action='删除生产记录',
         details=f'删除生产记录：员工 {record.employee.name}，工序 {record.process.process_name}，数量 {record.quantity}',
         can_rollback=True,
@@ -1468,25 +1532,97 @@ def import_process_prices():
         success_count = 0
         error_messages = []
         
+        # 第一遍：处理普通工序
+        normal_processes = {}  # 用于存储导入的普通工序，以便后续建立小计关联
+        
         for data in process_data:
-            try:
-                # 创建新工序价格记录
-                process = ProcessPrice(
-                    serial_number=SerialNumber.get_next_number(),
-                    process_code=data['process_code'],
-                    process_name=data['process_name'],
-                    component=data['component'],
-                    drawing_no=data['drawing_no'],
-                    model_no=data['model_no'],
-                    price=data['price'],
-                    version=data['version'],
-                    notes=data['notes']
-                )
-                db.session.add(process)
-                success_count += 1
-                
-            except Exception as e:
-                error_messages.append(f"处理 {data['process_code']} 时出错: {str(e)}")
+            if data['price_type'] != 'subtotal':
+                try:
+                    # 创建新工序价格记录
+                    process = ProcessPrice(
+                        serial_number=SerialNumber.get_next_number(),
+                        process_code=data['process_code'],
+                        process_name=data['process_name'],
+                        component=data['component'],
+                        drawing_no=data['drawing_no'],
+                        model_no=data['model_no'],
+                        price=data['price'],
+                        effective_date=data['effective_date'],
+                        notes=data['notes'],
+                        version=1,  # 新工序的初始版本为1
+                        is_current=True,  # 新工序默认为当前生效
+                        price_type='normal'
+                    )
+                    db.session.add(process)
+                    db.session.flush()  # 获取ID
+                    
+                    normal_processes[data['process_code']] = process.id
+                    success_count += 1
+                    
+                except Exception as e:
+                    error_messages.append(f"处理普通工序 {data['process_code']} 时出错: {str(e)}")
+        
+        # 提交普通工序，以便后续小计能找到
+        db.session.commit()
+        
+        # 第二遍：处理小计工序
+        for data in process_data:
+            if data['price_type'] == 'subtotal':
+                try:
+                    # 查找包含的普通工序
+                    included_process_ids = []
+                    
+                    # 首先查找本次导入的工序
+                    for code in data['included_processes']:
+                        if code in normal_processes:
+                            included_process_ids.append(normal_processes[code])
+                        else:
+                            # 查找数据库中已有的工序
+                            existing_process = ProcessPrice.query.filter_by(process_code=code, price_type='normal', is_current=True).first()
+                            if existing_process:
+                                included_process_ids.append(existing_process.id)
+                    
+                    if not included_process_ids:
+                        error_messages.append(f"小计工序 {data['process_code']} 没有找到有效的包含工序")
+                        continue
+                    
+                    # 计算小计总价
+                    total_price = 0
+                    for pid in included_process_ids:
+                        process = ProcessPrice.query.get(pid)
+                        if process:
+                            total_price += process.price
+                    
+                    # 创建小计工序
+                    subtotal = ProcessPrice(
+                        serial_number=SerialNumber.get_next_number(),
+                        process_code=data['process_code'],
+                        process_name=data['process_name'],
+                        component=data['component'],
+                        drawing_no=data['drawing_no'],
+                        model_no=data['model_no'],
+                        price=total_price,
+                        effective_date=data['effective_date'],
+                        notes=data['notes'],
+                        version=1,  # 新工序的初始版本为1
+                        is_current=True,  # 新工序默认为当前生效
+                        price_type='subtotal'
+                    )
+                    db.session.add(subtotal)
+                    db.session.flush()  # 获取ID
+                    
+                    # 创建小计关联
+                    for pid in included_process_ids:
+                        group = ProcessPriceGroup(
+                            subtotal_id=subtotal.id,
+                            process_id=pid
+                        )
+                        db.session.add(group)
+                    
+                    success_count += 1
+                    
+                except Exception as e:
+                    error_messages.append(f"处理小计工序 {data['process_code']} 时出错: {str(e)}")
         
         if success_count > 0:
             db.session.commit()

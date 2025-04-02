@@ -89,6 +89,33 @@
                             {% endif %}
                         </div>
                     </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            {{ form.hire_date.label }}
+                            {{ form.hire_date(class="form-control", type="date") }}
+                            {% if form.hire_date.errors %}
+                            <div class="invalid-feedback d-block">
+                                {% for error in form.hire_date.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            {{ form.termination_date.label }}
+                            {{ form.termination_date(class="form-control", type="date") }}
+                            {% if form.termination_date.errors %}
+                            <div class="invalid-feedback d-block">
+                                {% for error in form.termination_date.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                            <small class="form-text text-muted">如果员工在职，请留空</small>
+                        </div>
+                    </div>
                     {% if current_user.role == 'admin' %}
                     <div class="col-md-6">
                         <div class="form-check mt-4">

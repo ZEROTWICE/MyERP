@@ -60,10 +60,41 @@ class ProcessPrice(db.Model):
     effective_date = db.Column(db.DateTime, default=datetime.utcnow)
     is_current = db.Column(db.Boolean, default=True)
     notes = db.Column(db.Text)  # 备注
+    price_type = db.Column(db.String(20), nullable=False, default='normal')  # normal: 普通工价, subtotal: 小计
     
     __table_args__ = (
         db.UniqueConstraint('serial_number', name='uq_process_price_serial_number'),
     )
+
+    @property
+    def is_subtotal(self):
+        return self.price_type == 'subtotal'
+
+class ProcessPriceGroup(db.Model):
+    """工序价格小计关系表"""
+    __tablename__ = 'process_price_group'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    serial_number = db.Column(db.String(8), unique=True, nullable=False)
+    subtotal_id = db.Column(db.Integer, db.ForeignKey('process_price.id', ondelete='CASCADE'), nullable=False)
+    process_id = db.Column(db.Integer, db.ForeignKey('process_price.id', ondelete='CASCADE'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    __table_args__ = (
+        db.UniqueConstraint('serial_number', name='uq_process_price_group_serial_number'),
+        db.UniqueConstraint('subtotal_id', 'process_id', name='uq_subtotal_process'),
+    )
+    
+    # 关系
+    subtotal = db.relationship('ProcessPrice', foreign_keys=[subtotal_id], 
+                             backref=db.backref('included_processes', lazy='dynamic'))
+    process = db.relationship('ProcessPrice', foreign_keys=[process_id],
+                            backref=db.backref('belongs_to_subtotals', lazy='dynamic'))
+    
+    def __init__(self, **kwargs):
+        super(ProcessPriceGroup, self).__init__(**kwargs)
+        if not self.serial_number:
+            self.serial_number = SerialNumber.get_next_number()
 
 class Employee(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -74,6 +105,9 @@ class Employee(db.Model):
     base_salary = db.Column(db.Float, default=0)
     coefficient = db.Column(db.Float, default=1.0)
     department = db.Column(db.String(50))
+    hire_date = db.Column(db.Date, nullable=False)  # 入职时间
+    termination_date = db.Column(db.Date, nullable=True)  # 离职时间
+    is_active = db.Column(db.Boolean, default=True)  # 是否在职
     user_id = db.Column(db.Integer, db.ForeignKey('user.id', name='fk_employee_user_id'))
     user = db.relationship('User', backref=db.backref('employee', uselist=False))
     
@@ -89,6 +123,21 @@ class Employee(db.Model):
         adjustments = sum(bp.amount if bp.type == 'bonus' else -bp.amount for bp in self.bonuses_penalties)
         # 总工资 = 基本工资 + 计件工资 * 系数 + 调整金额
         return self.base_salary + piecework * self.coefficient + adjustments
+
+    @property
+    def status(self):
+        """获取员工状态"""
+        if not self.is_active:
+            return '离职'
+        return '在职'
+
+    def update_active_status(self):
+        """根据入职时间和离职时间更新活跃状态"""
+        today = datetime.now().date()
+        if self.termination_date and self.termination_date <= today:
+            self.is_active = False
+        else:
+            self.is_active = True
 
     production_records = db.relationship('ProductionRecord', backref='employee', lazy='dynamic')
     bonuses_penalties = db.relationship('BonusPenalty', backref='employee', lazy='dynamic')

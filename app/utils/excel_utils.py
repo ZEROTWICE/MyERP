@@ -13,7 +13,7 @@ class ExcelGenerator:
         ws.title = "员工信息"
         
         # 设置表头
-        headers = ['工号', '姓名', '职位', '部门', '基本工资', '系数']
+        headers = ['工号', '姓名', '职位', '部门', '基本工资', '系数', '入职时间', '离职时间']
         for col, header in enumerate(headers, 1):
             cell = ws.cell(row=1, column=col, value=header)
             cell.font = Font(bold=True)
@@ -32,6 +32,10 @@ class ExcelGenerator:
                     pass
             adjusted_width = (max_length + 2)
             ws.column_dimensions[column].width = adjusted_width
+            
+        # 添加日期格式说明
+        ws.cell(row=2, column=7, value='格式：YYYY-MM-DD')
+        ws.cell(row=2, column=8, value='格式：YYYY-MM-DD（可选）')
             
         return wb
 
@@ -163,7 +167,7 @@ class ExcelGenerator:
         ws.title = "员工信息"
         
         # 设置表头
-        headers = ['工号', '姓名', '职位', '部门', '基本工资', '系数']
+        headers = ['工号', '姓名', '职位', '部门', '基本工资', '系数', '入职时间', '离职时间', '状态']
         for col, header in enumerate(headers, 1):
             cell = ws.cell(row=1, column=col, value=header)
             cell.font = Font(bold=True)
@@ -178,6 +182,9 @@ class ExcelGenerator:
             ws.cell(row=row, column=4, value=employee.department)
             ws.cell(row=row, column=5, value=employee.base_salary)
             ws.cell(row=row, column=6, value=employee.coefficient)
+            ws.cell(row=row, column=7, value=employee.hire_date.strftime('%Y-%m-%d') if employee.hire_date else '')
+            ws.cell(row=row, column=8, value=employee.termination_date.strftime('%Y-%m-%d') if employee.termination_date else '')
+            ws.cell(row=row, column=9, value=employee.status)
             
         # 设置列宽
         for col in ws.columns:
