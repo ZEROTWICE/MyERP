@@ -540,4 +540,42 @@ class ExcelGenerator:
                     pass
             ws.column_dimensions[col[0].column_letter].width = max_length + 2
 
-        return wb 
+        return wb
+
+    @staticmethod
+    def add_headers(wb, headers):
+        """添加表头"""
+        ws = wb.active
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col, value=header)
+            ExcelGenerator._apply_header_style(cell)
+        return ws
+
+    @staticmethod
+    def add_row(ws, row_data, row_number=None):
+        """添加数据行"""
+        if row_number is None:
+            row_number = ws.max_row + 1
+        
+        for col, value in enumerate(row_data, 1):
+            cell = ws.cell(row=row_number, column=col, value=value)
+            ExcelGenerator._apply_cell_style(cell)
+
+    @staticmethod
+    def generate_response(wb, filename):
+        """生成Excel响应"""
+        from io import BytesIO
+        from flask import send_file
+        
+        # 保存到内存
+        excel_file = BytesIO()
+        wb.save(excel_file)
+        excel_file.seek(0)
+        
+        # 返回文件
+        return send_file(
+            excel_file,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name=filename
+        ) 

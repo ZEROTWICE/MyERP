@@ -12,16 +12,24 @@ from app.main.forms import (
     BonusPenaltySearchForm, ExportEmployeeForm, ExportProcessForm,
     ExportProductionRecordForm, ExportBonusPenaltyForm, ExportTaskForm
 )
-from sqlalchemy import desc
+from sqlalchemy import desc, or_
 from app.utils.excel_generator import ExcelGenerator
 import os
 import time
 from werkzeug.utils import secure_filename
+from werkzeug.datastructures import FileStorage
+from typing import Optional
 from flask import after_this_request
 from functools import wraps
 import tempfile
 from flask_paginate import Pagination
 import pandas as pd
+from app.decorators import admin_required
+import numpy as np
+from werkzeug.datastructures import FileStorage
+from typing import List, Dict, Any, Optional, Union
+import shutil
+from openpyxl import Workbook
 
 def handle_pagination_args(f):
     @wraps(f)
@@ -3160,43 +3168,38 @@ def delete_salary_change():
 @login_required
 @handle_pagination_args
 def manage_inventory():
-    """库存管理主页"""
-    # 获取库存类型参数
-    inventory_type = request.args.get('type', 'finished')  # finished 或 raw
-    search_term = request.args.get('search', '')
+    page = request.args.get('page', 1, type=int)
+    per_page = 20
+    inventory_type = request.args.get('type', 'finished')
+    search = request.args.get('search', '')
     
-    # 根据库存类型构建不同的查询
-    if inventory_type == 'finished':
-        query = FinishedProduct.query
-        if search_term:
-            search_term = f"%{search_term}%"
-            query = query.filter(db.or_(
-                FinishedProduct.product_number.like(search_term),
-                FinishedProduct.drawing_number.like(search_term),
-                FinishedProduct.model.like(search_term),
-                FinishedProduct.inspector.like(search_term)
+    if inventory_type == 'raw':
+        query = RawMaterial.query
+        if search:
+            query = query.filter(or_(
+                RawMaterial.supplier.ilike(f'%{search}%'),
+                RawMaterial.material_name.ilike(f'%{search}%'),
+                RawMaterial.melt_number.ilike(f'%{search}%'),
+                RawMaterial.supplier_number.ilike(f'%{search}%'),
+                RawMaterial.internal_number.ilike(f'%{search}%')
             ))
     else:
-        query = RawMaterial.query
-        if search_term:
-            search_term = f"%{search_term}%"
-            query = query.filter(db.or_(
-                RawMaterial.supplier.like(search_term),
-                RawMaterial.material_name.like(search_term),
-                RawMaterial.melt_number.like(search_term),
-                RawMaterial.supplier_number.like(search_term),
-                RawMaterial.internal_number.like(search_term)
+        query = FinishedProduct.query
+        if search:
+            query = query.filter(or_(
+                FinishedProduct.product_number.ilike(f'%{search}%'),
+                FinishedProduct.drawing_number.ilike(f'%{search}%'),
+                FinishedProduct.model.ilike(f'%{search}%'),
+                FinishedProduct.inspector.ilike(f'%{search}%')
             ))
     
-    # 分页
-    page = request.validated_page
-    pagination = query.paginate(page=page, per_page=request.validated_per_page)
-    inventory = pagination.items
+    pagination = query.order_by(desc('id')).paginate(
+        page=page, per_page=per_page, error_out=False
+    )
     
     return render_template('main/inventory.html',
-                         inventory=inventory,
-                         pagination=pagination,
-                         search_form=search_form)
+                         inventory=pagination.items,
+                         pagination=pagination)
 
 @bp.route('/inventory/template')
 @login_required
@@ -3204,34 +3207,56 @@ def download_inventory_template():
     """下载库存导入模板"""
     inventory_type = request.args.get('type', 'finished')
     
-    if inventory_type == 'finished':
-        headers = ['产品编号', '生产日期', '图号', '型号', '检验员', '状态', '备注']
-        filename = '成品库存导入模板.xlsx'
-    else:
-        headers = ['供应商', '品名', '原料冶炼炉号', '供应商编号', '入库时间', '数量', '是否带样品', '备注']
-        filename = '原材料库存导入模板.xlsx'
+    # 创建工作簿
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "库存导入模板"
     
-    # 创建Excel文件
-    excel_generator = ExcelGenerator()
-    excel_generator.add_headers(headers)
-    
-    # 添加示例数据
     if inventory_type == 'finished':
+        headers = ['产品编号*', '生产日期*', '图号*', '型号*', '检验员*', '状态*', '备注']
         example_data = [
             ['P2024001', '2024-03-20', 'DWG-001', 'MODEL-A', '张三', 'in_stock', '示例数据'],
             ['P2024002', '2024-03-20', 'DWG-002', 'MODEL-B', '李四', 'in_stock', '示例数据']
         ]
+        filename = '成品库存导入模板.xlsx'
     else:
+        headers = ['供应商*', '品名*', '原料冶炼炉号*', '供应商编号*', '入库时间*', '数量*', '是否带样品', '备注']
         example_data = [
             ['供应商A', '钢材', 'M001', 'S001', '2024-03-20', '100', '是', '示例数据'],
             ['供应商B', '铝材', 'M002', 'S002', '2024-03-20', '200', '否', '示例数据']
         ]
+        filename = '原材料库存导入模板.xlsx'
     
-    for row in example_data:
-        excel_generator.add_row(row)
+    # 添加表头
+    ws = ExcelGenerator.add_headers(wb, headers)
     
-    # 生成并返回文件
-    return excel_generator.generate_response(filename)
+    # 添加示例数据
+    for i, row in enumerate(example_data, 2):
+        ExcelGenerator.add_row(ws, row, i)
+    
+    # 添加说明
+    start_row = len(example_data) + 3
+    ws.cell(row=start_row, column=1, value='说明：')
+    ws.cell(row=start_row + 1, column=1, value='1. 标记*的字段为必填项')
+    if inventory_type == 'finished':
+        ws.cell(row=start_row + 2, column=1, value='2. 状态可选值：in_stock(在库), shipped(已发货), scrapped(报废), used(已使用)')
+    else:
+        ws.cell(row=start_row + 2, column=1, value='2. 是否带样品可选值：是, 否')
+    ws.cell(row=start_row + 3, column=1, value='3. 日期格式：YYYY-MM-DD')
+    
+    # 调整列宽
+    for col in ws.columns:
+        max_length = 0
+        for cell in col:
+            try:
+                if len(str(cell.value)) > max_length:
+                    max_length = len(str(cell.value))
+            except:
+                pass
+        ws.column_dimensions[col[0].column_letter].width = max_length + 2
+    
+    # 返回文件
+    return ExcelGenerator.generate_response(wb, filename)
 
 @bp.route('/inventory/finished/import', methods=['POST'])
 @login_required
@@ -3476,3 +3501,143 @@ def export_inventory():
     except Exception as e:
         flash(f'导出失败：{str(e)}', 'danger')
         return redirect(url_for('main.manage_inventory', type=inventory_type))
+
+def validate_raw_material_data(df):
+    """验证原材料数据的必填字段"""
+    required_columns = ['name', 'specification', 'unit', 'unit_price', 'quantity']
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    if missing_columns:
+        return False, f"缺少必填列：{', '.join(missing_columns)}"
+    return True, None
+
+def validate_finished_product_data(df):
+    """验证成品数据的必填字段"""
+    required_columns = ['name', 'model', 'specification', 'unit', 'unit_price', 'quantity']
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    if missing_columns:
+        return False, f"缺少必填列：{', '.join(missing_columns)}"
+    return True, None
+
+def allowed_file(filename: str, allowed_extensions: set = {'xlsx', 'xls'}) -> bool:
+    """检查文件扩展名是否允许上传"""
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in allowed_extensions
+
+def validate_excel_file(file: FileStorage) -> Optional[str]:
+    """验证上传的Excel文件"""
+    if not file:
+        return "未选择文件"
+    if not allowed_file(file.filename):
+        return "不支持的文件格式，请上传Excel文件(.xlsx或.xls)"
+    return None
+
+def save_temp_file(file: FileStorage) -> str:
+    """保存上传的文件到临时目录"""
+    temp_dir = tempfile.mkdtemp()
+    temp_path = os.path.join(temp_dir, secure_filename(file.filename))
+    file.save(temp_path)
+    return temp_path
+
+@bp.route('/upload/raw-materials', methods=['POST'])
+@login_required
+@admin_required
+def upload_raw_materials():
+    """处理原材料数据文件上传"""
+    try:
+        file = request.files.get('file')
+        error = validate_excel_file(file)
+        if error:
+            return jsonify({'success': False, 'message': error})
+
+        temp_path = save_temp_file(file)
+        
+        try:
+            df = pd.read_excel(temp_path)
+            required_columns = ['material_code', 'material_name', 'unit', 'unit_price']
+            
+            # 验证必需列是否存在
+            missing_columns = [col for col in required_columns if col not in df.columns]
+            if missing_columns:
+                return jsonify({
+                    'success': False,
+                    'message': f'文件缺少必需的列：{", ".join(missing_columns)}'
+                })
+            
+            # 开始数据导入事务
+            with db.session.begin_nested():
+                for _, row in df.iterrows():
+                    raw_material = RawMaterial(
+                        material_code=str(row['material_code']),
+                        material_name=str(row['material_name']),
+                        unit=str(row['unit']),
+                        unit_price=float(row['unit_price'])
+                    )
+                    db.session.add(raw_material)
+            
+            db.session.commit()
+            return jsonify({'success': True, 'message': '原材料数据导入成功'})
+            
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'success': False, 'message': f'数据处理错误：{str(e)}'})
+        
+        finally:
+            # 清理临时文件
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+            os.rmdir(os.path.dirname(temp_path))
+            
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'上传处理错误：{str(e)}'})
+
+@bp.route('/upload/finished-products', methods=['POST'])
+@login_required
+@admin_required
+def upload_finished_products():
+    """处理成品数据文件上传"""
+    try:
+        file = request.files.get('file')
+        error = validate_excel_file(file)
+        if error:
+            return jsonify({'success': False, 'message': error})
+
+        temp_path = save_temp_file(file)
+        
+        try:
+            df = pd.read_excel(temp_path)
+            required_columns = ['product_code', 'product_name', 'specification', 'unit', 'unit_price']
+            
+            # 验证必需列是否存在
+            missing_columns = [col for col in required_columns if col not in df.columns]
+            if missing_columns:
+                return jsonify({
+                    'success': False,
+                    'message': f'文件缺少必需的列：{", ".join(missing_columns)}'
+                })
+            
+            # 开始数据导入事务
+            with db.session.begin_nested():
+                for _, row in df.iterrows():
+                    finished_product = FinishedProduct(
+                        product_code=str(row['product_code']),
+                        product_name=str(row['product_name']),
+                        specification=str(row['specification']),
+                        unit=str(row['unit']),
+                        unit_price=float(row['unit_price'])
+                    )
+                    db.session.add(finished_product)
+            
+            db.session.commit()
+            return jsonify({'success': True, 'message': '成品数据导入成功'})
+            
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'success': False, 'message': f'数据处理错误：{str(e)}'})
+        
+        finally:
+            # 清理临时文件
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+            os.rmdir(os.path.dirname(temp_path))
+            
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'上传处理错误：{str(e)}'})
