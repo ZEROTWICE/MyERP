@@ -231,8 +231,9 @@ If you have run out of energy or time for your project, put a note at the top of
 
 already 流水号 ✔
 already 修复奖惩管理找不到员工和工序 ✔
+already 工资变更生效日
 
-next 工资变更生效日
+next 库存管理
 next 任务完成自动创建生产记录
 next user界面我的薪资。
 

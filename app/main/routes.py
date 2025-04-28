@@ -2,7 +2,7 @@ from flask import render_template, redirect, url_for, flash, request, jsonify, c
 from sqlalchemy.exc import SQLAlchemyError
 from flask_login import login_required, current_user
 from app import db
-from app.models import Employee, ProcessPrice, ProductionRecord, BonusPenalty, AuditLog, ProcessPrice, User, TaskAssignment, SerialNumber, SalaryChange, CoefficientChange, EmployeeSalaryHistory, EmployeeCoefficientHistory, ProcessPriceGroup
+from app.models import Employee, ProcessPrice, ProductionRecord, BonusPenalty, AuditLog, ProcessPrice, User, TaskAssignment, SerialNumber, SalaryChange, CoefficientChange, EmployeeSalaryHistory, EmployeeCoefficientHistory, ProcessPriceGroup, FinishedProduct, RawMaterial
 from datetime import datetime, timedelta
 from . import bp
 from app.main.forms import (
@@ -21,6 +21,7 @@ from flask import after_this_request
 from functools import wraps
 import tempfile
 from flask_paginate import Pagination
+import pandas as pd
 
 def handle_pagination_args(f):
     @wraps(f)
@@ -487,13 +488,13 @@ def add_process_price():
             # 创建新的工序价格记录
             process_price = ProcessPrice(
                 serial_number=SerialNumber.get_next_number(),
-            process_code=form.process_code.data,
-            process_name=form.process_name.data,
-            component=form.component.data,
-            drawing_no=form.drawing_no.data,
-            model_no=form.model_no.data,
+                process_code=form.process_code.data,
+                process_name=form.process_name.data,
+                component=form.component.data,
+                drawing_no=form.drawing_no.data,
+                model_no=form.model_no.data,
                 price=price,
-            effective_date=form.effective_date.data,
+                effective_date=form.effective_date.data,
                 notes=form.notes.data,
                 version=1,  # 新工序的初始版本为1
                 is_current=True,  # 新工序默认为当前生效
@@ -763,7 +764,7 @@ def manage_production_records():
             
             process_price = ProcessPrice.query.filter(
                 ProcessPrice.process_code == form.process_code.data,
-                                ProcessPrice.effective_date <= end_of_day + timedelta(days=1)
+                                        ProcessPrice.effective_date <= end_of_day + timedelta(days=1)
             ).order_by(ProcessPrice.effective_date.desc()).first()
 
             if not process_price:
@@ -771,7 +772,7 @@ def manage_production_records():
                 return redirect(url_for('main.manage_production_records'))
 
             record = ProductionRecord(
-                                serial_number=SerialNumber.get_next_number(),
+                serial_number=SerialNumber.get_next_number(),
                 employee_id=form.employee_id.data,
                 process_id=process_price.id,
                 quantity=form.quantity.data,
@@ -1538,27 +1539,27 @@ def import_process_prices():
         for data in process_data:
             if data['price_type'] != 'subtotal':
                 try:
-                    # 创建新工序价格记录
+                # 创建新工序价格记录
                     process = ProcessPrice(
-                        serial_number=SerialNumber.get_next_number(),
-                        process_code=data['process_code'],
-                        process_name=data['process_name'],
-                        component=data['component'],
-                        drawing_no=data['drawing_no'],
-                        model_no=data['model_no'],
-                        price=data['price'],
-                        effective_date=data['effective_date'],
-                        notes=data['notes'],
-                        version=1,  # 新工序的初始版本为1
-                        is_current=True,  # 新工序默认为当前生效
-                        price_type='normal'
-                    )
+                    serial_number=SerialNumber.get_next_number(),
+                    process_code=data['process_code'],
+                    process_name=data['process_name'],
+                    component=data['component'],
+                    drawing_no=data['drawing_no'],
+                    model_no=data['model_no'],
+                    price=data['price'],
+                    effective_date=data['effective_date'],
+                    notes=data['notes'],
+                            version=1,  # 新工序的初始版本为1
+                            is_current=True,  # 新工序默认为当前生效
+                            price_type='normal'
+                )
                     db.session.add(process)
                     db.session.flush()  # 获取ID
-                    
+                            
                     normal_processes[data['process_code']] = process.id
                     success_count += 1
-                    
+                
                 except Exception as e:
                     error_messages.append(f"处理普通工序 {data['process_code']} 时出错: {str(e)}")
         
@@ -3154,3 +3155,324 @@ def delete_salary_change():
         db.session.rollback()
         current_app.logger.error(f"删除工资变更记录失败: {str(e)}")
         return jsonify({'success': False, 'message': str(e)})
+
+@bp.route('/inventory')
+@login_required
+@handle_pagination_args
+def manage_inventory():
+    """库存管理主页"""
+    # 获取库存类型参数
+    inventory_type = request.args.get('type', 'finished')  # finished 或 raw
+    search_term = request.args.get('search', '')
+    
+    # 根据库存类型构建不同的查询
+    if inventory_type == 'finished':
+        query = FinishedProduct.query
+        if search_term:
+            search_term = f"%{search_term}%"
+            query = query.filter(db.or_(
+                FinishedProduct.product_number.like(search_term),
+                FinishedProduct.drawing_number.like(search_term),
+                FinishedProduct.model.like(search_term),
+                FinishedProduct.inspector.like(search_term)
+            ))
+    else:
+        query = RawMaterial.query
+        if search_term:
+            search_term = f"%{search_term}%"
+            query = query.filter(db.or_(
+                RawMaterial.supplier.like(search_term),
+                RawMaterial.material_name.like(search_term),
+                RawMaterial.melt_number.like(search_term),
+                RawMaterial.supplier_number.like(search_term),
+                RawMaterial.internal_number.like(search_term)
+            ))
+    
+    # 分页
+    page = request.validated_page
+    pagination = query.paginate(page=page, per_page=request.validated_per_page)
+    inventory = pagination.items
+    
+    return render_template('main/inventory.html',
+                         inventory=inventory,
+                         pagination=pagination,
+                         search_form=search_form)
+
+@bp.route('/inventory/template')
+@login_required
+def download_inventory_template():
+    """下载库存导入模板"""
+    inventory_type = request.args.get('type', 'finished')
+    
+    if inventory_type == 'finished':
+        headers = ['产品编号', '生产日期', '图号', '型号', '检验员', '状态', '备注']
+        filename = '成品库存导入模板.xlsx'
+    else:
+        headers = ['供应商', '品名', '原料冶炼炉号', '供应商编号', '入库时间', '数量', '是否带样品', '备注']
+        filename = '原材料库存导入模板.xlsx'
+    
+    # 创建Excel文件
+    excel_generator = ExcelGenerator()
+    excel_generator.add_headers(headers)
+    
+    # 添加示例数据
+    if inventory_type == 'finished':
+        example_data = [
+            ['P2024001', '2024-03-20', 'DWG-001', 'MODEL-A', '张三', 'in_stock', '示例数据'],
+            ['P2024002', '2024-03-20', 'DWG-002', 'MODEL-B', '李四', 'in_stock', '示例数据']
+        ]
+    else:
+        example_data = [
+            ['供应商A', '钢材', 'M001', 'S001', '2024-03-20', '100', '是', '示例数据'],
+            ['供应商B', '铝材', 'M002', 'S002', '2024-03-20', '200', '否', '示例数据']
+        ]
+    
+    for row in example_data:
+        excel_generator.add_row(row)
+    
+    # 生成并返回文件
+    return excel_generator.generate_response(filename)
+
+@bp.route('/inventory/finished/import', methods=['POST'])
+@login_required
+def import_finished_products():
+    """导入成品库存"""
+    if current_user.role not in ['admin', 'manager']:
+        return jsonify({'success': False, 'message': '权限不足'})
+    
+    if 'file' not in request.files:
+        return jsonify({'success': False, 'message': '没有上传文件'})
+    
+    file = request.files['file']
+    if not file or not file.filename.endswith('.xlsx'):
+        return jsonify({'success': False, 'message': '请上传Excel文件'})
+    
+    try:
+        # 保存临时文件
+        temp_path = os.path.join(tempfile.gettempdir(), secure_filename(file.filename))
+        file.save(temp_path)
+        
+        # 读取Excel文件
+        df = pd.read_excel(temp_path)
+        
+        # 验证必要的列是否存在
+        required_columns = ['产品编号', '生产日期', '图号', '型号', '检验员', '状态']
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return jsonify({'success': False, 'message': f'缺少必要的列：{", ".join(missing_columns)}'})
+        
+        # 开始导入
+        success_count = 0
+        error_messages = []
+        
+        for index, row in df.iterrows():
+            try:
+                # 创建成品记录
+                product = FinishedProduct(
+                    global_sn=SerialNumber.get_next_number(),
+                    serial_number=SerialNumber.get_next_number(),
+                    product_number=str(row['产品编号']),
+                    production_date=pd.to_datetime(row['生产日期']).date(),
+                    drawing_number=str(row['图号']),
+                    model=str(row['型号']),
+                    inspector=str(row['检验员']),
+                    status=str(row['状态']),
+                    notes=str(row.get('备注', ''))
+                )
+                db.session.add(product)
+                
+                # 记录审计日志
+                log = AuditLog(
+                    user_id=current_user.id,
+                    action='导入成品',
+                    details=f'导入成品：{product.product_number}',
+                    can_rollback=True,
+                    rollback_type='add',
+                    target_model='FinishedProduct',
+                    target_id=product.id,
+                    new_data={
+                        'product_number': product.product_number,
+                        'drawing_number': product.drawing_number,
+                        'model': product.model,
+                        'inspector': product.inspector,
+                        'status': product.status
+                    }
+                )
+                db.session.add(log)
+                
+                success_count += 1
+            except Exception as e:
+                error_messages.append(f'第{index+2}行导入失败：{str(e)}')
+        
+        db.session.commit()
+        
+        # 返回结果
+        message = f'成功导入{success_count}条记录'
+        if error_messages:
+            message += f'，{len(error_messages)}条记录导入失败：\n' + '\n'.join(error_messages)
+        
+        return jsonify({'success': True, 'message': message})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'导入失败：{str(e)}'})
+    finally:
+        # 清理临时文件
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+
+@bp.route('/inventory/raw/import', methods=['POST'])
+@login_required
+def import_raw_materials():
+    """导入原材料库存"""
+    if current_user.role not in ['admin', 'manager']:
+        return jsonify({'success': False, 'message': '权限不足'})
+    
+    if 'file' not in request.files:
+        return jsonify({'success': False, 'message': '没有上传文件'})
+    
+    file = request.files['file']
+    if not file or not file.filename.endswith('.xlsx'):
+        return jsonify({'success': False, 'message': '请上传Excel文件'})
+    
+    try:
+        # 保存临时文件
+        temp_path = os.path.join(tempfile.gettempdir(), secure_filename(file.filename))
+        file.save(temp_path)
+        
+        # 读取Excel文件
+        df = pd.read_excel(temp_path)
+        
+        # 验证必要的列是否存在
+        required_columns = ['供应商', '品名', '原料冶炼炉号', '供应商编号', '入库时间', '数量']
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return jsonify({'success': False, 'message': f'缺少必要的列：{", ".join(missing_columns)}'})
+        
+        # 开始导入
+        success_count = 0
+        error_messages = []
+        
+        for index, row in df.iterrows():
+            try:
+                # 创建原材料记录
+                material = RawMaterial(
+                    global_sn=SerialNumber.get_next_number(),
+                    supplier=str(row['供应商']),
+                    material_name=str(row['品名']),
+                    melt_number=str(row['原料冶炼炉号']),
+                    supplier_number=str(row['供应商编号']),
+                    storage_date=pd.to_datetime(row['入库时间']).date(),
+                    internal_number=SerialNumber.get_next_number(),
+                    quantity=float(row['数量']),
+                    has_sample=bool(row.get('是否带样品', False)),
+                    notes=str(row.get('备注', ''))
+                )
+                db.session.add(material)
+                
+                # 记录审计日志
+                log = AuditLog(
+                    user_id=current_user.id,
+                    action='导入原材料',
+                    details=f'导入原材料：{material.material_name}',
+                    can_rollback=True,
+                    rollback_type='add',
+                    target_model='RawMaterial',
+                    target_id=material.id,
+                    new_data={
+                        'supplier': material.supplier,
+                        'material_name': material.material_name,
+                        'melt_number': material.melt_number,
+                        'supplier_number': material.supplier_number,
+                        'quantity': material.quantity
+                    }
+                )
+                db.session.add(log)
+                
+                success_count += 1
+            except Exception as e:
+                error_messages.append(f'第{index+2}行导入失败：{str(e)}')
+        
+        db.session.commit()
+        
+        # 返回结果
+        message = f'成功导入{success_count}条记录'
+        if error_messages:
+            message += f'，{len(error_messages)}条记录导入失败：\n' + '\n'.join(error_messages)
+        
+        return jsonify({'success': True, 'message': message})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'导入失败：{str(e)}'})
+    finally:
+        # 清理临时文件
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+
+@bp.route('/inventory/export')
+@login_required
+def export_inventory():
+    """导出库存数据"""
+    inventory_type = request.args.get('type', 'finished')
+    
+    try:
+        # 创建Excel生成器
+        excel_generator = ExcelGenerator()
+        
+        if inventory_type == 'finished':
+            # 导出成品库存
+            headers = ['全局流水号', '产品编号', '生产日期', '图号', '型号', '检验员', '状态', '备注']
+            excel_generator.add_headers(headers)
+            
+            # 查询数据
+            products = FinishedProduct.query.order_by(FinishedProduct.created_at.desc()).all()
+            
+            # 添加数据行
+            for product in products:
+                row = [
+                    product.global_sn,
+                    product.product_number,
+                    product.production_date.strftime('%Y-%m-%d'),
+                    product.drawing_number,
+                    product.model,
+                    product.inspector,
+                    product.status,
+                    product.notes or ''
+                ]
+                excel_generator.add_row(row)
+            
+            filename = f'成品库存_{datetime.now().strftime("%Y%m%d")}.xlsx'
+        else:
+            # 导出原材料库存
+            headers = ['全局流水号', '供应商', '品名', '原料冶炼炉号', '供应商编号', '内部编号', 
+                      '入库时间', '数量', '是否带样品', '备注']
+            excel_generator.add_headers(headers)
+            
+            # 查询数据
+            materials = RawMaterial.query.order_by(RawMaterial.created_at.desc()).all()
+            
+            # 添加数据行
+            for material in materials:
+                row = [
+                    material.global_sn,
+                    material.supplier,
+                    material.material_name,
+                    material.melt_number,
+                    material.supplier_number,
+                    material.internal_number,
+                    material.storage_date.strftime('%Y-%m-%d'),
+                    f'{material.quantity:.2f}',
+                    '是' if material.has_sample else '否',
+                    material.notes or ''
+                ]
+                excel_generator.add_row(row)
+            
+            filename = f'原材料库存_{datetime.now().strftime("%Y%m%d")}.xlsx'
+        
+        # 生成并返回文件
+        return excel_generator.generate_response(filename)
+        
+    except Exception as e:
+        flash(f'导出失败：{str(e)}', 'danger')
+        return redirect(url_for('main.manage_inventory', type=inventory_type))

@@ -294,3 +294,56 @@ class EmployeeCoefficientHistory(db.Model):
 # 为与路由函数保持一致，创建别名
 SalaryChange = EmployeeSalaryHistory
 CoefficientChange = EmployeeCoefficientHistory
+
+class FinishedProduct(db.Model):
+    """成品库存管理"""
+    id = db.Column(db.Integer, primary_key=True)
+    global_sn = db.Column(db.String(8), unique=True, nullable=False)  # 全局流水号
+    serial_number = db.Column(db.String(8), unique=True, nullable=False)
+    product_number = db.Column(db.String(50), nullable=False, index=True)  # 产品编号
+    production_date = db.Column(db.Date, nullable=False)  # 生产日期
+    drawing_number = db.Column(db.String(100), nullable=False)  # 图号
+    model = db.Column(db.String(100), nullable=False)  # 型号
+    inspector = db.Column(db.String(50), nullable=False)  # 检验员
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    status = db.Column(db.String(20), default='in_stock')  # in_stock: 在库, shipped: 已发货, scrapped: 报废, used: 已使用
+    notes = db.Column(db.Text)  # 备注
+    
+    __table_args__ = (
+        db.UniqueConstraint('serial_number', name='uq_finished_product_serial_number'),
+        db.UniqueConstraint('global_sn', name='uq_finished_product_global_sn'),
+    )
+    
+    def __init__(self, **kwargs):
+        super(FinishedProduct, self).__init__(**kwargs)
+        if not self.serial_number:
+            self.serial_number = SerialNumber.get_next_number()
+        if not self.global_sn:
+            self.global_sn = SerialNumber.get_next_number()
+
+class RawMaterial(db.Model):
+    """原材料管理"""
+    id = db.Column(db.Integer, primary_key=True)
+    global_sn = db.Column(db.String(8), unique=True, nullable=False)  # 全局流水号
+    supplier = db.Column(db.String(100), nullable=False)  # 供应商
+    material_name = db.Column(db.String(100), nullable=False)  # 品名
+    melt_number = db.Column(db.String(100), nullable=False)  # 原料冶炼炉号
+    supplier_number = db.Column(db.String(100), nullable=False)  # 供应商编号
+    has_sample = db.Column(db.Boolean, default=False)  # 是否带样品
+    storage_date = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)  # 入库时间
+    internal_number = db.Column(db.String(100), nullable=False)  # 内部编号
+    quantity = db.Column(db.Float, nullable=False)  # 数量
+    notes = db.Column(db.Text)  # 备注
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    __table_args__ = (
+        db.UniqueConstraint('global_sn', name='uq_raw_material_global_sn'),
+        db.UniqueConstraint('internal_number', name='uq_raw_material_internal_number'),
+    )
+    
+    def __init__(self, **kwargs):
+        super(RawMaterial, self).__init__(**kwargs)
+        if not self.global_sn:
+            self.global_sn = SerialNumber.get_next_number()
+        if not self.internal_number:
+            self.internal_number = SerialNumber.get_next_number()
