@@ -2,7 +2,7 @@ from flask import render_template, redirect, url_for, flash, request, jsonify, c
 from sqlalchemy.exc import SQLAlchemyError
 from flask_login import login_required, current_user
 from app import db
-from app.models import Employee, ProcessPrice, ProductionRecord, BonusPenalty, AuditLog, ProcessPrice, User, TaskAssignment, SerialNumber, SalaryChange, CoefficientChange, EmployeeSalaryHistory, EmployeeCoefficientHistory, ProcessPriceGroup, FinishedProduct, RawMaterial
+from app.models import Employee, ProcessPrice, ProductionRecord, BonusPenalty, AuditLog, ProcessPrice, User, TaskAssignment, SerialNumber, SalaryChange, CoefficientChange, EmployeeSalaryHistory, EmployeeCoefficientHistory, ProcessPriceGroup, FinishedProduct, RawMaterial, CodeRule, CodeGenerationLog
 from datetime import datetime, timedelta
 from . import bp
 from app.main.forms import (
@@ -3787,3 +3787,196 @@ def add_raw_material():
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': f'添加失败：{str(e)}'})
+
+@bp.route('/code_rules')
+@login_required
+def manage_code_rules():
+    """编码规则管理"""
+    if current_user.role != 'admin':
+        flash('权限不足')
+        return redirect(url_for('main.index'))
+    
+    rules = CodeRule.query.order_by(CodeRule.created_at.desc()).all()
+    return render_template('main/code_rules.html', rules=rules)
+
+@bp.route('/code_rules/add', methods=['GET', 'POST'])
+@login_required
+def add_code_rule():
+    """添加编码规则"""
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'message': '权限不足'})
+    
+    if request.method == 'POST':
+        try:
+            data = request.get_json()
+            
+            # 创建新规则
+            rule = CodeRule(
+                name=data['name'],
+                code_type=data['code_type'],
+                prefix=data.get('prefix', ''),
+                suffix=data.get('suffix', ''),
+                sequence_length=int(data.get('sequence_length', 4)),
+                reset_frequency=data.get('reset_frequency', 'never'),
+                format_pattern=data['format_pattern'],
+                created_by=current_user.id,
+                notes=data.get('notes', '')
+            )
+            
+            db.session.add(rule)
+            
+            # 添加审计日志
+            log = AuditLog(
+                user_id=current_user.id,
+                action='添加编码规则',
+                details=f'添加编码规则：{rule.name}',
+                can_rollback=True,
+                rollback_type='add',
+                target_model='CodeRule',
+                target_id=rule.id,
+                new_data={
+                    'name': rule.name,
+                    'code_type': rule.code_type,
+                    'format_pattern': rule.format_pattern
+                }
+            )
+            db.session.add(log)
+            
+            db.session.commit()
+            return jsonify({'success': True, 'message': '添加成功'})
+            
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'success': False, 'message': f'添加失败：{str(e)}'})
+    
+    return render_template('main/code_rule_form.html', title='添加编码规则')
+
+@bp.route('/code_rules/<int:rule_id>/edit', methods=['GET', 'POST'])
+@login_required
+def edit_code_rule(rule_id):
+    """编辑编码规则"""
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'message': '权限不足'})
+    
+    rule = CodeRule.query.get_or_404(rule_id)
+    
+    if request.method == 'POST':
+        try:
+            data = request.get_json()
+            
+            # 保存旧数据用于审计日志
+            old_data = {
+                'name': rule.name,
+                'code_type': rule.code_type,
+                'format_pattern': rule.format_pattern
+            }
+            
+            # 更新规则
+            rule.name = data['name']
+            rule.code_type = data['code_type']
+            rule.prefix = data.get('prefix', '')
+            rule.suffix = data.get('suffix', '')
+            rule.sequence_length = int(data.get('sequence_length', 4))
+            rule.reset_frequency = data.get('reset_frequency', 'never')
+            rule.format_pattern = data['format_pattern']
+            rule.notes = data.get('notes', '')
+            
+            # 添加审计日志
+            log = AuditLog(
+                user_id=current_user.id,
+                action='编辑编码规则',
+                details=f'编辑编码规则：{rule.name}',
+                can_rollback=True,
+                rollback_type='edit',
+                target_model='CodeRule',
+                target_id=rule.id,
+                old_data=old_data,
+                new_data={
+                    'name': rule.name,
+                    'code_type': rule.code_type,
+                    'format_pattern': rule.format_pattern
+                }
+            )
+            db.session.add(log)
+            
+            db.session.commit()
+            return jsonify({'success': True, 'message': '更新成功'})
+            
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'success': False, 'message': f'更新失败：{str(e)}'})
+    
+    return render_template('main/code_rule_form.html', title='编辑编码规则', rule=rule)
+
+@bp.route('/code_rules/<int:rule_id>/delete', methods=['POST'])
+@login_required
+def delete_code_rule(rule_id):
+    """删除编码规则"""
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'message': '权限不足'})
+    
+    rule = CodeRule.query.get_or_404(rule_id)
+    
+    try:
+        # 保存旧数据用于审计日志
+        old_data = {
+            'name': rule.name,
+            'code_type': rule.code_type,
+            'format_pattern': rule.format_pattern
+        }
+        
+        # 添加审计日志
+        log = AuditLog(
+            user_id=current_user.id,
+            action='删除编码规则',
+            details=f'删除编码规则：{rule.name}',
+            can_rollback=True,
+            rollback_type='delete',
+            target_model='CodeRule',
+            target_id=rule.id,
+            old_data=old_data
+        )
+        db.session.add(log)
+        
+        db.session.delete(rule)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': '删除成功'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'删除失败：{str(e)}'})
+
+@bp.route('/code_rules/<int:rule_id>/generate', methods=['POST'])
+@login_required
+def generate_code(rule_id):
+    """生成编码"""
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'message': '权限不足'})
+        
+    rule = CodeRule.query.get_or_404(rule_id)
+    
+    try:
+        # 生成编码
+        code = rule.generate_code()
+        
+        # 记录生成日志
+        log = CodeGenerationLog(
+            rule_id=rule.id,
+            generated_code=code,
+            created_by=current_user.id,
+            target_type=request.json.get('target_type'),
+            target_id=request.json.get('target_id')
+        )
+        db.session.add(log)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'code': code,
+            'message': '编码生成成功'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'编码生成失败：{str(e)}'})
