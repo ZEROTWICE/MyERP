@@ -49,7 +49,7 @@ class SerialNumber(db.Model):
 
 class ProcessPrice(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    serial_number = db.Column(db.String(8), unique=True, nullable=False)
+    global_sn = db.Column(db.String(8), unique=True, nullable=False)  # 全局流水号
     process_code = db.Column(db.String(50), nullable=False, index=True)  # 工序编号
     process_name = db.Column(db.String(100), nullable=False)
     component = db.Column(db.String(100))  # 部件
@@ -63,25 +63,30 @@ class ProcessPrice(db.Model):
     price_type = db.Column(db.String(20), nullable=False, default='normal')  # normal: 普通工价, subtotal: 小计
     
     __table_args__ = (
-        db.UniqueConstraint('serial_number', name='uq_process_price_serial_number'),
+        db.UniqueConstraint('global_sn', name='uq_process_price_global_sn'),
     )
 
     @property
     def is_subtotal(self):
         return self.price_type == 'subtotal'
 
+    def __init__(self, **kwargs):
+        super(ProcessPrice, self).__init__(**kwargs)
+        if not self.global_sn:
+            self.global_sn = SerialNumber.get_next_number()
+
 class ProcessPriceGroup(db.Model):
     """工序价格小计关系表"""
     __tablename__ = 'process_price_group'
     
     id = db.Column(db.Integer, primary_key=True)
-    serial_number = db.Column(db.String(8), unique=True, nullable=False)
+    global_sn = db.Column(db.String(8), unique=True, nullable=False)  # 全局流水号
     subtotal_id = db.Column(db.Integer, db.ForeignKey('process_price.id', ondelete='CASCADE'), nullable=False)
     process_id = db.Column(db.Integer, db.ForeignKey('process_price.id', ondelete='CASCADE'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     __table_args__ = (
-        db.UniqueConstraint('serial_number', name='uq_process_price_group_serial_number'),
+        db.UniqueConstraint('global_sn', name='uq_process_price_group_global_sn'),
         db.UniqueConstraint('subtotal_id', 'process_id', name='uq_subtotal_process'),
     )
     
@@ -93,12 +98,12 @@ class ProcessPriceGroup(db.Model):
     
     def __init__(self, **kwargs):
         super(ProcessPriceGroup, self).__init__(**kwargs)
-        if not self.serial_number:
-            self.serial_number = SerialNumber.get_next_number()
+        if not self.global_sn:
+            self.global_sn = SerialNumber.get_next_number()
 
 class Employee(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    serial_number = db.Column(db.String(8), unique=True, nullable=False)
+    global_sn = db.Column(db.String(8), unique=True, nullable=False)  # 全局流水号
     employee_id = db.Column(db.String(50), unique=True, nullable=False, index=True)  # 工号
     name = db.Column(db.String(100), nullable=False)
     position = db.Column(db.String(50), nullable=False, default='普通员工')
@@ -112,7 +117,7 @@ class Employee(db.Model):
     user = db.relationship('User', backref=db.backref('employee', uselist=False))
     
     __table_args__ = (
-        db.UniqueConstraint('serial_number', name='uq_employee_serial_number'),
+        db.UniqueConstraint('global_sn', name='uq_employee_global_sn'),
     )
 
     @property
@@ -139,12 +144,17 @@ class Employee(db.Model):
         else:
             self.is_active = True
 
+    def __init__(self, **kwargs):
+        super(Employee, self).__init__(**kwargs)
+        if not self.global_sn:
+            self.global_sn = SerialNumber.get_next_number()
+
     production_records = db.relationship('ProductionRecord', backref='employee', lazy='dynamic')
     bonuses_penalties = db.relationship('BonusPenalty', backref='employee', lazy='dynamic')
 
 class ProductionRecord(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    serial_number = db.Column(db.String(8), unique=True, nullable=False)
+    global_sn = db.Column(db.String(8), unique=True, nullable=False)  # 全局流水号
     employee_id = db.Column(db.Integer, db.ForeignKey('employee.id'))
     process_id = db.Column(db.Integer, db.ForeignKey('process_price.id'))
     quantity = db.Column(db.Integer)
@@ -152,12 +162,17 @@ class ProductionRecord(db.Model):
     process = db.relationship('ProcessPrice', backref='production_records', lazy='joined')
     
     __table_args__ = (
-        db.UniqueConstraint('serial_number', name='uq_production_record_serial_number'),
+        db.UniqueConstraint('global_sn', name='uq_production_record_global_sn'),
     )
+
+    def __init__(self, **kwargs):
+        super(ProductionRecord, self).__init__(**kwargs)
+        if not self.global_sn:
+            self.global_sn = SerialNumber.get_next_number()
 
 class BonusPenalty(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    serial_number = db.Column(db.String(8), unique=True, nullable=False)
+    global_sn = db.Column(db.String(8), unique=True, nullable=False)  # 全局流水号
     employee_id = db.Column(db.Integer, db.ForeignKey('employee.id'))
     amount = db.Column(db.Float)
     reason = db.Column(db.Text)
@@ -167,8 +182,13 @@ class BonusPenalty(db.Model):
     process = db.relationship('ProcessPrice', backref='bonus_penalties')
     
     __table_args__ = (
-        db.UniqueConstraint('serial_number', name='uq_bonus_penalty_serial_number'),
+        db.UniqueConstraint('global_sn', name='uq_bonus_penalty_global_sn'),
     )
+
+    def __init__(self, **kwargs):
+        super(BonusPenalty, self).__init__(**kwargs)
+        if not self.global_sn:
+            self.global_sn = SerialNumber.get_next_number()
 
 class AuditLog(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -198,7 +218,7 @@ class AuditLog(db.Model):
 class TaskAssignment(db.Model):
     """生产任务分配"""
     id = db.Column(db.Integer, primary_key=True)
-    serial_number = db.Column(db.String(8), unique=True, nullable=False)
+    global_sn = db.Column(db.String(8), unique=True, nullable=False)  # 全局流水号
     employee_id = db.Column(db.Integer, db.ForeignKey('employee.id'), nullable=False)
     process_id = db.Column(db.Integer, db.ForeignKey('process_price.id'), nullable=False)
     assigned_date = db.Column(db.DateTime, default=datetime.utcnow)  # 分配时间
@@ -209,7 +229,7 @@ class TaskAssignment(db.Model):
     notes = db.Column(db.Text)  # 备注
     
     __table_args__ = (
-        db.UniqueConstraint('serial_number', name='uq_task_assignment_serial_number'),
+        db.UniqueConstraint('global_sn', name='uq_task_assignment_global_sn'),
     )
 
     # 关系
@@ -231,12 +251,17 @@ class TaskAssignment(db.Model):
         """是否逾期"""
         return self.target_date < datetime.now().date() and self.status != 'completed'
 
+    def __init__(self, **kwargs):
+        super(TaskAssignment, self).__init__(**kwargs)
+        if not self.global_sn:
+            self.global_sn = SerialNumber.get_next_number()
+
 class EmployeeSalaryHistory(db.Model):
     """员工工资变更历史"""
     __tablename__ = 'employee_salary_history'
     
     id = db.Column(db.Integer, primary_key=True)
-    serial_number = db.Column(db.String(8), unique=True, nullable=False)
+    global_sn = db.Column(db.String(8), unique=True, nullable=False)  # 全局流水号
     employee_id = db.Column(db.Integer, db.ForeignKey('employee.id', ondelete='CASCADE', name='fk_salary_history_employee_id'), nullable=False)
     old_salary = db.Column(db.Float, nullable=False)
     new_salary = db.Column(db.Float, nullable=False)
@@ -246,7 +271,7 @@ class EmployeeSalaryHistory(db.Model):
     created_by = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='SET NULL', name='fk_salary_history_creator_id'), nullable=True)
     
     __table_args__ = (
-        db.UniqueConstraint('serial_number', name='uq_salary_history_serial_number'),
+        db.UniqueConstraint('global_sn', name='uq_salary_history_global_sn'),
     )
     
     employee = db.relationship('Employee', backref=db.backref('salary_history', lazy=True))
@@ -258,15 +283,15 @@ class EmployeeSalaryHistory(db.Model):
         super(EmployeeSalaryHistory, self).__init__(**kwargs)
         
         # 如果没有设置流水号，自动生成一个
-        if not self.serial_number:
-            self.serial_number = SerialNumber.get_next_number()
+        if not self.global_sn:
+            self.global_sn = SerialNumber.get_next_number()
 
 class EmployeeCoefficientHistory(db.Model):
     """员工工资系数变更历史"""
     __tablename__ = 'employee_coefficient_history'
     
     id = db.Column(db.Integer, primary_key=True)
-    serial_number = db.Column(db.String(8), unique=True, nullable=False)
+    global_sn = db.Column(db.String(8), unique=True, nullable=False)  # 全局流水号
     employee_id = db.Column(db.Integer, db.ForeignKey('employee.id', ondelete='CASCADE', name='fk_coefficient_history_employee_id'), nullable=False)
     old_coefficient = db.Column(db.Float, nullable=False)
     new_coefficient = db.Column(db.Float, nullable=False)
@@ -276,7 +301,7 @@ class EmployeeCoefficientHistory(db.Model):
     created_by = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='SET NULL', name='fk_coefficient_history_creator_id'), nullable=True)
     
     __table_args__ = (
-        db.UniqueConstraint('serial_number', name='uq_coefficient_history_serial_number'),
+        db.UniqueConstraint('global_sn', name='uq_coefficient_history_global_sn'),
     )
     
     employee = db.relationship('Employee', backref=db.backref('coefficient_history', lazy=True))
@@ -288,8 +313,8 @@ class EmployeeCoefficientHistory(db.Model):
         super(EmployeeCoefficientHistory, self).__init__(**kwargs)
         
         # 如果没有设置流水号，自动生成一个
-        if not self.serial_number:
-            self.serial_number = SerialNumber.get_next_number()
+        if not self.global_sn:
+            self.global_sn = SerialNumber.get_next_number()
 
 # 为与路由函数保持一致，创建别名
 SalaryChange = EmployeeSalaryHistory
@@ -345,5 +370,5 @@ class RawMaterial(db.Model):
         super(RawMaterial, self).__init__(**kwargs)
         if not self.global_sn:
             self.global_sn = SerialNumber.get_next_number()
-        if not self.internal_number:
+        if not self.internal_number or self.internal_number == '':
             self.internal_number = SerialNumber.get_next_number()

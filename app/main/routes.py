@@ -203,7 +203,7 @@ def add_employee():
         
         # 创建员工记录
         employee = Employee(
-            serial_number=SerialNumber.get_next_number(),
+            global_sn=SerialNumber.get_next_number(),
             employee_id=form.employee_id.data,
             name=form.name.data,
             position=form.position.data,
@@ -212,9 +212,8 @@ def add_employee():
             department=form.department.data,
             hire_date=form.hire_date.data,
             termination_date=form.termination_date.data,
-            user=user
+            is_active=True if not form.termination_date.data or form.termination_date.data > datetime.now().date() else False
         )
-        employee.update_active_status()  # 根据入职和离职时间更新状态
         db.session.add(employee)
         db.session.flush()
         
@@ -495,7 +494,7 @@ def add_process_price():
 
             # 创建新的工序价格记录
             process_price = ProcessPrice(
-                serial_number=SerialNumber.get_next_number(),
+                global_sn=SerialNumber.get_next_number(),
                 process_code=form.process_code.data,
                 process_name=form.process_name.data,
                 component=form.component.data,
@@ -780,7 +779,7 @@ def manage_production_records():
                 return redirect(url_for('main.manage_production_records'))
 
             record = ProductionRecord(
-                serial_number=SerialNumber.get_next_number(),
+                global_sn=SerialNumber.get_next_number(),
                 employee_id=form.employee_id.data,
                 process_id=process_price.id,
                 quantity=form.quantity.data,
@@ -1098,7 +1097,7 @@ def add_bonus_penalty():
         
         # 创建新的奖金/罚款记录
         bonus_penalty = BonusPenalty(
-            serial_number=SerialNumber.get_next_number(),
+            global_sn=SerialNumber.get_next_number(),
             employee_id=data.get('employee_id'),
             amount=data.get('amount'),
             reason=data.get('reason'),
@@ -1354,7 +1353,7 @@ def import_employees():
                 
                 # 创建员工记录
                 employee = Employee(
-                    serial_number=SerialNumber.get_next_number(),
+                    global_sn=SerialNumber.get_next_number(),
                     employee_id=data['employee_id'],
                     name=data['name'],
                     position=data['position'],
@@ -1549,7 +1548,7 @@ def import_process_prices():
                 try:
                 # 创建新工序价格记录
                     process = ProcessPrice(
-                    serial_number=SerialNumber.get_next_number(),
+                    global_sn=SerialNumber.get_next_number(),
                     process_code=data['process_code'],
                     process_name=data['process_name'],
                     component=data['component'],
@@ -1604,7 +1603,7 @@ def import_process_prices():
                     
                     # 创建小计工序
                     subtotal = ProcessPrice(
-                        serial_number=SerialNumber.get_next_number(),
+                        global_sn=SerialNumber.get_next_number(),
                         process_code=data['process_code'],
                         process_name=data['process_name'],
                         component=data['component'],
@@ -1801,7 +1800,7 @@ def import_production_records():
                 
                 # 创建生产记录
                 record = ProductionRecord(
-                    serial_number=SerialNumber.get_next_number(),
+                    global_sn=SerialNumber.get_next_number(),
                     employee_id=employee.id,
                     process_id=process_price.id,
                     quantity=data['quantity'],
@@ -2050,7 +2049,7 @@ def manage_tasks():
             
             # 创建任务分配记录
             task = TaskAssignment(
-                serial_number=SerialNumber.get_next_number(),
+                global_sn=SerialNumber.get_next_number(),
                 employee_id=form.employee_id.data,
                 process_id=process_price.id,
                 quantity=form.quantity.data,
@@ -2315,7 +2314,7 @@ def import_bonus_penalties():
                 
                 # 创建奖惩记录
                 record = BonusPenalty(
-                    serial_number=SerialNumber.get_next_number(),
+                    global_sn=SerialNumber.get_next_number(),
                     employee_id=employee.id,
                     type=data['type'],
                     amount=data['amount'],
@@ -2439,7 +2438,7 @@ def import_tasks():
                 
                 # 创建任务记录
                 task = TaskAssignment(
-                    serial_number=SerialNumber.get_next_number(),
+                    global_sn=SerialNumber.get_next_number(),
                     employee_id=employee.id,
                     process_id=process.id,
                     quantity=data['quantity'],
@@ -2655,7 +2654,7 @@ def add_production_record():
                 return redirect(url_for('main.manage_production_records'))
             
             record = ProductionRecord(
-                serial_number=SerialNumber.get_next_number(),
+                global_sn=SerialNumber.get_next_number(),
                 employee_id=form.employee_id.data,
                 process_code=form.process_code.data,
                 quantity=form.quantity.data,
@@ -2809,7 +2808,7 @@ def add_task():
         
         # 创建任务分配记录
         task = TaskAssignment(
-            serial_number=SerialNumber.get_next_number(),
+            global_sn=SerialNumber.get_next_number(),
             employee_id=data.get('employee_id'),
             process_id=data.get('process_id'),
             quantity=data.get('quantity'),
@@ -2986,7 +2985,7 @@ def employee_salary_changes(employee_id):
     for change in salary_changes:
         records.append({
             'id': change.id,
-            'serial_number': change.serial_number,
+            'global_sn': change.global_sn,
             'change_type': 'salary',
             'old_value': change.old_salary,
             'new_value': change.new_salary,
@@ -2999,7 +2998,7 @@ def employee_salary_changes(employee_id):
     for change in coefficient_changes:
         records.append({
             'id': change.id,
-            'serial_number': change.serial_number,
+            'global_sn': change.global_sn,
             'change_type': 'coefficient',
             'old_value': change.old_coefficient,
             'new_value': change.new_coefficient,
@@ -3054,23 +3053,23 @@ def add_salary_change():
     try:
         if change_type == 'salary':
             change = SalaryChange(
+                global_sn=SerialNumber.get_next_number(),
                 employee_id=employee_id,
                 old_salary=old_value,
                 new_salary=new_value,
                 effective_date=effective_date,
                 reason=reason,
-                creator_id=current_user.id,
-                serial_number=SerialNumber.get_next_number()
+                creator_id=current_user.id
             )
         else:
             change = CoefficientChange(
+                global_sn=SerialNumber.get_next_number(),
                 employee_id=employee_id,
                 old_coefficient=old_value,
                 new_coefficient=new_value,
                 effective_date=effective_date,
                 reason=reason,
-                creator_id=current_user.id,
-                serial_number=SerialNumber.get_next_number()
+                creator_id=current_user.id
             )
         
         db.session.add(change)
@@ -3641,3 +3640,150 @@ def upload_finished_products():
             
     except Exception as e:
         return jsonify({'success': False, 'message': f'上传处理错误：{str(e)}'})
+
+@bp.route('/inventory/finished/add', methods=['POST'])
+@login_required
+def add_finished_product():
+    """添加单个成品"""
+    if current_user.role not in ['admin', 'manager']:
+        return jsonify({'success': False, 'message': '权限不足'})
+    
+    try:
+        # 检查Content-Type
+        if not request.is_json:
+            return jsonify({'success': False, 'message': '请求必须是JSON格式'})
+            
+        data = request.json
+        if not data:
+            return jsonify({'success': False, 'message': '请求数据为空'})
+            
+        # 打印日志，辅助调试
+        current_app.logger.info(f"接收到添加成品请求: {data}")
+        
+        # 检查必填字段
+        required_fields = ['product_number', 'drawing_number', 'model', 'production_date', 'inspector']
+        missing_fields = [field for field in required_fields if field not in data or not data[field]]
+        
+        if missing_fields:
+            return jsonify({'success': False, 'message': f'缺少必要的字段：{", ".join(missing_fields)}'})
+        
+        # 创建成品记录
+        product = FinishedProduct(
+            global_sn=SerialNumber.get_next_number(),
+            serial_number=SerialNumber.get_next_number(),
+            product_number=data['product_number'],
+            production_date=datetime.strptime(data['production_date'], '%Y-%m-%d').date(),
+            drawing_number=data['drawing_number'],
+            model=data['model'],
+            inspector=data['inspector'],
+            status='in_stock',
+            notes=data.get('notes', '')
+        )
+        
+        # 添加到数据库
+        db.session.add(product)
+        
+        # 记录审计日志
+        log = AuditLog(
+            user_id=current_user.id,
+            action='添加成品',
+            details=f'添加成品：{product.product_number}',
+            can_rollback=True,
+            rollback_type='add',
+            target_model='FinishedProduct',
+            target_id=product.id,
+            new_data={
+                'product_number': product.product_number,
+                'drawing_number': product.drawing_number,
+                'model': product.model,
+                'inspector': product.inspector,
+                'status': product.status
+            }
+        )
+        db.session.add(log)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True, 
+            'message': '成功添加成品',
+            'id': product.id
+        })
+    
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'添加失败：{str(e)}'})
+
+@bp.route('/inventory/raw/add', methods=['POST'])
+@login_required
+def add_raw_material():
+    """添加单个原材料"""
+    if current_user.role not in ['admin', 'manager']:
+        return jsonify({'success': False, 'message': '权限不足'})
+    
+    try:
+        # 检查Content-Type
+        if not request.is_json:
+            return jsonify({'success': False, 'message': '请求必须是JSON格式'})
+            
+        data = request.json
+        if not data:
+            return jsonify({'success': False, 'message': '请求数据为空'})
+            
+        # 打印日志，辅助调试
+        current_app.logger.info(f"接收到添加原材料请求: {data}")
+        
+        # 检查必填字段
+        required_fields = ['supplier', 'material_name', 'melt_number', 'supplier_number', 'quantity', 'storage_date']
+        missing_fields = [field for field in required_fields if field not in data or not data[field]]
+        
+        if missing_fields:
+            return jsonify({'success': False, 'message': f'缺少必要的字段：{", ".join(missing_fields)}'})
+        
+        # 创建原材料记录
+        material = RawMaterial(
+            global_sn=SerialNumber.get_next_number(),
+            supplier=data['supplier'],
+            material_name=data['material_name'],
+            melt_number=data['melt_number'],
+            supplier_number=data['supplier_number'],
+            storage_date=datetime.strptime(data['storage_date'], '%Y-%m-%d').date(),
+            internal_number=data.get('internal_number', ''),  # 允许用户提供内部编号
+            quantity=float(data['quantity']),
+            has_sample=data.get('has_sample', False),
+            notes=data.get('notes', '')
+        )
+        
+        # 添加到数据库
+        db.session.add(material)
+        
+        # 记录审计日志
+        log = AuditLog(
+            user_id=current_user.id,
+            action='添加原材料',
+            details=f'添加原材料：{material.material_name}',
+            can_rollback=True,
+            rollback_type='add',
+            target_model='RawMaterial',
+            target_id=material.id,
+            new_data={
+                'supplier': material.supplier,
+                'material_name': material.material_name,
+                'melt_number': material.melt_number,
+                'supplier_number': material.supplier_number,
+                'quantity': material.quantity
+            }
+        )
+        db.session.add(log)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True, 
+            'message': '成功添加原材料',
+            'id': material.id
+        })
+    
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'添加失败：{str(e)}'})

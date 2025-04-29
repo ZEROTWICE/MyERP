@@ -42,6 +42,10 @@
                     <button type="button" class="btn btn-success" onclick="document.getElementById('importFile').click()">
                         <i class="fas fa-file-import"></i> 导入
                     </button>
+                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" 
+                            data-bs-target="#{{ 'addFinishedProductModal' if request.args.get('type', 'finished') == 'finished' else 'addRawMaterialModal' }}">
+                        <i class="fas fa-plus"></i> 添加
+                    </button>
                     <input type="file" id="importFile" style="display: none" accept=".xlsx" onchange="importInventory(this)">
                     {% endif %}
                 </div>
@@ -74,11 +78,11 @@
                     <td>{{ item.melt_number }}</td>
                     <td>{{ item.supplier_number }}</td>
                     <td>{{ item.internal_number }}</td>
-                    <td>{{ item.entry_date.strftime('%Y-%m-%d') }}</td>
+                    <td>{{ item.storage_date.strftime('%Y-%m-%d') }}</td>
                     <td>{{ item.quantity }}</td>
                     <td>
                         {% if current_user.role in ['admin', 'manager'] %}
-                        <button class="btn btn-sm btn-primary" onclick="editRawMaterial({{ item.id }})">
+                        <button class="btn btn-sm btn-primary" onclick="editRawMaterial({{ item.id | tojson }})">
                             <i class="fas fa-edit"></i>
                         </button>
                         {% endif %}
@@ -112,7 +116,7 @@
                     <td>{{ item.quantity }}</td>
                     <td>
                         {% if current_user.role in ['admin', 'manager'] %}
-                        <button class="btn btn-sm btn-primary" onclick="editFinishedProduct({{ item.id }})">
+                        <button class="btn btn-sm btn-primary" onclick="editFinishedProduct({{ item.id | tojson }})">
                             <i class="fas fa-edit"></i>
                         </button>
                         {% endif %}
@@ -146,6 +150,22 @@
 
 <!-- 导入相关的JavaScript代码 -->
 <script>
+// 添加CSRF令牌处理
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
 function importInventory(input) {
     if (!input.files || !input.files[0]) return;
     
@@ -185,5 +205,190 @@ function editFinishedProduct(id) {
     // TODO: 实现编辑成品的功能
     alert('编辑成品功能即将上线');
 }
+
+// 提交添加成品表单
+function submitFinishedProduct() {
+    // 收集表单数据
+    const formData = {
+        product_number: document.getElementById('productNumber').value,
+        drawing_number: document.getElementById('drawingNumber').value,
+        model: document.getElementById('model').value,
+        production_date: document.getElementById('productionDate').value,
+        inspector: document.getElementById('inspector').value,
+        notes: document.getElementById('notes') ? document.getElementById('notes').value : ''
+    };
+    
+    // 发送API请求
+    fetch("{{ url_for('main.add_finished_product') }}", {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('成功添加成品！');
+            // 关闭模态框并刷新页面
+            const modal = bootstrap.Modal.getInstance(document.getElementById('addFinishedProductModal'));
+            modal.hide();
+            location.reload();
+        } else {
+            alert('添加失败：' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('添加失败，请重试');
+    });
+}
+
+// 提交添加原材料表单
+function submitRawMaterial() {
+    // 收集表单数据
+    const formData = {
+        supplier: document.getElementById('supplier').value,
+        material_name: document.getElementById('materialName').value,
+        melt_number: document.getElementById('meltNumber').value,
+        supplier_number: document.getElementById('supplierNumber').value,
+        internal_number: document.getElementById('internalNumber').value,
+        storage_date: document.getElementById('entryDate').value,
+        quantity: document.getElementById('rawQuantity').value,
+        has_sample: document.getElementById('hasSample') ? document.getElementById('hasSample').checked : false,
+        notes: document.getElementById('rawNotes') ? document.getElementById('rawNotes').value : ''
+    };
+    
+    // 发送API请求
+    fetch("{{ url_for('main.add_raw_material') }}", {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('成功添加原材料！');
+            // 关闭模态框并刷新页面
+            const modal = bootstrap.Modal.getInstance(document.getElementById('addRawMaterialModal'));
+            modal.hide();
+            location.reload();
+        } else {
+            alert('添加失败：' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('添加失败，请重试');
+    });
+}
 </script>
+
+<!-- 添加成品模态框 -->
+<div class="modal fade" id="addFinishedProductModal" tabindex="-1" aria-labelledby="addFinishedProductModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addFinishedProductModalLabel">添加成品</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addFinishedProductForm">
+                    <div class="mb-3">
+                        <label for="productNumber" class="form-label">产品编号</label>
+                        <input type="text" class="form-control" id="productNumber" name="product_number" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="drawingNumber" class="form-label">图号</label>
+                        <input type="text" class="form-control" id="drawingNumber" name="drawing_number" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="model" class="form-label">型号</label>
+                        <input type="text" class="form-control" id="model" name="model" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="productionDate" class="form-label">生产日期</label>
+                        <input type="date" class="form-control" id="productionDate" name="production_date" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="inspector" class="form-label">检验员</label>
+                        <input type="text" class="form-control" id="inspector" name="inspector" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="notes" class="form-label">备注</label>
+                        <textarea class="form-control" id="notes" name="notes"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="submitFinishedProduct()">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 添加原材料模态框 -->
+<div class="modal fade" id="addRawMaterialModal" tabindex="-1" aria-labelledby="addRawMaterialModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addRawMaterialModalLabel">添加原材料</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addRawMaterialForm">
+                    <div class="mb-3">
+                        <label for="supplier" class="form-label">供应商</label>
+                        <input type="text" class="form-control" id="supplier" name="supplier" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="materialName" class="form-label">品名</label>
+                        <input type="text" class="form-control" id="materialName" name="material_name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="meltNumber" class="form-label">原料冶炼炉号</label>
+                        <input type="text" class="form-control" id="meltNumber" name="melt_number" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="supplierNumber" class="form-label">供应商编号</label>
+                        <input type="text" class="form-control" id="supplierNumber" name="supplier_number" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="internalNumber" class="form-label">内部编号</label>
+                        <input type="text" class="form-control" id="internalNumber" name="internal_number" placeholder="可选，留空则自动生成">
+                    </div>
+                    <div class="mb-3">
+                        <label for="entryDate" class="form-label">入库时间</label>
+                        <input type="date" class="form-control" id="entryDate" name="storage_date" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="rawQuantity" class="form-label">数量</label>
+                        <input type="number" class="form-control" id="rawQuantity" name="quantity" min="1" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="hasSample" class="form-check-label">
+                            <input type="checkbox" class="form-check-input" id="hasSample" name="has_sample">
+                            是否带样品
+                        </label>
+                    </div>
+                    <div class="mb-3">
+                        <label for="rawNotes" class="form-label">备注</label>
+                        <textarea class="form-control" id="rawNotes" name="notes"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="submitRawMaterial()">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %} 

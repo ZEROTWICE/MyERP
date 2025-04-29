@@ -1,5 +1,5 @@
 from app import create_app, db
-from app.models import Employee, ProcessPrice, ProductionRecord, BonusPenalty, TaskAssignment, SerialNumber
+from app.models import Employee, ProcessPrice, ProductionRecord, BonusPenalty, TaskAssignment, SerialNumber, RawMaterial, FinishedProduct
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -8,15 +8,17 @@ def fix_serial_numbers():
     with app.app_context():
         try:
             # 获取所有表中的最大序列号
-            max_employee = db.session.query(db.func.max(Employee.serial_number)).scalar()
-            max_process = db.session.query(db.func.max(ProcessPrice.serial_number)).scalar()
-            max_production = db.session.query(db.func.max(ProductionRecord.serial_number)).scalar()
-            max_bonus = db.session.query(db.func.max(BonusPenalty.serial_number)).scalar()
-            max_task = db.session.query(db.func.max(TaskAssignment.serial_number)).scalar()
+            max_employee = db.session.query(db.func.max(Employee.global_sn)).scalar()
+            max_process = db.session.query(db.func.max(ProcessPrice.global_sn)).scalar()
+            max_production = db.session.query(db.func.max(ProductionRecord.global_sn)).scalar()
+            max_bonus = db.session.query(db.func.max(BonusPenalty.global_sn)).scalar()
+            max_task = db.session.query(db.func.max(TaskAssignment.global_sn)).scalar()
+            max_raw_material = db.session.query(db.func.max(RawMaterial.global_sn)).scalar()
+            max_finished_product = db.session.query(db.func.max(FinishedProduct.global_sn)).scalar()
             
             # 将所有序列号转换为整数进行比较
             max_numbers = []
-            for x in [max_employee, max_process, max_production, max_bonus, max_task]:
+            for x in [max_employee, max_process, max_production, max_bonus, max_task, max_raw_material, max_finished_product]:
                 try:
                     max_numbers.append(int(x) if x else 0)
                 except (ValueError, TypeError):
@@ -43,5 +45,5 @@ def fix_serial_numbers():
         except Exception as e:
             print(f"发生错误: {str(e)}")
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     fix_serial_numbers() 
