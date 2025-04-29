@@ -494,14 +494,14 @@ def add_process_price():
 
             # 创建新的工序价格记录
             process_price = ProcessPrice(
-                global_sn=SerialNumber.get_next_number(),
-                process_code=form.process_code.data,
-                process_name=form.process_name.data,
-                component=form.component.data,
-                drawing_no=form.drawing_no.data,
-                model_no=form.model_no.data,
-                price=price,
-                effective_date=form.effective_date.data,
+            global_sn=SerialNumber.get_next_number(),
+            process_code=form.process_code.data,
+            process_name=form.process_name.data,
+            component=form.component.data,
+            drawing_no=form.drawing_no.data,
+            model_no=form.model_no.data,
+            price=price,
+            effective_date=form.effective_date.data,
                 notes=form.notes.data,
                 version=1,  # 新工序的初始版本为1
                 is_current=True,  # 新工序默认为当前生效
@@ -521,8 +521,8 @@ def add_process_price():
             
                 # 记录可回滚的审计日志
             log = AuditLog(
-                user_id=current_user.id,
-                action='添加工序价格',
+            user_id=current_user.id,
+            action='添加工序价格',
                 details=f'添加工序：{process_price.process_name}，编号：{process_price.process_code}',
                 can_rollback=True,
                 rollback_type='add',
@@ -541,7 +541,7 @@ def add_process_price():
                     'is_current': process_price.is_current,
                     'price_type': process_price.price_type
                 }
-            )
+        )
             db.session.add(log)
             db.session.commit()
             flash('工序价格添加成功', 'success')
@@ -771,7 +771,7 @@ def manage_production_records():
             
             process_price = ProcessPrice.query.filter(
                 ProcessPrice.process_code == form.process_code.data,
-                                        ProcessPrice.effective_date <= end_of_day + timedelta(days=1)
+                                            ProcessPrice.effective_date <= end_of_day + timedelta(days=1)
             ).order_by(ProcessPrice.effective_date.desc()).first()
 
             if not process_price:
@@ -779,7 +779,7 @@ def manage_production_records():
                 return redirect(url_for('main.manage_production_records'))
 
             record = ProductionRecord(
-                global_sn=SerialNumber.get_next_number(),
+                    global_sn=SerialNumber.get_next_number(),
                 employee_id=form.employee_id.data,
                 process_id=process_price.id,
                 quantity=form.quantity.data,
@@ -1546,7 +1546,7 @@ def import_process_prices():
         for data in process_data:
             if data['price_type'] != 'subtotal':
                 try:
-                # 创建新工序价格记录
+                    # 创建新工序价格记录
                     process = ProcessPrice(
                     global_sn=SerialNumber.get_next_number(),
                     process_code=data['process_code'],
@@ -1560,13 +1560,13 @@ def import_process_prices():
                             version=1,  # 新工序的初始版本为1
                             is_current=True,  # 新工序默认为当前生效
                             price_type='normal'
-                )
+                    )
                     db.session.add(process)
                     db.session.flush()  # 获取ID
                             
                     normal_processes[data['process_code']] = process.id
                     success_count += 1
-                
+                    
                 except Exception as e:
                     error_messages.append(f"处理普通工序 {data['process_code']} 时出错: {str(e)}")
         
@@ -2654,12 +2654,12 @@ def add_production_record():
                 return redirect(url_for('main.manage_production_records'))
             
             record = ProductionRecord(
-                global_sn=SerialNumber.get_next_number(),
-                employee_id=form.employee_id.data,
-                process_code=form.process_code.data,
-                quantity=form.quantity.data,
-                date=form.date.data,
-                notes=form.notes.data
+            global_sn=SerialNumber.get_next_number(),
+            employee_id=form.employee_id.data,
+            process_code=form.process_code.data,
+            quantity=form.quantity.data,
+            date=form.date.data,
+            notes=form.notes.data
             )
             db.session.add(record)
             db.session.flush()

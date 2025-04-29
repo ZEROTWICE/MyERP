@@ -330,6 +330,7 @@ class FinishedProduct(db.Model):
     drawing_number = db.Column(db.String(100), nullable=False)  # 图号
     model = db.Column(db.String(100), nullable=False)  # 型号
     inspector = db.Column(db.String(50), nullable=False)  # 检验员
+    quantity = db.Column(db.Integer, nullable=False, default=1)  # 数量
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     status = db.Column(db.String(20), default='in_stock')  # in_stock: 在库, shipped: 已发货, scrapped: 报废, used: 已使用
     notes = db.Column(db.Text)  # 备注
@@ -372,3 +373,87 @@ class RawMaterial(db.Model):
             self.global_sn = SerialNumber.get_next_number()
         if not self.internal_number or self.internal_number == '':
             self.internal_number = SerialNumber.get_next_number()
+
+class CodeRule(db.Model):
+    """编码规则管理"""
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False, unique=True)  # 规则名称
+    code_type = db.Column(db.String(50), nullable=False)  # 编码类型：product(产品编码), material(物料编码), etc.
+    prefix = db.Column(db.String(20))  # 前缀
+    suffix = db.Column(db.String(20))  # 后缀
+    sequence_length = db.Column(db.Integer, nullable=False, default=4)  # 序号长度
+    current_sequence = db.Column(db.Integer, default=1)  # 当前序号
+    reset_frequency = db.Column(db.String(20), default='never')  # 重置频率：never, daily, monthly, yearly
+    last_reset_date = db.Column(db.DateTime)  # 上次重置时间
+    format_pattern = db.Column(db.String(200))  # 格式模式，例如：{prefix}{year}{month}{sequence}
+    is_active = db.Column(db.Boolean, default=True)  # 是否启用
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_by = db.Column(db.Integer, db.ForeignKey('user.id'))
+    notes = db.Column(db.Text)  # 备注
+
+    def generate_code(self):
+        """生成编码"""
+        # 检查是否需要重置序号
+        self._check_reset()
+        
+        # 获取当前日期时间
+        now = datetime.now()
+        
+        # 准备替换字典
+        replace_dict = {
+            'prefix': self.prefix or '',
+            'suffix': self.suffix or '',
+            'year': str(now.year),
+            'year2': str(now.year)[-2:],
+            'month': f"{now.month:02d}",
+            'day': f"{now.day:02d}",
+            'sequence': str(self.current_sequence).zfill(self.sequence_length)
+        }
+        
+        # 使用格式模式生成编码
+        code = self.format_pattern
+        for key, value in replace_dict.items():
+            code = code.replace('{' + key + '}', value)
+        
+        # 更新序号
+        self.current_sequence += 1
+        db.session.commit()
+        
+        return code
+
+    def _check_reset(self):
+        """检查是否需要重置序号"""
+        if not self.last_reset_date:
+            self.last_reset_date = datetime.now()
+            return
+
+        now = datetime.now()
+        last_reset = self.last_reset_date
+
+        if self.reset_frequency == 'daily':
+            if now.date() > last_reset.date():
+                self._reset_sequence()
+        elif self.reset_frequency == 'monthly':
+            if now.year > last_reset.year or now.month > last_reset.month:
+                self._reset_sequence()
+        elif self.reset_frequency == 'yearly':
+            if now.year > last_reset.year:
+                self._reset_sequence()
+
+    def _reset_sequence(self):
+        """重置序号"""
+        self.current_sequence = 1
+        self.last_reset_date = datetime.now()
+
+class CodeGenerationLog(db.Model):
+    """编码生成日志"""
+    id = db.Column(db.Integer, primary_key=True)
+    rule_id = db.Column(db.Integer, db.ForeignKey('code_rule.id'), nullable=False)
+    generated_code = db.Column(db.String(100), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_by = db.Column(db.Integer, db.ForeignKey('user.id'))
+    target_type = db.Column(db.String(50))  # 使用目标类型
+    target_id = db.Column(db.Integer)  # 使用目标ID
+
+    rule = db.relationship('CodeRule', backref='generation_logs')
+    creator = db.relationship('User', backref='code_generation_logs')

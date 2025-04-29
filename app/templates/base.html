@@ -131,7 +131,7 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
                     {% if current_user.is_authenticated %}
-                        {% if current_user.role in ['admin', 'hr'] %}
+                        {% if current_user.role in ['admin'] %}
                         <li class="nav-item">
                             <a class="nav-link" href="{{ url_for('main.manage_employees') }}">员工管理</a>
                         </li>
@@ -153,8 +153,9 @@
                         <li class="nav-item">
                             <a class="nav-link" href="{{ url_for('main.manage_inventory') }}">库存管理</a>
                         </li>
-                        {% endif %}
-                        {% if current_user.role == 'admin' %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('main.manage_code_rules') }}">编码管理</a>
+                        </li>
                         <li class="nav-item">
                             <a class="nav-link" href="{{ url_for('main.view_audit_logs') }}">审计日志</a>
                         </li>

@@ -208,17 +208,21 @@ function editFinishedProduct(id) {
 
 // 提交添加成品表单
 function submitFinishedProduct() {
-    // 收集表单数据
     const formData = {
         product_number: document.getElementById('productNumber').value,
         drawing_number: document.getElementById('drawingNumber').value,
         model: document.getElementById('model').value,
         production_date: document.getElementById('productionDate').value,
         inspector: document.getElementById('inspector').value,
+        quantity: parseInt(document.getElementById('quantity').value) || 1,
         notes: document.getElementById('notes') ? document.getElementById('notes').value : ''
     };
     
-    // 发送API请求
+    if (formData.quantity <= 0) {
+        alert('数量必须大于0');
+        return;
+    }
+    
     fetch("{{ url_for('main.add_finished_product') }}", {
         method: 'POST',
         headers: {
@@ -232,7 +236,6 @@ function submitFinishedProduct() {
     .then(data => {
         if (data.success) {
             alert('成功添加成品！');
-            // 关闭模态框并刷新页面
             const modal = bootstrap.Modal.getInstance(document.getElementById('addFinishedProductModal'));
             modal.hide();
             location.reload();
@@ -319,6 +322,10 @@ function submitRawMaterial() {
                     <div class="mb-3">
                         <label for="inspector" class="form-label">检验员</label>
                         <input type="text" class="form-control" id="inspector" name="inspector" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="quantity" class="form-label">数量</label>
+                        <input type="number" class="form-control" id="quantity" name="quantity" min="1" required>
                     </div>
                     <div class="mb-3">
                         <label for="notes" class="form-label">备注</label>

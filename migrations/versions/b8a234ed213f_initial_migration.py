@@ -1,8 +1,8 @@
-"""Initial migration
+"""initial migration
 
-Revision ID: 35f746a0b9a4
+Revision ID: b8a234ed213f
 Revises: 
-Create Date: 2025-04-16 10:20:30.868816
+Create Date: 2025-04-29 16:40:13.039155
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '35f746a0b9a4'
+revision = 'b8a234ed213f'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -27,6 +27,7 @@ def upgrade():
     sa.Column('drawing_number', sa.String(length=100), nullable=False),
     sa.Column('model', sa.String(length=100), nullable=False),
     sa.Column('inspector', sa.String(length=50), nullable=False),
+    sa.Column('quantity', sa.Integer(), nullable=False),
     sa.Column('created_at', sa.DateTime(), nullable=True),
     sa.Column('status', sa.String(length=20), nullable=True),
     sa.Column('notes', sa.Text(), nullable=True),
@@ -41,7 +42,7 @@ def upgrade():
 
     op.create_table('process_price',
     sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('serial_number', sa.String(length=8), nullable=False),
+    sa.Column('global_sn', sa.String(length=8), nullable=False),
     sa.Column('process_code', sa.String(length=50), nullable=False),
     sa.Column('process_name', sa.String(length=100), nullable=False),
     sa.Column('component', sa.String(length=100), nullable=True),
@@ -54,8 +55,8 @@ def upgrade():
     sa.Column('notes', sa.Text(), nullable=True),
     sa.Column('price_type', sa.String(length=20), nullable=False),
     sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('serial_number'),
-    sa.UniqueConstraint('serial_number', name='uq_process_price_serial_number')
+    sa.UniqueConstraint('global_sn'),
+    sa.UniqueConstraint('global_sn', name='uq_process_price_global_sn')
     )
     with op.batch_alter_table('process_price', schema=None) as batch_op:
         batch_op.create_index(batch_op.f('ix_process_price_process_code'), ['process_code'], unique=False)
@@ -115,7 +116,7 @@ def upgrade():
     )
     op.create_table('employee',
     sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('serial_number', sa.String(length=8), nullable=False),
+    sa.Column('global_sn', sa.String(length=8), nullable=False),
     sa.Column('employee_id', sa.String(length=50), nullable=False),
     sa.Column('name', sa.String(length=100), nullable=False),
     sa.Column('position', sa.String(length=50), nullable=False),
@@ -128,28 +129,28 @@ def upgrade():
     sa.Column('user_id', sa.Integer(), nullable=True),
     sa.ForeignKeyConstraint(['user_id'], ['user.id'], name='fk_employee_user_id'),
     sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('serial_number'),
-    sa.UniqueConstraint('serial_number', name='uq_employee_serial_number')
+    sa.UniqueConstraint('global_sn'),
+    sa.UniqueConstraint('global_sn', name='uq_employee_global_sn')
     )
     with op.batch_alter_table('employee', schema=None) as batch_op:
         batch_op.create_index(batch_op.f('ix_employee_employee_id'), ['employee_id'], unique=True)
 
     op.create_table('process_price_group',
     sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('serial_number', sa.String(length=8), nullable=False),
+    sa.Column('global_sn', sa.String(length=8), nullable=False),
     sa.Column('subtotal_id', sa.Integer(), nullable=False),
     sa.Column('process_id', sa.Integer(), nullable=False),
     sa.Column('created_at', sa.DateTime(), nullable=True),
     sa.ForeignKeyConstraint(['process_id'], ['process_price.id'], ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['subtotal_id'], ['process_price.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('serial_number'),
-    sa.UniqueConstraint('serial_number', name='uq_process_price_group_serial_number'),
+    sa.UniqueConstraint('global_sn'),
+    sa.UniqueConstraint('global_sn', name='uq_process_price_group_global_sn'),
     sa.UniqueConstraint('subtotal_id', 'process_id', name='uq_subtotal_process')
     )
     op.create_table('bonus_penalty',
     sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('serial_number', sa.String(length=8), nullable=False),
+    sa.Column('global_sn', sa.String(length=8), nullable=False),
     sa.Column('employee_id', sa.Integer(), nullable=True),
     sa.Column('amount', sa.Float(), nullable=True),
     sa.Column('reason', sa.Text(), nullable=True),
@@ -159,12 +160,12 @@ def upgrade():
     sa.ForeignKeyConstraint(['employee_id'], ['employee.id'], ),
     sa.ForeignKeyConstraint(['process_id'], ['process_price.id'], name='fk_bp_process_id'),
     sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('serial_number'),
-    sa.UniqueConstraint('serial_number', name='uq_bonus_penalty_serial_number')
+    sa.UniqueConstraint('global_sn'),
+    sa.UniqueConstraint('global_sn', name='uq_bonus_penalty_global_sn')
     )
     op.create_table('employee_coefficient_history',
     sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('serial_number', sa.String(length=8), nullable=False),
+    sa.Column('global_sn', sa.String(length=8), nullable=False),
     sa.Column('employee_id', sa.Integer(), nullable=False),
     sa.Column('old_coefficient', sa.Float(), nullable=False),
     sa.Column('new_coefficient', sa.Float(), nullable=False),
@@ -175,12 +176,12 @@ def upgrade():
     sa.ForeignKeyConstraint(['created_by'], ['user.id'], name='fk_coefficient_history_creator_id', ondelete='SET NULL'),
     sa.ForeignKeyConstraint(['employee_id'], ['employee.id'], name='fk_coefficient_history_employee_id', ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('serial_number'),
-    sa.UniqueConstraint('serial_number', name='uq_coefficient_history_serial_number')
+    sa.UniqueConstraint('global_sn'),
+    sa.UniqueConstraint('global_sn', name='uq_coefficient_history_global_sn')
     )
     op.create_table('employee_salary_history',
     sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('serial_number', sa.String(length=8), nullable=False),
+    sa.Column('global_sn', sa.String(length=8), nullable=False),
     sa.Column('employee_id', sa.Integer(), nullable=False),
     sa.Column('old_salary', sa.Float(), nullable=False),
     sa.Column('new_salary', sa.Float(), nullable=False),
@@ -191,12 +192,12 @@ def upgrade():
     sa.ForeignKeyConstraint(['created_by'], ['user.id'], name='fk_salary_history_creator_id', ondelete='SET NULL'),
     sa.ForeignKeyConstraint(['employee_id'], ['employee.id'], name='fk_salary_history_employee_id', ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('serial_number'),
-    sa.UniqueConstraint('serial_number', name='uq_salary_history_serial_number')
+    sa.UniqueConstraint('global_sn'),
+    sa.UniqueConstraint('global_sn', name='uq_salary_history_global_sn')
     )
     op.create_table('production_record',
     sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('serial_number', sa.String(length=8), nullable=False),
+    sa.Column('global_sn', sa.String(length=8), nullable=False),
     sa.Column('employee_id', sa.Integer(), nullable=True),
     sa.Column('process_id', sa.Integer(), nullable=True),
     sa.Column('quantity', sa.Integer(), nullable=True),
@@ -204,12 +205,12 @@ def upgrade():
     sa.ForeignKeyConstraint(['employee_id'], ['employee.id'], ),
     sa.ForeignKeyConstraint(['process_id'], ['process_price.id'], ),
     sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('serial_number'),
-    sa.UniqueConstraint('serial_number', name='uq_production_record_serial_number')
+    sa.UniqueConstraint('global_sn'),
+    sa.UniqueConstraint('global_sn', name='uq_production_record_global_sn')
     )
     op.create_table('task_assignment',
     sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('serial_number', sa.String(length=8), nullable=False),
+    sa.Column('global_sn', sa.String(length=8), nullable=False),
     sa.Column('employee_id', sa.Integer(), nullable=False),
     sa.Column('process_id', sa.Integer(), nullable=False),
     sa.Column('assigned_date', sa.DateTime(), nullable=True),
@@ -221,8 +222,8 @@ def upgrade():
     sa.ForeignKeyConstraint(['employee_id'], ['employee.id'], ),
     sa.ForeignKeyConstraint(['process_id'], ['process_price.id'], ),
     sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('serial_number'),
-    sa.UniqueConstraint('serial_number', name='uq_task_assignment_serial_number')
+    sa.UniqueConstraint('global_sn'),
+    sa.UniqueConstraint('global_sn', name='uq_task_assignment_global_sn')
     )
     # ### end Alembic commands ###
 

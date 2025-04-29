@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>{{ title }}</h2>
+    
+    <div class="card">
+        <div class="card-body">
+            <form id="codeRuleForm">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="name" class="form-label">规则名称</label>
+                            <input type="text" class="form-control" id="name" name="name" required
+                                   value="{{ rule.name if rule else '' }}">
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="code_type" class="form-label">编码类型</label>
+                            <select class="form-control" id="code_type" name="code_type" required>
+                                <option value="">请选择</option>
+                                <option value="product" {{ 'selected' if rule and rule.code_type == 'product' else '' }}>产品编码</option>
+                                <option value="material" {{ 'selected' if rule and rule.code_type == 'material' else '' }}>物料编码</option>
+                                <option value="custom" {{ 'selected' if rule and rule.code_type == 'custom' else '' }}>自定义</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="prefix" class="form-label">前缀</label>
+                            <input type="text" class="form-control" id="prefix" name="prefix"
+                                   value="{{ rule.prefix if rule else '' }}">
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="suffix" class="form-label">后缀</label>
+                            <input type="text" class="form-control" id="suffix" name="suffix"
+                                   value="{{ rule.suffix if rule else '' }}">
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="sequence_length" class="form-label">序号长度</label>
+                            <input type="number" class="form-control" id="sequence_length" name="sequence_length"
+                                   min="1" max="10" required value="{{ rule.sequence_length if rule else 4 }}">
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="reset_frequency" class="form-label">重置频率</label>
+                            <select class="form-control" id="reset_frequency" name="reset_frequency" required>
+                                <option value="never" {{ 'selected' if rule and rule.reset_frequency == 'never' else '' }}>从不</option>
+                                <option value="daily" {{ 'selected' if rule and rule.reset_frequency == 'daily' else '' }}>每日</option>
+                                <option value="monthly" {{ 'selected' if rule and rule.reset_frequency == 'monthly' else '' }}>每月</option>
+                                <option value="yearly" {{ 'selected' if rule and rule.reset_frequency == 'yearly' else '' }}>每年</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-12">
+                        <div class="form-group">
+                            <label for="format_pattern" class="form-label">格式模式</label>
+                            <input type="text" class="form-control" id="format_pattern" name="format_pattern" required
+                                   value="{{ rule.format_pattern if rule else '' }}"
+                                   placeholder="{prefix}{year2}{month}{sequence}{suffix}">
+                            <small class="form-text text-muted">
+                                可用的占位符：<br>
+                                {prefix} - 前缀<br>
+                                {suffix} - 后缀<br>
+                                {year} - 四位年份<br>
+                                {year2} - 两位年份<br>
+                                {month} - 两位月份<br>
+                                {day} - 两位日期<br>
+                                {sequence} - 序号
+                            </small>
+                        </div>
+                    </div>
+                    <div class="col-12">
+                        <div class="form-group">
+                            <label for="notes" class="form-label">备注</label>
+                            <textarea class="form-control" id="notes" name="notes" rows="3">{{ rule.notes if rule else '' }}</textarea>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-3">
+                    <button type="submit" class="btn btn-primary">保存</button>
+                    <a href="{{ url_for('main.manage_code_rules') }}" class="btn btn-secondary">返回</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('codeRuleForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const formData = {
+        name: document.getElementById('name').value,
+        code_type: document.getElementById('code_type').value,
+        prefix: document.getElementById('prefix').value,
+        suffix: document.getElementById('suffix').value,
+        sequence_length: document.getElementById('sequence_length').value,
+        reset_frequency: document.getElementById('reset_frequency').value,
+        format_pattern: document.getElementById('format_pattern').value,
+        notes: document.getElementById('notes').value
+    };
+    
+    const url = "{{ url_for('main.add_code_rule') if not rule else url_for('main.edit_code_rule', rule_id=rule.id) }}";
+    
+    fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
+        },
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('保存成功！');
+            window.location.href = "{{ url_for('main.manage_code_rules') }}";
+        } else {
+            alert('保存失败：' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('保存失败，请重试');
+    });
+});
+</script>
+{% endblock %} 

@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+
+{% block title %}编码规则管理{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>编码规则管理</h2>
+    
+    <!-- 操作按钮 -->
+    <div class="mb-4">
+        {% if current_user.role in ['admin', 'manager'] %}
+        <button type="button" class="btn btn-primary" id="addRuleBtn">
+            <i class="fas fa-plus"></i> 添加规则
+        </button>
+        {% endif %}
+    </div>
+
+    <!-- 规则列表 -->
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>规则名称</th>
+                    <th>编码类型</th>
+                    <th>前缀</th>
+                    <th>后缀</th>
+                    <th>序号长度</th>
+                    <th>重置频率</th>
+                    <th>格式模式</th>
+                    <th>状态</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for rule in rules %}
+                <tr>
+                    <td>{{ rule.name }}</td>
+                    <td>{{ rule.code_type }}</td>
+                    <td>{{ rule.prefix or '-' }}</td>
+                    <td>{{ rule.suffix or '-' }}</td>
+                    <td>{{ rule.sequence_length }}</td>
+                    <td>{{ {'never': '从不', 'daily': '每日', 'monthly': '每月', 'yearly': '每年'}[rule.reset_frequency] }}</td>
+                    <td>{{ rule.format_pattern }}</td>
+                    <td>
+                        <span class="badge {% if rule.is_active %}bg-success{% else %}bg-danger{% endif %}">
+                            {{ '启用' if rule.is_active else '禁用' }}
+                        </span>
+                    </td>
+                    <td>
+                        {% if current_user.role in ['admin', 'manager'] %}
+                        <button class="btn btn-sm btn-info test-btn" data-rule-id="{{ rule.id }}">
+                            <i class="fas fa-play"></i> 测试
+                        </button>
+                        <button class="btn btn-sm btn-primary edit-btn" data-rule-id="{{ rule.id }}">
+                            <i class="fas fa-edit"></i> 编辑
+                        </button>
+                        <button class="btn btn-sm btn-danger delete-btn" data-rule-id="{{ rule.id }}">
+                            <i class="fas fa-trash"></i> 删除
+                        </button>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- 测试生成结果模态框 -->
+<div class="modal fade" id="testResultModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">测试生成结果</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>生成的编码：<strong id="generatedCode"></strong></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 添加规则按钮
+    const addRuleBtn = document.getElementById('addRuleBtn');
+    if (addRuleBtn) {
+        addRuleBtn.addEventListener('click', function() {
+            window.location.href = "{{ url_for('main.add_code_rule') }}";
+        });
+    }
+
+    // 测试按钮
+    document.querySelectorAll('.test-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const ruleId = this.dataset.ruleId;
+            testGenerate(ruleId);
+        });
+    });
+
+    // 编辑按钮
+    document.querySelectorAll('.edit-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const ruleId = this.dataset.ruleId;
+            window.location.href = `/code_rules/${ruleId}/edit`;
+        });
+    });
+
+    // 删除按钮
+    document.querySelectorAll('.delete-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const ruleId = this.dataset.ruleId;
+            deleteRule(ruleId);
+        });
+    });
+});
+
+function testGenerate(ruleId) {
+    fetch(`/code_rules/${ruleId}/generate`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
+        },
+        body: JSON.stringify({
+            target_type: 'test',
+            target_id: null
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            document.getElementById('generatedCode').textContent = data.code;
+            const modal = new bootstrap.Modal(document.getElementById('testResultModal'));
+            modal.show();
+        } else {
+            alert('生成失败：' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('生成失败，请重试');
+    });
+}
+
+function deleteRule(ruleId) {
+    if (!confirm('确定要删除这个规则吗？')) {
+        return;
+    }
+    
+    fetch(`/code_rules/${ruleId}/delete`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            window.location.reload();
+        } else {
+            alert('删除失败：' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('删除失败，请重试');
+    });
+}
+</script>
+{% endblock %} 
