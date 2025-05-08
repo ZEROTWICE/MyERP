@@ -3196,9 +3196,13 @@ def manage_inventory():
         page=page, per_page=per_page, error_out=False
     )
     
+    # 获取可用的产品编码规则
+    code_rules = CodeRule.query.filter_by(code_type='product', is_active=True).all()
+    
     return render_template('main/inventory.html',
                          inventory=pagination.items,
-                         pagination=pagination)
+                         pagination=pagination,
+                         code_rules=code_rules)
 
 @bp.route('/inventory/template')
 @login_required
@@ -3661,17 +3665,36 @@ def add_finished_product():
         current_app.logger.info(f"接收到添加成品请求: {data}")
         
         # 检查必填字段
-        required_fields = ['product_number', 'drawing_number', 'model', 'production_date', 'inspector']
+        required_fields = ['drawing_number', 'model', 'production_date', 'inspector']
         missing_fields = [field for field in required_fields if field not in data or not data[field]]
         
         if missing_fields:
             return jsonify({'success': False, 'message': f'缺少必要的字段：{", ".join(missing_fields)}'})
         
+        # 处理产品编号
+        product_number = None
+        if data.get('product_number_type') == 'manual':
+            if not data.get('product_number'):
+                return jsonify({'success': False, 'message': '手动输入模式下产品编号不能为空'})
+            product_number = data['product_number']
+        else:  # 使用编码规则
+            if not data.get('code_rule_id'):
+                return jsonify({'success': False, 'message': '请选择编码规则'})
+            
+            # 获取编码规则并生成编码
+            rule = CodeRule.query.get(data['code_rule_id'])
+            if not rule:
+                return jsonify({'success': False, 'message': '编码规则不存在'})
+            if not rule.is_active:
+                return jsonify({'success': False, 'message': '编码规则已禁用'})
+            
+            product_number = rule.generate_code()
+        
         # 创建成品记录
         product = FinishedProduct(
             global_sn=SerialNumber.get_next_number(),
             serial_number=SerialNumber.get_next_number(),
-            product_number=data['product_number'],
+            product_number=product_number,
             production_date=datetime.strptime(data['production_date'], '%Y-%m-%d').date(),
             drawing_number=data['drawing_number'],
             model=data['model'],
@@ -3733,22 +3756,39 @@ def add_raw_material():
         # 打印日志，辅助调试
         current_app.logger.info(f"接收到添加原材料请求: {data}")
         
-        # 检查必填字段
-        required_fields = ['supplier', 'material_name', 'melt_number', 'supplier_number', 'quantity', 'storage_date']
+        # 检查必填字段（移除了melt_number）
+        required_fields = ['supplier', 'material_name', 'supplier_number', 'storage_date', 'quantity']
         missing_fields = [field for field in required_fields if field not in data or not data[field]]
         
         if missing_fields:
             return jsonify({'success': False, 'message': f'缺少必要的字段：{", ".join(missing_fields)}'})
+        
+        # 处理内部编号
+        internal_number = None
+        if data.get('internal_number_type') == 'manual':
+            internal_number = data.get('internal_number', '')
+        else:  # 使用编码规则
+            if not data.get('code_rule_id'):
+                return jsonify({'success': False, 'message': '请选择编码规则'})
+            
+            # 获取编码规则并生成编码
+            rule = CodeRule.query.get(data['code_rule_id'])
+            if not rule:
+                return jsonify({'success': False, 'message': '编码规则不存在'})
+            if not rule.is_active:
+                return jsonify({'success': False, 'message': '编码规则已禁用'})
+            
+            internal_number = rule.generate_code()
         
         # 创建原材料记录
         material = RawMaterial(
             global_sn=SerialNumber.get_next_number(),
             supplier=data['supplier'],
             material_name=data['material_name'],
-            melt_number=data['melt_number'],
+            melt_number=data.get('melt_number', ''),  # 修改为可选字段
             supplier_number=data['supplier_number'],
             storage_date=datetime.strptime(data['storage_date'], '%Y-%m-%d').date(),
-            internal_number=data.get('internal_number', ''),  # 允许用户提供内部编号
+            internal_number=internal_number or SerialNumber.get_next_number(),
             quantity=float(data['quantity']),
             has_sample=data.get('has_sample', False),
             notes=data.get('notes', '')
@@ -3771,6 +3811,7 @@ def add_raw_material():
                 'material_name': material.material_name,
                 'melt_number': material.melt_number,
                 'supplier_number': material.supplier_number,
+                'internal_number': material.internal_number,
                 'quantity': material.quantity
             }
         )
@@ -3980,3 +4021,247 @@ def generate_code(rule_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': f'编码生成失败：{str(e)}'})
+
+@bp.route('/code_rules/available/product', methods=['GET'])
+@login_required
+def get_available_product_rules():
+    """获取可用的产品编码规则"""
+    try:
+        rules = CodeRule.query.filter_by(code_type='product', is_active=True).all()
+        current_app.logger.info(f"找到 {len(rules)} 个可用的产品编码规则")
+        
+        rules_data = [{
+            'id': rule.id,
+            'name': rule.name
+        } for rule in rules]
+        
+        current_app.logger.debug(f"编码规则数据: {rules_data}")
+        
+        return jsonify({
+            'success': True,
+            'rules': rules_data
+        })
+    except Exception as e:
+        current_app.logger.error(f"获取产品编码规则时出错: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'获取编码规则失败: {str(e)}'
+        }), 500
+
+@bp.route('/code_rules/available/material', methods=['GET'])
+@login_required
+def get_available_material_rules():
+    """获取可用的原材料编码规则"""
+    try:
+        rules = CodeRule.query.filter_by(code_type='material', is_active=True).all()
+        current_app.logger.info(f"找到 {len(rules)} 个可用的原材料编码规则")
+        
+        rules_data = [{
+            'id': rule.id,
+            'name': rule.name
+        } for rule in rules]
+        
+        current_app.logger.debug(f"编码规则数据: {rules_data}")
+        
+        return jsonify({
+            'success': True,
+            'rules': rules_data
+        })
+    except Exception as e:
+        current_app.logger.error(f"获取原材料编码规则时出错: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'获取编码规则失败: {str(e)}'
+        }), 500
+
+@bp.route('/inventory/finished/<int:id>', methods=['GET'])
+@login_required
+def get_finished_product(id):
+    """获取成品详情"""
+    if current_user.role not in ['admin', 'manager']:
+        return jsonify({'success': False, 'message': '权限不足'})
+    
+    try:
+        product = FinishedProduct.query.get_or_404(id)
+        return jsonify({
+            'success': True,
+            'data': {
+                'id': product.id,
+                'product_number': product.product_number,
+                'drawing_number': product.drawing_number,
+                'model': product.model,
+                'production_date': product.production_date.strftime('%Y-%m-%d'),
+                'inspector': product.inspector,
+                'quantity': product.quantity,
+                'status': product.status,
+                'notes': product.notes or ''
+            }
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'获取成品详情失败：{str(e)}'})
+
+@bp.route('/inventory/finished/<int:id>', methods=['PUT'])
+@login_required
+def update_finished_product(id):
+    """更新成品信息"""
+    if current_user.role not in ['admin', 'manager']:
+        return jsonify({'success': False, 'message': '权限不足'})
+    
+    try:
+        product = FinishedProduct.query.get_or_404(id)
+        data = request.json
+        
+        if not data:
+            return jsonify({'success': False, 'message': '请求数据为空'})
+        
+        # 保存旧数据用于审计日志
+        old_data = {
+            'product_number': product.product_number,
+            'drawing_number': product.drawing_number,
+            'model': product.model,
+            'production_date': product.production_date.strftime('%Y-%m-%d'),
+            'inspector': product.inspector,
+            'quantity': product.quantity,
+            'status': product.status,
+            'notes': product.notes
+        }
+        
+        # 更新数据
+        product.drawing_number = data['drawing_number']
+        product.model = data['model']
+        product.production_date = datetime.strptime(data['production_date'], '%Y-%m-%d').date()
+        product.inspector = data['inspector']
+        product.quantity = data['quantity']
+        product.status = data['status']
+        product.notes = data.get('notes', '')
+        
+        # 记录审计日志
+        log = AuditLog(
+            user_id=current_user.id,
+            action='更新成品',
+            details=f'更新成品：{product.product_number}',
+            can_rollback=True,
+            rollback_type='edit',
+            target_model='FinishedProduct',
+            target_id=product.id,
+            old_data=old_data,
+            new_data={
+                'product_number': product.product_number,
+                'drawing_number': product.drawing_number,
+                'model': product.model,
+                'production_date': product.production_date.strftime('%Y-%m-%d'),
+                'inspector': product.inspector,
+                'quantity': product.quantity,
+                'status': product.status,
+                'notes': product.notes
+            }
+        )
+        db.session.add(log)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': '成功更新成品信息'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'更新失败：{str(e)}'})
+
+@bp.route('/inventory/raw/<int:id>', methods=['GET'])
+@login_required
+def get_raw_material(id):
+    """获取原材料详情"""
+    if current_user.role not in ['admin', 'manager']:
+        return jsonify({'success': False, 'message': '权限不足'})
+    
+    try:
+        material = RawMaterial.query.get_or_404(id)
+        return jsonify({
+            'success': True,
+            'data': {
+                'id': material.id,
+                'supplier': material.supplier,
+                'material_name': material.material_name,
+                'melt_number': material.melt_number,
+                'supplier_number': material.supplier_number,
+                'internal_number': material.internal_number,
+                'storage_date': material.storage_date.strftime('%Y-%m-%d'),
+                'quantity': material.quantity,
+                'has_sample': material.has_sample,
+                'notes': material.notes or ''
+            }
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'获取原材料详情失败：{str(e)}'})
+
+@bp.route('/inventory/raw/<int:id>', methods=['PUT'])
+@login_required
+def update_raw_material(id):
+    """更新原材料信息"""
+    if current_user.role not in ['admin', 'manager']:
+        return jsonify({'success': False, 'message': '权限不足'})
+    
+    try:
+        material = RawMaterial.query.get_or_404(id)
+        data = request.json
+        
+        if not data:
+            return jsonify({'success': False, 'message': '请求数据为空'})
+        
+        # 保存旧数据用于审计日志
+        old_data = {
+            'supplier': material.supplier,
+            'material_name': material.material_name,
+            'melt_number': material.melt_number,
+            'supplier_number': material.supplier_number,
+            'internal_number': material.internal_number,
+            'storage_date': material.storage_date.strftime('%Y-%m-%d'),
+            'quantity': material.quantity,
+            'has_sample': material.has_sample,
+            'notes': material.notes
+        }
+        
+        # 更新数据
+        material.supplier = data['supplier']
+        material.material_name = data['material_name']
+        material.melt_number = data.get('melt_number', '')  # 可选字段
+        material.supplier_number = data['supplier_number']
+        material.storage_date = datetime.strptime(data['storage_date'], '%Y-%m-%d').date()
+        material.quantity = float(data['quantity'])
+        material.has_sample = data.get('has_sample', False)
+        material.notes = data.get('notes', '')
+        
+        # 记录审计日志
+        log = AuditLog(
+            user_id=current_user.id,
+            action='更新原材料',
+            details=f'更新原材料：{material.material_name}',
+            can_rollback=True,
+            rollback_type='edit',
+            target_model='RawMaterial',
+            target_id=material.id,
+            old_data=old_data,
+            new_data={
+                'supplier': material.supplier,
+                'material_name': material.material_name,
+                'melt_number': material.melt_number,
+                'supplier_number': material.supplier_number,
+                'internal_number': material.internal_number,
+                'storage_date': material.storage_date.strftime('%Y-%m-%d'),
+                'quantity': material.quantity,
+                'has_sample': material.has_sample,
+                'notes': material.notes
+            }
+        )
+        db.session.add(log)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': '成功更新原材料信息'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'更新失败：{str(e)}'})

@@ -197,19 +197,178 @@ function importInventory(input) {
 }
 
 function editRawMaterial(id) {
-    // TODO: 实现编辑原材料的功能
-    alert('编辑原材料功能即将上线');
+    console.log('编辑原材料:', id);
+    // 获取原材料详情
+    fetch(`/inventory/raw/${id}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // 填充表单数据
+                document.getElementById('editRawMaterialId').value = data.data.id;
+                document.getElementById('editInternalNumber').value = data.data.internal_number;
+                document.getElementById('editSupplier').value = data.data.supplier;
+                document.getElementById('editMaterialName').value = data.data.material_name;
+                document.getElementById('editMeltNumber').value = data.data.melt_number;
+                document.getElementById('editSupplierNumber').value = data.data.supplier_number;
+                document.getElementById('editStorageDate').value = data.data.storage_date;
+                document.getElementById('editRawQuantity').value = data.data.quantity;
+                document.getElementById('editHasSample').checked = data.data.has_sample;
+                document.getElementById('editRawNotes').value = data.data.notes;
+                
+                // 显示模态框
+                const modal = new bootstrap.Modal(document.getElementById('editRawMaterialModal'));
+                modal.show();
+            } else {
+                alert('获取原材料详情失败：' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('获取原材料详情失败，请重试');
+        });
+}
+
+function submitEditRawMaterial() {
+    const id = document.getElementById('editRawMaterialId').value;
+    const formData = {
+        supplier: document.getElementById('editSupplier').value,
+        material_name: document.getElementById('editMaterialName').value,
+        melt_number: document.getElementById('editMeltNumber').value,
+        supplier_number: document.getElementById('editSupplierNumber').value,
+        storage_date: document.getElementById('editStorageDate').value,
+        quantity: parseFloat(document.getElementById('editRawQuantity').value) || 0,
+        has_sample: document.getElementById('editHasSample').checked,
+        notes: document.getElementById('editRawNotes').value
+    };
+    
+    if (formData.quantity <= 0) {
+        alert('数量必须大于0');
+        return;
+    }
+    
+    fetch(`/inventory/raw/${id}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('成功更新原材料信息！');
+            const modal = bootstrap.Modal.getInstance(document.getElementById('editRawMaterialModal'));
+            modal.hide();
+            location.reload();
+        } else {
+            alert('更新失败：' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('更新失败，请重试');
+    });
 }
 
 function editFinishedProduct(id) {
-    // TODO: 实现编辑成品的功能
-    alert('编辑成品功能即将上线');
+    console.log('编辑成品:', id);
+    // 获取成品详情
+    fetch(`/inventory/finished/${id}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // 填充表单数据
+                document.getElementById('editProductId').value = data.data.id;
+                document.getElementById('editProductNumber').value = data.data.product_number;
+                document.getElementById('editDrawingNumber').value = data.data.drawing_number;
+                document.getElementById('editModel').value = data.data.model;
+                document.getElementById('editProductionDate').value = data.data.production_date;
+                document.getElementById('editInspector').value = data.data.inspector;
+                document.getElementById('editQuantity').value = data.data.quantity;
+                document.getElementById('editStatus').value = data.data.status;
+                document.getElementById('editNotes').value = data.data.notes;
+                
+                // 显示模态框
+                const modal = new bootstrap.Modal(document.getElementById('editFinishedProductModal'));
+                modal.show();
+            } else {
+                alert('获取成品详情失败：' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('获取成品详情失败，请重试');
+        });
 }
 
-// 提交添加成品表单
-function submitFinishedProduct() {
+function submitEditFinishedProduct() {
+    const id = document.getElementById('editProductId').value;
     const formData = {
-        product_number: document.getElementById('productNumber').value,
+        drawing_number: document.getElementById('editDrawingNumber').value,
+        model: document.getElementById('editModel').value,
+        production_date: document.getElementById('editProductionDate').value,
+        inspector: document.getElementById('editInspector').value,
+        quantity: parseInt(document.getElementById('editQuantity').value) || 1,
+        status: document.getElementById('editStatus').value,
+        notes: document.getElementById('editNotes').value
+    };
+    
+    if (formData.quantity <= 0) {
+        alert('数量必须大于0');
+        return;
+    }
+    
+    fetch(`/inventory/finished/${id}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('成功更新成品信息！');
+            const modal = bootstrap.Modal.getInstance(document.getElementById('editFinishedProductModal'));
+            modal.hide();
+            location.reload();
+        } else {
+            alert('更新失败：' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('更新失败，请重试');
+    });
+}
+
+function handleProductNumberTypeChange() {
+    const type = document.getElementById('productNumberType').value;
+    const manualDiv = document.getElementById('manualProductNumberDiv');
+    const ruleDiv = document.getElementById('ruleProductNumberDiv');
+    
+    if (type === 'manual') {
+        manualDiv.style.display = 'block';
+        ruleDiv.style.display = 'none';
+        document.getElementById('productNumber').required = true;
+        document.getElementById('codeRule').required = false;
+    } else {
+        manualDiv.style.display = 'none';
+        ruleDiv.style.display = 'block';
+        document.getElementById('productNumber').required = false;
+        document.getElementById('codeRule').required = true;
+    }
+}
+
+// 修改提交成品表单函数
+function submitFinishedProduct() {
+    const productNumberType = document.getElementById('productNumberType').value;
+    let formData = {
+        product_number_type: productNumberType,
         drawing_number: document.getElementById('drawingNumber').value,
         model: document.getElementById('model').value,
         production_date: document.getElementById('productionDate').value,
@@ -217,6 +376,12 @@ function submitFinishedProduct() {
         quantity: parseInt(document.getElementById('quantity').value) || 1,
         notes: document.getElementById('notes') ? document.getElementById('notes').value : ''
     };
+    
+    if (productNumberType === 'manual') {
+        formData.product_number = document.getElementById('productNumber').value;
+    } else {
+        formData.code_rule_id = document.getElementById('codeRule').value;
+    }
     
     if (formData.quantity <= 0) {
         alert('数量必须大于0');
@@ -249,20 +414,174 @@ function submitFinishedProduct() {
     });
 }
 
-// 提交添加原材料表单
+// 添加加载编码规则的函数
+function loadProductRules() {
+    console.log('开始加载编码规则...');
+    fetch("{{ url_for('main.get_available_product_rules') }}", {
+        method: 'GET',
+        headers: {
+            'Accept': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
+        },
+        credentials: 'same-origin'
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        console.log('获取到的编码规则数据:', data);
+        if (data.success) {
+            const select = document.getElementById('codeRule');
+            if (!select) {
+                console.error('找不到编码规则选择框元素');
+                return;
+            }
+            // 清除现有选项（保留"请选择"选项）
+            select.innerHTML = '<option value="">请选择</option>';
+            // 添加规则选项
+            data.rules.forEach(rule => {
+                const option = document.createElement('option');
+                option.value = rule.id;
+                option.textContent = rule.name;
+                select.appendChild(option);
+                console.log(`添加规则选项: ${rule.name}`);
+            });
+        } else {
+            console.error('加载编码规则失败:', data.message);
+            alert('加载编码规则失败，请刷新页面重试');
+        }
+    })
+    .catch(error => {
+        console.error('加载编码规则时出错:', error);
+        alert('加载编码规则失败，请刷新页面重试');
+    });
+}
+
+// 在文档加载完成后设置模态框事件
+document.addEventListener('DOMContentLoaded', function() {
+    const modal = document.getElementById('addFinishedProductModal');
+    if (modal) {
+        modal.addEventListener('show.bs.modal', function (event) {
+            console.log('模态框打开事件触发');
+            // 重置表单
+            document.getElementById('addFinishedProductForm').reset();
+            // 设置默认日期为今天
+            document.getElementById('productionDate').valueAsDate = new Date();
+            // 加载编码规则
+            loadProductRules();
+            // 触发一次生成方式切换，确保界面状态正确
+            handleProductNumberTypeChange();
+        });
+    } else {
+        console.error('找不到添加成品模态框元素');
+    }
+});
+
+// 添加加载原材料编码规则的函数
+function loadMaterialRules() {
+    console.log('开始加载原材料编码规则...');
+    fetch("{{ url_for('main.get_available_material_rules') }}", {
+        method: 'GET',
+        headers: {
+            'Accept': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
+        },
+        credentials: 'same-origin'
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        console.log('获取到的编码规则数据:', data);
+        if (data.success) {
+            const select = document.getElementById('materialCodeRule');
+            if (!select) {
+                console.error('找不到编码规则选择框元素');
+                return;
+            }
+            // 清除现有选项（保留"请选择"选项）
+            select.innerHTML = '<option value="">请选择</option>';
+            // 添加规则选项
+            data.rules.forEach(rule => {
+                const option = document.createElement('option');
+                option.value = rule.id;
+                option.textContent = rule.name;
+                select.appendChild(option);
+                console.log(`添加规则选项: ${rule.name}`);
+            });
+        } else {
+            console.error('加载编码规则失败:', data.message);
+            alert('加载编码规则失败，请刷新页面重试');
+        }
+    })
+    .catch(error => {
+        console.error('加载编码规则时出错:', error);
+        alert('加载编码规则失败，请刷新页面重试');
+    });
+}
+
+function handleInternalNumberTypeChange() {
+    const type = document.getElementById('internalNumberType').value;
+    const manualDiv = document.getElementById('manualInternalNumberDiv');
+    const ruleDiv = document.getElementById('ruleInternalNumberDiv');
+    
+    if (type === 'manual') {
+        manualDiv.style.display = 'block';
+        ruleDiv.style.display = 'none';
+        document.getElementById('materialCodeRule').required = false;
+    } else {
+        manualDiv.style.display = 'none';
+        ruleDiv.style.display = 'block';
+        document.getElementById('materialCodeRule').required = true;
+    }
+}
+
+// 修改原材料模态框打开事件
+document.addEventListener('DOMContentLoaded', function() {
+    const rawMaterialModal = document.getElementById('addRawMaterialModal');
+    if (rawMaterialModal) {
+        rawMaterialModal.addEventListener('show.bs.modal', function (event) {
+            console.log('原材料模态框打开事件触发');
+            // 重置表单
+            document.getElementById('addRawMaterialForm').reset();
+            // 设置默认日期为今天
+            document.getElementById('entryDate').valueAsDate = new Date();
+            // 加载编码规则
+            loadMaterialRules();
+            // 触发一次生成方式切换，确保界面状态正确
+            handleInternalNumberTypeChange();
+        });
+    } else {
+        console.error('找不到添加原材料模态框元素');
+    }
+});
+
+// 修改提交原材料表单函数
 function submitRawMaterial() {
-    // 收集表单数据
-    const formData = {
+    const internalNumberType = document.getElementById('internalNumberType').value;
+    let formData = {
         supplier: document.getElementById('supplier').value,
         material_name: document.getElementById('materialName').value,
         melt_number: document.getElementById('meltNumber').value,
         supplier_number: document.getElementById('supplierNumber').value,
-        internal_number: document.getElementById('internalNumber').value,
+        internal_number_type: internalNumberType,
         storage_date: document.getElementById('entryDate').value,
         quantity: document.getElementById('rawQuantity').value,
         has_sample: document.getElementById('hasSample') ? document.getElementById('hasSample').checked : false,
         notes: document.getElementById('rawNotes') ? document.getElementById('rawNotes').value : ''
     };
+    
+    if (internalNumberType === 'manual') {
+        formData.internal_number = document.getElementById('internalNumber').value;
+    } else {
+        formData.code_rule_id = document.getElementById('materialCodeRule').value;
+    }
     
     // 发送API请求
     fetch("{{ url_for('main.add_raw_material') }}", {
@@ -304,8 +623,21 @@ function submitRawMaterial() {
             <div class="modal-body">
                 <form id="addFinishedProductForm">
                     <div class="mb-3">
+                        <label for="productNumberType" class="form-label">产品编号生成方式</label>
+                        <select class="form-control" id="productNumberType" name="product_number_type" required onchange="handleProductNumberTypeChange()">
+                            <option value="manual">手动输入</option>
+                            <option value="rule">使用编码规则</option>
+                        </select>
+                    </div>
+                    <div class="mb-3" id="manualProductNumberDiv">
                         <label for="productNumber" class="form-label">产品编号</label>
-                        <input type="text" class="form-control" id="productNumber" name="product_number" required>
+                        <input type="text" class="form-control" id="productNumber" name="product_number">
+                    </div>
+                    <div class="mb-3" id="ruleProductNumberDiv" style="display: none;">
+                        <label for="codeRule" class="form-label">选择编码规则</label>
+                        <select class="form-control" id="codeRule" name="code_rule_id">
+                            <option value="">请选择</option>
+                        </select>
                     </div>
                     <div class="mb-3">
                         <label for="drawingNumber" class="form-label">图号</label>
@@ -361,15 +693,28 @@ function submitRawMaterial() {
                     </div>
                     <div class="mb-3">
                         <label for="meltNumber" class="form-label">原料冶炼炉号</label>
-                        <input type="text" class="form-control" id="meltNumber" name="melt_number" required>
+                        <input type="text" class="form-control" id="meltNumber" name="melt_number" placeholder="可选">
                     </div>
                     <div class="mb-3">
                         <label for="supplierNumber" class="form-label">供应商编号</label>
                         <input type="text" class="form-control" id="supplierNumber" name="supplier_number" required>
                     </div>
                     <div class="mb-3">
+                        <label for="internalNumberType" class="form-label">内部编号生成方式</label>
+                        <select class="form-control" id="internalNumberType" name="internal_number_type" required onchange="handleInternalNumberTypeChange()">
+                            <option value="manual">手动输入</option>
+                            <option value="rule">使用编码规则</option>
+                        </select>
+                    </div>
+                    <div class="mb-3" id="manualInternalNumberDiv">
                         <label for="internalNumber" class="form-label">内部编号</label>
                         <input type="text" class="form-control" id="internalNumber" name="internal_number" placeholder="可选，留空则自动生成">
+                    </div>
+                    <div class="mb-3" id="ruleInternalNumberDiv" style="display: none;">
+                        <label for="materialCodeRule" class="form-label">选择编码规则</label>
+                        <select class="form-control" id="materialCodeRule" name="code_rule_id">
+                            <option value="">请选择</option>
+                        </select>
                     </div>
                     <div class="mb-3">
                         <label for="entryDate" class="form-label">入库时间</label>
@@ -394,6 +739,123 @@ function submitRawMaterial() {
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
                 <button type="button" class="btn btn-primary" onclick="submitRawMaterial()">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 编辑成品模态框 -->
+<div class="modal fade" id="editFinishedProductModal" tabindex="-1" aria-labelledby="editFinishedProductModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editFinishedProductModalLabel">编辑成品</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editFinishedProductForm">
+                    <input type="hidden" id="editProductId">
+                    <div class="mb-3">
+                        <label class="form-label">产品编号</label>
+                        <input type="text" class="form-control" id="editProductNumber" disabled>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editDrawingNumber" class="form-label">图号</label>
+                        <input type="text" class="form-control" id="editDrawingNumber" name="drawing_number" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editModel" class="form-label">型号</label>
+                        <input type="text" class="form-control" id="editModel" name="model" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editProductionDate" class="form-label">生产日期</label>
+                        <input type="date" class="form-control" id="editProductionDate" name="production_date" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editInspector" class="form-label">检验员</label>
+                        <input type="text" class="form-control" id="editInspector" name="inspector" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editQuantity" class="form-label">数量</label>
+                        <input type="number" class="form-control" id="editQuantity" name="quantity" min="1" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editStatus" class="form-label">状态</label>
+                        <select class="form-control" id="editStatus" name="status" required>
+                            <option value="in_stock">在库</option>
+                            <option value="shipped">已发货</option>
+                            <option value="scrapped">报废</option>
+                            <option value="used">已使用</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editNotes" class="form-label">备注</label>
+                        <textarea class="form-control" id="editNotes" name="notes"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="submitEditFinishedProduct()">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 编辑原材料模态框 -->
+<div class="modal fade" id="editRawMaterialModal" tabindex="-1" aria-labelledby="editRawMaterialModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editRawMaterialModalLabel">编辑原材料</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editRawMaterialForm">
+                    <input type="hidden" id="editRawMaterialId">
+                    <div class="mb-3">
+                        <label class="form-label">内部编号</label>
+                        <input type="text" class="form-control" id="editInternalNumber" disabled>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editSupplier" class="form-label">供应商</label>
+                        <input type="text" class="form-control" id="editSupplier" name="supplier" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editMaterialName" class="form-label">品名</label>
+                        <input type="text" class="form-control" id="editMaterialName" name="material_name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editMeltNumber" class="form-label">原料冶炼炉号</label>
+                        <input type="text" class="form-control" id="editMeltNumber" name="melt_number" placeholder="可选">
+                    </div>
+                    <div class="mb-3">
+                        <label for="editSupplierNumber" class="form-label">供应商编号</label>
+                        <input type="text" class="form-control" id="editSupplierNumber" name="supplier_number" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editStorageDate" class="form-label">入库时间</label>
+                        <input type="date" class="form-control" id="editStorageDate" name="storage_date" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editRawQuantity" class="form-label">数量</label>
+                        <input type="number" class="form-control" id="editRawQuantity" name="quantity" min="0.01" step="0.01" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editHasSample" class="form-check-label">
+                            <input type="checkbox" class="form-check-input" id="editHasSample" name="has_sample">
+                            是否带样品
+                        </label>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editRawNotes" class="form-label">备注</label>
+                        <textarea class="form-control" id="editRawNotes" name="notes"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="submitEditRawMaterial()">保存</button>
             </div>
         </div>
     </div>
