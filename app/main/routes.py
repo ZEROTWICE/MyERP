@@ -193,6 +193,11 @@ def add_employee():
             flash('工号已存在', 'danger')
             return render_template('main/employee_form.html', form=form, title='新增员工')
         
+        # 检查用户名是否已存在
+        if User.query.filter_by(username=form.employee_id.data).first():
+            flash('该工号已被用作其他用户的用户名，请使用其他工号', 'danger')
+            return render_template('main/employee_form.html', form=form, title='新增员工')
+        
         # 创建用户账号
         user = User(
             username=form.employee_id.data,
@@ -212,7 +217,8 @@ def add_employee():
             department=form.department.data,
             hire_date=form.hire_date.data,
             termination_date=form.termination_date.data,
-            is_active=True if not form.termination_date.data or form.termination_date.data > datetime.now().date() else False
+            is_active=True if not form.termination_date.data or form.termination_date.data > datetime.now().date() else False,
+            user=user  # 关联用户账号
         )
         db.session.add(employee)
         db.session.flush()
@@ -1344,6 +1350,11 @@ def import_employees():
                 # 检查工号是否已存在
                 if Employee.query.filter_by(employee_id=data['employee_id']).first():
                     error_messages.append(f"工号 {data['employee_id']} 已存在")
+                    continue
+                
+                # 检查用户名是否已存在
+                if User.query.filter_by(username=data['employee_id']).first():
+                    error_messages.append(f"用户名 {data['employee_id']} 已存在")
                     continue
                 
                 # 创建用户账号
