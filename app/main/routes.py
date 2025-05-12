@@ -2207,28 +2207,41 @@ def update_task_status(id):
             if not employee or employee.id != task.employee_id:
                 return jsonify({'success': False, 'message': '权限不足'}), 403
         
-        new_status = request.form.get('status')
-        completed_quantity = request.form.get('completed_quantity', type=int)
-        
-        if new_status not in ['pending', 'in_progress', 'completed', 'cancelled']:
-            return jsonify({'success': False, 'message': '无效的状态值'}), 400
-        
         # 保存旧数据用于回滚
         old_data = {
             'status': task.status,
             'completed_quantity': task.completed_quantity
         }
         
-        # 更新任务状态
-        task.status = new_status
+        # 更新状态（如果提供了）
+        new_status = request.form.get('status')
+        if new_status is not None:
+            if new_status not in ['pending', 'in_progress', 'completed', 'cancelled']:
+                return jsonify({'success': False, 'message': '无效的状态值'}), 400
+            task.status = new_status
+        
+        # 更新完成数量（如果提供了）
+        completed_quantity = request.form.get('completed_quantity', type=int)
         if completed_quantity is not None:
+            if completed_quantity < 0:
+                return jsonify({'success': False, 'message': '完成数量不能为负数'}), 400
+            if completed_quantity > task.quantity:
+                return jsonify({'success': False, 'message': '完成数量不能超过总数量'}), 400
             task.completed_quantity = completed_quantity
+            
+            # 根据完成数量自动更新状态
+            if completed_quantity == 0:
+                task.status = 'pending'
+            elif completed_quantity == task.quantity:
+                task.status = 'completed'
+            elif completed_quantity < task.quantity:
+                task.status = 'in_progress'
         
         # 记录审计日志
         log = AuditLog(
             user_id=current_user.id,
             action='更新任务状态',
-            details=f'更新任务（ID：{task.id}）状态为 {new_status}',
+            details=f'更新任务（ID：{task.id}）完成数量为 {task.completed_quantity}，状态为 {task.status}',
             can_rollback=True,
             rollback_type='edit',
             target_model='TaskAssignment',

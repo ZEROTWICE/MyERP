@@ -72,19 +72,23 @@
                             <th>{{ sort_link('process_code', '工序代码') }}</th>
                             <th>{{ sort_link('process_name', '工序名称') }}</th>
                             <th>{{ sort_link('quantity', '数量') }}</th>
+                            <th>已完成</th>
+                            <th>完成率</th>
                             <th>{{ sort_link('status', '状态') }}</th>
                             <th>操作</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for task in tasks %}
-                        <tr>
+                        <tr class="{% if task.is_overdue %}table-danger{% endif %}">
                             <td>{{ task.target_date.strftime('%Y-%m-%d') }}</td>
                             <td>{{ task.employee.employee_id }}</td>
                             <td>{{ task.employee.name }}</td>
                             <td>{{ task.process.process_code }}</td>
                             <td>{{ task.process.process_name }}</td>
                             <td>{{ task.quantity }}</td>
+                            <td>{{ task.completed_quantity }}</td>
+                            <td>{{ "%.1f"|format(task.completion_rate) }}%</td>
                             <td>
                                 {% if task.status == 'pending' %}
                                 <span class="badge bg-warning">待完成</span>
@@ -101,6 +105,9 @@
                                 </button>
                                 <button class="btn btn-danger btn-sm delete-task" data-id="{{ task.id }}" data-bs-toggle="modal" data-bs-target="#deleteModal">
                                     删除
+                                </button>
+                                <button class="btn btn-info btn-sm update-quantity" data-task-id="{{ task.id }}" data-bs-toggle="modal" data-bs-target="#quantityModal">
+                                    更新进度
                                 </button>
                                 {% endif %}
                             </td>
@@ -253,6 +260,26 @@
             </div>
         </div>
     </div>
+
+    <!-- 更新进度的模态框 -->
+    <div class="modal fade" id="quantityModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">更新完成数量</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="number" class="form-control" id="completedQuantity" min="0">
+                    <input type="hidden" id="taskId">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" id="saveQuantity">保存</button>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}
 
@@ -261,6 +288,45 @@
 let taskToDelete = null;
 
 $(document).ready(function() {
+    // 初始化Select2
+    $('.select2').each(function() {
+        $(this).select2({
+            theme: 'bootstrap-5',
+            width: '100%',
+            dropdownParent: $(this).closest('.modal'),
+            language: {
+                noResults: function() {
+                    return "没有找到匹配的选项";
+                },
+                searching: function() {
+                    return "搜索中...";
+                }
+            }
+        });
+    });
+
+    // 当模态框显示时重新初始化Select2
+    $('#addModal, #editModal').on('shown.bs.modal', function() {
+        $(this).find('.select2').select2({
+            theme: 'bootstrap-5',
+            width: '100%',
+            dropdownParent: $(this),
+            language: {
+                noResults: function() {
+                    return "没有找到匹配的选项";
+                },
+                searching: function() {
+                    return "搜索中...";
+                }
+            }
+        });
+    });
+
+    // 当模态框隐藏时销毁Select2
+    $('#addModal, #editModal').on('hidden.bs.modal', function() {
+        $(this).find('.select2').select2('destroy');
+    });
+
     // 点击删除按钮时保存要删除的任务ID
     $('.delete-task').click(function() {
         taskToDelete = $(this).data('id');
@@ -353,10 +419,50 @@ $(document).ready(function() {
         form.submit();
     });
 
-    // 初始化Select2
-    $('#employee_id, #process_id, #edit_employee_id, #edit_process_id').select2({
-        theme: 'bootstrap-5',
-        width: '100%'
+    // 更新进度模态框
+    $('.update-quantity').click(function() {
+        const taskId = $(this).data('task-id');
+        $('#taskId').val(taskId);
+        
+        // 获取当前任务的已完成数量
+        $.ajax({
+            url: '{{ url_for("main.get_task_assignment", id=0) }}'.replace('0', taskId),
+            type: 'GET',
+            success: function(result) {
+                if (result.success) {
+                    $('#completedQuantity').val(result.data.completed_quantity);
+                }
+            }
+        });
+    });
+    
+    // 保存完成数量
+    $('#saveQuantity').click(function() {
+        const taskId = $('#taskId').val();
+        const quantity = $('#completedQuantity').val();
+        
+        $.ajax({
+            url: `/tasks/${taskId}/update_status`,
+            method: 'POST',
+            data: {
+                completed_quantity: quantity
+            },
+            headers: {
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
+            },
+            success: function(response) {
+                if (response.success) {
+                    toastr.success(response.message);
+                    $('#quantityModal').modal('hide');
+                    location.reload();
+                } else {
+                    toastr.error(response.message);
+                }
+            },
+            error: function() {
+                toastr.error('更新进度失败');
+            }
+        });
     });
 });
 
