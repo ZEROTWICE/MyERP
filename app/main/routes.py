@@ -487,6 +487,16 @@ def add_process_price():
     normal_processes = ProcessPrice.query.filter_by(price_type='normal', is_current=True).all()
     form.included_processes.choices = [(p.id, f"{p.process_code} - {p.process_name} (单价: {p.price}元)") for p in normal_processes]
     
+    # 获取可用的编码规则
+    finished_rules = CodeRule.query.filter_by(code_type='product', is_active=True).all()
+    raw_rules = CodeRule.query.filter_by(code_type='material', is_active=True).all()
+    # 将编码规则数据传递给模板
+    finished_rules_json = [{'id': r.id, 'name': r.name} for r in finished_rules]
+    raw_rules_json = [{'id': r.id, 'name': r.name} for r in raw_rules]
+    
+    # 设置编码规则选项（初始为空）
+    form.code_rule_id.choices = [(0, '请选择')]
+    
     if form.validate_on_submit():
         try:
             # 如果是小计类型，计算总价
@@ -500,18 +510,22 @@ def add_process_price():
 
             # 创建新的工序价格记录
             process_price = ProcessPrice(
-            global_sn=SerialNumber.get_next_number(),
-            process_code=form.process_code.data,
-            process_name=form.process_name.data,
-            component=form.component.data,
-            drawing_no=form.drawing_no.data,
-            model_no=form.model_no.data,
-            price=price,
-            effective_date=form.effective_date.data,
+                global_sn=SerialNumber.get_next_number(),
+                process_code=form.process_code.data,
+                process_name=form.process_name.data,
+                component=form.component.data,
+                drawing_no=form.drawing_no.data,
+                model_no=form.model_no.data,
+                price=price,
+                effective_date=form.effective_date.data,
                 notes=form.notes.data,
                 version=1,  # 新工序的初始版本为1
                 is_current=True,  # 新工序默认为当前生效
-                price_type=form.price_type.data
+                price_type=form.price_type.data,
+                has_output=form.has_output.data,
+                output_type=form.output_type.data if form.has_output.data else None,
+                code_rule_id=form.code_rule_id.data if form.has_output.data else None,
+                needs_inspection=form.needs_inspection.data
             )
             db.session.add(process_price)
             db.session.flush()  # 获取process_price.id
@@ -545,7 +559,11 @@ def add_process_price():
                     'effective_date': process_price.effective_date.isoformat() if process_price.effective_date else None,
                     'notes': process_price.notes,
                     'is_current': process_price.is_current,
-                    'price_type': process_price.price_type
+                    'price_type': process_price.price_type,
+                    'has_output': process_price.has_output,
+                    'output_type': process_price.output_type,
+                    'code_rule_id': process_price.code_rule_id,
+                    'needs_inspection': process_price.needs_inspection
                 }
         )
             db.session.add(log)
@@ -554,11 +572,19 @@ def add_process_price():
             return redirect(url_for('main.process_prices'))
         except Exception as e:
             db.session.rollback()
-            flash(f'添加失败：{str(e)}', 'danger')
             current_app.logger.error(f'添加工序价格失败: {str(e)}')
-            return render_template('main/process_price_form.html', form=form, title='新增工序价格')
+            flash('操作失败，请重试', 'danger')
+            return render_template('main/process_price_form.html', 
+                                form=form, 
+                                title='新增工序价格',
+                                finished_rules_json=finished_rules_json,
+                                raw_rules_json=raw_rules_json)
     
-    return render_template('main/process_price_form.html', form=form, title='新增工序价格')
+    return render_template('main/process_price_form.html', 
+                         form=form, 
+                         title='新增工序价格',
+                         finished_rules_json=finished_rules_json,
+                         raw_rules_json=raw_rules_json)
 
 @bp.route('/process_prices/<int:id>/edit', methods=['GET', 'POST'])
 @login_required
@@ -578,6 +604,21 @@ def edit_process_price(id):
     ).all()
     form.included_processes.choices = [(p.id, f"{p.process_code} - {p.process_name} (单价: {p.price}元)") for p in normal_processes]
     
+    # 获取可用的编码规则
+    finished_rules = CodeRule.query.filter_by(code_type='product', is_active=True).all()
+    raw_rules = CodeRule.query.filter_by(code_type='material', is_active=True).all()
+    # 将编码规则数据传递给模板
+    finished_rules_json = [{'id': r.id, 'name': r.name} for r in finished_rules]
+    raw_rules_json = [{'id': r.id, 'name': r.name} for r in raw_rules]
+    
+    # 根据当前产出类型设置编码规则选项
+    if process_price.output_type == 'finished':
+        form.code_rule_id.choices = [(0, '请选择')] + [(r.id, r.name) for r in finished_rules]
+    elif process_price.output_type == 'raw':
+        form.code_rule_id.choices = [(0, '请选择')] + [(r.id, r.name) for r in raw_rules]
+    else:
+        form.code_rule_id.choices = [(0, '请选择')]
+    
     if form.validate_on_submit():
         try:
             # 保存旧数据用于回滚
@@ -592,7 +633,11 @@ def edit_process_price(id):
                 'notes': process_price.notes,
                 'version': process_price.version,
                 'is_current': process_price.is_current,
-                'price_type': process_price.price_type
+                'price_type': process_price.price_type,
+                'has_output': process_price.has_output,
+                'output_type': process_price.output_type,
+                'code_rule_id': process_price.code_rule_id,
+                'needs_inspection': process_price.needs_inspection
             }
             
             # 如果是小计类型，计算总价
@@ -614,6 +659,10 @@ def edit_process_price(id):
             process_price.effective_date = form.effective_date.data
             process_price.notes = form.notes.data
             process_price.price_type = form.price_type.data
+            process_price.has_output = form.has_output.data
+            process_price.output_type = form.output_type.data if form.has_output.data else None
+            process_price.code_rule_id = form.code_rule_id.data if form.has_output.data else None
+            process_price.needs_inspection = form.needs_inspection.data
             
             # 更新小计关联
             if form.price_type.data == 'subtotal':
@@ -648,7 +697,11 @@ def edit_process_price(id):
                     'notes': process_price.notes,
                     'version': process_price.version,
                     'is_current': process_price.is_current,
-                    'price_type': process_price.price_type
+                    'price_type': process_price.price_type,
+                    'has_output': process_price.has_output,
+                    'output_type': process_price.output_type,
+                    'code_rule_id': process_price.code_rule_id,
+                    'needs_inspection': process_price.needs_inspection
                 }
             )
             db.session.add(log)
@@ -658,10 +711,17 @@ def edit_process_price(id):
             return redirect(url_for('main.process_prices'))
         except Exception as e:
             db.session.rollback()
-            flash(f'修改失败：{str(e)}', 'danger')
             current_app.logger.error(f'修改工序价格失败: {str(e)}')
-    else:
-        # 填充表单数据
+            flash('操作失败，请重试', 'danger')
+            return render_template('main/process_price_form.html', 
+                                form=form, 
+                                title='编辑工序价格', 
+                                employee=process_price,
+                                finished_rules_json=finished_rules_json,
+                                raw_rules_json=raw_rules_json)
+    
+    # GET请求时，填充表单数据
+    if request.method == 'GET':
         form.process_code.data = process_price.process_code
         form.process_name.data = process_price.process_name
         form.component.data = process_price.component
@@ -671,13 +731,22 @@ def edit_process_price(id):
         form.effective_date.data = process_price.effective_date
         form.notes.data = process_price.notes
         form.price_type.data = process_price.price_type
+        form.has_output.data = process_price.has_output
+        form.output_type.data = process_price.output_type
+        form.code_rule_id.data = process_price.code_rule_id
+        form.needs_inspection.data = process_price.needs_inspection
         
         # 如果是小计，填充已包含的工序
         if process_price.price_type == 'subtotal':
             included_process_ids = [group.process_id for group in ProcessPriceGroup.query.filter_by(subtotal_id=id).all()]
             form.included_processes.data = included_process_ids
     
-    return render_template('main/process_price_form.html', form=form, title='编辑工序价格')
+    return render_template('main/process_price_form.html', 
+                         form=form, 
+                         title='编辑工序价格', 
+                         employee=process_price,
+                         finished_rules_json=finished_rules_json,
+                         raw_rules_json=raw_rules_json)
 
 @bp.route('/process_price/<int:id>', methods=['DELETE'])
 @login_required
@@ -699,7 +768,10 @@ def delete_process_price(id):
             'version': process.version,
             'effective_date': process.effective_date.isoformat() if process.effective_date else None,
             'notes': process.notes,
-            'is_current': process.is_current
+            'is_current': process.is_current,
+            'output_type': process.output_type,
+            'code_rule_id': process.code_rule_id,
+            'needs_inspection': process.needs_inspection
         }
         
         # 记录可回滚的审计日志

@@ -31,6 +31,10 @@ class ProcessPriceForm(FlaskForm):
     notes = TextAreaField('备注')
     price_type = SelectField('价格类型', choices=[('normal', '普通工价'), ('subtotal', '小计')], default='normal')
     included_processes = SelectMultipleField('包含的工序', coerce=int, validators=[Optional()])
+    has_output = BooleanField('是否有产出', default=True)
+    output_type = SelectField('产出类型', choices=[('finished', '成品'), ('raw', '原材料')], validators=[Optional()])
+    code_rule_id = SelectField('编码规则', coerce=int, validators=[Optional()])
+    needs_inspection = BooleanField('是否需要检验', default=True)
     submit = SubmitField('提交')
 
     def validate_included_processes(self, field):
@@ -42,6 +46,10 @@ class ProcessPriceForm(FlaskForm):
             raise ValidationError('普通工价必须填写单价')
         elif self.price_type.data == 'normal' and field.data <= 0:
             raise ValidationError('单价必须大于0')
+
+    def validate_code_rule_id(self, field):
+        if self.has_output.data and not field.data:
+            raise ValidationError('有产出时必须选择编码规则')
 
 class ProcessPriceSearchForm(FlaskForm):
     search = StringField('搜索', render_kw={"placeholder": "输入工序编号、部件、图号或型号进行搜索"})

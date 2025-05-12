@@ -10,6 +10,9 @@
         <div class="card-body">
             <form method="POST">
                 {{ form.csrf_token }}
+                <!-- 添加编码规则数据 -->
+                <input type="hidden" id="finished_rules" value='{{ finished_rules_json|tojson|safe }}'>
+                <input type="hidden" id="raw_rules" value='{{ raw_rules_json|tojson|safe }}'>
         <div class="row g-3">
             <div class="col-md-6">
                 <div class="form-group">
@@ -144,7 +147,7 @@
                     <div class="col-md-12">
                 <div class="form-group">
                             {{ form.notes.label }}
-                    {{ form.notes(class="form-control", rows=3) }}
+                    {{ form.notes(class="form-control") }}
                             {% if form.notes.errors %}
                             <div class="invalid-feedback d-block">
                     {% for error in form.notes.errors %}
@@ -152,6 +155,40 @@
                     {% endfor %}
                             </div>
                             {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-check mt-4">
+                            {{ form.has_output(class="form-check-input") }}
+                            {{ form.has_output.label(class="form-check-label") }}
+                        </div>
+                        <div id="output_options" style="display: none;">
+                            <div class="form-group mt-3">
+                                {{ form.output_type.label }}
+                                {{ form.output_type(class="form-control") }}
+                                {% if form.output_type.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {% for error in form.output_type.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
+                            </div>
+                            <div class="form-group mt-3">
+                                {{ form.code_rule_id.label }}
+                                {{ form.code_rule_id(class="form-control") }}
+                                {% if form.code_rule_id.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {% for error in form.code_rule_id.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="form-check mt-2">
+                            {{ form.needs_inspection(class="form-check-input") }}
+                            {{ form.needs_inspection.label(class="form-check-label") }}
                         </div>
                     </div>
                 </div>
@@ -241,6 +278,77 @@ $(document).ready(function() {
             $('#' + priceId).val(total.toFixed(2));
         }
     });
+
+    // 获取编码规则数据
+    var finishedRules = JSON.parse($('#finished_rules').val());
+    var rawRules = JSON.parse($('#raw_rules').val());
+
+    // 更新编码规则选项
+    function updateCodeRuleOptions(outputType) {
+        var $codeRuleSelect = $('#{{ form.code_rule_id.id }}');
+        $codeRuleSelect.empty().append($('<option>', {
+            value: 0,
+            text: '请选择'
+        }));
+
+        var rules = outputType === 'finished' ? finishedRules : 
+                   outputType === 'raw' ? rawRules : [];
+
+        rules.forEach(function(rule) {
+            $codeRuleSelect.append($('<option>', {
+                value: rule.id,
+                text: rule.name
+            }));
+        });
+
+        // 重置选择
+        $codeRuleSelect.val(0).trigger('change');
+    }
+
+    // 当产出类型改变时更新编码规则选项
+    $('#{{ form.output_type.id }}').change(function() {
+        var outputType = $(this).val();
+        updateCodeRuleOptions(outputType);
+    });
+
+    // 处理是否有产出的显示/隐藏
+    function toggleOutputOptions() {
+        if ($('#{{ form.has_output.id }}').is(':checked')) {
+            $('#output_options').show();
+            // 触发一次产出类型的change事件，以更新编码规则选项
+            $('#{{ form.output_type.id }}').trigger('change');
+        } else {
+            $('#output_options').hide();
+            $('#{{ form.output_type.id }}').val('');
+            $('#{{ form.code_rule_id.id }}').val(0).trigger('change');
+        }
+    }
+
+    // 初始化时执行一次
+    toggleOutputOptions();
+
+    // 当是否有产出改变时执行
+    $('#{{ form.has_output.id }}').change(function() {
+        toggleOutputOptions();
+    });
+
+    // 初始化select2
+    $('#{{ form.code_rule_id.id }}').select2({
+        theme: 'bootstrap4',
+        width: '100%',
+        placeholder: '请选择编码规则'
+    });
+
+    // 如果是编辑页面且已有产出类型，初始化编码规则选项
+    var initialOutputType = $('#{{ form.output_type.id }}').val();
+    if (initialOutputType) {
+        updateCodeRuleOptions(initialOutputType);
+        // 如果有预设的编码规则ID，设置它
+        var initialCodeRuleId = $('#{{ form.code_rule_id.id }}').data('initial-value');
+        if (initialCodeRuleId) {
+            $('#{{ form.code_rule_id.id }}').val(initialCodeRuleId).trigger('change');
+        }
+    }
 });
 </script>
 {% endblock %}

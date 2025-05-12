@@ -61,6 +61,10 @@ class ProcessPrice(db.Model):
     is_current = db.Column(db.Boolean, default=True)
     notes = db.Column(db.Text)  # 备注
     price_type = db.Column(db.String(20), nullable=False, default='normal')  # normal: 普通工价, subtotal: 小计
+    has_output = db.Column(db.Boolean, default=True)  # 是否有产出
+    output_type = db.Column(db.String(20))  # finished: 成品, raw: 原材料
+    code_rule_id = db.Column(db.Integer, db.ForeignKey('code_rule.id', ondelete='SET NULL', name='fk_process_code_rule_id'))  # 编码规则ID
+    needs_inspection = db.Column(db.Boolean, default=True)  # 是否需要检验
     
     __table_args__ = (
         db.UniqueConstraint('global_sn', name='uq_process_price_global_sn'),
@@ -74,6 +78,9 @@ class ProcessPrice(db.Model):
         super(ProcessPrice, self).__init__(**kwargs)
         if not self.global_sn:
             self.global_sn = SerialNumber.get_next_number()
+
+    # 关联关系
+    code_rule = db.relationship('CodeRule', backref=db.backref('processes', lazy=True))
 
 class ProcessPriceGroup(db.Model):
     """工序价格小计关系表"""
