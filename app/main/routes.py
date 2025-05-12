@@ -811,6 +811,7 @@ def salary_details(employee_id):
 @login_required
 @handle_pagination_args
 def manage_production_records():
+    """管理生产记录"""
     form = ProductionRecordForm()
     search_form = ProductionRecordSearchForm()
     
@@ -4361,3 +4362,41 @@ def update_raw_material(id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': f'更新失败：{str(e)}'})
+
+@bp.route('/process_prices/<int:id>', methods=['GET'])
+@login_required
+def get_process_price(id):
+    """获取工序详情"""
+    try:
+        process = ProcessPrice.query.get_or_404(id)
+        return jsonify({
+            'success': True,
+            'data': {
+                'id': process.id,
+                'process_code': process.process_code,
+                'process_name': process.process_name,
+                'has_output': process.has_output,
+                'output_type': process.output_type,
+                'needs_raw_material': process.needs_raw_material,
+                'code_rule_id': process.code_rule_id
+            }
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'获取工序详情失败：{str(e)}'}), 500
+
+@bp.route('/raw_materials/available', methods=['GET'])
+@login_required
+def get_available_raw_materials():
+    """获取可用的原材料列表"""
+    try:
+        materials = RawMaterial.query.filter(RawMaterial.quantity > 0).all()
+        return jsonify({
+            'success': True,
+            'data': [{
+                'id': material.id,
+                'material_name': material.material_name,
+                'quantity': material.quantity
+            } for material in materials]
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'获取原材料列表失败：{str(e)}'}), 500

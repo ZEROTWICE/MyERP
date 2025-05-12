@@ -1,4 +1,6 @@
 {% extends "base.html" %}
+{% from 'bootstrap5/form.html' import render_form %}
+{% from 'bootstrap5/pagination.html' import render_pagination %}
 
 {% block title %}生产记录管理{% endblock %}
 
@@ -64,16 +66,15 @@
                                 {% endif %}
                             {% endmacro %}
 
-                            <th>{{ sort_link('date', '日期') }}</th>
-                            <th>{{ sort_link('employee_name', '员工姓名') }}</th>
-                            <th>{{ sort_link('process_code', '工序编号') }}</th>
-                            <th>{{ sort_link('process_name', '工序名称') }}</th>
-                            <th>{{ sort_link('component', '部件') }}</th>
-                            <th>{{ sort_link('drawing_no', '图号') }}</th>
-                            <th>{{ sort_link('model_no', '型号') }}</th>
+                            <th>{{ sort_link('date', '生产日期') }}</th>
+                            <th>{{ sort_link('employee_name', '员工') }}</th>
+                            <th>{{ sort_link('process_name', '工序') }}</th>
                             <th>{{ sort_link('quantity', '数量') }}</th>
-                            <th>单价</th>
-                            <th>金额</th>
+                            <th>原材料</th>
+                            <th>原材料用量</th>
+                            <th>成品编号</th>
+                            <th>检验员</th>
+                            <th>备注</th>
                             <th>操作</th>
                         </tr>
                     </thead>
@@ -81,18 +82,33 @@
                         {% for record in records %}
                         <tr>
                             <td>{{ record.date.strftime('%Y-%m-%d') }}</td>
-                            <td>{{ record.employee.name }}</td>
-                            <td>{{ record.process.process_code }}</td>
-                            <td>{{ record.process.process_name }}</td>
-                            <td>{{ record.process.component }}</td>
-                            <td>{{ record.process.drawing_no }}</td>
-                            <td>{{ record.process.model_no }}</td>
+                            <td>{{ record.employee.name }} ({{ record.employee.employee_id }})</td>
+                            <td>{{ record.process.process_name }} ({{ record.process.process_code }})</td>
                             <td>{{ record.quantity }}</td>
-                            <td>{{ "%.2f"|format(record.process.price) }}</td>
-                            <td>{{ "%.2f"|format(record.quantity * record.process.price) }}</td>
                             <td>
-                                {% if current_user.role in ['admin', 'hr'] %}
-                                <button class="btn btn-danger btn-sm delete-record" data-id="{{ record.id }}" data-bs-toggle="modal" data-bs-target="#deleteModal">
+                                {% if record.raw_material %}
+                                    {{ record.raw_material.material_name }}
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if record.raw_material_quantity %}
+                                    {{ "%.2f"|format(record.raw_material_quantity) }}
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if record.finished_product %}
+                                    {{ record.finished_product.product_number }}
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if record.finished_product %}
+                                    {{ record.finished_product.inspector }}
+                                {% endif %}
+                            </td>
+                            <td>{{ record.notes }}</td>
+                            <td>
+                                {% if current_user.role in ['admin', 'manager'] %}
+                                <button class="btn btn-danger btn-sm delete-record" data-id="{{ record.id }}">
                                     删除
                                 </button>
                                 {% endif %}
@@ -104,40 +120,8 @@
             </div>
 
             <!-- 分页 -->
-            <div class="d-flex flex-column align-items-center mt-3">
-                <div class="d-flex align-items-center mb-3">
-                    <span class="me-2">每页显示：</span>
-                    <select class="form-select" id="per_page" name="per_page" style="width: auto;">
-                        <option value="20" {% if request.args.get('per_page', '20') == '20' %}selected{% endif %}>20条</option>
-                        <option value="50" {% if request.args.get('per_page') == '50' %}selected{% endif %}>50条</option>
-                        <option value="100" {% if request.args.get('per_page') == '100' %}selected{% endif %}>100条</option>
-                    </select>
-                </div>
-                <nav aria-label="Page navigation">
-                    <ul class="pagination mb-0">
-                        {% if pagination.has_prev %}
-                        <li class="page-item">
-                            <a class="page-link" href="{{ url_for('main.manage_production_records', page=pagination.prev_num, sort=current_sort, direction=current_direction, search=search_form.search.data, per_page=request.args.get('per_page', 20)) }}">上一页</a>
-                        </li>
-                        {% endif %}
-                        
-                        {% for page in pagination.iter_pages() %}
-                            {% if page %}
-                                <li class="page-item {% if page == pagination.page %}active{% endif %}">
-                                    <a class="page-link" href="{{ url_for('main.manage_production_records', page=page, sort=current_sort, direction=current_direction, search=search_form.search.data, per_page=request.args.get('per_page', 20)) }}">{{ page }}</a>
-                                </li>
-                            {% else %}
-                                <li class="page-item disabled"><span class="page-link">...</span></li>
-                            {% endif %}
-                        {% endfor %}
-                        
-                        {% if pagination.has_next %}
-                        <li class="page-item">
-                            <a class="page-link" href="{{ url_for('main.manage_production_records', page=pagination.next_num, sort=current_sort, direction=current_direction, search=search_form.search.data, per_page=request.args.get('per_page', 20)) }}">下一页</a>
-                        </li>
-                        {% endif %}
-                    </ul>
-                </nav>
+            <div class="d-flex justify-content-center mt-3">
+                {{ render_pagination(pagination) }}
             </div>
         </div>
     </div>
@@ -158,16 +142,44 @@
                             {{ form.employee_id(class="form-control select2") }}
                         </div>
                         <div class="mb-3">
-                            {{ form.process_code.label(class="form-label") }}
-                            {{ form.process_code(class="form-control select2") }}
+                            {{ form.process_id.label(class="form-label") }}
+                            {{ form.process_id(class="form-control select2", onchange="handleProcessChange(this.value)") }}
                         </div>
                         <div class="mb-3">
                             {{ form.quantity.label(class="form-label") }}
-                            {{ form.quantity(class="form-control", type="number", step="1") }}
+                            {{ form.quantity(class="form-control", type="number", min="1") }}
                         </div>
                         <div class="mb-3">
                             {{ form.date.label(class="form-label") }}
                             {{ form.date(class="form-control", type="date") }}
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    {{ form.raw_material_id.label(class="form-label") }}
+                                    {{ form.raw_material_id(class="form-control select2") }}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    {{ form.raw_material_quantity.label(class="form-label") }}
+                                    {{ form.raw_material_quantity(class="form-control", type="number", min="0", step="0.01") }}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 finished-product-fields" style="display: none;">
+                                <div class="mb-3">
+                                    {{ form.inspector.label(class="form-label") }}
+                                    {{ form.inspector(class="form-control") }}
+                                </div>
+                            </div>
+                            <div class="col-md-12">
+                                <div class="mb-3">
+                                    {{ form.notes.label(class="form-label") }}
+                                    {{ form.notes(class="form-control", rows="3") }}
+                                </div>
+                            </div>
                         </div>
                         <div class="modal-footer">
                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
@@ -201,27 +213,19 @@
 {% endblock %}
 
 {% block scripts %}
-<!-- 引入Select2的CSS和JS -->
-<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
-<link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
-<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
-
+{{ super() }}
 <script>
 let recordToDelete = null;
 
 $(document).ready(function() {
-    // 初始化Select2
-    $('.select2').select2({
-        theme: 'bootstrap-5',
-        width: '100%',
-        language: {
-            noResults: function() {
-                return "没有找到匹配的选项";
-            },
-            searching: function() {
-                return "搜索中...";
-            }
-        }
+    // 初始化模态框内的 Select2
+    initializeSelect2();
+    
+    // 模态框显示时重新初始化 Select2
+    $('#addProductionRecordModal').on('shown.bs.modal', function () {
+        initializeSelect2();
+        // 加载原材料列表
+        loadRawMaterials();
     });
 
     // 设置默认日期为今天
@@ -235,6 +239,7 @@ $(document).ready(function() {
     // 点击删除按钮时保存要删除的记录ID
     $('.delete-record').click(function() {
         recordToDelete = $(this).data('id');
+        $('#deleteModal').modal('show');
     });
 
     // 确认删除
@@ -261,6 +266,43 @@ $(document).ready(function() {
         }
     });
 });
+
+// 初始化 Select2 的函数
+function initializeSelect2() {
+    $('#addProductionRecordModal .select2').each(function() {
+        if ($(this).data('select2')) {
+            $(this).select2('destroy');
+        }
+        $(this).select2({
+            theme: 'bootstrap-5',
+            width: '100%',
+            dropdownParent: $('#addProductionRecordModal'),
+            language: {
+                noResults: function() {
+                    return "没有找到匹配的选项";
+                },
+                searching: function() {
+                    return "搜索中...";
+                }
+            }
+        });
+    });
+}
+
+// 加载原材料列表
+function loadRawMaterials() {
+    $.get('/raw_materials/available', function(response) {
+        if (response.success) {
+            const select = $('#raw_material_id');
+            select.empty();
+            select.append('<option value="">请选择原材料</option>');
+            response.data.forEach(material => {
+                select.append(`<option value="${material.id}">${material.material_name} (库存: ${material.quantity})</option>`);
+            });
+            select.trigger('change');
+        }
+    });
+}
 
 function importProductionRecords(input) {
     if (!input.files || !input.files[0]) return;
@@ -309,12 +351,44 @@ function showAlert(type, message) {
         alertDiv.remove();
     }, 3000);
 }
+
+// 处理工序变更
+function handleProcessChange(processId) {
+    if (!processId) return;
+    
+    // 获取工序详情
+    $.get(`/process_prices/${processId}`, function(response) {
+        if (response.success) {
+            const process = response.data;
+            
+            // 只控制成品字段的显示/隐藏
+            $('.finished-product-fields').toggle(process.has_output);
+        }
+    });
+}
 </script>
 
 <style>
 .select2-container--bootstrap-5 .select2-selection {
     min-height: 38px;
     padding: 0.375rem 0.75rem;
+}
+
+.select2-container--bootstrap-5 .select2-selection--single {
+    border: 1px solid #dee2e6;
+}
+
+.select2-container--bootstrap-5.select2-container--focus .select2-selection {
+    border-color: #86b7fe;
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+
+.select2-container--bootstrap-5 .select2-dropdown {
+    border-color: #dee2e6;
+}
+
+.raw-material-fields {
+    transition: all 0.3s ease;
 }
 </style>
 {% endblock %} 

@@ -168,10 +168,6 @@
                     <form method="POST" action="{{ url_for('main.manage_tasks') }}">
                         {{ form.csrf_token }}
                         <div class="mb-3">
-                            {{ form.target_date.label(class="form-label") }}
-                            {{ form.target_date(class="form-control", type="date") }}
-                        </div>
-                        <div class="mb-3">
                             {{ form.employee_id.label(class="form-label") }}
                             {{ form.employee_id(class="form-control select2") }}
                         </div>
@@ -181,7 +177,11 @@
                         </div>
                         <div class="mb-3">
                             {{ form.quantity.label(class="form-label") }}
-                            {{ form.quantity(class="form-control", type="number", step="1") }}
+                            {{ form.quantity(class="form-control", type="number", min="1") }}
+                        </div>
+                        <div class="mb-3">
+                            {{ form.target_date.label(class="form-label") }}
+                            {{ form.target_date(class="form-control", type="date") }}
                         </div>
                         <div class="mb-3">
                             {{ form.notes.label(class="form-label") }}
@@ -284,52 +284,23 @@
 {% endblock %}
 
 {% block scripts %}
+{{ super() }}
 <script>
 let taskToDelete = null;
 
 $(document).ready(function() {
-    // 初始化Select2
-    $('.select2').each(function() {
-        $(this).select2({
-            theme: 'bootstrap-5',
-            width: '100%',
-            dropdownParent: $(this).closest('.modal'),
-            language: {
-                noResults: function() {
-                    return "没有找到匹配的选项";
-                },
-                searching: function() {
-                    return "搜索中...";
-                }
-            }
-        });
-    });
-
-    // 当模态框显示时重新初始化Select2
-    $('#addModal, #editModal').on('shown.bs.modal', function() {
-        $(this).find('.select2').select2({
-            theme: 'bootstrap-5',
-            width: '100%',
-            dropdownParent: $(this),
-            language: {
-                noResults: function() {
-                    return "没有找到匹配的选项";
-                },
-                searching: function() {
-                    return "搜索中...";
-                }
-            }
-        });
-    });
-
-    // 当模态框隐藏时销毁Select2
-    $('#addModal, #editModal').on('hidden.bs.modal', function() {
-        $(this).find('.select2').select2('destroy');
+    // 初始化模态框内的 Select2
+    initializeSelect2();
+    
+    // 模态框显示时重新初始化 Select2
+    $('#addModal, #editModal').on('shown.bs.modal', function () {
+        initializeSelect2();
     });
 
     // 点击删除按钮时保存要删除的任务ID
     $('.delete-task').click(function() {
         taskToDelete = $(this).data('id');
+        $('#deleteModal').modal('show');
     });
 
     // 点击编辑按钮时加载任务数据
@@ -415,8 +386,7 @@ $(document).ready(function() {
 
     // 点击更改每页显示数量时自动提交表单
     $('#per_page').change(function() {
-        var form = $('#searchForm');
-        form.submit();
+        $('#searchForm').submit();
     });
 
     // 更新进度模态框
@@ -466,33 +436,94 @@ $(document).ready(function() {
     });
 });
 
-function importTasks(input) {
-    if (input.files && input.files[0]) {
-        var formData = new FormData();
-        formData.append('file', input.files[0]);
-
-        $.ajax({
-            url: '{{ url_for("main.import_tasks") }}',
-            type: 'POST',
-            data: formData,
-            processData: false,
-            contentType: false,
-            headers: {
-                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
-            },
-            success: function(response) {
-                if (response.success) {
-                    alert(response.message);
-                    location.reload();
-                } else {
-                    alert(response.message);
+// 初始化 Select2 的函数
+function initializeSelect2() {
+    $('.modal .select2').each(function() {
+        if ($(this).data('select2')) {
+            $(this).select2('destroy');
+        }
+        $(this).select2({
+            theme: 'bootstrap-5',
+            width: '100%',
+            dropdownParent: $(this).closest('.modal'),
+            language: {
+                noResults: function() {
+                    return "没有找到匹配的选项";
+                },
+                searching: function() {
+                    return "搜索中...";
                 }
-            },
-            error: function() {
-                alert('导入失败，请重试');
             }
         });
-    }
+    });
+}
+
+function importTasks(input) {
+    if (!input.files || !input.files[0]) return;
+    
+    const file = input.files[0];
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    fetch('{{ url_for("main.import_tasks") }}', {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showAlert('success', data.message);
+            setTimeout(() => location.reload(), 2000);
+        } else {
+            showAlert('danger', data.message);
+        }
+    })
+    .catch(error => {
+        showAlert('danger', '导入失败，请重试');
+        console.error('Error:', error);
+    })
+    .finally(() => {
+        input.value = ''; // 清除文件选择
+    });
+}
+
+function showAlert(type, message) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+    alertDiv.role = 'alert';
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    `;
+    document.querySelector('.container').insertBefore(alertDiv, document.querySelector('.card'));
+    
+    // 3秒后自动消失
+    setTimeout(() => {
+        alertDiv.remove();
+    }, 3000);
 }
 </script>
+
+<style>
+.select2-container--bootstrap-5 .select2-selection {
+    min-height: 38px;
+    padding: 0.375rem 0.75rem;
+}
+
+.select2-container--bootstrap-5 .select2-selection--single {
+    border: 1px solid #dee2e6;
+}
+
+.select2-container--bootstrap-5.select2-container--focus .select2-selection {
+    border-color: #86b7fe;
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+
+.select2-container--bootstrap-5 .select2-dropdown {
+    border-color: #dee2e6;
+}
+</style>
 {% endblock %} 

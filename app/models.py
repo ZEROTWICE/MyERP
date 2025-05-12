@@ -156,21 +156,32 @@ class Employee(db.Model):
         if not self.global_sn:
             self.global_sn = SerialNumber.get_next_number()
 
-    production_records = db.relationship('ProductionRecord', backref='employee', lazy='dynamic')
+    # 关系
     bonuses_penalties = db.relationship('BonusPenalty', backref='employee', lazy='dynamic')
+    production_records = db.relationship('ProductionRecord', backref=db.backref('employee'), lazy='dynamic')
 
 class ProductionRecord(db.Model):
+    """生产记录"""
     id = db.Column(db.Integer, primary_key=True)
     global_sn = db.Column(db.String(8), unique=True, nullable=False)  # 全局流水号
-    employee_id = db.Column(db.Integer, db.ForeignKey('employee.id'))
-    process_id = db.Column(db.Integer, db.ForeignKey('process_price.id'))
-    quantity = db.Column(db.Integer)
-    date = db.Column(db.DateTime, default=datetime.utcnow)
-    process = db.relationship('ProcessPrice', backref='production_records', lazy='joined')
+    employee_id = db.Column(db.Integer, db.ForeignKey('employee.id'), nullable=False)
+    process_id = db.Column(db.Integer, db.ForeignKey('process_price.id'), nullable=False)
+    quantity = db.Column(db.Integer, nullable=False)  # 生产数量
+    date = db.Column(db.Date, nullable=False)  # 生产日期
+    notes = db.Column(db.Text)  # 备注
     
-    __table_args__ = (
-        db.UniqueConstraint('global_sn', name='uq_production_record_global_sn'),
-    )
+    # 新增字段
+    raw_material_id = db.Column(db.Integer, db.ForeignKey('raw_material.id'))  # 使用的原材料ID
+    raw_material_quantity = db.Column(db.Float)  # 使用的原材料数量
+    finished_product_id = db.Column(db.Integer, db.ForeignKey('finished_product.id'))  # 生成的成品ID
+    
+    # 关系
+    process = db.relationship('ProcessPrice', backref='production_records')
+    raw_material = db.relationship('RawMaterial', backref='production_records')
+    finished_product = db.relationship('FinishedProduct', backref='production_records')
+    
+    def __repr__(self):
+        return f'<ProductionRecord {self.id}: {self.employee.name} - {self.process.process_name}>'
 
     def __init__(self, **kwargs):
         super(ProductionRecord, self).__init__(**kwargs)

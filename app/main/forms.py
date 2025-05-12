@@ -61,18 +61,15 @@ class ProductionRecordSearchForm(FlaskForm):
     submit = SubmitField('搜索')
 
 class ProductionRecordForm(FlaskForm):
-    employee_id = SelectField('员工', coerce=int, validators=[DataRequired()], render_kw={
-        "data-live-search": "true",
-        "data-placeholder": "请输入工号或姓名搜索",
-        "class": "form-select select2"
-    })
-    process_code = SelectField('工序', validators=[DataRequired()], render_kw={
-        "data-live-search": "true",
-        "data-placeholder": "请输入工序编号、名称或部件搜索",
-        "class": "form-select select2"
-    })
+    """生产记录表单"""
+    employee_id = SelectField('员工', coerce=int, validators=[DataRequired()])
+    process_id = SelectField('工序', coerce=int, validators=[DataRequired()])
     quantity = IntegerField('数量', validators=[DataRequired(), NumberRange(min=1)])
-    date = DateField('日期', format='%Y-%m-%d', validators=[DataRequired()])
+    date = DateField('生产日期', validators=[DataRequired()])
+    raw_material_id = SelectField('原材料', coerce=int, validators=[Optional()])
+    raw_material_quantity = FloatField('原材料使用量', validators=[Optional(), NumberRange(min=0)])
+    inspector = StringField('检验员', validators=[Optional(), Length(max=50)])
+    notes = TextAreaField('备注')
     submit = SubmitField('提交')
 
 class BonusPenaltySearchForm(FlaskForm):
