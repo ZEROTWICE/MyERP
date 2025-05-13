@@ -86,13 +86,29 @@
                             <td>{{ record.process.process_name }} ({{ record.process.process_code }})</td>
                             <td>{{ record.quantity }}</td>
                             <td>
-                                {% if record.raw_material %}
+                                {% if record.materials and record.materials|length > 0 %}
+                                    <ul class="list-unstyled mb-0">
+                                        {% for material in record.materials %}
+                                            <li>{{ material.raw_material.material_name }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                {% elif record.raw_material %}
                                     {{ record.raw_material.material_name }}
+                                {% else %}
+                                    -
                                 {% endif %}
                             </td>
                             <td>
-                                {% if record.raw_material_quantity %}
+                                {% if record.materials and record.materials|length > 0 %}
+                                    <ul class="list-unstyled mb-0">
+                                        {% for material in record.materials %}
+                                            <li>{{ "%.2f"|format(material.quantity) }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                {% elif record.raw_material_quantity %}
                                     {{ "%.2f"|format(record.raw_material_quantity) }}
+                                {% else %}
+                                    -
                                 {% endif %}
                             </td>
                             <td>
@@ -168,7 +184,7 @@
                             </div>
                         </div>
                         <div class="row">
-                            <div class="col-md-6 finished-product-fields" style="display: none;">
+                            <div class="col-md-6">
                                 <div class="mb-3">
                                     {{ form.inspector.label(class="form-label") }}
                                     {{ form.inspector(class="form-control") }}
@@ -181,6 +197,29 @@
                                 </div>
                             </div>
                         </div>
+                        
+                        <!-- 多原材料管理部分 -->
+                        <div class="mb-3">
+                            <label class="form-label">原材料列表</label>
+                            <div class="table-responsive">
+                                <table class="table table-sm" id="materialsTable">
+                                    <thead>
+                                        <tr>
+                                            <th>原材料</th>
+                                            <th>数量</th>
+                                            <th>操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="materialsList">
+                                        <!-- 原材料列表将在这里动态添加 -->
+                                    </tbody>
+                                </table>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-primary" id="addMaterialBtn">
+                                <i class="fas fa-plus"></i> 添加原材料
+                            </button>
+                        </div>
+                        
                         <div class="modal-footer">
                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
                             {{ form.submit(class="btn btn-primary") }}
@@ -365,6 +404,172 @@ function handleProcessChange(processId) {
             $('.finished-product-fields').toggle(process.has_output);
         }
     });
+}
+
+// 原材料列表管理
+let materialsList = [];
+let lastMaterialId = 0;
+
+// 添加原材料按钮点击事件
+$(document).ready(function() {
+    $('#addMaterialBtn').click(function() {
+        addNewMaterialRow();
+    });
+    
+    // 处理表单提交
+    $('form').submit(function(e) {
+        // 如果有原材料，添加到表单数据
+        if (materialsList.length > 0) {
+            // 清除已有的原材料隐藏字段
+            $('input[name^="material_data"]').remove();
+            
+            // 为每个原材料添加隐藏字段
+            materialsList.forEach(function(material, index) {
+                const materialData = JSON.stringify({
+                    id: material.id,
+                    quantity: material.quantity
+                });
+                $('<input>').attr({
+                    type: 'hidden',
+                    name: `material_data_${index}`,
+                    value: materialData
+                }).appendTo($(this));
+            });
+        }
+    });
+    
+    // 重置模态框时清空原材料列表
+    $('#addProductionRecordModal').on('hidden.bs.modal', function() {
+        materialsList = [];
+        lastMaterialId = 0;
+        $('#materialsList').empty();
+    });
+});
+
+// 添加新的原材料行
+function addNewMaterialRow() {
+    lastMaterialId++;
+    const rowId = `material-row-${lastMaterialId}`;
+    
+    // 从API获取可用原材料
+    $.get('/raw_materials/available', function(response) {
+        if (response.success) {
+            const rawMaterials = response.data;
+            
+            // 创建选择器选项
+            let materialOptions = '<option value="">请选择原材料</option>';
+            rawMaterials.forEach(material => {
+                materialOptions += `<option value="${material.id}" data-available="${material.quantity}">${material.material_name} (库存: ${material.quantity})</option>`;
+            });
+            
+            // 创建新行HTML
+            const newRow = `
+                <tr id="${rowId}">
+                    <td>
+                        <select class="form-control material-select" id="material-${lastMaterialId}">
+                            ${materialOptions}
+                        </select>
+                    </td>
+                    <td>
+                        <input type="number" class="form-control material-quantity" id="quantity-${lastMaterialId}" min="0.01" step="0.01" placeholder="数量">
+                    </td>
+                    <td>
+                        <button type="button" class="btn btn-sm btn-danger" onclick="removeMaterialRow('${rowId}')">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+            
+            // 添加新行
+            $('#materialsList').append(newRow);
+            
+            // 初始化新添加的select2
+            $(`#material-${lastMaterialId}`).select2({
+                theme: 'bootstrap-5',
+                width: '100%',
+                dropdownParent: $('#addProductionRecordModal'),
+                language: {
+                    noResults: function() {
+                        return "没有找到匹配的选项";
+                    },
+                    searching: function() {
+                        return "搜索中...";
+                    }
+                }
+            });
+            
+            // 监听原材料选择和数量变化
+            $(`#material-${lastMaterialId}`).on('change', function() {
+                updateMaterialsList(lastMaterialId);
+            });
+            
+            $(`#quantity-${lastMaterialId}`).on('input', function() {
+                updateMaterialsList(lastMaterialId);
+            });
+        }
+    });
+}
+
+// 更新材料列表数组
+function updateMaterialsList(id) {
+    const materialSelect = $(`#material-${id}`);
+    const quantityInput = $(`#quantity-${id}`);
+    
+    const materialId = materialSelect.val();
+    const quantity = parseFloat(quantityInput.val());
+    
+    // 检查是否已有该材料ID的记录
+    const index = materialsList.findIndex(m => m.rowId === id);
+    
+    if (materialId && !isNaN(quantity) && quantity > 0) {
+        const materialName = materialSelect.find('option:selected').text();
+        const availableQuantity = parseFloat(materialSelect.find('option:selected').data('available'));
+        
+        // 数量不能超过库存
+        if (quantity > availableQuantity) {
+            alert('原材料使用量不能超过库存量！');
+            quantityInput.val(availableQuantity);
+        }
+        
+        if (index >= 0) {
+            // 更新现有记录
+            materialsList[index] = {
+                rowId: id,
+                id: materialId,
+                name: materialName,
+                quantity: Math.min(quantity, availableQuantity)
+            };
+        } else {
+            // 添加新记录
+            materialsList.push({
+                rowId: id,
+                id: materialId,
+                name: materialName,
+                quantity: Math.min(quantity, availableQuantity)
+            });
+        }
+    } else if (index >= 0) {
+        // 如果没有有效的材料ID或数量，且存在记录，则移除
+        materialsList.splice(index, 1);
+    }
+    
+    console.log('当前原材料列表:', materialsList);
+}
+
+// 移除原材料行
+function removeMaterialRow(rowId) {
+    // 从DOM中移除行
+    $(`#${rowId}`).remove();
+    
+    // 从数组中移除对应记录
+    const numericId = parseInt(rowId.split('-').pop());
+    const index = materialsList.findIndex(m => m.rowId === numericId);
+    if (index >= 0) {
+        materialsList.splice(index, 1);
+    }
+    
+    console.log('移除后的原材料列表:', materialsList);
 }
 </script>
 

@@ -66,8 +66,6 @@ class ProductionRecordForm(FlaskForm):
     process_id = SelectField('工序', coerce=int, validators=[DataRequired()])
     quantity = IntegerField('数量', validators=[DataRequired(), NumberRange(min=1)])
     date = DateField('生产日期', validators=[DataRequired()])
-    raw_material_id = SelectField('原材料', coerce=int, validators=[Optional()], choices=[(0, '请选择原材料')])
-    raw_material_quantity = FloatField('原材料使用量', validators=[Optional(), NumberRange(min=0)])
     inspector = StringField('检验员', validators=[Optional(), Length(max=50)])
     notes = TextAreaField('备注')
     submit = SubmitField('提交')

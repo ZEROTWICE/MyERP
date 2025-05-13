@@ -2,7 +2,7 @@ from flask import render_template, redirect, url_for, flash, request, jsonify, c
 from sqlalchemy.exc import SQLAlchemyError
 from flask_login import login_required, current_user
 from app import db
-from app.models import Employee, ProcessPrice, ProductionRecord, BonusPenalty, AuditLog, ProcessPrice, User, TaskAssignment, SerialNumber, SalaryChange, CoefficientChange, EmployeeSalaryHistory, EmployeeCoefficientHistory, ProcessPriceGroup, FinishedProduct, RawMaterial, CodeRule, CodeGenerationLog
+from app.models import Employee, ProcessPrice, ProductionRecord, BonusPenalty, AuditLog, ProcessPrice, User, TaskAssignment, SerialNumber, SalaryChange, CoefficientChange, EmployeeSalaryHistory, EmployeeCoefficientHistory, ProcessPriceGroup, FinishedProduct, RawMaterial, CodeRule, CodeGenerationLog, ProductionRecordMaterial
 from datetime import datetime, timedelta
 from . import bp
 from app.main.forms import (
@@ -30,6 +30,7 @@ from werkzeug.datastructures import FileStorage
 from typing import List, Dict, Any, Optional, Union
 import shutil
 from openpyxl import Workbook
+import json
 
 def handle_pagination_args(f):
     @wraps(f)
@@ -878,6 +879,57 @@ def manage_production_records():
                 record.finished_product_id = finished_product.id
             
             db.session.add(record)
+            db.session.flush()  # 获取生产记录ID
+            
+            # 处理多个原材料
+            material_data = []
+            for key, value in request.form.items():
+                if key.startswith('material_data_'):
+                    try:
+                        data = json.loads(value)
+                        material_data.append(data)
+                    except (json.JSONDecodeError, ValueError) as e:
+                        current_app.logger.error(f"解析材料数据失败: {str(e)}")
+                        continue
+            
+            # 添加原材料关联记录
+            for data in material_data:
+                material_id = data.get('id')
+                quantity = data.get('quantity')
+                
+                if material_id and quantity:
+                    # 获取原材料
+                    raw_material = RawMaterial.query.get(material_id)
+                    if raw_material:
+                        # 检查库存是否足够
+                        if raw_material.quantity >= float(quantity):
+                            # 创建关联记录
+                            record_material = ProductionRecordMaterial(
+                                production_record_id=record.id,
+                                raw_material_id=material_id,
+                                quantity=float(quantity)
+                            )
+                            db.session.add(record_material)
+                            
+                            # 更新原材料库存
+                            raw_material.quantity -= float(quantity)
+                        else:
+                            db.session.rollback()
+                            flash(f'原材料 {raw_material.material_name} 库存不足！', 'danger')
+                            return redirect(url_for('main.manage_production_records'))
+            
+            # 添加审计日志
+            log = AuditLog(
+            user_id=current_user.id,
+            action='添加生产记录',
+                details=f'添加生产记录：员工 {Employee.query.get(form.employee_id.data).name}，工序 {ProcessPrice.query.get(form.process_id.data).process_name}，数量 {form.quantity.data}',
+                can_rollback=True,
+                rollback_type='add',
+                target_model='ProductionRecord',
+                target_id=record.id
+        )
+            db.session.add(log)
+
             db.session.commit()
             flash('生产记录添加成功', 'success')
             return redirect(url_for('main.manage_production_records'))
@@ -939,7 +991,7 @@ def manage_production_records():
                          current_sort=sort_column,
                          current_direction=sort_direction)
 
-@bp.route('/delete_production_record/<int:id>', methods=['POST'])
+@bp.route('/delete_production_record/<int:id>', methods=['DELETE'])
 @login_required
 def delete_production_record(id):
     if not current_user.role in ['admin', 'hr']:
@@ -948,27 +1000,54 @@ def delete_production_record(id):
     try:
         record = ProductionRecord.query.get_or_404(id)
         
+        # 保存旧数据用于回滚
         old_data = {
             'employee_id': record.employee_id,
-            'process_code': record.process_code,
+            'process_id': record.process_id,
             'quantity': record.quantity,
             'date': record.date.isoformat() if record.date else None,
-            'notes': record.notes
+            'notes': record.notes,
+            'materials': []
         }
         
+        # 恢复所有使用的原材料库存
+        for material in record.materials:
+            # 保存原材料数据用于回滚
+            old_data['materials'].append({
+                'material_id': material.raw_material_id,
+                'quantity': material.quantity
+            })
+            
+            # 恢复库存
+            if material.raw_material:
+                material.raw_material.quantity += material.quantity
+        
+        # 如果使用旧方式存储了原材料，也需要恢复
+        if record.raw_material and record.raw_material_quantity:
+            # 保存原材料数据用于回滚
+            old_data['raw_material_id'] = record.raw_material_id
+            old_data['raw_material_quantity'] = record.raw_material_quantity
+            
+            # 恢复库存
+            record.raw_material.quantity += record.raw_material_quantity
+        
+        # 记录审计日志
         log = AuditLog(
-        user_id=current_user.id,
-        action='删除生产记录',
-        details=f'删除生产记录：员工 {record.employee.name}，工序 {record.process.process_name}，数量 {record.quantity}',
-        can_rollback=True,
-        rollback_type='delete',
-        target_model='ProductionRecord',
-        target_id=record.id,
-        old_data=old_data
-            )
+            user_id=current_user.id,
+            action='删除生产记录',
+            details=f'删除生产记录：员工 {record.employee.name}，工序 {record.process.process_name}，数量 {record.quantity}',
+            can_rollback=True,
+            rollback_type='delete',
+            target_model='ProductionRecord',
+            target_id=record.id,
+            old_data=old_data
+        )
         db.session.add(log)
-        db.session.delete(record)
+        
+        # 删除记录及其关联的原材料记录
+        db.session.delete(record)  # 由于材料上的cascade设置，关联的材料记录会被自动删除
         db.session.commit()
+        
         return jsonify({'success': True, 'message': '生产记录删除成功'})
     except SQLAlchemyError as e:
         db.session.rollback()

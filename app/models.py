@@ -179,6 +179,7 @@ class ProductionRecord(db.Model):
     process = db.relationship('ProcessPrice', backref='production_records')
     raw_material = db.relationship('RawMaterial', backref='production_records')
     finished_product = db.relationship('FinishedProduct', backref='production_records')
+    materials = db.relationship('ProductionRecordMaterial', back_populates='production_record', cascade='all, delete-orphan')
     
     def __repr__(self):
         return f'<ProductionRecord {self.id}: {self.employee.name} - {self.process.process_name}>'
@@ -187,6 +188,23 @@ class ProductionRecord(db.Model):
         super(ProductionRecord, self).__init__(**kwargs)
         if not self.global_sn:
             self.global_sn = SerialNumber.get_next_number()
+
+class ProductionRecordMaterial(db.Model):
+    """生产记录与原材料的关联表"""
+    __tablename__ = 'production_record_materials'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    production_record_id = db.Column(db.Integer, db.ForeignKey('production_record.id', ondelete='CASCADE'), nullable=False)
+    raw_material_id = db.Column(db.Integer, db.ForeignKey('raw_material.id', ondelete='SET NULL'))
+    quantity = db.Column(db.Float, nullable=False)  # this field stores the quantity of raw material used
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # 关系
+    production_record = db.relationship('ProductionRecord', back_populates='materials')
+    raw_material = db.relationship('RawMaterial', backref='production_materials')
+    
+    def __repr__(self):
+        return f'<ProductionRecordMaterial: Record {self.production_record_id}, Material {self.raw_material_id}, Quantity {self.quantity}>'
 
 class BonusPenalty(db.Model):
     id = db.Column(db.Integer, primary_key=True)
