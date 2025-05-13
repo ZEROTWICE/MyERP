@@ -29,8 +29,13 @@ class SerialNumber(db.Model):
     last_updated = db.Column(db.DateTime, nullable=False, default=datetime.now)
 
     @classmethod
-    def get_next_number(cls):
-        """获取下一个流水号"""
+    def get_next_number(cls, prefix=None):
+        """获取下一个流水号
+        Args:
+            prefix: 可选的前缀，如果提供则会添加到流水号前面
+        Returns:
+            str: 格式化的流水号
+        """
         while True:
             try:
                 with db.session.begin_nested():
@@ -42,7 +47,8 @@ class SerialNumber(db.Model):
                         serial.current_number += 1
                         serial.last_updated = datetime.now()
                     db.session.flush()
-                    return f"{serial.current_number:08d}"
+                    number = f"{serial.current_number:08d}"
+                    return f"{prefix}{number}" if prefix else number
             except SQLAlchemyError:
                 db.session.rollback()
                 continue

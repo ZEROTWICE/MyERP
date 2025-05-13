@@ -878,10 +878,31 @@ def manage_production_records():
             )
             
             if form.inspector.data:
+                # 获取工序信息
+                process = ProcessPrice.query.get(form.process_id.data)
+                
+                # 生成产品编号
+                if process and process.code_rule_id:
+                    # 如果工序有关联的编码规则，使用该规则生成编号
+                    code_rule = CodeRule.query.get(process.code_rule_id)
+                    if code_rule and code_rule.is_active:
+                        product_number = code_rule.generate_code()
+                    else:
+                        product_number = SerialNumber.get_next_number()
+                else:
+                    product_number = SerialNumber.get_next_number()
+                
                 # 如果提供了检验员信息，创建成品记录
                 finished_product = FinishedProduct(
-                    product_number=SerialNumber.get_next_number('FP'),
-                    inspector=form.inspector.data
+                    global_sn=SerialNumber.get_next_number(),
+                    serial_number=SerialNumber.get_next_number(),
+                    product_number=product_number,  # 使用生成的产品编号
+                    production_date=form.date.data,  # 使用生产记录的日期
+                    drawing_number=process.drawing_no if process and process.drawing_no else "未知",  # 使用工序的图号
+                    model=process.model_no if process and process.model_no else "未知",  # 使用工序的型号
+                    inspector=form.inspector.data,
+                    quantity=1,  # 默认数量为1
+                    status='in_stock'  # 默认状态为在库
                 )
                 db.session.add(finished_product)
                 db.session.flush()  # 获取成品ID
