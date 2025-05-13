@@ -177,6 +177,9 @@
                             <div class="form-group mt-3">
                                 {{ form.code_rule_id.label }}
                                 {{ form.code_rule_id(class="form-control") }}
+                                {% if code_rule_id_initial is defined %}
+                                <input type="hidden" id="code_rule_id_initial" value="{{ code_rule_id_initial }}">
+                                {% endif %}
                                 {% if form.code_rule_id.errors %}
                                 <div class="invalid-feedback d-block">
                                     {% for error in form.code_rule_id.errors %}
@@ -286,21 +289,33 @@ $(document).ready(function() {
     // 更新编码规则选项
     function updateCodeRuleOptions(outputType) {
         var $codeRuleSelect = $('#{{ form.code_rule_id.id }}');
-        $codeRuleSelect.empty().append($('<option>', {
+        
+        // 清空并重置下拉框
+        $codeRuleSelect.empty();
+        
+        // 添加默认选项
+        $codeRuleSelect.append($('<option>', {
             value: 0,
             text: '请选择'
         }));
-
+        
+        // 如果没有选择产出类型，则只显示默认选项
+        if (!outputType) {
+            $codeRuleSelect.val(0).trigger('change');
+            return;
+        }
+        
+        // 根据产出类型添加对应的编码规则
         var rules = outputType === 'finished' ? finishedRules : 
                    outputType === 'raw' ? rawRules : [];
-
+        
         rules.forEach(function(rule) {
             $codeRuleSelect.append($('<option>', {
                 value: rule.id,
                 text: rule.name
             }));
         });
-
+        
         // 重置选择
         $codeRuleSelect.val(0).trigger('change');
     }
@@ -308,7 +323,35 @@ $(document).ready(function() {
     // 当产出类型改变时更新编码规则选项
     $('#{{ form.output_type.id }}').change(function() {
         var outputType = $(this).val();
+        // 显示加载提示
+        var $loadingMsg = $('#code_rule_loading');
+        if ($loadingMsg.length === 0) {
+            $('#{{ form.code_rule_id.id }}').after(
+                '<small id="code_rule_loading" class="form-text text-info">正在加载编码规则...</small>'
+            );
+        }
+        
+        // 更新编码规则选项
         updateCodeRuleOptions(outputType);
+        
+        // 隐藏加载提示
+        $('#code_rule_loading').remove();
+        
+        // 添加产出类型指示
+        var typeText = outputType === 'finished' ? '成品' : 
+                      outputType === 'raw' ? '原材料' : '';
+        if (typeText) {
+            var $typeIndicator = $('#code_rule_type');
+            if ($typeIndicator.length === 0) {
+                $('#{{ form.code_rule_id.id }}').after(
+                    '<small id="code_rule_type" class="form-text text-success">当前显示: ' + typeText + '编码规则</small>'
+                );
+            } else {
+                $typeIndicator.text('当前显示: ' + typeText + '编码规则');
+            }
+        } else {
+            $('#code_rule_type').remove();
+        }
     });
 
     // 处理是否有产出的显示/隐藏
@@ -317,10 +360,19 @@ $(document).ready(function() {
             $('#output_options').show();
             // 触发一次产出类型的change事件，以更新编码规则选项
             $('#{{ form.output_type.id }}').trigger('change');
+            
+            // 为编码规则添加提示信息
+            var $outputTypeHelp = $('#output_type_help');
+            if ($outputTypeHelp.length === 0) {
+                $('#{{ form.output_type.id }}').after(
+                    '<small id="output_type_help" class="form-text text-muted">请先选择产出类型，然后再选择对应的编码规则</small>'
+                );
+            }
         } else {
             $('#output_options').hide();
             $('#{{ form.output_type.id }}').val('');
             $('#{{ form.code_rule_id.id }}').val(0).trigger('change');
+            $('#output_type_help').remove();
         }
     }
 
@@ -336,17 +388,37 @@ $(document).ready(function() {
     $('#{{ form.code_rule_id.id }}').select2({
         theme: 'bootstrap4',
         width: '100%',
-        placeholder: '请选择编码规则'
+        placeholder: '请选择编码规则',
+        language: {
+            noResults: function() {
+                return "没有找到匹配的编码规则";
+            }
+        }
     });
 
     // 如果是编辑页面且已有产出类型，初始化编码规则选项
     var initialOutputType = $('#{{ form.output_type.id }}').val();
     if (initialOutputType) {
         updateCodeRuleOptions(initialOutputType);
-        // 如果有预设的编码规则ID，设置它
-        var initialCodeRuleId = $('#{{ form.code_rule_id.id }}').data('initial-value');
-        if (initialCodeRuleId) {
-            $('#{{ form.code_rule_id.id }}').val(initialCodeRuleId).trigger('change');
+        
+        // 如果有初始编码规则ID，设置它
+        if (document.getElementById('code_rule_id_initial')) {
+            var initialCodeRuleId = parseInt(document.getElementById('code_rule_id_initial').value);
+            if (initialCodeRuleId > 0) {
+                // 首先确保下拉框中有这个选项（可能在更新后已不存在）
+                var optionExists = false;
+                $('#{{ form.code_rule_id.id }} option').each(function() {
+                    if (parseInt($(this).val()) === initialCodeRuleId) {
+                        optionExists = true;
+                        return false; // 跳出循环
+                    }
+                });
+                
+                // 如果选项存在，则选中它
+                if (optionExists) {
+                    $('#{{ form.code_rule_id.id }}').val(initialCodeRuleId).trigger('change');
+                }
+            }
         }
     }
 });

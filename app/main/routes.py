@@ -1,9 +1,9 @@
-from flask import render_template, redirect, url_for, flash, request, jsonify, current_app, send_file
+from flask import render_template, redirect, url_for, flash, request, jsonify, current_app, send_file, Blueprint, abort, make_response, send_from_directory, session, after_this_request
 from sqlalchemy.exc import SQLAlchemyError
 from flask_login import login_required, current_user
 from app import db
 from app.models import Employee, ProcessPrice, ProductionRecord, BonusPenalty, AuditLog, ProcessPrice, User, TaskAssignment, SerialNumber, SalaryChange, CoefficientChange, EmployeeSalaryHistory, EmployeeCoefficientHistory, ProcessPriceGroup, FinishedProduct, RawMaterial, CodeRule, CodeGenerationLog, ProductionRecordMaterial
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from . import bp
 from app.main.forms import (
     EmployeeForm, ProcessPriceForm, ProductionRecordForm, BonusPenaltyForm,
@@ -495,8 +495,11 @@ def add_process_price():
     finished_rules_json = [{'id': r.id, 'name': r.name} for r in finished_rules]
     raw_rules_json = [{'id': r.id, 'name': r.name} for r in raw_rules]
     
-    # 设置编码规则选项（初始为空）
-    form.code_rule_id.choices = [(0, '请选择')]
+    # 设置编码规则选项 - 修改此处，包含所有可能的选项
+    all_rules = [(0, '请选择')]
+    all_rules.extend([(r.id, r.name) for r in finished_rules])
+    all_rules.extend([(r.id, r.name) for r in raw_rules])
+    form.code_rule_id.choices = all_rules
     
     if form.validate_on_submit():
         try:
@@ -525,7 +528,7 @@ def add_process_price():
                 price_type=form.price_type.data,
                 has_output=form.has_output.data,
                 output_type=form.output_type.data if form.has_output.data else None,
-                code_rule_id=form.code_rule_id.data if form.has_output.data else None,
+                code_rule_id=form.code_rule_id.data if form.has_output.data and form.code_rule_id.data != 0 else None,
                 needs_inspection=form.needs_inspection.data
             )
             db.session.add(process_price)
@@ -612,13 +615,11 @@ def edit_process_price(id):
     finished_rules_json = [{'id': r.id, 'name': r.name} for r in finished_rules]
     raw_rules_json = [{'id': r.id, 'name': r.name} for r in raw_rules]
     
-    # 根据当前产出类型设置编码规则选项
-    if process_price.output_type == 'finished':
-        form.code_rule_id.choices = [(0, '请选择')] + [(r.id, r.name) for r in finished_rules]
-    elif process_price.output_type == 'raw':
-        form.code_rule_id.choices = [(0, '请选择')] + [(r.id, r.name) for r in raw_rules]
-    else:
-        form.code_rule_id.choices = [(0, '请选择')]
+    # 设置编码规则选项 - 修改此处，包含所有可能的选项
+    all_rules = [(0, '请选择')]
+    all_rules.extend([(r.id, r.name) for r in finished_rules])
+    all_rules.extend([(r.id, r.name) for r in raw_rules])
+    form.code_rule_id.choices = all_rules
     
     if form.validate_on_submit():
         try:
@@ -662,7 +663,7 @@ def edit_process_price(id):
             process_price.price_type = form.price_type.data
             process_price.has_output = form.has_output.data
             process_price.output_type = form.output_type.data if form.has_output.data else None
-            process_price.code_rule_id = form.code_rule_id.data if form.has_output.data else None
+            process_price.code_rule_id = form.code_rule_id.data if form.has_output.data and form.code_rule_id.data != 0 else None
             process_price.needs_inspection = form.needs_inspection.data
             
             # 更新小计关联
@@ -721,7 +722,7 @@ def edit_process_price(id):
                                 finished_rules_json=finished_rules_json,
                                 raw_rules_json=raw_rules_json)
     
-    # GET请求时，填充表单数据
+    # 如果是GET请求，填充表单数据
     if request.method == 'GET':
         form.process_code.data = process_price.process_code
         form.process_name.data = process_price.process_name
@@ -733,21 +734,27 @@ def edit_process_price(id):
         form.notes.data = process_price.notes
         form.price_type.data = process_price.price_type
         form.has_output.data = process_price.has_output
-        form.output_type.data = process_price.output_type
-        form.code_rule_id.data = process_price.code_rule_id
+        form.output_type.data = process_price.output_type or ''
+        form.code_rule_id.data = process_price.code_rule_id or 0
         form.needs_inspection.data = process_price.needs_inspection
-        
-        # 如果是小计，填充已包含的工序
+
+        # 如果是小计，获取包含的工序
         if process_price.price_type == 'subtotal':
-            included_process_ids = [group.process_id for group in ProcessPriceGroup.query.filter_by(subtotal_id=id).all()]
+            included_process_ids = [group.process_id for group in process_price.included_processes]
             form.included_processes.data = included_process_ids
+            
+    # 添加代码规则ID初始值，传递给JS使用
+    code_rule_id_initial = process_price.code_rule_id if process_price.code_rule_id else 0
     
-    return render_template('main/process_price_form.html', 
-                         form=form, 
-                         title='编辑工序价格', 
-                         employee=process_price,
-                         finished_rules_json=finished_rules_json,
-                         raw_rules_json=raw_rules_json)
+    return render_template(
+        'main/process_price_form.html',
+        title='编辑工序价格',
+        form=form,
+        process_price=process_price,
+        finished_rules_json=finished_rules_json,
+        raw_rules_json=raw_rules_json,
+        code_rule_id_initial=code_rule_id_initial
+    )
 
 @bp.route('/process_price/<int:id>', methods=['DELETE'])
 @login_required
@@ -843,9 +850,13 @@ def manage_production_records():
     # 设置工序选项
     form.process_id.choices = [(0, '请选择工序')] + [(p.id, f"{p.process_code} - {p.process_name} ({p.component or ''} {p.drawing_no or ''} {p.model_no or ''})".strip()) for p in current_processes]
 
-    # 获取可用的原材料
-    raw_materials = RawMaterial.query.filter(RawMaterial.quantity > 0).all()
-    form.raw_material_id.choices = [(0, '请选择原材料')] + [(m.id, f"{m.material_name} (库存: {m.quantity})") for m in raw_materials]
+    # 获取可用的原材料列表 - 用于前端展示
+    available_raw_materials = RawMaterial.query.filter(RawMaterial.quantity > 0).all()
+    raw_materials_json = [{
+        'id': m.id,
+        'name': m.material_name,
+        'quantity': m.quantity
+    } for m in available_raw_materials]
 
     if form.validate_on_submit():
         try:
@@ -863,8 +874,6 @@ def manage_production_records():
                 process_id=form.process_id.data,
                 quantity=form.quantity.data,
                 date=form.date.data,
-                raw_material_id=form.raw_material_id.data if form.raw_material_id.data != 0 else None,
-                raw_material_quantity=form.raw_material_quantity.data,
                 notes=form.notes.data
             )
             
@@ -989,7 +998,8 @@ def manage_production_records():
                          records=records,
                          pagination=pagination,
                          current_sort=sort_column,
-                         current_direction=sort_direction)
+                         current_direction=sort_direction,
+                         raw_materials=raw_materials_json)
 
 @bp.route('/delete_production_record/<int:id>', methods=['DELETE'])
 @login_required
@@ -2844,15 +2854,52 @@ def add_production_record():
                 return redirect(url_for('main.manage_production_records'))
             
             record = ProductionRecord(
-            global_sn=SerialNumber.get_next_number(),
-            employee_id=form.employee_id.data,
-            process_code=form.process_code.data,
-            quantity=form.quantity.data,
-            date=form.date.data,
-            notes=form.notes.data
+                global_sn=SerialNumber.get_next_number(),
+                employee_id=form.employee_id.data,
+                process_id=process_price.id,  # 使用process_id而不是process_code
+                quantity=form.quantity.data,
+                date=form.date.data,
+                notes=form.notes.data
             )
             db.session.add(record)
             db.session.flush()
+            
+            # 处理多个原材料
+            material_data = []
+            for key, value in request.form.items():
+                if key.startswith('material_data_'):
+                    try:
+                        data = json.loads(value)
+                        material_data.append(data)
+                    except (json.JSONDecodeError, ValueError) as e:
+                        current_app.logger.error(f"解析材料数据失败: {str(e)}")
+                        continue
+            
+            # 添加原材料关联记录
+            for data in material_data:
+                material_id = data.get('id')
+                quantity = data.get('quantity')
+                
+                if material_id and quantity:
+                    # 获取原材料
+                    raw_material = RawMaterial.query.get(material_id)
+                    if raw_material:
+                        # 检查库存是否足够
+                        if raw_material.quantity >= float(quantity):
+                            # 创建关联记录
+                            record_material = ProductionRecordMaterial(
+                                production_record_id=record.id,
+                                raw_material_id=material_id,
+                                quantity=float(quantity)
+                            )
+                            db.session.add(record_material)
+                            
+                            # 更新原材料库存
+                            raw_material.quantity -= float(quantity)
+                        else:
+                            db.session.rollback()
+                            flash(f'原材料 {raw_material.material_name} 库存不足！', 'danger')
+                            return redirect(url_for('main.manage_production_records'))
             
             log = AuditLog(
                 user_id=current_user.id,
@@ -2864,10 +2911,11 @@ def add_production_record():
                 target_id=record.id,
                 new_data={
                     'employee_id': record.employee_id,
-                    'process_code': record.process_code,
+                    'process_id': record.process_id,
                     'quantity': record.quantity,
                     'date': record.date.isoformat() if record.date else None,
-                    'notes': record.notes
+                    'notes': record.notes,
+                    'materials': material_data
                 }
             )
             db.session.add(log)
@@ -2880,7 +2928,15 @@ def add_production_record():
             flash(f'添加失败：{str(e)}', 'danger')
             return redirect(url_for('main.manage_production_records'))
     
-    return render_template('main/production_record_form.html', form=form, title='添加生产记录')
+    # 获取可用的原材料列表 - 用于前端展示
+    available_raw_materials = RawMaterial.query.filter(RawMaterial.quantity > 0).all()
+    raw_materials_json = [{
+        'id': m.id,
+        'name': m.material_name,
+        'quantity': m.quantity
+    } for m in available_raw_materials]
+    
+    return render_template('main/production_record_form.html', form=form, title='添加生产记录', raw_materials=raw_materials_json)
 
 @bp.route('/bonus_penalties/<int:id>', methods=['GET'])
 @login_required
@@ -4468,10 +4524,17 @@ def get_process_price(id):
                 'id': process.id,
                 'process_code': process.process_code,
                 'process_name': process.process_name,
+                'component': process.component,
+                'drawing_no': process.drawing_no,
+                'model_no': process.model_no,
+                'price': process.price,
+                'effective_date': process.effective_date.strftime('%Y-%m-%d'),
+                'price_type': process.price_type,
                 'has_output': process.has_output,
                 'output_type': process.output_type,
-                'needs_raw_material': process.needs_raw_material,
-                'code_rule_id': process.code_rule_id
+                'needs_inspection': process.needs_inspection,
+                'code_rule_id': process.code_rule_id,
+                'notes': process.notes
             }
         })
     except Exception as e:

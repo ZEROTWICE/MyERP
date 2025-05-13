@@ -169,34 +169,6 @@
                             {{ form.date.label(class="form-label") }}
                             {{ form.date(class="form-control", type="date") }}
                         </div>
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    {{ form.raw_material_id.label(class="form-label") }}
-                                    {{ form.raw_material_id(class="form-control select2") }}
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    {{ form.raw_material_quantity.label(class="form-label") }}
-                                    {{ form.raw_material_quantity(class="form-control", type="number", min="0", step="0.01") }}
-                                </div>
-                            </div>
-                        </div>
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    {{ form.inspector.label(class="form-label") }}
-                                    {{ form.inspector(class="form-control") }}
-                                </div>
-                            </div>
-                            <div class="col-md-12">
-                                <div class="mb-3">
-                                    {{ form.notes.label(class="form-label") }}
-                                    {{ form.notes(class="form-control", rows="3") }}
-                                </div>
-                            </div>
-                        </div>
                         
                         <!-- 多原材料管理部分 -->
                         <div class="mb-3">
@@ -218,6 +190,21 @@
                             <button type="button" class="btn btn-sm btn-primary" id="addMaterialBtn">
                                 <i class="fas fa-plus"></i> 添加原材料
                             </button>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    {{ form.inspector.label(class="form-label") }}
+                                    {{ form.inspector(class="form-control") }}
+                                </div>
+                            </div>
+                            <div class="col-md-12">
+                                <div class="mb-3">
+                                    {{ form.notes.label(class="form-label") }}
+                                    {{ form.notes(class="form-control", rows="3") }}
+                                </div>
+                            </div>
                         </div>
                         
                         <div class="modal-footer">
@@ -255,6 +242,7 @@
 {{ super() }}
 <script>
 let recordToDelete = null;
+let availableRawMaterials = {{ raw_materials|default([])|tojson|safe }};
 
 $(document).ready(function() {
     // 初始化模态框内的 Select2
@@ -263,8 +251,8 @@ $(document).ready(function() {
     // 模态框显示时重新初始化 Select2
     $('#addProductionRecordModal').on('shown.bs.modal', function () {
         initializeSelect2();
-        // 加载原材料列表
-        loadRawMaterials();
+        // 清空之前的原材料列表
+        $('#materialsList').empty();
     });
 
     // 设置默认日期为今天
@@ -287,59 +275,133 @@ $(document).ready(function() {
             $.ajax({
                 url: '{{ url_for("main.delete_production_record", id=0) }}'.replace('0', recordToDelete),
                 type: 'DELETE',
-                headers: {
-                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
-                },
                 success: function(result) {
                     if (result.success) {
                         $('#deleteModal').modal('hide');
                         location.reload();
                     } else {
-                        alert(result.message || '删除失败');
+                        alert(result.message);
                     }
                 },
-                error: function(xhr) {
-                    alert(xhr.responseJSON?.message || '删除失败');
+                error: function() {
+                    alert('删除失败，请重试');
                 }
             });
         }
+    });
+    
+    // 添加原材料按钮点击事件
+    $('#addMaterialBtn').click(function() {
+        addMaterialRow();
+    });
+    
+    // 表单提交前收集原材料数据
+    $('form').submit(function(e) {
+        collectMaterialsData();
     });
 });
 
-// 初始化 Select2 的函数
+// 初始化Select2插件
 function initializeSelect2() {
-    $('#addProductionRecordModal .select2').each(function() {
-        if ($(this).data('select2')) {
-            $(this).select2('destroy');
-        }
-        $(this).select2({
-            theme: 'bootstrap-5',
-            width: '100%',
-            dropdownParent: $('#addProductionRecordModal'),
-            language: {
-                noResults: function() {
-                    return "没有找到匹配的选项";
-                },
-                searching: function() {
-                    return "搜索中...";
-                }
-            }
-        });
+    $('.select2').select2({
+        theme: 'bootstrap4',
+        width: '100%',
+        dropdownParent: $('#addProductionRecordModal'),
+        placeholder: '请选择...'
     });
 }
 
-// 加载原材料列表
-function loadRawMaterials() {
-    $.get('/raw_materials/available', function(response) {
-        if (response.success) {
-            const select = $('#raw_material_id');
-            select.empty();
-            select.append('<option value="">请选择原材料</option>');
-            response.data.forEach(material => {
-                select.append(`<option value="${material.id}">${material.material_name} (库存: ${material.quantity})</option>`);
+// 处理工序变更
+function handleProcessChange(processId) {
+    // 这里可以添加工序变更后的处理逻辑
+    console.log('工序变更为:', processId);
+}
+
+// 添加一行原材料
+function addMaterialRow() {
+    // 创建一个原材料选择下拉框
+    let materialSelect = '<select class="form-control material-select" onchange="updateAvailableQuantity(this)">';
+    materialSelect += '<option value="">请选择原材料</option>';
+    availableRawMaterials.forEach(material => {
+        materialSelect += `<option value="${material.id}" data-quantity="${material.quantity}">${material.name} (库存: ${material.quantity})</option>`;
+    });
+    materialSelect += '</select>';
+    
+    // 创建行HTML
+    const rowHtml = `
+        <tr class="material-row">
+            <td>${materialSelect}</td>
+            <td>
+                <input type="number" class="form-control material-quantity" min="0.01" step="0.01" placeholder="数量">
+                <small class="form-text text-muted available-quantity"></small>
+            </td>
+            <td>
+                <button type="button" class="btn btn-sm btn-danger remove-material">
+                    <i class="fas fa-times"></i>
+                </button>
+            </td>
+        </tr>
+    `;
+    
+    // 添加到表格中
+    $('#materialsList').append(rowHtml);
+    
+    // 为新添加的行绑定事件
+    const $newRow = $('#materialsList').find('tr:last');
+    $newRow.find('.remove-material').click(function() {
+        $(this).closest('tr').remove();
+    });
+    
+    // 初始化新添加的select
+    $newRow.find('.material-select').select2({
+        theme: 'bootstrap4',
+        width: '100%',
+        placeholder: '请选择原材料'
+    });
+}
+
+// 更新可用数量提示
+function updateAvailableQuantity(selectElement) {
+    const $row = $(selectElement).closest('tr');
+    const selectedOption = $(selectElement).find('option:selected');
+    const availableQuantity = selectedOption.data('quantity');
+    
+    if (availableQuantity) {
+        $row.find('.available-quantity').text(`可用: ${availableQuantity}`);
+        $row.find('.material-quantity').attr('max', availableQuantity);
+    } else {
+        $row.find('.available-quantity').text('');
+        $row.find('.material-quantity').removeAttr('max');
+    }
+}
+
+// 收集所有原材料数据并添加到表单中
+function collectMaterialsData() {
+    const materials = [];
+    
+    $('.material-row').each(function() {
+        const $row = $(this);
+        const materialId = $row.find('.material-select').val();
+        const quantity = $row.find('.material-quantity').val();
+        
+        if (materialId && quantity) {
+            materials.push({
+                id: parseInt(materialId),
+                quantity: parseFloat(quantity)
             });
-            select.trigger('change');
         }
+    });
+    
+    // 移除之前可能存在的材料数据字段
+    $('input[name^="material_data_"]').remove();
+    
+    // 添加材料数据到表单
+    materials.forEach((material, index) => {
+        $('<input>')
+            .attr('type', 'hidden')
+            .attr('name', `material_data_${index}`)
+            .val(JSON.stringify(material))
+            .appendTo('form');
     });
 }
 
@@ -389,187 +451,6 @@ function showAlert(type, message) {
     setTimeout(() => {
         alertDiv.remove();
     }, 3000);
-}
-
-// 处理工序变更
-function handleProcessChange(processId) {
-    if (!processId) return;
-    
-    // 获取工序详情
-    $.get(`/process_prices/${processId}`, function(response) {
-        if (response.success) {
-            const process = response.data;
-            
-            // 只控制成品字段的显示/隐藏
-            $('.finished-product-fields').toggle(process.has_output);
-        }
-    });
-}
-
-// 原材料列表管理
-let materialsList = [];
-let lastMaterialId = 0;
-
-// 添加原材料按钮点击事件
-$(document).ready(function() {
-    $('#addMaterialBtn').click(function() {
-        addNewMaterialRow();
-    });
-    
-    // 处理表单提交
-    $('form').submit(function(e) {
-        // 如果有原材料，添加到表单数据
-        if (materialsList.length > 0) {
-            // 清除已有的原材料隐藏字段
-            $('input[name^="material_data"]').remove();
-            
-            // 为每个原材料添加隐藏字段
-            materialsList.forEach(function(material, index) {
-                const materialData = JSON.stringify({
-                    id: material.id,
-                    quantity: material.quantity
-                });
-                $('<input>').attr({
-                    type: 'hidden',
-                    name: `material_data_${index}`,
-                    value: materialData
-                }).appendTo($(this));
-            });
-        }
-    });
-    
-    // 重置模态框时清空原材料列表
-    $('#addProductionRecordModal').on('hidden.bs.modal', function() {
-        materialsList = [];
-        lastMaterialId = 0;
-        $('#materialsList').empty();
-    });
-});
-
-// 添加新的原材料行
-function addNewMaterialRow() {
-    lastMaterialId++;
-    const rowId = `material-row-${lastMaterialId}`;
-    
-    // 从API获取可用原材料
-    $.get('/raw_materials/available', function(response) {
-        if (response.success) {
-            const rawMaterials = response.data;
-            
-            // 创建选择器选项
-            let materialOptions = '<option value="">请选择原材料</option>';
-            rawMaterials.forEach(material => {
-                materialOptions += `<option value="${material.id}" data-available="${material.quantity}">${material.material_name} (库存: ${material.quantity})</option>`;
-            });
-            
-            // 创建新行HTML
-            const newRow = `
-                <tr id="${rowId}">
-                    <td>
-                        <select class="form-control material-select" id="material-${lastMaterialId}">
-                            ${materialOptions}
-                        </select>
-                    </td>
-                    <td>
-                        <input type="number" class="form-control material-quantity" id="quantity-${lastMaterialId}" min="0.01" step="0.01" placeholder="数量">
-                    </td>
-                    <td>
-                        <button type="button" class="btn btn-sm btn-danger" onclick="removeMaterialRow('${rowId}')">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                    </td>
-                </tr>
-            `;
-            
-            // 添加新行
-            $('#materialsList').append(newRow);
-            
-            // 初始化新添加的select2
-            $(`#material-${lastMaterialId}`).select2({
-                theme: 'bootstrap-5',
-                width: '100%',
-                dropdownParent: $('#addProductionRecordModal'),
-                language: {
-                    noResults: function() {
-                        return "没有找到匹配的选项";
-                    },
-                    searching: function() {
-                        return "搜索中...";
-                    }
-                }
-            });
-            
-            // 监听原材料选择和数量变化
-            $(`#material-${lastMaterialId}`).on('change', function() {
-                updateMaterialsList(lastMaterialId);
-            });
-            
-            $(`#quantity-${lastMaterialId}`).on('input', function() {
-                updateMaterialsList(lastMaterialId);
-            });
-        }
-    });
-}
-
-// 更新材料列表数组
-function updateMaterialsList(id) {
-    const materialSelect = $(`#material-${id}`);
-    const quantityInput = $(`#quantity-${id}`);
-    
-    const materialId = materialSelect.val();
-    const quantity = parseFloat(quantityInput.val());
-    
-    // 检查是否已有该材料ID的记录
-    const index = materialsList.findIndex(m => m.rowId === id);
-    
-    if (materialId && !isNaN(quantity) && quantity > 0) {
-        const materialName = materialSelect.find('option:selected').text();
-        const availableQuantity = parseFloat(materialSelect.find('option:selected').data('available'));
-        
-        // 数量不能超过库存
-        if (quantity > availableQuantity) {
-            alert('原材料使用量不能超过库存量！');
-            quantityInput.val(availableQuantity);
-        }
-        
-        if (index >= 0) {
-            // 更新现有记录
-            materialsList[index] = {
-                rowId: id,
-                id: materialId,
-                name: materialName,
-                quantity: Math.min(quantity, availableQuantity)
-            };
-        } else {
-            // 添加新记录
-            materialsList.push({
-                rowId: id,
-                id: materialId,
-                name: materialName,
-                quantity: Math.min(quantity, availableQuantity)
-            });
-        }
-    } else if (index >= 0) {
-        // 如果没有有效的材料ID或数量，且存在记录，则移除
-        materialsList.splice(index, 1);
-    }
-    
-    console.log('当前原材料列表:', materialsList);
-}
-
-// 移除原材料行
-function removeMaterialRow(rowId) {
-    // 从DOM中移除行
-    $(`#${rowId}`).remove();
-    
-    // 从数组中移除对应记录
-    const numericId = parseInt(rowId.split('-').pop());
-    const index = materialsList.findIndex(m => m.rowId === numericId);
-    if (index >= 0) {
-        materialsList.splice(index, 1);
-    }
-    
-    console.log('移除后的原材料列表:', materialsList);
 }
 </script>
 

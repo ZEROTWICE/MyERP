@@ -1,6 +1,6 @@
 from flask_wtf import FlaskForm
-from wtforms import StringField, FloatField, IntegerField, SelectField, TextAreaField, DateField, SubmitField, BooleanField, PasswordField, DecimalField, SelectMultipleField
-from wtforms.validators import DataRequired, NumberRange, Optional, Length, ValidationError
+from wtforms import StringField, FloatField, IntegerField, SelectField, TextAreaField, DateField, SubmitField, BooleanField, PasswordField, DecimalField, SelectMultipleField, HiddenField, MultipleFileField
+from wtforms.validators import DataRequired, NumberRange, Optional, Length, ValidationError, Email
 
 class EmployeeForm(FlaskForm):
     employee_id = StringField('工号', validators=[DataRequired()])
@@ -20,22 +20,39 @@ class EmployeeForm(FlaskForm):
             raise ValidationError('离职时间不能早于入职时间')
 
 class ProcessPriceForm(FlaskForm):
-    process_id = None  # 用于存储编辑时的工序ID
-    process_code = StringField('工序编号', validators=[DataRequired(), Length(max=50)])
-    process_name = StringField('工序名称', validators=[DataRequired(), Length(max=100)])
+    """工序价格表单"""
+    process_code = StringField('工序编号', validators=[DataRequired('请输入工序编号'), Length(max=50)])
+    process_name = StringField('工序名称', validators=[DataRequired('请输入工序名称'), Length(max=100)])
     component = StringField('部件', validators=[Optional(), Length(max=100)])
     drawing_no = StringField('图号', validators=[Optional(), Length(max=100)])
     model_no = StringField('型号', validators=[Optional(), Length(max=100)])
-    price = FloatField('单价', validators=[Optional()])  # 修改为可选，因为小计时会自动计算
-    effective_date = DateField('生效日期', format='%Y-%m-%d', validators=[DataRequired()])
+    price = FloatField('单价(元/件)', validators=[DataRequired('请输入单价')])
+    effective_date = DateField('生效日期', validators=[DataRequired('请选择生效日期')])
     notes = TextAreaField('备注')
-    price_type = SelectField('价格类型', choices=[('normal', '普通工价'), ('subtotal', '小计')], default='normal')
-    included_processes = SelectMultipleField('包含的工序', coerce=int, validators=[Optional()])
-    has_output = BooleanField('是否有产出', default=True)
-    output_type = SelectField('产出类型', choices=[('finished', '成品'), ('raw', '原材料')], validators=[Optional()])
+    price_type = SelectField('价格类型', choices=[('normal', '普通工价'), ('subtotal', '小计')], default='normal', validators=[DataRequired('请选择价格类型')])
+    included_processes = SelectMultipleField('包含工序', coerce=int, validators=[Optional()])
+    has_output = BooleanField('有产出', default=False)
+    output_type = SelectField('产出类型', choices=[('', '请选择'), ('finished', '成品'), ('raw', '原材料')], validators=[Optional()])
     code_rule_id = SelectField('编码规则', coerce=int, validators=[Optional()])
-    needs_inspection = BooleanField('是否需要检验', default=True)
+    needs_inspection = BooleanField('需要检验', default=True)
     submit = SubmitField('提交')
+
+    def validate_output_type(form, field):
+        """验证产出类型"""
+        if form.has_output.data and not field.data:
+            raise ValidationError('如果有产出，请选择产出类型')
+    
+    def validate_code_rule_id(form, field):
+        """验证编码规则"""
+        # 只有当有产出并且选择了产出类型时才验证
+        if form.has_output.data and form.output_type.data:
+            # 允许值为0（表示"请选择"）
+            if field.data == 0:
+                return
+            
+            # 所有值都被视为有效，因为后端已经加载了所有可能的选项
+            # 如果值无效，在routes.py中会处理（设为None）
+            pass
 
     def validate_included_processes(self, field):
         if self.price_type.data == 'subtotal' and not field.data:
@@ -46,10 +63,6 @@ class ProcessPriceForm(FlaskForm):
             raise ValidationError('普通工价必须填写单价')
         elif self.price_type.data == 'normal' and field.data <= 0:
             raise ValidationError('单价必须大于0')
-
-    def validate_code_rule_id(self, field):
-        if self.has_output.data and not field.data:
-            raise ValidationError('有产出时必须选择编码规则')
 
 class ProcessPriceSearchForm(FlaskForm):
     search = StringField('搜索', render_kw={"placeholder": "输入工序编号、部件、图号或型号进行搜索"})
