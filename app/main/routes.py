@@ -816,8 +816,8 @@ def manage_production_records():
     search_form = ProductionRecordSearchForm()
     
     # 获取所有员工
-    employees = Employee.query.all()
-    form.employee_id.choices = [(e.id, f"{e.employee_id} - {e.name} ({e.department})") for e in employees]
+    employees = Employee.query.filter_by(is_active=True).all()
+    form.employee_id.choices = [(0, '请选择员工')] + [(e.id, f"{e.employee_id} - {e.name} ({e.department})") for e in employees]
 
     # 获取所有当前生效的工序
     today = datetime.now().date()
@@ -840,30 +840,43 @@ def manage_production_records():
     ).order_by(ProcessPrice.process_code).all()
     
     # 设置工序选项
-    form.process_code.choices = [(p.process_code, f"{p.process_code} - {p.process_name} ({p.component or ''} {p.drawing_no or ''} {p.model_no or ''})".strip()) for p in current_processes]
+    form.process_id.choices = [(0, '请选择工序')] + [(p.id, f"{p.process_code} - {p.process_name} ({p.component or ''} {p.drawing_no or ''} {p.model_no or ''})".strip()) for p in current_processes]
+
+    # 获取可用的原材料
+    raw_materials = RawMaterial.query.filter(RawMaterial.quantity > 0).all()
+    form.raw_material_id.choices = [(0, '请选择原材料')] + [(m.id, f"{m.material_name} (库存: {m.quantity})") for m in raw_materials]
 
     if form.validate_on_submit():
         try:
-            target_date = form.date.data
-            start_of_day = datetime.combine(target_date, datetime.min.time())
-            end_of_day = datetime.combine(target_date, datetime.max.time())
-            
-            process_price = ProcessPrice.query.filter(
-                ProcessPrice.process_code == form.process_code.data,
-                                            ProcessPrice.effective_date <= end_of_day + timedelta(days=1)
-            ).order_by(ProcessPrice.effective_date.desc()).first()
-
-            if not process_price:
-                flash('未找到该日期下的工序价格', 'danger')
+            # 验证选择的值
+            if form.employee_id.data == 0:
+                flash('请选择员工', 'danger')
                 return redirect(url_for('main.manage_production_records'))
-
+            if form.process_id.data == 0:
+                flash('请选择工序', 'danger')
+                return redirect(url_for('main.manage_production_records'))
+            
             record = ProductionRecord(
-                    global_sn=SerialNumber.get_next_number(),
+                global_sn=SerialNumber.get_next_number(),
                 employee_id=form.employee_id.data,
-                process_id=process_price.id,
+                process_id=form.process_id.data,
                 quantity=form.quantity.data,
-                date=form.date.data
+                date=form.date.data,
+                raw_material_id=form.raw_material_id.data if form.raw_material_id.data != 0 else None,
+                raw_material_quantity=form.raw_material_quantity.data,
+                notes=form.notes.data
             )
+            
+            if form.inspector.data:
+                # 如果提供了检验员信息，创建成品记录
+                finished_product = FinishedProduct(
+                    product_number=SerialNumber.get_next_number('FP'),
+                    inspector=form.inspector.data
+                )
+                db.session.add(finished_product)
+                db.session.flush()  # 获取成品ID
+                record.finished_product_id = finished_product.id
+            
             db.session.add(record)
             db.session.commit()
             flash('生产记录添加成功', 'success')
@@ -874,8 +887,9 @@ def manage_production_records():
             flash(f'添加失败：{str(e)}', 'danger')
             return redirect(url_for('main.manage_production_records'))
 
-    # 处理搜索
+    # 处理搜索和排序
     query = ProductionRecord.query.join(Employee).join(ProcessPrice)
+    
     if search_form.search.data:
         search_term = f"%{search_form.search.data}%"
         query = query.filter(db.or_(
