@@ -85,6 +85,9 @@
                         <button class="btn btn-sm btn-primary" onclick="editRawMaterial({{ item.id | tojson }})">
                             <i class="fas fa-edit"></i>
                         </button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteRawMaterial({{ item.id | tojson }})">
+                            <i class="fas fa-trash"></i>
+                        </button>
                         {% endif %}
                     </td>
                 </tr>
@@ -118,6 +121,9 @@
                         {% if current_user.role in ['admin', 'manager'] %}
                         <button class="btn btn-sm btn-primary" onclick="editFinishedProduct({{ item.id | tojson }})">
                             <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteFinishedProduct({{ item.id | tojson }})">
+                            <i class="fas fa-trash"></i>
                         </button>
                         {% endif %}
                     </td>
@@ -610,6 +616,74 @@ function submitRawMaterial() {
         alert('添加失败，请重试');
     });
 }
+
+// 删除原材料
+function deleteRawMaterial(id) {
+    if (confirm('确定要删除这个原材料吗？此操作不可恢复！')) {
+        fetch(`/inventory/raw/${id}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token() }}'
+            },
+            credentials: 'same-origin'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // 显示成功消息
+                showToast('success', '删除成功');
+                // 刷新页面
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showToast('error', data.message || '删除失败');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showToast('error', '删除失败，请重试');
+        });
+    }
+}
+
+// 删除成品
+function deleteFinishedProduct(id) {
+    if (confirm('确定要删除这个成品吗？此操作不可恢复！')) {
+        fetch(`/inventory/finished/${id}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token() }}'
+            },
+            credentials: 'same-origin'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // 显示成功消息
+                showToast('success', '删除成功');
+                // 刷新页面
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showToast('error', data.message || '删除失败');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showToast('error', '删除失败，请重试');
+        });
+    }
+}
+
+// 显示提示消息
+function showToast(type, message) {
+    // 如果使用了Bootstrap的Toast组件
+    const toast = new bootstrap.Toast(document.getElementById('toast'));
+    document.getElementById('toastBody').textContent = message;
+    document.getElementById('toast').classList.remove('bg-success', 'bg-danger');
+    document.getElementById('toast').classList.add(type === 'success' ? 'bg-success' : 'bg-danger');
+    toast.show();
+}
 </script>
 
 <!-- 添加成品模态框 -->
@@ -857,6 +931,16 @@ function submitRawMaterial() {
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
                 <button type="button" class="btn btn-primary" onclick="submitEditRawMaterial()">保存</button>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast提示框 -->
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index: 11">
+    <div id="toast" class="toast align-items-center text-white border-0" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="d-flex">
+            <div class="toast-body" id="toastBody"></div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
         </div>
     </div>
 </div>

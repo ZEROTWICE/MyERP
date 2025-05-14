@@ -1,7 +1,7 @@
 from flask import render_template, redirect, url_for, flash, request, jsonify, current_app, send_file, Blueprint, abort, make_response, send_from_directory, session, after_this_request
 from sqlalchemy.exc import SQLAlchemyError
 from flask_login import login_required, current_user
-from app import db
+from app import db, csrf
 from app.models import Employee, ProcessPrice, ProductionRecord, BonusPenalty, AuditLog, ProcessPrice, User, TaskAssignment, SerialNumber, SalaryChange, CoefficientChange, EmployeeSalaryHistory, EmployeeCoefficientHistory, ProcessPriceGroup, FinishedProduct, RawMaterial, CodeRule, CodeGenerationLog, ProductionRecordMaterial
 from datetime import datetime, timedelta, date
 from . import bp
@@ -4577,3 +4577,172 @@ def get_available_raw_materials():
         })
     except Exception as e:
         return jsonify({'success': False, 'message': f'获取原材料列表失败：{str(e)}'}), 500
+
+@bp.route('/inventory/raw/<int:id>', methods=['DELETE'])
+@login_required
+@csrf.exempt  # 对DELETE请求豁免CSRF保护
+def delete_raw_material(id):
+    """删除原材料"""
+    if current_user.role not in ['admin', 'manager']:
+        return jsonify({'success': False, 'message': '权限不足'}), 403
+    
+    try:
+        material = RawMaterial.query.get_or_404(id)
+        
+        # 检查是否有关联的生产记录
+        if len(material.production_records) > 0:
+            return jsonify({
+                'success': False, 
+                'message': '该原材料已被使用，无法删除'
+            }), 400
+        
+        # 保存旧数据用于审计日志
+        old_data = {
+            'supplier': material.supplier,
+            'material_name': material.material_name,
+            'melt_number': material.melt_number,
+            'supplier_number': material.supplier_number,
+            'internal_number': material.internal_number,
+            'storage_date': material.storage_date.strftime('%Y-%m-%d'),
+            'quantity': material.quantity,
+            'has_sample': material.has_sample,
+            'notes': material.notes
+        }
+        
+        # 记录审计日志
+        log = AuditLog(
+            user_id=current_user.id,
+            action='删除原材料',
+            details=f'删除原材料：{material.material_name}',
+            can_rollback=True,
+            rollback_type='delete',
+            target_model='RawMaterial',
+            target_id=material.id,
+            old_data=old_data
+        )
+        db.session.add(log)
+        
+        # 删除原材料
+        db.session.delete(material)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': '原材料删除成功'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f'删除原材料失败: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': f'删除失败：{str(e)}'
+        }), 500
+
+@bp.route('/inventory/finished/<int:id>', methods=['DELETE'])
+@login_required
+@csrf.exempt  # 对DELETE请求豁免CSRF保护
+def delete_finished_product(id):
+    """删除成品"""
+    if current_user.role not in ['admin', 'manager']:
+        return jsonify({'success': False, 'message': '权限不足'}), 403
+    
+    try:
+        product = FinishedProduct.query.get_or_404(id)
+        
+        # 检查是否有关联的生产记录
+        if len(product.production_records) > 0:
+            return jsonify({
+                'success': False, 
+                'message': '该成品已关联生产记录，无法删除'
+            }), 400
+        
+        # 保存旧数据用于审计日志
+        old_data = {
+            'product_number': product.product_number,
+            'drawing_number': product.drawing_number,
+            'model': product.model,
+            'production_date': product.production_date.strftime('%Y-%m-%d'),
+            'inspector': product.inspector,
+            'quantity': product.quantity,
+            'status': product.status,
+            'notes': product.notes
+        }
+        
+        # 记录审计日志
+        log = AuditLog(
+            user_id=current_user.id,
+            action='删除成品',
+            details=f'删除成品：{product.product_number}',
+            can_rollback=True,
+            rollback_type='delete',
+            target_model='FinishedProduct',
+            target_id=product.id,
+            old_data=old_data
+        )
+        db.session.add(log)
+        
+        # 删除成品
+        db.session.delete(product)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': '成品删除成功'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f'删除成品失败: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': f'删除失败：{str(e)}'
+        }), 500
+
+@bp.route('/quality')
+@login_required
+def quality_management():
+    """质量管理主页"""
+    if current_user.role not in ['admin', 'manager', 'inspector']:
+        flash('权限不足', 'danger')
+        return redirect(url_for('main.index'))
+    
+    # 获取质检任务统计信息
+    inspection_tasks_pending = 0  # 待处理的质检任务数
+    inspection_tasks_completed = 0  # 已完成的质检任务数
+    templates_count = 0  # 质检模板数量
+    
+    return render_template('main/quality/index.html',
+                         inspection_tasks_pending=inspection_tasks_pending,
+                         inspection_tasks_completed=inspection_tasks_completed,
+                         templates_count=templates_count)
+
+@bp.route('/quality/tasks')
+@login_required
+def quality_tasks():
+    """质检任务列表"""
+    if current_user.role not in ['admin', 'manager', 'inspector']:
+        flash('权限不足', 'danger')
+        return redirect(url_for('main.index'))
+    
+    return render_template('main/quality/tasks.html')
+
+@bp.route('/quality/templates')
+@login_required
+def quality_templates():
+    """质检模板列表"""
+    if current_user.role not in ['admin', 'manager']:
+        flash('权限不足', 'danger')
+        return redirect(url_for('main.index'))
+    
+    return render_template('main/quality/templates.html')
+
+@bp.route('/quality/records')
+@login_required
+def quality_records():
+    """质检记录列表"""
+    if current_user.role not in ['admin', 'manager', 'inspector']:
+        flash('权限不足', 'danger')
+        return redirect(url_for('main.index'))
+    
+    return render_template('main/quality/records.html')

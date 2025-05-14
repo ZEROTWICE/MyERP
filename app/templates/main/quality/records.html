@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+
+{% block title %}质检记录{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>质检记录</h2>
+        <div>
+            <button class="btn btn-success me-2" onclick="importRecords()">
+                <i class="fas fa-file-import"></i> 导入记录
+            </button>
+            <button class="btn btn-info" onclick="exportRecords()">
+                <i class="fas fa-file-export"></i> 导出记录
+            </button>
+        </div>
+    </div>
+
+    <!-- 搜索和筛选 -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-3">
+                    <input type="text" class="form-control" name="search" 
+                           value="{{ request.args.get('search', '') }}" 
+                           placeholder="搜索记录...">
+                </div>
+                <div class="col-md-2">
+                    <select class="form-control" name="type">
+                        <option value="">所有类型</option>
+                        <option value="product" {% if request.args.get('type') == 'product' %}selected{% endif %}>产品质检</option>
+                        <option value="process" {% if request.args.get('type') == 'process' %}selected{% endif %}>过程质检</option>
+                        <option value="material" {% if request.args.get('type') == 'material' %}selected{% endif %}>原材料质检</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <select class="form-control" name="result">
+                        <option value="">所有结果</option>
+                        <option value="pass" {% if request.args.get('result') == 'pass' %}selected{% endif %}>合格</option>
+                        <option value="fail" {% if request.args.get('result') == 'fail' %}selected{% endif %}>不合格</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <div class="input-group">
+                        <input type="date" class="form-control" name="start_date" 
+                               value="{{ request.args.get('start_date', '') }}">
+                        <span class="input-group-text">至</span>
+                        <input type="date" class="form-control" name="end_date" 
+                               value="{{ request.args.get('end_date', '') }}">
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-search"></i> 搜索
+                    </button>
+                    <button type="reset" class="btn btn-secondary">
+                        <i class="fas fa-redo"></i> 重置
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 记录列表 -->
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>记录编号</th>
+                    <th>检验类型</th>
+                    <th>检验对象</th>
+                    <th>检验员</th>
+                    <th>检验时间</th>
+                    <th>检验结果</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- 这里将来会通过后端传递记录数据 -->
+                <tr>
+                    <td colspan="7" class="text-center">暂无数据</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- 分页 -->
+    {% if pagination %}
+    <nav aria-label="Page navigation" class="mt-4">
+        <ul class="pagination justify-content-center">
+            {% for page in pagination.iter_pages() %}
+                {% if page %}
+                    <li class="page-item {{ 'active' if page == pagination.page else '' }}">
+                        <a class="page-link" href="{{ url_for('main.quality_records', page=page) }}">{{ page }}</a>
+                    </li>
+                {% else %}
+                    <li class="page-item disabled">
+                        <span class="page-link">...</span>
+                    </li>
+                {% endif %}
+            {% endfor %}
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+
+<!-- 导入记录模态框 -->
+<div class="modal fade" id="importModal" tabindex="-1" aria-labelledby="importModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="importModalLabel">导入质检记录</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="importForm">
+                    <div class="mb-3">
+                        <label for="fileInput" class="form-label">选择Excel文件</label>
+                        <input type="file" class="form-control" id="fileInput" accept=".xlsx,.xls">
+                    </div>
+                    <div class="mb-3">
+                        <a href="#" class="text-primary">
+                            <i class="fas fa-download"></i> 下载导入模板
+                        </a>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="submitImport()">导入</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function importRecords() {
+    $('#importModal').modal('show');
+}
+
+function exportRecords() {
+    // 导出记录的函数将在后续实现
+    alert('功能开发中...');
+}
+
+function submitImport() {
+    // 提交导入的函数将在后续实现
+    alert('功能开发中...');
+}
+</script>
+{% endblock %} 

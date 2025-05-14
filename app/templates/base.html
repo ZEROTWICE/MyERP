@@ -153,6 +153,11 @@
                         <li class="nav-item">
                             <a class="nav-link" href="{{ url_for('main.manage_inventory') }}">库存管理</a>
                         </li>
+                        {% if current_user.role in ['admin', 'manager', 'inspector'] %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('main.quality_management') }}">质量管理</a>
+                        </li>
+                        {% endif %}
                         <li class="nav-item">
                             <a class="nav-link" href="{{ url_for('main.manage_code_rules') }}">编码管理</a>
                         </li>

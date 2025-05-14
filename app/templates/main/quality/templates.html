@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+
+{% block title %}质检模板{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>质检模板</h2>
+        {% if current_user.role in ['admin', 'manager'] %}
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addTemplateModal">
+            <i class="fas fa-plus"></i> 新建模板
+        </button>
+        {% endif %}
+    </div>
+
+    <!-- 搜索和筛选 -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-4">
+                    <input type="text" class="form-control" name="search" 
+                           value="{{ request.args.get('search', '') }}" 
+                           placeholder="搜索模板...">
+                </div>
+                <div class="col-md-3">
+                    <select class="form-control" name="type">
+                        <option value="">所有类型</option>
+                        <option value="product" {% if request.args.get('type') == 'product' %}selected{% endif %}>产品质检</option>
+                        <option value="process" {% if request.args.get('type') == 'process' %}selected{% endif %}>过程质检</option>
+                        <option value="material" {% if request.args.get('type') == 'material' %}selected{% endif %}>原材料质检</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-search"></i> 搜索
+                    </button>
+                    <button type="reset" class="btn btn-secondary">
+                        <i class="fas fa-redo"></i> 重置
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 模板列表 -->
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>模板编号</th>
+                    <th>模板名称</th>
+                    <th>类型</th>
+                    <th>创建时间</th>
+                    <th>最后修改</th>
+                    <th>状态</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- 这里将来会通过后端传递模板数据 -->
+                <tr>
+                    <td colspan="7" class="text-center">暂无数据</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- 分页 -->
+    {% if pagination %}
+    <nav aria-label="Page navigation" class="mt-4">
+        <ul class="pagination justify-content-center">
+            {% for page in pagination.iter_pages() %}
+                {% if page %}
+                    <li class="page-item {{ 'active' if page == pagination.page else '' }}">
+                        <a class="page-link" href="{{ url_for('main.quality_templates', page=page) }}">{{ page }}</a>
+                    </li>
+                {% else %}
+                    <li class="page-item disabled">
+                        <span class="page-link">...</span>
+                    </li>
+                {% endif %}
+            {% endfor %}
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+
+<!-- 新建模板模态框 -->
+<div class="modal fade" id="addTemplateModal" tabindex="-1" aria-labelledby="addTemplateModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addTemplateModalLabel">新建质检模板</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addTemplateForm">
+                    <!-- 表单内容将在后续实现 -->
+                    <p class="text-center">功能开发中...</p>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="submitTemplate()">创建</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function submitTemplate() {
+    // 提交模板的函数将在后续实现
+    alert('功能开发中...');
+}
+</script>
+{% endblock %} 

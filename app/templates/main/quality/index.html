@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block title %}质量管理{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>质量管理</h2>
+
+    <!-- 统计卡片 -->
+    <div class="row mt-4">
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">待处理质检任务</h5>
+                    <p class="card-text display-4">{{ inspection_tasks_pending }}</p>
+                    <a href="{{ url_for('main.quality_tasks') }}" class="btn btn-primary">查看任务</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">已完成质检任务</h5>
+                    <p class="card-text display-4">{{ inspection_tasks_completed }}</p>
+                    <a href="{{ url_for('main.quality_records') }}" class="btn btn-success">查看记录</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">质检模板</h5>
+                    <p class="card-text display-4">{{ templates_count }}</p>
+                    <a href="{{ url_for('main.quality_templates') }}" class="btn btn-info">管理模板</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 快捷操作 -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">快捷操作</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% if current_user.role in ['admin', 'manager'] %}
+                        <div class="col-md-3">
+                            <button class="btn btn-primary btn-lg w-100 mb-3" onclick="location.href='{{ url_for('main.quality_tasks') }}'">
+                                <i class="fas fa-plus"></i> 新建质检任务
+                            </button>
+                        </div>
+                        <div class="col-md-3">
+                            <button class="btn btn-success btn-lg w-100 mb-3" onclick="location.href='{{ url_for('main.quality_templates') }}'">
+                                <i class="fas fa-file-alt"></i> 创建质检模板
+                            </button>
+                        </div>
+                        {% endif %}
+                        <div class="col-md-3">
+                            <button class="btn btn-info btn-lg w-100 mb-3" onclick="location.href='{{ url_for('main.quality_records') }}'">
+                                <i class="fas fa-upload"></i> 导入质检记录
+                            </button>
+                        </div>
+                        {% if current_user.role == 'inspector' %}
+                        <div class="col-md-3">
+                            <button class="btn btn-warning btn-lg w-100 mb-3" onclick="location.href='{{ url_for('main.quality_tasks') }}'">
+                                <i class="fas fa-tasks"></i> 我的质检任务
+                            </button>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 
