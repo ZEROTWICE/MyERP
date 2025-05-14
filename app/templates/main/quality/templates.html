@@ -5,9 +5,9 @@
 {% block content %}
 <div class="container mt-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2>质检模板</h2>
+        <h2>质检模板管理</h2>
         {% if current_user.role in ['admin', 'manager'] %}
-        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addTemplateModal">
+        <button class="btn btn-primary" onclick="showCreateTemplateModal()">
             <i class="fas fa-plus"></i> 新建模板
         </button>
         {% endif %}
@@ -16,92 +16,141 @@
     <!-- 搜索和筛选 -->
     <div class="card mb-4">
         <div class="card-body">
-            <form method="get" class="row g-3">
+            <form id="searchForm" class="row g-3">
                 <div class="col-md-4">
-                    <input type="text" class="form-control" name="search" 
-                           value="{{ request.args.get('search', '') }}" 
-                           placeholder="搜索模板...">
+                    <input type="text" class="form-control" id="search" name="search" placeholder="搜索模板编号、名称或描述">
                 </div>
-                <div class="col-md-3">
-                    <select class="form-control" name="type">
-                        <option value="">所有类型</option>
-                        <option value="product" {% if request.args.get('type') == 'product' %}selected{% endif %}>产品质检</option>
-                        <option value="process" {% if request.args.get('type') == 'process' %}selected{% endif %}>过程质检</option>
-                        <option value="material" {% if request.args.get('type') == 'material' %}selected{% endif %}>原材料质检</option>
+                <div class="col-md-2">
+                    <select class="form-select" id="type" name="type">
+                        <option value="">全部类型</option>
+                        <option value="process">工序质检</option>
+                        <option value="product">成品质检</option>
+                        <option value="material">原材料质检</option>
                     </select>
                 </div>
-                <div class="col-md-3">
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-search"></i> 搜索
-                    </button>
-                    <button type="reset" class="btn btn-secondary">
-                        <i class="fas fa-redo"></i> 重置
-                    </button>
+                <div class="col-md-2">
+                    <select class="form-select" id="is_active" name="is_active">
+                        <option value="">全部状态</option>
+                        <option value="true">启用</option>
+                        <option value="false">禁用</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100">搜索</button>
+                </div>
+                <div class="col-md-2">
+                    <button type="reset" class="btn btn-secondary w-100">重置</button>
                 </div>
             </form>
         </div>
     </div>
 
     <!-- 模板列表 -->
-    <div class="table-responsive">
-        <table class="table table-striped">
-            <thead>
-                <tr>
-                    <th>模板编号</th>
-                    <th>模板名称</th>
-                    <th>类型</th>
-                    <th>创建时间</th>
-                    <th>最后修改</th>
-                    <th>状态</th>
-                    <th>操作</th>
-                </tr>
-            </thead>
-            <tbody>
-                <!-- 这里将来会通过后端传递模板数据 -->
-                <tr>
-                    <td colspan="7" class="text-center">暂无数据</td>
-                </tr>
-            </tbody>
-        </table>
+    <div class="card">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>模板编号</th>
+                            <th>名称</th>
+                            <th>类型</th>
+                            <th>基本信息项</th>
+                            <th>检验项目</th>
+                            <th>状态</th>
+                            <th>创建时间</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="templateList">
+                        <!-- 模板列表将通过JavaScript动态加载 -->
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- 分页 -->
+            <nav aria-label="Page navigation" class="mt-4">
+                <ul class="pagination justify-content-center" id="pagination">
+                    <!-- 分页将通过JavaScript动态加载 -->
+                </ul>
+            </nav>
+        </div>
     </div>
-
-    <!-- 分页 -->
-    {% if pagination %}
-    <nav aria-label="Page navigation" class="mt-4">
-        <ul class="pagination justify-content-center">
-            {% for page in pagination.iter_pages() %}
-                {% if page %}
-                    <li class="page-item {{ 'active' if page == pagination.page else '' }}">
-                        <a class="page-link" href="{{ url_for('main.quality_templates', page=page) }}">{{ page }}</a>
-                    </li>
-                {% else %}
-                    <li class="page-item disabled">
-                        <span class="page-link">...</span>
-                    </li>
-                {% endif %}
-            {% endfor %}
-        </ul>
-    </nav>
-    {% endif %}
 </div>
 
-<!-- 新建模板模态框 -->
-<div class="modal fade" id="addTemplateModal" tabindex="-1" aria-labelledby="addTemplateModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
+<!-- 创建/编辑模板模态框 -->
+<div class="modal fade" id="templateModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="addTemplateModalLabel">新建质检模板</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <h5 class="modal-title" id="templateModalTitle">新建质检模板</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <form id="addTemplateForm">
-                    <!-- 表单内容将在后续实现 -->
-                    <p class="text-center">功能开发中...</p>
+                <form id="templateForm">
+                    <input type="hidden" id="templateId">
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label">模板编号</label>
+                            <input type="text" class="form-control" id="templateCode" name="template_code" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">模板名称</label>
+                            <input type="text" class="form-control" id="templateName" name="name" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">模板类型</label>
+                            <select class="form-select" id="templateType" name="type" required>
+                                <option value="process">工序质检</option>
+                                <option value="product">成品质检</option>
+                                <option value="material">原材料质检</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">描述</label>
+                        <textarea class="form-control" id="templateDescription" name="description" rows="2"></textarea>
+                    </div>
+                    
+                    <!-- 基本信息项目 -->
+                    <div class="card mb-3">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">基本信息项目</h5>
+                            <button type="button" class="btn btn-sm btn-primary" onclick="addBaseItem()">
+                                <i class="fas fa-plus"></i> 添加项目
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            <div id="baseItemsList">
+                                <!-- 基本信息项目将通过JavaScript动态加载 -->
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 检验项目 -->
+                    <div class="card mb-3">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">检验项目</h5>
+                            <button type="button" class="btn btn-sm btn-primary" onclick="addInspectionItem()">
+                                <i class="fas fa-plus"></i> 添加项目
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            <div id="inspectionItemsList">
+                                <!-- 检验项目将通过JavaScript动态加载 -->
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="templateIsActive" name="is_active" checked>
+                        <label class="form-check-label" for="templateIsActive">启用模板</label>
+                    </div>
                 </form>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                <button type="button" class="btn btn-primary" onclick="submitTemplate()">创建</button>
+                <button type="button" class="btn btn-primary" onclick="saveTemplate()">保存</button>
             </div>
         </div>
     </div>
@@ -111,9 +160,530 @@
 
 {% block scripts %}
 <script>
-function submitTemplate() {
-    // 提交模板的函数将在后续实现
-    alert('功能开发中...');
+let currentPage = 1;
+let itemsPerPage = 20;
+let templateModal;
+
+// 页面加载完成后初始化
+document.addEventListener('DOMContentLoaded', function() {
+    // 初始化模态框
+    templateModal = new bootstrap.Modal(document.getElementById('templateModal'));
+    
+    // 加载模板列表
+    loadTemplates();
+    
+    // 绑定搜索表单提交事件
+    document.getElementById('searchForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        currentPage = 1;
+        loadTemplates();
+    });
+});
+
+// 加载模板列表
+function loadTemplates() {
+    const searchForm = document.getElementById('searchForm');
+    const formData = new FormData(searchForm);
+    const params = new URLSearchParams(formData);
+    params.append('page', currentPage);
+    params.append('per_page', itemsPerPage);
+    
+    fetch(`/api/quality/templates?${params.toString()}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                renderTemplates(data.data);
+            } else {
+                showToast('error', data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showToast('error', '加载模板列表失败');
+        });
+}
+
+// 渲染模板列表
+function renderTemplates(data) {
+    const tbody = document.getElementById('templateList');
+    tbody.innerHTML = '';
+    
+    data.items.forEach(template => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${template.template_code}</td>
+            <td>${template.name}</td>
+            <td>${getTemplateTypeName(template.type)}</td>
+            <td>${template.base_items_count}</td>
+            <td>${template.items_count}</td>
+            <td>
+                <span class="badge ${template.is_active ? 'bg-success' : 'bg-secondary'}">
+                    ${template.is_active ? '启用' : '禁用'}
+                </span>
+            </td>
+            <td>${template.created_at}</td>
+            <td>
+                <div class="btn-group btn-group-sm">
+                    <button class="btn btn-outline-primary" onclick="viewTemplate(${template.id})">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                    {% if current_user.role in ['admin', 'manager'] %}
+                    <button class="btn btn-outline-success" onclick="editTemplate(${template.id})">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn btn-outline-danger" onclick="deleteTemplate(${template.id})">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                    {% endif %}
+                </div>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+    
+    // 渲染分页
+    renderPagination(data);
+}
+
+// 渲染分页
+function renderPagination(data) {
+    const pagination = document.getElementById('pagination');
+    pagination.innerHTML = '';
+    
+    // 上一页
+    const prevLi = document.createElement('li');
+    prevLi.className = `page-item ${currentPage === 1 ? 'disabled' : ''}`;
+    prevLi.innerHTML = `
+        <a class="page-link" href="#" onclick="changePage(${currentPage - 1})">
+            <i class="fas fa-chevron-left"></i>
+        </a>
+    `;
+    pagination.appendChild(prevLi);
+    
+    // 页码
+    for (let i = 1; i <= data.pages; i++) {
+        const li = document.createElement('li');
+        li.className = `page-item ${i === currentPage ? 'active' : ''}`;
+        li.innerHTML = `
+            <a class="page-link" href="#" onclick="changePage(${i})">${i}</a>
+        `;
+        pagination.appendChild(li);
+    }
+    
+    // 下一页
+    const nextLi = document.createElement('li');
+    nextLi.className = `page-item ${currentPage === data.pages ? 'disabled' : ''}`;
+    nextLi.innerHTML = `
+        <a class="page-link" href="#" onclick="changePage(${currentPage + 1})">
+            <i class="fas fa-chevron-right"></i>
+        </a>
+    `;
+    pagination.appendChild(nextLi);
+}
+
+// 切换页码
+function changePage(page) {
+    if (page < 1) return;
+    currentPage = page;
+    loadTemplates();
+}
+
+// 获取模板类型名称
+function getTemplateTypeName(type) {
+    const types = {
+        'process': '工序质检',
+        'product': '成品质检',
+        'material': '原材料质检'
+    };
+    return types[type] || type;
+}
+
+// 显示创建模板模态框
+function showCreateTemplateModal() {
+    document.getElementById('templateModalTitle').textContent = '新建质检模板';
+    document.getElementById('templateForm').reset();
+    document.getElementById('templateId').value = '';
+    document.getElementById('baseItemsList').innerHTML = '';
+    document.getElementById('inspectionItemsList').innerHTML = '';
+    templateModal.show();
+}
+
+// 查看模板详情
+function viewTemplate(id) {
+    fetch(`/api/quality/templates/${id}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showTemplateDetail(data.data);
+            } else {
+                showToast('error', data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showToast('error', '获取模板详情失败');
+        });
+}
+
+// 编辑模板
+function editTemplate(id) {
+    fetch(`/api/quality/templates/${id}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showEditTemplate(data.data);
+            } else {
+                showToast('error', data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showToast('error', '获取模板详情失败');
+        });
+}
+
+// 显示编辑模板
+function showEditTemplate(template) {
+    document.getElementById('templateModalTitle').textContent = '编辑质检模板';
+    document.getElementById('templateId').value = template.id;
+    document.getElementById('templateCode').value = template.template_code;
+    document.getElementById('templateName').value = template.name;
+    document.getElementById('templateType').value = template.type;
+    document.getElementById('templateDescription').value = template.description;
+    document.getElementById('templateIsActive').checked = template.is_active;
+    
+    // 渲染基本信息项目
+    const baseItemsList = document.getElementById('baseItemsList');
+    baseItemsList.innerHTML = '';
+    template.base_items.forEach(item => {
+        baseItemsList.appendChild(createBaseItemElement(item));
+    });
+    
+    // 渲染检验项目
+    const inspectionItemsList = document.getElementById('inspectionItemsList');
+    inspectionItemsList.innerHTML = '';
+    template.items.forEach(item => {
+        inspectionItemsList.appendChild(createInspectionItemElement(item));
+    });
+    
+    templateModal.show();
+}
+
+// 添加基本信息项目
+function addBaseItem() {
+    const baseItemsList = document.getElementById('baseItemsList');
+    const item = {
+        name: '',
+        description: '',
+        notes: '',
+        input_type: 'text',
+        default_value: '',
+        options: [],
+        is_required: true,
+        validation_rules: null,
+        order_num: baseItemsList.children.length + 1
+    };
+    baseItemsList.appendChild(createBaseItemElement(item));
+}
+
+// 添加检验项目
+function addInspectionItem() {
+    const inspectionItemsList = document.getElementById('inspectionItemsList');
+    const item = {
+        name: '',
+        description: '',
+        notes: '',
+        inspection_method: '',
+        standard: '',
+        standard_value: '',
+        linked_base_item_id: null,
+        use_linked_value: false,
+        value_extraction_rule: null,
+        deviation_type: 'value',
+        upper_deviation_value: null,
+        lower_deviation_value: null,
+        upper_deviation_percentage: null,
+        lower_deviation_percentage: null,
+        unit: '',
+        order_num: inspectionItemsList.children.length + 1
+    };
+    inspectionItemsList.appendChild(createInspectionItemElement(item));
+}
+
+// 创建基本信息项目元素
+function createBaseItemElement(item) {
+    const div = document.createElement('div');
+    div.className = 'card mb-3';
+    div.innerHTML = `
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-4">
+                    <label class="form-label">名称</label>
+                    <input type="text" class="form-control" name="base_items[][name]" value="${item.name}" required>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">输入类型</label>
+                    <select class="form-select" name="base_items[][input_type]" onchange="toggleOptions(this)">
+                        <option value="text" ${item.input_type === 'text' ? 'selected' : ''}>文本</option>
+                        <option value="number" ${item.input_type === 'number' ? 'selected' : ''}>数字</option>
+                        <option value="date" ${item.input_type === 'date' ? 'selected' : ''}>日期</option>
+                        <option value="select" ${item.input_type === 'select' ? 'selected' : ''}>下拉选择</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">默认值</label>
+                    <input type="text" class="form-control" name="base_items[][default_value]" value="${item.default_value}">
+                </div>
+            </div>
+            <div class="row mt-3">
+                <div class="col-md-12">
+                    <label class="form-label">描述</label>
+                    <textarea class="form-control" name="base_items[][description]" rows="2">${item.description}</textarea>
+                </div>
+            </div>
+            <div class="row mt-3 options-container" style="display: ${item.input_type === 'select' ? 'block' : 'none'}">
+                <div class="col-md-12">
+                    <label class="form-label">选项（每行一个）</label>
+                    <textarea class="form-control" name="base_items[][options]" rows="3">${Array.isArray(item.options) ? item.options.join('\n') : ''}</textarea>
+                </div>
+            </div>
+            <div class="row mt-3">
+                <div class="col-md-12">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="base_items[][is_required]" ${item.is_required ? 'checked' : ''}>
+                        <label class="form-check-label">必填项</label>
+                    </div>
+                </div>
+            </div>
+            <div class="text-end mt-3">
+                <button type="button" class="btn btn-danger btn-sm" onclick="this.closest('.card').remove()">
+                    <i class="fas fa-trash"></i> 删除
+                </button>
+            </div>
+        </div>
+    `;
+    return div;
+}
+
+// 创建检验项目元素
+function createInspectionItemElement(item) {
+    const div = document.createElement('div');
+    div.className = 'card mb-3';
+    div.innerHTML = `
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-4">
+                    <label class="form-label">名称</label>
+                    <input type="text" class="form-control" name="items[][name]" value="${item.name}" required>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">检验方法</label>
+                    <input type="text" class="form-control" name="items[][inspection_method]" value="${item.inspection_method}">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">标准</label>
+                    <input type="text" class="form-control" name="items[][standard]" value="${item.standard}">
+                </div>
+            </div>
+            <div class="row mt-3">
+                <div class="col-md-4">
+                    <label class="form-label">标准值</label>
+                    <input type="text" class="form-control" name="items[][standard_value]" value="${item.standard_value}">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">单位</label>
+                    <input type="text" class="form-control" name="items[][unit]" value="${item.unit}">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">偏差类型</label>
+                    <select class="form-select" name="items[][deviation_type]" onchange="toggleDeviationInputs(this)">
+                        <option value="value" ${item.deviation_type === 'value' ? 'selected' : ''}>固定值</option>
+                        <option value="percentage" ${item.deviation_type === 'percentage' ? 'selected' : ''}>百分比</option>
+                    </select>
+                </div>
+            </div>
+            <div class="row mt-3 deviation-value" style="display: ${item.deviation_type === 'value' ? 'flex' : 'none'}">
+                <div class="col-md-6">
+                    <label class="form-label">上偏差值</label>
+                    <input type="number" class="form-control" name="items[][upper_deviation_value]" value="${item.upper_deviation_value || ''}">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">下偏差值</label>
+                    <input type="number" class="form-control" name="items[][lower_deviation_value]" value="${item.lower_deviation_value || ''}">
+                </div>
+            </div>
+            <div class="row mt-3 deviation-percentage" style="display: ${item.deviation_type === 'percentage' ? 'flex' : 'none'}">
+                <div class="col-md-6">
+                    <label class="form-label">上偏差百分比</label>
+                    <input type="number" class="form-control" name="items[][upper_deviation_percentage]" value="${item.upper_deviation_percentage || ''}">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">下偏差百分比</label>
+                    <input type="number" class="form-control" name="items[][lower_deviation_percentage]" value="${item.lower_deviation_percentage || ''}">
+                </div>
+            </div>
+            <div class="row mt-3">
+                <div class="col-md-12">
+                    <label class="form-label">描述</label>
+                    <textarea class="form-control" name="items[][description]" rows="2">${item.description}</textarea>
+                </div>
+            </div>
+            <div class="text-end mt-3">
+                <button type="button" class="btn btn-danger btn-sm" onclick="this.closest('.card').remove()">
+                    <i class="fas fa-trash"></i> 删除
+                </button>
+            </div>
+        </div>
+    `;
+    return div;
+}
+
+// 切换选项输入框显示
+function toggleOptions(select) {
+    const optionsContainer = select.closest('.row').nextElementSibling.nextElementSibling;
+    optionsContainer.style.display = select.value === 'select' ? 'block' : 'none';
+}
+
+// 切换偏差输入框显示
+function toggleDeviationInputs(select) {
+    const card = select.closest('.card-body');
+    const valueInputs = card.querySelector('.deviation-value');
+    const percentageInputs = card.querySelector('.deviation-percentage');
+    
+    if (select.value === 'value') {
+        valueInputs.style.display = 'flex';
+        percentageInputs.style.display = 'none';
+    } else {
+        valueInputs.style.display = 'none';
+        percentageInputs.style.display = 'flex';
+    }
+}
+
+// 保存模板
+function saveTemplate() {
+    const form = document.getElementById('templateForm');
+    const formData = new FormData(form);
+    const templateId = document.getElementById('templateId').value;
+    
+    // 构建请求数据
+    const data = {
+        template_code: formData.get('template_code'),
+        name: formData.get('name'),
+        type: formData.get('type'),
+        description: formData.get('description'),
+        is_active: formData.get('is_active') === 'on',
+        base_items: [],
+        items: []
+    };
+    
+    // 收集基本信息项目数据
+    const baseItems = document.querySelectorAll('#baseItemsList .card');
+    baseItems.forEach((item, index) => {
+        const itemData = {
+            name: item.querySelector('[name="base_items[][name]"]').value,
+            description: item.querySelector('[name="base_items[][description]"]').value,
+            input_type: item.querySelector('[name="base_items[][input_type]"]').value,
+            default_value: item.querySelector('[name="base_items[][default_value]"]').value,
+            is_required: item.querySelector('[name="base_items[][is_required]"]').checked,
+            order_num: index + 1
+        };
+        
+        if (itemData.input_type === 'select') {
+            const options = item.querySelector('[name="base_items[][options]"]').value;
+            itemData.options = options.split('\n').filter(opt => opt.trim());
+        }
+        
+        data.base_items.push(itemData);
+    });
+    
+    // 收集检验项目数据
+    const inspectionItems = document.querySelectorAll('#inspectionItemsList .card');
+    inspectionItems.forEach((item, index) => {
+        const itemData = {
+            name: item.querySelector('[name="items[][name]"]').value,
+            description: item.querySelector('[name="items[][description]"]').value,
+            inspection_method: item.querySelector('[name="items[][inspection_method]"]').value,
+            standard: item.querySelector('[name="items[][standard]"]').value,
+            standard_value: item.querySelector('[name="items[][standard_value]"]').value,
+            unit: item.querySelector('[name="items[][unit]"]').value,
+            deviation_type: item.querySelector('[name="items[][deviation_type]"]').value,
+            order_num: index + 1
+        };
+        
+        if (itemData.deviation_type === 'value') {
+            itemData.upper_deviation_value = item.querySelector('[name="items[][upper_deviation_value]"]').value;
+            itemData.lower_deviation_value = item.querySelector('[name="items[][lower_deviation_value]"]').value;
+        } else {
+            itemData.upper_deviation_percentage = item.querySelector('[name="items[][upper_deviation_percentage]"]').value;
+            itemData.lower_deviation_percentage = item.querySelector('[name="items[][lower_deviation_percentage]"]').value;
+        }
+        
+        data.items.push(itemData);
+    });
+    
+    // 发送请求
+    const url = templateId ? `/api/quality/templates/${templateId}` : '/api/quality/templates';
+    const method = templateId ? 'PUT' : 'POST';
+    
+    fetch(url, {
+        method: method,
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast('success', data.message);
+            templateModal.hide();
+            loadTemplates();
+        } else {
+            showToast('error', data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showToast('error', '保存失败');
+    });
+}
+
+// 删除模板
+function deleteTemplate(id) {
+    if (!confirm('确定要删除这个模板吗？')) return;
+    
+    fetch(`/api/quality/templates/${id}`, {
+        method: 'DELETE'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast('success', data.message);
+            loadTemplates();
+        } else {
+            showToast('error', data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showToast('error', '删除失败');
+    });
+}
+
+// 显示提示消息
+function showToast(type, message) {
+    const toast = Swal.mixin({
+        toast: true,
+        position: 'top-end',
+        showConfirmButton: false,
+        timer: 3000,
+        timerProgressBar: true
+    });
+    
+    toast.fire({
+        icon: type,
+        title: message
+    });
 }
 </script>
 {% endblock %} 

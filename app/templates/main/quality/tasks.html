@@ -5,9 +5,9 @@
 {% block content %}
 <div class="container mt-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2>质检任务</h2>
+        <h2>质检任务管理</h2>
         {% if current_user.role in ['admin', 'manager'] %}
-        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addTaskModal">
+        <button class="btn btn-primary" onclick="showCreateTaskModal()">
             <i class="fas fa-plus"></i> 新建任务
         </button>
         {% endif %}
@@ -16,91 +16,183 @@
     <!-- 搜索和筛选 -->
     <div class="card mb-4">
         <div class="card-body">
-            <form method="get" class="row g-3">
-                <div class="col-md-4">
-                    <input type="text" class="form-control" name="search" 
-                           value="{{ request.args.get('search', '') }}" 
-                           placeholder="搜索任务...">
-                </div>
+            <form id="searchForm" class="row g-3">
                 <div class="col-md-3">
-                    <select class="form-control" name="status">
-                        <option value="">所有状态</option>
-                        <option value="pending" {% if request.args.get('status') == 'pending' %}selected{% endif %}>待处理</option>
-                        <option value="in_progress" {% if request.args.get('status') == 'in_progress' %}selected{% endif %}>进行中</option>
-                        <option value="completed" {% if request.args.get('status') == 'completed' %}selected{% endif %}>已完成</option>
+                    <input type="text" class="form-control" id="search" name="search" placeholder="搜索任务编号、产品编号等">
+                </div>
+                <div class="col-md-2">
+                    <select class="form-select" id="type" name="type">
+                        <option value="">全部类型</option>
+                        <option value="process">工序质检</option>
+                        <option value="product">成品质检</option>
+                        <option value="material">原材料质检</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <select class="form-select" id="status" name="status">
+                        <option value="">全部状态</option>
+                        <option value="pending">待处理</option>
+                        <option value="in_progress">进行中</option>
+                        <option value="completed">已完成</option>
+                        <option value="failed">不合格</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <select class="form-select" id="inspector" name="inspector">
+                        <option value="">全部检验员</option>
                     </select>
                 </div>
                 <div class="col-md-3">
+                    <div class="input-group">
+                        <input type="date" class="form-control" id="start_date" name="start_date">
+                        <span class="input-group-text">至</span>
+                        <input type="date" class="form-control" id="end_date" name="end_date">
+                    </div>
+                </div>
+                <div class="col-md-12">
                     <button type="submit" class="btn btn-primary">
                         <i class="fas fa-search"></i> 搜索
                     </button>
                     <button type="reset" class="btn btn-secondary">
                         <i class="fas fa-redo"></i> 重置
                     </button>
+                    {% if current_user.role in ['admin', 'manager'] %}
+                    <button type="button" class="btn btn-success" onclick="exportTasks()">
+                        <i class="fas fa-file-export"></i> 导出
+                    </button>
+                    <button type="button" class="btn btn-info" onclick="importTasks()">
+                        <i class="fas fa-file-import"></i> 导入
+                    </button>
+                    {% endif %}
                 </div>
             </form>
         </div>
     </div>
 
     <!-- 任务列表 -->
-    <div class="table-responsive">
-        <table class="table table-striped">
-            <thead>
-                <tr>
-                    <th>任务编号</th>
-                    <th>产品信息</th>
-                    <th>检验员</th>
-                    <th>创建时间</th>
-                    <th>状态</th>
-                    <th>操作</th>
-                </tr>
-            </thead>
-            <tbody>
-                <!-- 这里将来会通过后端传递任务数据 -->
-                <tr>
-                    <td colspan="6" class="text-center">暂无数据</td>
-                </tr>
-            </tbody>
-        </table>
+    <div class="card">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>任务编号</th>
+                            <th>类型</th>
+                            <th>检验对象</th>
+                            <th>检验员</th>
+                            <th>创建时间</th>
+                            <th>计划完成时间</th>
+                            <th>状态</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="taskList">
+                        <!-- 任务列表将通过JavaScript动态加载 -->
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- 分页 -->
+            <nav aria-label="Page navigation" class="mt-4">
+                <ul class="pagination justify-content-center" id="pagination">
+                    <!-- 分页将通过JavaScript动态加载 -->
+                </ul>
+            </nav>
+        </div>
     </div>
-
-    <!-- 分页 -->
-    {% if pagination %}
-    <nav aria-label="Page navigation" class="mt-4">
-        <ul class="pagination justify-content-center">
-            {% for page in pagination.iter_pages() %}
-                {% if page %}
-                    <li class="page-item {{ 'active' if page == pagination.page else '' }}">
-                        <a class="page-link" href="{{ url_for('main.quality_tasks', page=page) }}">{{ page }}</a>
-                    </li>
-                {% else %}
-                    <li class="page-item disabled">
-                        <span class="page-link">...</span>
-                    </li>
-                {% endif %}
-            {% endfor %}
-        </ul>
-    </nav>
-    {% endif %}
 </div>
 
-<!-- 新建任务模态框 -->
-<div class="modal fade" id="addTaskModal" tabindex="-1" aria-labelledby="addTaskModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
+<!-- 创建/编辑任务模态框 -->
+<div class="modal fade" id="taskModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="addTaskModalLabel">新建质检任务</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <h5 class="modal-title" id="taskModalTitle">新建质检任务</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <form id="addTaskForm">
-                    <!-- 表单内容将在后续实现 -->
-                    <p class="text-center">功能开发中...</p>
+                <form id="taskForm">
+                    <input type="hidden" id="taskId">
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label">任务类型</label>
+                            <select class="form-select" id="taskType" name="type" required onchange="loadTemplates()">
+                                <option value="process">工序质检</option>
+                                <option value="product">成品质检</option>
+                                <option value="material">原材料质检</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">质检模板</label>
+                            <select class="form-select" id="templateId" name="template_id" required>
+                                <option value="">请选择模板</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">检验员</label>
+                            <select class="form-select" id="inspectorId" name="inspector_id" required>
+                                <option value="">请选择检验员</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label">检验对象</label>
+                            <div id="inspectionTargetContainer">
+                                <!-- 根据任务类型动态加载不同的选择控件 -->
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">计划完成时间</label>
+                            <input type="datetime-local" class="form-control" id="plannedCompletionTime" name="planned_completion_time" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">优先级</label>
+                            <select class="form-select" id="priority" name="priority">
+                                <option value="low">低</option>
+                                <option value="medium" selected>中</option>
+                                <option value="high">高</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">备注</label>
+                        <textarea class="form-control" id="notes" name="notes" rows="2"></textarea>
+                    </div>
                 </form>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                <button type="button" class="btn btn-primary" onclick="submitTask()">创建</button>
+                <button type="button" class="btn btn-primary" onclick="saveTask()">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 导入任务模态框 -->
+<div class="modal fade" id="importModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">导入质检任务</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="importForm">
+                    <div class="mb-3">
+                        <label class="form-label">选择文件</label>
+                        <input type="file" class="form-control" id="importFile" accept=".xlsx,.xls">
+                    </div>
+                    <div class="mb-3">
+                        <a href="#" onclick="downloadTemplate()" class="text-decoration-none">
+                            <i class="fas fa-download"></i> 下载导入模板
+                        </a>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="submitImport()">导入</button>
             </div>
         </div>
     </div>
@@ -110,9 +202,362 @@
 
 {% block scripts %}
 <script>
-function submitTask() {
-    // 提交任务的函数将在后续实现
-    alert('功能开发中...');
+let currentPage = 1;
+let itemsPerPage = 20;
+let taskModal;
+let importModal;
+
+// 页面加载完成后初始化
+document.addEventListener('DOMContentLoaded', function() {
+    // 初始化模态框
+    taskModal = new bootstrap.Modal(document.getElementById('taskModal'));
+    importModal = new bootstrap.Modal(document.getElementById('importModal'));
+    
+    // 加载任务列表
+    loadTasks();
+    
+    // 加载检验员列表
+    loadInspectors();
+    
+    // 绑定搜索表单提交事件
+    document.getElementById('searchForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        currentPage = 1;
+        loadTasks();
+    });
+});
+
+// 加载任务列表
+function loadTasks() {
+    const searchForm = document.getElementById('searchForm');
+    const formData = new FormData(searchForm);
+    const params = new URLSearchParams(formData);
+    params.append('page', currentPage);
+    params.append('per_page', itemsPerPage);
+    
+    fetch(`/api/quality/tasks?${params.toString()}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                renderTasks(data.data);
+            } else {
+                showToast('error', data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showToast('error', '加载任务列表失败');
+        });
+}
+
+// 渲染任务列表
+function renderTasks(data) {
+    const tbody = document.getElementById('taskList');
+    tbody.innerHTML = '';
+    
+    data.items.forEach(task => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${task.task_code}</td>
+            <td>${getTaskTypeName(task.type)}</td>
+            <td>${task.inspection_target}</td>
+            <td>${task.inspector_name}</td>
+            <td>${task.created_at}</td>
+            <td>${task.planned_completion_time}</td>
+            <td>
+                <span class="badge ${getStatusBadgeClass(task.status)}">
+                    ${getStatusName(task.status)}
+                </span>
+            </td>
+            <td>
+                <div class="btn-group btn-group-sm">
+                    <button class="btn btn-outline-primary" onclick="viewTask(${task.id})">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                    {% if current_user.role in ['admin', 'manager', 'inspector'] %}
+                    <button class="btn btn-outline-success" onclick="startInspection(${task.id})">
+                        <i class="fas fa-play"></i>
+                    </button>
+                    {% endif %}
+                    {% if current_user.role in ['admin', 'manager'] %}
+                    <button class="btn btn-outline-warning" onclick="editTask(${task.id})">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn btn-outline-danger" onclick="deleteTask(${task.id})">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                    {% endif %}
+                </div>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+    
+    // 渲染分页
+    renderPagination(data);
+}
+
+// 获取任务类型名称
+function getTaskTypeName(type) {
+    const types = {
+        'process': '工序质检',
+        'product': '成品质检',
+        'material': '原材料质检'
+    };
+    return types[type] || type;
+}
+
+// 获取状态名称
+function getStatusName(status) {
+    const statuses = {
+        'pending': '待处理',
+        'in_progress': '进行中',
+        'completed': '已完成',
+        'failed': '不合格'
+    };
+    return statuses[status] || status;
+}
+
+// 获取状态徽章样式
+function getStatusBadgeClass(status) {
+    const classes = {
+        'pending': 'bg-secondary',
+        'in_progress': 'bg-primary',
+        'completed': 'bg-success',
+        'failed': 'bg-danger'
+    };
+    return classes[status] || 'bg-secondary';
+}
+
+// 渲染分页
+function renderPagination(data) {
+    const pagination = document.getElementById('pagination');
+    pagination.innerHTML = '';
+    
+    // 上一页
+    const prevLi = document.createElement('li');
+    prevLi.className = `page-item ${currentPage === 1 ? 'disabled' : ''}`;
+    prevLi.innerHTML = `
+        <a class="page-link" href="#" onclick="changePage(${currentPage - 1})">
+            <i class="fas fa-chevron-left"></i>
+        </a>
+    `;
+    pagination.appendChild(prevLi);
+    
+    // 页码
+    for (let i = 1; i <= data.pages; i++) {
+        const li = document.createElement('li');
+        li.className = `page-item ${i === currentPage ? 'active' : ''}`;
+        li.innerHTML = `
+            <a class="page-link" href="#" onclick="changePage(${i})">${i}</a>
+        `;
+        pagination.appendChild(li);
+    }
+    
+    // 下一页
+    const nextLi = document.createElement('li');
+    nextLi.className = `page-item ${currentPage === data.pages ? 'disabled' : ''}`;
+    nextLi.innerHTML = `
+        <a class="page-link" href="#" onclick="changePage(${currentPage + 1})">
+            <i class="fas fa-chevron-right"></i>
+        </a>
+    `;
+    pagination.appendChild(nextLi);
+}
+
+// 切换页码
+function changePage(page) {
+    if (page < 1) return;
+    currentPage = page;
+    loadTasks();
+}
+
+// 加载检验员列表
+function loadInspectors() {
+    fetch('/api/quality/inspectors')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const select = document.getElementById('inspector');
+                data.inspectors.forEach(inspector => {
+                    const option = document.createElement('option');
+                    option.value = inspector.id;
+                    option.textContent = inspector.name;
+                    select.appendChild(option);
+                });
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+        });
+}
+
+// 显示创建任务模态框
+function showCreateTaskModal() {
+    document.getElementById('taskModalTitle').textContent = '新建质检任务';
+    document.getElementById('taskForm').reset();
+    document.getElementById('taskId').value = '';
+    taskModal.show();
+}
+
+// 加载质检模板
+function loadTemplates() {
+    const type = document.getElementById('taskType').value;
+    fetch(`/api/quality/templates?type=${type}&is_active=true`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const select = document.getElementById('templateId');
+                select.innerHTML = '<option value="">请选择模板</option>';
+                data.templates.forEach(template => {
+                    const option = document.createElement('option');
+                    option.value = template.id;
+                    option.textContent = template.name;
+                    select.appendChild(option);
+                });
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+        });
+}
+
+// 保存任务
+function saveTask() {
+    const form = document.getElementById('taskForm');
+    const formData = new FormData(form);
+    const taskId = document.getElementById('taskId').value;
+    
+    // 构建请求数据
+    const data = {
+        type: formData.get('type'),
+        template_id: formData.get('template_id'),
+        inspector_id: formData.get('inspector_id'),
+        inspection_target_id: formData.get('inspection_target_id'),
+        planned_completion_time: formData.get('planned_completion_time'),
+        priority: formData.get('priority'),
+        notes: formData.get('notes')
+    };
+    
+    // 发送请求
+    const url = taskId ? `/api/quality/tasks/${taskId}` : '/api/quality/tasks';
+    const method = taskId ? 'PUT' : 'POST';
+    
+    fetch(url, {
+        method: method,
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast('success', data.message);
+            taskModal.hide();
+            loadTasks();
+        } else {
+            showToast('error', data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showToast('error', '保存失败');
+    });
+}
+
+// 删除任务
+function deleteTask(id) {
+    if (!confirm('确定要删除这个任务吗？')) return;
+    
+    fetch(`/api/quality/tasks/${id}`, {
+        method: 'DELETE'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast('success', data.message);
+            loadTasks();
+        } else {
+            showToast('error', data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showToast('error', '删除失败');
+    });
+}
+
+// 开始质检
+function startInspection(id) {
+    window.location.href = `/quality/inspection/${id}`;
+}
+
+// 导出任务
+function exportTasks() {
+    const searchForm = document.getElementById('searchForm');
+    const formData = new FormData(searchForm);
+    const params = new URLSearchParams(formData);
+    
+    window.location.href = `/api/quality/tasks/export?${params.toString()}`;
+}
+
+// 显示导入模态框
+function importTasks() {
+    document.getElementById('importForm').reset();
+    importModal.show();
+}
+
+// 下载导入模板
+function downloadTemplate() {
+    window.location.href = '/api/quality/tasks/template';
+}
+
+// 提交导入
+function submitImport() {
+    const fileInput = document.getElementById('importFile');
+    if (!fileInput.files.length) {
+        showToast('error', '请选择要导入的文件');
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('file', fileInput.files[0]);
+    
+    fetch('/api/quality/tasks/import', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast('success', data.message);
+            importModal.hide();
+            loadTasks();
+        } else {
+            showToast('error', data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showToast('error', '导入失败');
+    });
+}
+
+// 显示提示消息
+function showToast(type, message) {
+    const toast = Swal.mixin({
+        toast: true,
+        position: 'top-end',
+        showConfirmButton: false,
+        timer: 3000,
+        timerProgressBar: true
+    });
+    
+    toast.fire({
+        icon: type,
+        title: message
+    });
 }
 </script>
 {% endblock %} 

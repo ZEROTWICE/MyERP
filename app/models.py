@@ -499,3 +499,171 @@ class CodeGenerationLog(db.Model):
 
     rule = db.relationship('CodeRule', backref='generation_logs')
     creator = db.relationship('User', backref='code_generation_logs')
+
+class InspectionTemplate(db.Model):
+    """质检模板"""
+    __tablename__ = 'inspection_templates'
+
+    id = db.Column(db.Integer, primary_key=True)
+    template_code = db.Column(db.String(50), unique=True, nullable=False, comment='模板编码', index=True)
+    name = db.Column(db.String(100), nullable=False, comment='模板名称')
+    type = db.Column(db.String(20), nullable=False, comment='模板类型(product/process/material)', index=True)
+    description = db.Column(db.Text, comment='模板描述')
+    is_active = db.Column(db.Boolean, default=True, comment='是否启用', index=True)
+    created_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.now, index=True)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.now, onupdate=datetime.now)
+
+    # 关联关系
+    creator = db.relationship('User', backref=db.backref('created_templates', lazy='dynamic'))
+    base_items = db.relationship('InspectionBaseItem', backref='template', lazy='dynamic')
+    items = db.relationship('InspectionItem', backref='template', lazy='dynamic')
+    tasks = db.relationship('InspectionTask', backref='template', lazy='dynamic')
+
+    def __repr__(self):
+        return f'<InspectionTemplate {self.template_code}>'
+
+class InspectionBaseItem(db.Model):
+    """质检基本信息项目"""
+    __tablename__ = 'inspection_base_items'
+
+    id = db.Column(db.Integer, primary_key=True)
+    template_id = db.Column(db.Integer, db.ForeignKey('inspection_templates.id'), nullable=False)
+    name = db.Column(db.String(100), nullable=False, comment='信息项目名称')
+    description = db.Column(db.Text, comment='项目描述')
+    notes = db.Column(db.Text, comment='项目备注')
+    input_type = db.Column(db.String(20), nullable=False, comment='输入类型(text/number/date/select)')
+    default_value = db.Column(db.String(200), comment='默认值')
+    options = db.Column(db.JSON, comment='选择项(JSON格式)')
+    is_required = db.Column(db.Boolean, default=True, comment='是否必填')
+    validation_rules = db.Column(db.JSON, comment='验证规则(JSON格式)')
+    order_num = db.Column(db.Integer, default=0, comment='排序号')
+
+    # 关联关系
+    linked_items = db.relationship('InspectionItem', backref='linked_base_item', lazy='dynamic')
+    base_records = db.relationship('InspectionBaseItemRecord', backref='base_item', lazy='dynamic')
+
+    def __repr__(self):
+        return f'<InspectionBaseItem {self.name}>'
+
+class InspectionItem(db.Model):
+    """质检项目"""
+    __tablename__ = 'inspection_items'
+
+    id = db.Column(db.Integer, primary_key=True)
+    template_id = db.Column(db.Integer, db.ForeignKey('inspection_templates.id'), nullable=False)
+    name = db.Column(db.String(100), nullable=False, comment='检验项目名称')
+    description = db.Column(db.Text, comment='项目描述')
+    notes = db.Column(db.Text, comment='项目备注')
+    inspection_method = db.Column(db.Text, comment='检验方法')
+    standard = db.Column(db.Text, comment='检验标准')
+    standard_value = db.Column(db.Float, comment='标准值')
+    linked_base_item_id = db.Column(db.Integer, db.ForeignKey('inspection_base_items.id'), comment='关联的基本信息项目ID')
+    use_linked_value = db.Column(db.Boolean, default=False, comment='是否使用关联值作为标准值')
+    value_extraction_rule = db.Column(db.JSON, comment='值提取规则(JSON格式)')
+    deviation_type = db.Column(db.String(20), comment='偏差类型(value/percentage)')
+    upper_deviation_value = db.Column(db.Float, comment='上偏差值')
+    lower_deviation_value = db.Column(db.Float, comment='下偏差值')
+    upper_deviation_percentage = db.Column(db.Float, comment='上偏差百分比')
+    lower_deviation_percentage = db.Column(db.Float, comment='下偏差百分比')
+    unit = db.Column(db.String(20), comment='单位')
+    order_num = db.Column(db.Integer, default=0, comment='排序号')
+
+    # 关联关系
+    item_records = db.relationship('InspectionItemRecord', backref='item', lazy='dynamic')
+
+    def __repr__(self):
+        return f'<InspectionItem {self.name}>'
+
+class InspectionTask(db.Model):
+    """质检任务"""
+    __tablename__ = 'inspection_tasks'
+
+    id = db.Column(db.Integer, primary_key=True)
+    global_sn = db.Column(db.String(50), unique=True, nullable=False, comment='全局流水号', index=True)
+    template_id = db.Column(db.Integer, db.ForeignKey('inspection_templates.id'), nullable=False, index=True)
+    inspector_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
+    target_type = db.Column(db.String(20), nullable=False, comment='检验对象类型(product/process/material)', index=True)
+    target_id = db.Column(db.Integer, nullable=False, comment='检验对象ID', index=True)
+    status = db.Column(db.String(20), nullable=False, default='pending', comment='任务状态(pending/in_progress/completed/cancelled)', index=True)
+    priority = db.Column(db.Integer, default=0, comment='优先级', index=True)
+    deadline = db.Column(db.DateTime, comment='截止时间', index=True)
+    created_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.now, index=True)
+    completed_at = db.Column(db.DateTime, comment='完成时间', index=True)
+
+    # 关联关系
+    inspector = db.relationship('User', foreign_keys=[inspector_id], backref=db.backref('inspection_tasks', lazy='dynamic'))
+    creator = db.relationship('User', foreign_keys=[created_by], backref=db.backref('created_tasks', lazy='dynamic'))
+    record = db.relationship('InspectionRecord', backref='task', uselist=False)
+
+    def __repr__(self):
+        return f'<InspectionTask {self.global_sn}>'
+
+class InspectionRecord(db.Model):
+    """质检记录"""
+    __tablename__ = 'inspection_records'
+
+    id = db.Column(db.Integer, primary_key=True)
+    global_sn = db.Column(db.String(50), unique=True, nullable=False, comment='全局流水号', index=True)
+    task_id = db.Column(db.Integer, db.ForeignKey('inspection_tasks.id'), nullable=False, unique=True)
+    inspector_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
+    inspection_date = db.Column(db.Date, nullable=False, comment='检验日期', index=True)
+    result = db.Column(db.String(20), nullable=False, comment='总体检验结果(pass/fail)', index=True)
+    notes = db.Column(db.Text, comment='备注说明')
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.now, index=True)
+
+    # 关联关系
+    inspector = db.relationship('User', backref=db.backref('inspection_records', lazy='dynamic'))
+    base_item_records = db.relationship('InspectionBaseItemRecord', backref='record', lazy='dynamic')
+    item_records = db.relationship('InspectionItemRecord', backref='record', lazy='dynamic')
+    nonconformity_records = db.relationship('NonconformityRecord', backref='record', lazy='dynamic')
+
+    def __repr__(self):
+        return f'<InspectionRecord {self.global_sn}>'
+
+class InspectionBaseItemRecord(db.Model):
+    """质检基本信息记录"""
+    __tablename__ = 'inspection_base_item_records'
+
+    id = db.Column(db.Integer, primary_key=True)
+    record_id = db.Column(db.Integer, db.ForeignKey('inspection_records.id'), nullable=False)
+    base_item_id = db.Column(db.Integer, db.ForeignKey('inspection_base_items.id'), nullable=False)
+    value = db.Column(db.String(500), nullable=False, comment='记录的值')
+    notes = db.Column(db.Text, comment='备注说明')
+
+    def __repr__(self):
+        return f'<InspectionBaseItemRecord {self.id}>'
+
+class InspectionItemRecord(db.Model):
+    """质检项目记录"""
+    __tablename__ = 'inspection_item_records'
+
+    id = db.Column(db.Integer, primary_key=True)
+    record_id = db.Column(db.Integer, db.ForeignKey('inspection_records.id'), nullable=False)
+    item_id = db.Column(db.Integer, db.ForeignKey('inspection_items.id'), nullable=False)
+    measured_value = db.Column(db.Float, nullable=False, comment='实测值')
+    is_qualified = db.Column(db.Boolean, nullable=False, comment='是否合格')
+    notes = db.Column(db.Text, comment='备注说明')
+    evidence = db.Column(db.String(500), comment='证据(如照片路径)')
+
+    def __repr__(self):
+        return f'<InspectionItemRecord {self.id}>'
+
+class NonconformityRecord(db.Model):
+    """不合格品处理记录"""
+    __tablename__ = 'nonconformity_records'
+
+    id = db.Column(db.Integer, primary_key=True)
+    record_id = db.Column(db.Integer, db.ForeignKey('inspection_records.id'), nullable=False)
+    type = db.Column(db.String(20), nullable=False, comment='处理类型(rework/scrap/accept)')
+    handler_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    handling_date = db.Column(db.Date, nullable=False, comment='处理日期')
+    handling_result = db.Column(db.Text, nullable=False, comment='处理结果')
+    notes = db.Column(db.Text, comment='处理说明')
+
+    # 关联关系
+    handler = db.relationship('User', backref=db.backref('handled_nonconformities', lazy='dynamic'))
+
+    def __repr__(self):
+        return f'<NonconformityRecord {self.id}>'

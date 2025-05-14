@@ -6,50 +6,50 @@
 <div class="container mt-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2>质检记录</h2>
-        <div>
-            <button class="btn btn-success me-2" onclick="importRecords()">
-                <i class="fas fa-file-import"></i> 导入记录
+        <div class="btn-group">
+            {% if current_user.role in ['admin', 'manager'] %}
+            <button class="btn btn-success" onclick="exportRecords()">
+                <i class="fas fa-file-export"></i> 导出
             </button>
-            <button class="btn btn-info" onclick="exportRecords()">
-                <i class="fas fa-file-export"></i> 导出记录
-            </button>
+            {% endif %}
         </div>
     </div>
 
     <!-- 搜索和筛选 -->
     <div class="card mb-4">
         <div class="card-body">
-            <form method="get" class="row g-3">
+            <form id="searchForm" class="row g-3">
                 <div class="col-md-3">
-                    <input type="text" class="form-control" name="search" 
-                           value="{{ request.args.get('search', '') }}" 
-                           placeholder="搜索记录...">
+                    <input type="text" class="form-control" id="search" name="search" placeholder="搜索记录编号、产品编号等">
                 </div>
                 <div class="col-md-2">
-                    <select class="form-control" name="type">
-                        <option value="">所有类型</option>
-                        <option value="product" {% if request.args.get('type') == 'product' %}selected{% endif %}>产品质检</option>
-                        <option value="process" {% if request.args.get('type') == 'process' %}selected{% endif %}>过程质检</option>
-                        <option value="material" {% if request.args.get('type') == 'material' %}selected{% endif %}>原材料质检</option>
+                    <select class="form-select" id="type" name="type">
+                        <option value="">全部类型</option>
+                        <option value="process">工序质检</option>
+                        <option value="product">成品质检</option>
+                        <option value="material">原材料质检</option>
                     </select>
                 </div>
                 <div class="col-md-2">
-                    <select class="form-control" name="result">
-                        <option value="">所有结果</option>
-                        <option value="pass" {% if request.args.get('result') == 'pass' %}selected{% endif %}>合格</option>
-                        <option value="fail" {% if request.args.get('result') == 'fail' %}selected{% endif %}>不合格</option>
+                    <select class="form-select" id="result" name="result">
+                        <option value="">全部结果</option>
+                        <option value="pass">合格</option>
+                        <option value="fail">不合格</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <select class="form-select" id="inspector" name="inspector">
+                        <option value="">全部检验员</option>
                     </select>
                 </div>
                 <div class="col-md-3">
                     <div class="input-group">
-                        <input type="date" class="form-control" name="start_date" 
-                               value="{{ request.args.get('start_date', '') }}">
+                        <input type="date" class="form-control" id="start_date" name="start_date">
                         <span class="input-group-text">至</span>
-                        <input type="date" class="form-control" name="end_date" 
-                               value="{{ request.args.get('end_date', '') }}">
+                        <input type="date" class="form-control" id="end_date" name="end_date">
                     </div>
                 </div>
-                <div class="col-md-2">
+                <div class="col-md-12">
                     <button type="submit" class="btn btn-primary">
                         <i class="fas fa-search"></i> 搜索
                     </button>
@@ -62,72 +62,102 @@
     </div>
 
     <!-- 记录列表 -->
-    <div class="table-responsive">
-        <table class="table table-striped">
-            <thead>
-                <tr>
-                    <th>记录编号</th>
-                    <th>检验类型</th>
-                    <th>检验对象</th>
-                    <th>检验员</th>
-                    <th>检验时间</th>
-                    <th>检验结果</th>
-                    <th>操作</th>
-                </tr>
-            </thead>
-            <tbody>
-                <!-- 这里将来会通过后端传递记录数据 -->
-                <tr>
-                    <td colspan="7" class="text-center">暂无数据</td>
-                </tr>
-            </tbody>
-        </table>
+    <div class="card">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>记录编号</th>
+                            <th>类型</th>
+                            <th>检验对象</th>
+                            <th>检验员</th>
+                            <th>检验时间</th>
+                            <th>检验结果</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="recordList">
+                        <!-- 记录列表将通过JavaScript动态加载 -->
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- 分页 -->
+            <nav aria-label="Page navigation" class="mt-4">
+                <ul class="pagination justify-content-center" id="pagination">
+                    <!-- 分页将通过JavaScript动态加载 -->
+                </ul>
+            </nav>
+        </div>
     </div>
-
-    <!-- 分页 -->
-    {% if pagination %}
-    <nav aria-label="Page navigation" class="mt-4">
-        <ul class="pagination justify-content-center">
-            {% for page in pagination.iter_pages() %}
-                {% if page %}
-                    <li class="page-item {{ 'active' if page == pagination.page else '' }}">
-                        <a class="page-link" href="{{ url_for('main.quality_records', page=page) }}">{{ page }}</a>
-                    </li>
-                {% else %}
-                    <li class="page-item disabled">
-                        <span class="page-link">...</span>
-                    </li>
-                {% endif %}
-            {% endfor %}
-        </ul>
-    </nav>
-    {% endif %}
 </div>
 
-<!-- 导入记录模态框 -->
-<div class="modal fade" id="importModal" tabindex="-1" aria-labelledby="importModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
+<!-- 记录详情模态框 -->
+<div class="modal fade" id="recordModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="importModalLabel">导入质检记录</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <h5 class="modal-title">质检记录详情</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <form id="importForm">
-                    <div class="mb-3">
-                        <label for="fileInput" class="form-label">选择Excel文件</label>
-                        <input type="file" class="form-control" id="fileInput" accept=".xlsx,.xls">
+                <!-- 基本信息 -->
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h6 class="mb-0">基本信息</h6>
                     </div>
-                    <div class="mb-3">
-                        <a href="#" class="text-primary">
-                            <i class="fas fa-download"></i> 下载导入模板
-                        </a>
+                    <div class="card-body">
+                        <div class="row" id="recordBaseInfo">
+                            <!-- 基本信息将通过JavaScript动态加载 -->
+                        </div>
                     </div>
-                </form>
+                </div>
+                
+                <!-- 检验项目 -->
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h6 class="mb-0">检验项目</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>项目名称</th>
+                                        <th>检验标准</th>
+                                        <th>检验值</th>
+                                        <th>结果</th>
+                                        <th>备注</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="recordItems">
+                                    <!-- 检验项目将通过JavaScript动态加载 -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 不合格处理记录 -->
+                <div id="nonconformityContainer" style="display: none;">
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="mb-0">不合格处理记录</h6>
+                        </div>
+                        <div class="card-body">
+                            <div id="nonconformityInfo">
+                                <!-- 不合格处理记录将通过JavaScript动态加载 -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                <button type="button" class="btn btn-primary" onclick="submitImport()">导入</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                {% if current_user.role in ['admin', 'manager'] %}
+                <button type="button" class="btn btn-primary" onclick="printRecord()">打印</button>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -137,18 +167,297 @@
 
 {% block scripts %}
 <script>
-function importRecords() {
-    $('#importModal').modal('show');
+let currentPage = 1;
+let itemsPerPage = 20;
+let recordModal;
+
+// 页面加载完成后初始化
+document.addEventListener('DOMContentLoaded', function() {
+    // 初始化模态框
+    recordModal = new bootstrap.Modal(document.getElementById('recordModal'));
+    
+    // 加载记录列表
+    loadRecords();
+    
+    // 加载检验员列表
+    loadInspectors();
+    
+    // 绑定搜索表单提交事件
+    document.getElementById('searchForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        currentPage = 1;
+        loadRecords();
+    });
+});
+
+// 加载记录列表
+function loadRecords() {
+    const searchForm = document.getElementById('searchForm');
+    const formData = new FormData(searchForm);
+    const params = new URLSearchParams(formData);
+    params.append('page', currentPage);
+    params.append('per_page', itemsPerPage);
+    
+    fetch(`/api/quality/records?${params.toString()}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                renderRecords(data.data);
+            } else {
+                showToast('error', data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showToast('error', '加载记录列表失败');
+        });
 }
 
+// 渲染记录列表
+function renderRecords(data) {
+    const tbody = document.getElementById('recordList');
+    tbody.innerHTML = '';
+    
+    data.items.forEach(record => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${record.record_code}</td>
+            <td>${getRecordTypeName(record.type)}</td>
+            <td>${record.inspection_target}</td>
+            <td>${record.inspector_name}</td>
+            <td>${record.inspection_time}</td>
+            <td>
+                <span class="badge ${record.result === 'pass' ? 'bg-success' : 'bg-danger'}">
+                    ${record.result === 'pass' ? '合格' : '不合格'}
+                </span>
+            </td>
+            <td>
+                <div class="btn-group btn-group-sm">
+                    <button class="btn btn-outline-primary" onclick="viewRecord(${record.id})">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                    {% if current_user.role in ['admin', 'manager'] %}
+                    <button class="btn btn-outline-success" onclick="printRecord(${record.id})">
+                        <i class="fas fa-print"></i>
+                    </button>
+                    {% endif %}
+                </div>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+    
+    // 渲染分页
+    renderPagination(data);
+}
+
+// 获取记录类型名称
+function getRecordTypeName(type) {
+    const types = {
+        'process': '工序质检',
+        'product': '成品质检',
+        'material': '原材料质检'
+    };
+    return types[type] || type;
+}
+
+// 渲染分页
+function renderPagination(data) {
+    const pagination = document.getElementById('pagination');
+    pagination.innerHTML = '';
+    
+    // 上一页
+    const prevLi = document.createElement('li');
+    prevLi.className = `page-item ${currentPage === 1 ? 'disabled' : ''}`;
+    prevLi.innerHTML = `
+        <a class="page-link" href="#" onclick="changePage(${currentPage - 1})">
+            <i class="fas fa-chevron-left"></i>
+        </a>
+    `;
+    pagination.appendChild(prevLi);
+    
+    // 页码
+    for (let i = 1; i <= data.pages; i++) {
+        const li = document.createElement('li');
+        li.className = `page-item ${i === currentPage ? 'active' : ''}`;
+        li.innerHTML = `
+            <a class="page-link" href="#" onclick="changePage(${i})">${i}</a>
+        `;
+        pagination.appendChild(li);
+    }
+    
+    // 下一页
+    const nextLi = document.createElement('li');
+    nextLi.className = `page-item ${currentPage === data.pages ? 'disabled' : ''}`;
+    nextLi.innerHTML = `
+        <a class="page-link" href="#" onclick="changePage(${currentPage + 1})">
+            <i class="fas fa-chevron-right"></i>
+        </a>
+    `;
+    pagination.appendChild(nextLi);
+}
+
+// 切换页码
+function changePage(page) {
+    if (page < 1) return;
+    currentPage = page;
+    loadRecords();
+}
+
+// 加载检验员列表
+function loadInspectors() {
+    fetch('/api/quality/inspectors')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const select = document.getElementById('inspector');
+                data.inspectors.forEach(inspector => {
+                    const option = document.createElement('option');
+                    option.value = inspector.id;
+                    option.textContent = inspector.name;
+                    select.appendChild(option);
+                });
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+        });
+}
+
+// 查看记录详情
+function viewRecord(id) {
+    fetch(`/api/quality/records/${id}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                renderRecordDetail(data.data);
+                recordModal.show();
+            } else {
+                showToast('error', data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showToast('error', '获取记录详情失败');
+        });
+}
+
+// 渲染记录详情
+function renderRecordDetail(record) {
+    // 渲染基本信息
+    const baseInfo = document.getElementById('recordBaseInfo');
+    baseInfo.innerHTML = `
+        <div class="col-md-3">
+            <p class="mb-1"><strong>记录编号</strong></p>
+            <p>${record.record_code}</p>
+        </div>
+        <div class="col-md-3">
+            <p class="mb-1"><strong>检验类型</strong></p>
+            <p>${getRecordTypeName(record.type)}</p>
+        </div>
+        <div class="col-md-3">
+            <p class="mb-1"><strong>检验对象</strong></p>
+            <p>${record.inspection_target}</p>
+        </div>
+        <div class="col-md-3">
+            <p class="mb-1"><strong>检验员</strong></p>
+            <p>${record.inspector_name}</p>
+        </div>
+        <div class="col-md-3">
+            <p class="mb-1"><strong>检验时间</strong></p>
+            <p>${record.inspection_time}</p>
+        </div>
+        <div class="col-md-3">
+            <p class="mb-1"><strong>检验结果</strong></p>
+            <p>
+                <span class="badge ${record.result === 'pass' ? 'bg-success' : 'bg-danger'}">
+                    ${record.result === 'pass' ? '合格' : '不合格'}
+                </span>
+            </p>
+        </div>
+        <div class="col-md-6">
+            <p class="mb-1"><strong>备注</strong></p>
+            <p>${record.notes || '无'}</p>
+        </div>
+    `;
+    
+    // 渲染检验项目
+    const itemsBody = document.getElementById('recordItems');
+    itemsBody.innerHTML = '';
+    record.items.forEach(item => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${item.name}</td>
+            <td>${item.standard}</td>
+            <td>${item.value}</td>
+            <td>
+                <span class="badge ${item.result === 'pass' ? 'bg-success' : 'bg-danger'}">
+                    ${item.result === 'pass' ? '合格' : '不合格'}
+                </span>
+            </td>
+            <td>${item.notes || ''}</td>
+        `;
+        itemsBody.appendChild(tr);
+    });
+    
+    // 渲染不合格处理记录
+    const nonconformityContainer = document.getElementById('nonconformityContainer');
+    const nonconformityInfo = document.getElementById('nonconformityInfo');
+    if (record.nonconformity) {
+        nonconformityContainer.style.display = 'block';
+        nonconformityInfo.innerHTML = `
+            <div class="row">
+                <div class="col-md-4">
+                    <p class="mb-1"><strong>处理方式</strong></p>
+                    <p>${record.nonconformity.handling_method}</p>
+                </div>
+                <div class="col-md-4">
+                    <p class="mb-1"><strong>处理人</strong></p>
+                    <p>${record.nonconformity.handler_name}</p>
+                </div>
+                <div class="col-md-4">
+                    <p class="mb-1"><strong>处理时间</strong></p>
+                    <p>${record.nonconformity.handling_time}</p>
+                </div>
+                <div class="col-12">
+                    <p class="mb-1"><strong>处理说明</strong></p>
+                    <p>${record.nonconformity.handling_notes || '无'}</p>
+                </div>
+            </div>
+        `;
+    } else {
+        nonconformityContainer.style.display = 'none';
+    }
+}
+
+// 打印记录
+function printRecord(id) {
+    window.open(`/api/quality/records/${id}/print`, '_blank');
+}
+
+// 导出记录
 function exportRecords() {
-    // 导出记录的函数将在后续实现
-    alert('功能开发中...');
+    const searchForm = document.getElementById('searchForm');
+    const formData = new FormData(searchForm);
+    const params = new URLSearchParams(formData);
+    
+    window.location.href = `/api/quality/records/export?${params.toString()}`;
 }
 
-function submitImport() {
-    // 提交导入的函数将在后续实现
-    alert('功能开发中...');
+// 显示提示消息
+function showToast(type, message) {
+    const toast = Swal.mixin({
+        toast: true,
+        position: 'top-end',
+        showConfirmButton: false,
+        timer: 3000,
+        timerProgressBar: true
+    });
+    
+    toast.fire({
+        icon: type,
+        title: message
+    });
 }
 </script>
 {% endblock %} 
