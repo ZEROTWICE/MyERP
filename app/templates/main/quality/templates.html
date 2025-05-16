@@ -167,7 +167,10 @@ let templateModal;
 // 页面加载完成后初始化
 document.addEventListener('DOMContentLoaded', function() {
     // 初始化模态框
-    templateModal = new bootstrap.Modal(document.getElementById('templateModal'));
+    templateModal = new bootstrap.Modal(document.getElementById('templateModal'), {
+        backdrop: 'static',
+        keyboard: false
+    });
     
     // 加载模板列表
     loadTemplates();
@@ -225,14 +228,14 @@ function renderTemplates(data) {
             <td>
                 <div class="btn-group btn-group-sm">
                     <button class="btn btn-outline-primary" onclick="viewTemplate(${template.id})">
-                        <i class="fas fa-eye"></i>
+                        <i class="fas fa-eye"></i> 查看
                     </button>
                     {% if current_user.role in ['admin', 'manager'] %}
                     <button class="btn btn-outline-success" onclick="editTemplate(${template.id})">
-                        <i class="fas fa-edit"></i>
+                        <i class="fas fa-edit"></i> 编辑
                     </button>
                     <button class="btn btn-outline-danger" onclick="deleteTemplate(${template.id})">
-                        <i class="fas fa-trash"></i>
+                        <i class="fas fa-trash"></i> 删除
                     </button>
                     {% endif %}
                 </div>
@@ -310,19 +313,69 @@ function showCreateTemplateModal() {
 
 // 查看模板详情
 function viewTemplate(id) {
-    fetch(`/api/quality/templates/${id}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                showTemplateDetail(data.data);
-            } else {
-                showToast('error', data.message);
+    fetch(`/api/quality/templates/${id}`, {
+        headers: {
+            'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // 创建一个模态框来显示详情
+            const modalHtml = `
+                <div class="modal fade" id="viewTemplateModal" tabindex="-1">
+                    <div class="modal-dialog modal-lg">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">查看质检模板</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <dl class="row">
+                                    <dt class="col-sm-3">模板编号</dt>
+                                    <dd class="col-sm-9">${data.data.template_code}</dd>
+                                    
+                                    <dt class="col-sm-3">模板名称</dt>
+                                    <dd class="col-sm-9">${data.data.name}</dd>
+                                    
+                                    <dt class="col-sm-3">类型</dt>
+                                    <dd class="col-sm-9">${getTemplateTypeName(data.data.type)}</dd>
+                                    
+                                    <dt class="col-sm-3">描述</dt>
+                                    <dd class="col-sm-9">${data.data.description || ''}</dd>
+                                    
+                                    <dt class="col-sm-3">状态</dt>
+                                    <dd class="col-sm-9">${data.data.is_active ? '启用' : '禁用'}</dd>
+                                </dl>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // 移除旧的模态框（如果存在）
+            const oldModal = document.getElementById('viewTemplateModal');
+            if (oldModal) {
+                oldModal.remove();
             }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            showToast('error', '获取模板详情失败');
-        });
+            
+            // 添加新的模态框到页面
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            
+            // 显示模态框
+            const viewModal = new bootstrap.Modal(document.getElementById('viewTemplateModal'));
+            viewModal.show();
+        } else {
+            showToast('error', data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showToast('error', '获取模板详情失败');
+    });
 }
 
 // 编辑模板
@@ -621,6 +674,12 @@ function saveTemplate() {
         data.items.push(itemData);
     });
     
+    // 显示加载提示
+    const saveBtn = document.querySelector('.modal-footer .btn-primary');
+    const originalText = saveBtn.innerHTML;
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 保存中...';
+    
     // 发送请求
     const url = templateId ? `/api/quality/templates/${templateId}` : '/api/quality/templates';
     const method = templateId ? 'PUT' : 'POST';
@@ -628,21 +687,47 @@ function saveTemplate() {
     fetch(url, {
         method: method,
         headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
         },
         body: JSON.stringify(data)
     })
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            showToast('success', data.message);
-            templateModal.hide();
-            loadTemplates();
+            // 恢复按钮状态
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = originalText;
+            
+            // 获取模态框实例
+            const modalElement = document.getElementById('templateModal');
+            const modalInstance = bootstrap.Modal.getInstance(modalElement);
+            
+            // 添加模态框隐藏后的事件监听器，确保在模态框完全关闭后刷新列表
+            modalElement.addEventListener('hidden.bs.modal', function onHidden() {
+                // 刷新列表
+                loadTemplates();
+                // 显示成功提示
+                showToast('success', data.message);
+                // 移除事件监听器，避免重复执行
+                modalElement.removeEventListener('hidden.bs.modal', onHidden);
+            }, { once: true });
+            
+            // 关闭模态框
+            modalInstance.hide();
         } else {
+            // 恢复按钮状态
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = originalText;
+            
             showToast('error', data.message);
         }
     })
     .catch(error => {
+        // 恢复按钮状态
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = originalText;
+        
         console.error('Error:', error);
         showToast('error', '保存失败');
     });
@@ -652,21 +737,56 @@ function saveTemplate() {
 function deleteTemplate(id) {
     if (!confirm('确定要删除这个模板吗？')) return;
     
+    const deleteButton = document.querySelector(`button[onclick="deleteTemplate(${id})"]`);
+    if (deleteButton) {
+        // 禁用删除按钮并显示加载状态
+        const originalText = deleteButton.innerHTML;
+        deleteButton.disabled = true;
+        deleteButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 删除中...';
+    }
+    
     fetch(`/api/quality/templates/${id}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: {
+            'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
+        }
     })
-    .then(response => response.json())
+    .then(response => {
+        return response.json().catch(error => {
+            // 如果JSON解析失败，返回一个默认对象
+            console.error('Error parsing JSON:', error);
+            return { success: false, message: '服务器响应格式错误' };
+        });
+    })
     .then(data => {
-        if (data.success) {
-            showToast('success', data.message);
-            loadTemplates();
+        // 无论成功与否，都刷新列表
+        loadTemplates();
+        
+        // 然后根据结果显示对应的提示
+        if (data && data.success) {
+            showToast('success', data.message || '删除成功');
         } else {
-            showToast('error', data.message);
+            showToast('error', (data && data.message) || '删除失败，但列表已刷新');
+        }
+        
+        // 恢复按钮状态
+        if (deleteButton) {
+            deleteButton.disabled = false;
+            deleteButton.innerHTML = originalText;
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        showToast('error', '删除失败');
+        showToast('error', '删除请求失败');
+        
+        // 出错时也刷新列表，确保显示最新状态
+        loadTemplates();
+        
+        // 恢复按钮状态
+        if (deleteButton) {
+            deleteButton.disabled = false;
+            deleteButton.innerHTML = originalText;
+        }
     });
 }
 

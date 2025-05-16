@@ -1,0 +1,226 @@
+{% extends "base.html" %}
+
+{% block title %}打印质检记录{% endblock %}
+
+{% block styles %}
+<style>
+    @media print {
+        .no-print {
+            display: none !important;
+        }
+        body {
+            margin: 0;
+            padding: 15mm;
+        }
+        .container {
+            width: 100% !important;
+            max-width: none !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+    }
+    .record-header {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+    .record-title {
+        font-size: 24px;
+        font-weight: bold;
+        margin-bottom: 1rem;
+    }
+    .info-row {
+        margin-bottom: 1rem;
+    }
+    .info-label {
+        font-weight: bold;
+    }
+    .table th {
+        background-color: #f8f9fa;
+    }
+    @media print {
+        .table th {
+            background-color: #f8f9fa !important;
+            -webkit-print-color-adjust: exact;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <!-- 打印按钮 -->
+    <div class="text-end mb-4 no-print">
+        <button class="btn btn-primary" onclick="window.print()">
+            <i class="fas fa-print"></i> 打印
+        </button>
+    </div>
+
+    <!-- 记录头部 -->
+    <div class="record-header">
+        <div class="record-title">质检记录单</div>
+        <div>编号：{{ record.global_sn }}</div>
+    </div>
+
+    <!-- 基本信息 -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row info-row">
+                <div class="col-md-3">
+                    <span class="info-label">检验类型：</span>
+                    {{ record.task.target_type }}
+                </div>
+                <div class="col-md-3">
+                    <span class="info-label">检验对象：</span>
+                    {{ get_inspection_target_name(record.task) }}
+                </div>
+                <div class="col-md-3">
+                    <span class="info-label">检验员：</span>
+                    {{ record.inspector.name }}
+                </div>
+                <div class="col-md-3">
+                    <span class="info-label">检验日期：</span>
+                    {{ record.inspection_date.strftime('%Y-%m-%d') }}
+                </div>
+            </div>
+            <div class="row info-row">
+                <div class="col-md-3">
+                    <span class="info-label">检验结果：</span>
+                    <span class="badge {{ 'bg-success' if record.result == 'pass' else 'bg-danger' }}">
+                        {{ '合格' if record.result == 'pass' else '不合格' }}
+                    </span>
+                </div>
+                <div class="col-12">
+                    <span class="info-label">备注说明：</span>
+                    {{ record.notes or '无' }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 基本信息项目 -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">基本信息项目</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered">
+                    <thead>
+                        <tr>
+                            <th>项目名称</th>
+                            <th>记录值</th>
+                            <th>备注</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in record.base_item_records %}
+                        <tr>
+                            <td>{{ item.base_item.name }}</td>
+                            <td>{{ item.value }}</td>
+                            <td>{{ item.notes or '' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- 检验项目 -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">检验项目</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered">
+                    <thead>
+                        <tr>
+                            <th>项目名称</th>
+                            <th>检验标准</th>
+                            <th>实测值</th>
+                            <th>结果</th>
+                            <th>备注</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in record.item_records %}
+                        <tr>
+                            <td>{{ item.item.name }}</td>
+                            <td>{{ item.item.standard }}</td>
+                            <td>{{ item.measured_value }}</td>
+                            <td>
+                                <span class="badge {{ 'bg-success' if item.is_qualified else 'bg-danger' }}">
+                                    {{ '合格' if item.is_qualified else '不合格' }}
+                                </span>
+                            </td>
+                            <td>{{ item.notes or '' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- 不合格处理记录 -->
+    {% if record.nonconformity_records %}
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">不合格处理记录</h5>
+        </div>
+        <div class="card-body">
+            <div class="row info-row">
+                <div class="col-md-3">
+                    <span class="info-label">处理方式：</span>
+                    {{ record.nonconformity_records[0].type }}
+                </div>
+                <div class="col-md-3">
+                    <span class="info-label">处理人：</span>
+                    {{ record.nonconformity_records[0].handler.name }}
+                </div>
+                <div class="col-md-3">
+                    <span class="info-label">处理日期：</span>
+                    {{ record.nonconformity_records[0].handling_date.strftime('%Y-%m-%d') }}
+                </div>
+            </div>
+            <div class="row info-row">
+                <div class="col-12">
+                    <span class="info-label">处理结果：</span>
+                    {{ record.nonconformity_records[0].handling_result }}
+                </div>
+                <div class="col-12">
+                    <span class="info-label">处理说明：</span>
+                    {{ record.nonconformity_records[0].notes or '无' }}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- 签字栏 -->
+    <div class="row mt-5">
+        <div class="col-md-4">
+            <div class="border-bottom" style="width: 200px;">
+                <div class="mb-2">检验员签字：</div>
+                <div style="height: 50px;"></div>
+                <div class="text-center">日期：</div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="border-bottom" style="width: 200px;">
+                <div class="mb-2">复核人签字：</div>
+                <div style="height: 50px;"></div>
+                <div class="text-center">日期：</div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="border-bottom" style="width: 200px;">
+                <div class="mb-2">审批人签字：</div>
+                <div style="height: 50px;"></div>
+                <div class="text-center">日期：</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 
