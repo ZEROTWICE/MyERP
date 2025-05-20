@@ -2326,7 +2326,7 @@ def manage_tasks():
 @bp.route('/tasks/<int:id>/update_status', methods=['POST'])
 @login_required
 def update_task_status(id):
-    """更新任务状态"""
+    """更新任务状态和完成数量"""
     try:
         task = TaskAssignment.query.get_or_404(id)
         
@@ -2337,59 +2337,69 @@ def update_task_status(id):
             if not employee or employee.id != task.employee_id:
                 return jsonify({'success': False, 'message': '权限不足'}), 403
         
-        # 保存旧数据用于回滚
-        old_data = {
-            'status': task.status,
-            'completed_quantity': task.completed_quantity
-        }
-        
-        # 更新状态（如果提供了）
-        new_status = request.form.get('status')
-        if new_status is not None:
-            if new_status not in ['pending', 'in_progress', 'completed', 'cancelled']:
-                return jsonify({'success': False, 'message': '无效的状态值'}), 400
-            task.status = new_status
-        
-        # 更新完成数量（如果提供了）
         completed_quantity = request.form.get('completed_quantity', type=int)
-        if completed_quantity is not None:
-            if completed_quantity < 0:
-                return jsonify({'success': False, 'message': '完成数量不能为负数'}), 400
-            if completed_quantity > task.quantity:
-                return jsonify({'success': False, 'message': '完成数量不能超过总数量'}), 400
-            task.completed_quantity = completed_quantity
+        materials_data = request.form.get('materials')
+        
+        if not materials_data:
+            return jsonify({'success': False, 'message': '请提供原材料使用信息'}), 400
             
-            # 根据完成数量自动更新状态
-            if completed_quantity == 0:
-                task.status = 'pending'
-            elif completed_quantity == task.quantity:
-                task.status = 'completed'
-            elif completed_quantity < task.quantity:
-                task.status = 'in_progress'
+        try:
+            materials = json.loads(materials_data)
+        except json.JSONDecodeError:
+            return jsonify({'success': False, 'message': '原材料数据格式错误'}), 400
+            
+        if not materials:
+            return jsonify({'success': False, 'message': '请至少添加一种原材料'}), 400
+        
+        # 检查原材料库存
+        for material in materials:
+            raw_material = RawMaterial.query.get(material['raw_material_id'])
+            if not raw_material:
+                return jsonify({'success': False, 'message': f'原材料不存在'}), 400
+            if raw_material.quantity < material['quantity']:
+                return jsonify({'success': False, 'message': f'原材料 {raw_material.name} 库存不足'}), 400
+        
+        # 更新任务状态
+        task.completed_quantity = completed_quantity
+        if completed_quantity >= task.quantity:
+            task.status = 'completed'
+            task.completed_at = datetime.now()
+            
+            # 创建生产记录
+            production_record = ProductionRecord(
+                employee_id=task.employee_id,
+                process_id=task.process_id,
+                quantity=task.quantity,
+                global_sn=task.global_sn,
+                created_at=datetime.now()
+            )
+            db.session.add(production_record)
+            db.session.flush()  # 获取生产记录ID
+            
+            # 添加原材料使用记录
+            for material in materials:
+                material_usage = MaterialUsage(
+                    production_record_id=production_record.id,
+                    raw_material_id=material['raw_material_id'],
+                    quantity=material['quantity']
+                )
+                db.session.add(material_usage)
+                
+                # 更新原材料库存
+                raw_material = RawMaterial.query.get(material['raw_material_id'])
+                raw_material.quantity -= material['quantity']
         
         # 记录审计日志
-        log = AuditLog(
+        audit_log = AuditLog(
             user_id=current_user.id,
-            action='更新任务状态',
-            details=f'更新任务（ID：{task.id}）完成数量为 {task.completed_quantity}，状态为 {task.status}',
-            can_rollback=True,
-            rollback_type='edit',
-            target_model='TaskAssignment',
-            target_id=task.id,
-            old_data=old_data,
-            new_data={
-                'status': task.status,
-                'completed_quantity': task.completed_quantity
-            }
+            action='update_task',
+            details=f'更新任务 {task.id} 的完成数量为 {completed_quantity}',
+            ip_address=request.remote_addr
         )
-        db.session.add(log)
-        db.session.commit()
+        db.session.add(audit_log)
         
-        return jsonify({
-            'success': True,
-            'message': '任务状态更新成功',
-            'completion_rate': task.completion_rate
-        })
+        db.session.commit()
+        return jsonify({'success': True, 'message': '更新成功'})
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': f'更新失败：{str(e)}'}), 500
@@ -4566,22 +4576,7 @@ def get_process_price(id):
     except Exception as e:
         return jsonify({'success': False, 'message': f'获取工序详情失败：{str(e)}'}), 500
 
-@bp.route('/raw_materials/available', methods=['GET'])
-@login_required
-def get_available_raw_materials():
-    """获取可用的原材料列表"""
-    try:
-        materials = RawMaterial.query.filter(RawMaterial.quantity > 0).all()
-        return jsonify({
-            'success': True,
-            'data': [{
-                'id': material.id,
-                'material_name': material.material_name,
-                'quantity': material.quantity
-            } for material in materials]
-        })
-    except Exception as e:
-        return jsonify({'success': False, 'message': f'获取原材料列表失败：{str(e)}'}), 500
+
 
 @bp.route('/inventory/raw/<int:id>', methods=['DELETE'])
 @login_required
@@ -4702,4 +4697,72 @@ def delete_finished_product(id):
         return jsonify({
             'success': False,
             'message': f'删除失败：{str(e)}'
+        }), 500
+
+@bp.route('/tasks/<int:id>/get', methods=['GET'])
+@login_required
+def get_task_details(id):
+    """获取任务详情"""
+    try:
+        task = TaskAssignment.query.get_or_404(id)
+        
+        # 检查权限：管理员可以查看所有任务，普通用户只能查看自己的任务
+        if current_user.role not in ['admin', 'hr']:
+            # 获取当前用户的员工记录
+            employee = Employee.query.filter_by(user_id=current_user.id).first()
+            if not employee or employee.id != task.employee_id:
+                return jsonify({'success': False, 'message': '权限不足'}), 403
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'id': task.id,
+                'global_sn': task.global_sn,
+                'employee_id': task.employee_id,
+                'process_id': task.process_id,
+                'quantity': task.quantity,
+                'completed_quantity': task.completed_quantity,
+                'status': task.status,
+                'target_date': task.target_date.strftime('%Y-%m-%d') if task.target_date else None,
+                'notes': task.notes
+            }
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'获取任务详情失败：{str(e)}'}), 500
+
+@bp.route('/api/inventory/raw-materials')
+@login_required
+def get_available_raw_materials():
+    """获取可用的原材料列表
+    
+    Query Parameters:
+        only_available (bool): 是否只返回有库存的原材料
+    """
+    try:
+        query = RawMaterial.query
+        
+        # 如果指定了only_available参数，只返回有库存的原材料
+        if request.args.get('only_available', 'false').lower() == 'true':
+            query = query.filter(RawMaterial.quantity > 0)
+            
+        raw_materials = query.all()
+        materials_list = [{
+            'id': material.id,
+            'name': material.material_name,
+            'material_name': material.material_name,  # 为了兼容性保留
+            'specification': f"{material.internal_number} - {material.melt_number}",
+            'quantity': material.quantity,
+            'supplier': material.supplier,
+            'melt_number': material.melt_number,
+            'internal_number': material.internal_number
+        } for material in raw_materials]
+        
+        return jsonify({
+            'success': True,
+            'data': materials_list
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'获取原材料列表失败: {str(e)}'
         }), 500

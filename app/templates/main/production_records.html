@@ -319,44 +319,58 @@ function handleProcessChange(processId) {
 
 // 添加一行原材料
 function addMaterialRow() {
-    // 创建一个原材料选择下拉框
-    let materialSelect = '<select class="form-control material-select" onchange="updateAvailableQuantity(this)">';
-    materialSelect += '<option value="">请选择原材料</option>';
-    availableRawMaterials.forEach(material => {
-        materialSelect += `<option value="${material.id}" data-quantity="${material.quantity}">${material.name} (库存: ${material.quantity})</option>`;
-    });
-    materialSelect += '</select>';
-    
-    // 创建行HTML
-    const rowHtml = `
-        <tr class="material-row">
-            <td>${materialSelect}</td>
-            <td>
-                <input type="number" class="form-control material-quantity" min="0.01" step="0.01" placeholder="数量">
-                <small class="form-text text-muted available-quantity"></small>
-            </td>
-            <td>
-                <button type="button" class="btn btn-sm btn-danger remove-material">
-                    <i class="fas fa-times"></i>
-                </button>
-            </td>
-        </tr>
-    `;
-    
-    // 添加到表格中
-    $('#materialsList').append(rowHtml);
-    
-    // 为新添加的行绑定事件
-    const $newRow = $('#materialsList').find('tr:last');
-    $newRow.find('.remove-material').click(function() {
-        $(this).closest('tr').remove();
-    });
-    
-    // 初始化新添加的select
-    $newRow.find('.material-select').select2({
-        theme: 'bootstrap4',
-        width: '100%',
-        placeholder: '请选择原材料'
+    // 加载原材料列表
+    $.ajax({
+        url: '/api/inventory/raw-materials?only_available=true',
+        type: 'GET',
+        success: function(result) {
+            if (result.success) {
+                // 创建一个原材料选择下拉框
+                let materialSelect = '<select class="form-control material-select" onchange="updateAvailableQuantity(this)">';
+                materialSelect += '<option value="">请选择原材料</option>';
+                result.data.forEach(material => {
+                    materialSelect += `<option value="${material.id}" data-quantity="${material.quantity}">${material.name} (${material.specification}) - 库存: ${material.quantity}</option>`;
+                });
+                materialSelect += '</select>';
+                
+                // 创建行HTML
+                const rowHtml = `
+                    <tr class="material-row">
+                        <td>${materialSelect}</td>
+                        <td>
+                            <input type="number" class="form-control material-quantity" min="0.01" step="0.01" placeholder="数量">
+                            <small class="form-text text-muted available-quantity"></small>
+                        </td>
+                        <td>
+                            <button type="button" class="btn btn-sm btn-danger remove-material">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+                
+                // 添加到表格中
+                $('#materialsList').append(rowHtml);
+                
+                // 为新添加的行绑定事件
+                const $newRow = $('#materialsList').find('tr:last');
+                $newRow.find('.remove-material').click(function() {
+                    $(this).closest('tr').remove();
+                });
+                
+                // 初始化新添加的select
+                $newRow.find('.material-select').select2({
+                    theme: 'bootstrap4',
+                    width: '100%',
+                    placeholder: '请选择原材料'
+                });
+            } else {
+                toastr.error('加载原材料列表失败');
+            }
+        },
+        error: function() {
+            toastr.error('加载原材料列表失败');
+        }
     });
 }
 

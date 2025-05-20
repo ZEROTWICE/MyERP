@@ -263,14 +263,44 @@
 
     <!-- 更新进度的模态框 -->
     <div class="modal fade" id="quantityModal" tabindex="-1">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">更新完成数量</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <input type="number" class="form-control" id="completedQuantity" min="0">
+                    <div class="mb-3">
+                        <label class="form-label">完成数量</label>
+                        <input type="number" class="form-control" id="completedQuantity" min="0">
+                    </div>
+                    
+                    <!-- 原材料列表 -->
+                    <div class="card mb-3">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h6 class="mb-0">使用的原材料</h6>
+                            <button type="button" class="btn btn-sm btn-primary" onclick="addMaterialRow()">
+                                <i class="fas fa-plus"></i> 添加原材料
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-bordered" id="materialsTable">
+                                    <thead>
+                                        <tr>
+                                            <th>原材料</th>
+                                            <th>使用数量</th>
+                                            <th>操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <!-- 原材料行将通过JavaScript动态添加 -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <input type="hidden" id="taskId">
                 </div>
                 <div class="modal-footer">
@@ -287,7 +317,6 @@
 {{ super() }}
 <script>
 let taskToDelete = null;
-
 $(document).ready(function() {
     // 初始化模态框内的 Select2
     initializeSelect2();
@@ -396,7 +425,7 @@ $(document).ready(function() {
         
         // 获取当前任务的已完成数量
         $.ajax({
-            url: '{{ url_for("main.get_task_assignment", id=0) }}'.replace('0', taskId),
+            url: `/tasks/${taskId}/get`,
             type: 'GET',
             success: function(result) {
                 if (result.success) {
@@ -404,6 +433,10 @@ $(document).ready(function() {
                 }
             }
         });
+        
+        // 清空表格并添加一行
+        $('#materialsTable tbody').empty();
+        addMaterialRow();
     });
     
     // 保存完成数量
@@ -411,11 +444,31 @@ $(document).ready(function() {
         const taskId = $('#taskId').val();
         const quantity = $('#completedQuantity').val();
         
+        // 收集所有原材料数据
+        const materials = [];
+        $('#materialsTable tbody tr').each(function() {
+            const materialId = $(this).find('.material-select').val();
+            const quantity = $(this).find('.material-quantity').val();
+            
+            if (materialId && quantity) {
+                materials.push({
+                    raw_material_id: materialId,
+                    quantity: parseFloat(quantity)
+                });
+            }
+        });
+        
+        if (materials.length === 0) {
+            toastr.error('请至少添加一种原材料');
+            return;
+        }
+        
         $.ajax({
             url: `/tasks/${taskId}/update_status`,
             method: 'POST',
             data: {
-                completed_quantity: quantity
+                completed_quantity: quantity,
+                materials: JSON.stringify(materials)
             },
             headers: {
                 'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
@@ -504,6 +557,65 @@ function showAlert(type, message) {
     setTimeout(() => {
         alertDiv.remove();
     }, 3000);
+}
+
+// 添加原材料行
+function addMaterialRow() {
+    // 加载原材料列表
+    $.ajax({
+        url: '/api/inventory/raw-materials?only_available=true',
+        type: 'GET',
+        success: function(result) {
+            if (result.success) {
+                const tbody = $('#materialsTable tbody');
+                const row = $('<tr>');
+                
+                // 创建原材料选择下拉框
+                const materialSelect = $('<select>').addClass('form-select material-select').attr('required', true);
+                materialSelect.append('<option value="">请选择原材料</option>');
+                
+                // 添加可用的原材料选项
+                result.data.forEach(material => {
+                    materialSelect.append(`<option value="${material.id}" data-quantity="${material.quantity}">${material.name} (${material.specification}) - 库存: ${material.quantity}</option>`);
+                });
+                
+                // 创建数量输入框
+                const quantityInput = $('<input>')
+                    .addClass('form-control material-quantity')
+                    .attr('type', 'number')
+                    .attr('min', '0')
+                    .attr('step', '0.01')
+                    .attr('required', true);
+                
+                // 创建删除按钮
+                const deleteButton = $('<button>')
+                    .addClass('btn btn-danger btn-sm')
+                    .html('<i class="fas fa-trash"></i>')
+                    .click(function() {
+                        $(this).closest('tr').remove();
+                    });
+                
+                // 组装行
+                row.append($('<td>').append(materialSelect));
+                row.append($('<td>').append(quantityInput));
+                row.append($('<td>').append(deleteButton));
+                
+                tbody.append(row);
+                
+                // 初始化Select2
+                materialSelect.select2({
+                    theme: 'bootstrap-5',
+                    width: '100%',
+                    dropdownParent: $('#quantityModal')
+                });
+            } else {
+                toastr.error('加载原材料列表失败');
+            }
+        },
+        error: function() {
+            toastr.error('加载原材料列表失败');
+        }
+    });
 }
 </script>
 

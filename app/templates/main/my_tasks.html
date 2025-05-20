@@ -67,7 +67,20 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <input type="number" class="form-control" id="completedQuantity" min="0">
+                <div class="mb-3">
+                    <label class="form-label">完成数量</label>
+                    <input type="number" class="form-control" id="completedQuantity" min="0">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">使用的原材料</label>
+                    <select class="form-select" id="rawMaterialId" required>
+                        <option value="">请选择原材料</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">原材料使用数量</label>
+                    <input type="number" class="form-control" id="rawMaterialQuantity" min="0" step="0.01" required>
+                </div>
                 <input type="hidden" id="taskId">
             </div>
             <div class="modal-footer">
@@ -88,18 +101,53 @@ $(document).ready(function() {
     $('.update-quantity').click(function() {
         const taskId = $(this).data('task-id');
         $('#taskId').val(taskId);
+        
+        // 获取当前任务的已完成数量
+        $.ajax({
+            url: `/tasks/${taskId}/get`,
+            type: 'GET',
+            success: function(result) {
+                if (result.success) {
+                    $('#completedQuantity').val(result.data.completed_quantity);
+                }
+            }
+        });
+        
+        // 加载原材料列表
+        $.ajax({
+            url: '/api/inventory/raw-materials',
+            type: 'GET',
+            success: function(result) {
+                if (result.success) {
+                    const select = $('#rawMaterialId');
+                    select.empty().append('<option value="">请选择原材料</option>');
+                    result.data.forEach(material => {
+                        select.append(`<option value="${material.id}">${material.name} (${material.specification})</option>`);
+                    });
+                }
+            }
+        });
     });
     
     // 保存完成数量
     $('#saveQuantity').click(function() {
         const taskId = $('#taskId').val();
         const quantity = $('#completedQuantity').val();
+        const rawMaterialId = $('#rawMaterialId').val();
+        const rawMaterialQuantity = $('#rawMaterialQuantity').val();
+        
+        if (!rawMaterialId || !rawMaterialQuantity) {
+            toastr.error('请选择原材料并输入使用数量');
+            return;
+        }
         
         $.ajax({
             url: `/tasks/${taskId}/update_status`,
             method: 'POST',
             data: {
-                completed_quantity: quantity
+                completed_quantity: quantity,
+                raw_material_id: rawMaterialId,
+                raw_material_quantity: rawMaterialQuantity
             },
             success: function(response) {
                 if (response.success) {
