@@ -60,7 +60,7 @@
 
 <!-- 更新进度的模态框 -->
 <div class="modal fade" id="quantityModal" tabindex="-1">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">更新完成数量</h5>
@@ -71,16 +71,23 @@
                     <label class="form-label">完成数量</label>
                     <input type="number" class="form-control" id="completedQuantity" min="0">
                 </div>
-                <div class="mb-3">
-                    <label class="form-label">使用的原材料</label>
-                    <select class="form-select" id="rawMaterialId" required>
-                        <option value="">请选择原材料</option>
-                    </select>
+                
+                <!-- 原材料列表 -->
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h6 class="mb-0">使用的原材料</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <select class="form-control" id="materialSelect">
+                            </select>
+                        </div>
+                        <div id="selectedMaterials" class="mt-3">
+                            <!-- 已选择的原材料将在这里显示 -->
+                        </div>
+                    </div>
                 </div>
-                <div class="mb-3">
-                    <label class="form-label">原材料使用数量</label>
-                    <input type="number" class="form-control" id="rawMaterialQuantity" min="0" step="0.01" required>
-                </div>
+                
                 <input type="hidden" id="taskId">
             </div>
             <div class="modal-footer">
@@ -96,11 +103,72 @@
 {% block scripts %}
 {{ super() }}
 <script>
+let selectedMaterials = new Map(); // 存储已选择的原材料
+
 $(document).ready(function() {
+    // 初始化原材料选择器
+    $('#materialSelect').select2({
+        theme: 'bootstrap-5',
+        width: '100%',
+        dropdownParent: $('#quantityModal'),
+        placeholder: '搜索并选择原材料...',
+        allowClear: true,
+        ajax: {
+            url: '/api/inventory/raw-materials',
+            dataType: 'json',
+            delay: 250,
+            data: function(params) {
+                return {
+                    only_available: true,
+                    search: params.term
+                };
+            },
+            processResults: function(data) {
+                // 过滤掉已经选择的原材料
+                const filteredData = data.data.filter(item => !selectedMaterials.has(item.id.toString()));
+                return {
+                    results: filteredData.map(function(item) {
+                        return {
+                            id: item.id,
+                            text: `${item.name} (${item.specification})`,
+                            quantity: item.quantity,
+                            name: item.name,
+                            specification: item.specification
+                        };
+                    })
+                };
+            },
+            cache: false
+        },
+        minimumInputLength: 1,
+        templateResult: formatMaterial,
+        templateSelection: formatMaterialSelection,
+        language: {
+            inputTooShort: function() {
+                return '请输入至少1个字符以开始搜索...';
+            },
+            noResults: function() {
+                return '未找到匹配的原材料';
+            },
+            searching: function() {
+                return '搜索中...';
+            },
+            errorLoading: function() {
+                return '加载数据时出错';
+            }
+        }
+    }).on('select2:select', function(e) {
+        addSelectedMaterial(e.params.data);
+        $(this).val(null).trigger('change');
+    });
+
     // 更新进度模态框
     $('.update-quantity').click(function() {
         const taskId = $(this).data('task-id');
         $('#taskId').val(taskId);
+        selectedMaterials.clear();
+        $('#selectedMaterials').empty();
+        $('#materialSelect').val(null).trigger('change');
         
         // 获取当前任务的已完成数量
         $.ajax({
@@ -112,32 +180,26 @@ $(document).ready(function() {
                 }
             }
         });
-        
-        // 加载原材料列表
-        $.ajax({
-            url: '/api/inventory/raw-materials',
-            type: 'GET',
-            success: function(result) {
-                if (result.success) {
-                    const select = $('#rawMaterialId');
-                    select.empty().append('<option value="">请选择原材料</option>');
-                    result.data.forEach(material => {
-                        select.append(`<option value="${material.id}">${material.name} (${material.specification})</option>`);
-                    });
-                }
-            }
-        });
     });
     
     // 保存完成数量
     $('#saveQuantity').click(function() {
         const taskId = $('#taskId').val();
         const quantity = $('#completedQuantity').val();
-        const rawMaterialId = $('#rawMaterialId').val();
-        const rawMaterialQuantity = $('#rawMaterialQuantity').val();
         
-        if (!rawMaterialId || !rawMaterialQuantity) {
-            toastr.error('请选择原材料并输入使用数量');
+        // 收集所有原材料数据
+        const materials = [];
+        selectedMaterials.forEach((data, id) => {
+            if (data.quantity > 0) {
+                materials.push({
+                    raw_material_id: parseInt(id),
+                    quantity: parseFloat(data.quantity)
+                });
+            }
+        });
+        
+        if (materials.length === 0) {
+            toastr.error('请至少添加一种原材料');
             return;
         }
         
@@ -146,8 +208,10 @@ $(document).ready(function() {
             method: 'POST',
             data: {
                 completed_quantity: quantity,
-                raw_material_id: rawMaterialId,
-                raw_material_quantity: rawMaterialQuantity
+                materials: JSON.stringify(materials)
+            },
+            headers: {
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
             },
             success: function(response) {
                 if (response.success) {
@@ -164,5 +228,107 @@ $(document).ready(function() {
         });
     });
 });
+
+// 格式化原材料显示
+function formatMaterial(material) {
+    if (!material.id) return material.text;
+    return $(`
+        <div class="d-flex justify-content-between align-items-center py-1">
+            <div>
+                <div class="fw-bold">${material.name}</div>
+                <div class="text-muted small">${material.specification}</div>
+            </div>
+            <span class="badge bg-info ms-2">库存: ${material.quantity}</span>
+        </div>
+    `);
+}
+
+// 格式化已选择的原材料显示
+function formatMaterialSelection(material) {
+    if (!material.id) return material.text;
+    return material.name;
+}
+
+// 添加选中的原材料到列表
+function addSelectedMaterial(material) {
+    if (selectedMaterials.has(material.id.toString())) {
+        toastr.warning('该原材料已被选择');
+        return;
+    }
+    
+    const materialHtml = `
+        <div class="card mb-2" id="material-${material.id}">
+            <div class="card-body p-2">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="mb-1">${material.name}</h6>
+                        <div class="text-muted small">${material.specification}</div>
+                    </div>
+                    <div class="d-flex align-items-center">
+                        <div class="input-group input-group-sm me-2" style="width: 150px;">
+                            <input type="number" class="form-control material-quantity" 
+                                   min="0.01" max="${material.quantity}" step="0.01" 
+                                   placeholder="数量" value="0"
+                                   onchange="updateMaterialQuantity('${material.id}', this.value)">
+                            <span class="input-group-text">个</span>
+                        </div>
+                        <button class="btn btn-sm btn-danger" onclick="removeSelectedMaterial('${material.id}')">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    $('#selectedMaterials').append(materialHtml);
+    selectedMaterials.set(material.id.toString(), {
+        name: material.name,
+        specification: material.specification,
+        maxQuantity: material.quantity,
+        quantity: 0
+    });
+}
+
+// 更新原材料数量
+function updateMaterialQuantity(materialId, quantity) {
+    const material = selectedMaterials.get(materialId.toString());
+    if (material) {
+        const newQuantity = parseFloat(quantity) || 0;
+        if (newQuantity > material.maxQuantity) {
+            toastr.warning('输入数量超过库存限制');
+            return;
+        }
+        material.quantity = newQuantity;
+        selectedMaterials.set(materialId.toString(), material);
+    }
+}
+
+// 移除选中的原材料
+function removeSelectedMaterial(materialId) {
+    $(`#material-${materialId}`).remove();
+    selectedMaterials.delete(materialId.toString());
+    $('#materialSelect').val(null).trigger('change');
+}
 </script>
+
+<style>
+.select2-container--bootstrap-5 .select2-selection {
+    min-height: 38px;
+    padding: 0.375rem 0.75rem;
+}
+
+.select2-container--bootstrap-5 .select2-selection--single {
+    border: 1px solid #dee2e6;
+}
+
+.select2-container--bootstrap-5.select2-container--focus .select2-selection {
+    border-color: #86b7fe;
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+
+.select2-container--bootstrap-5 .select2-dropdown {
+    border-color: #dee2e6;
+}
+</style>
 {% endblock %} 

@@ -2337,14 +2337,23 @@ def update_task_status(id):
             if not employee or employee.id != task.employee_id:
                 return jsonify({'success': False, 'message': '权限不足'}), 403
         
-        completed_quantity = request.form.get('completed_quantity', type=int)
-        materials_data = request.form.get('materials')
+        # 获取并验证完成数量
+        try:
+            completed_quantity = int(request.form.get('completed_quantity', 0))
+            if completed_quantity < 0:
+                return jsonify({'success': False, 'message': '完成数量不能为负数'}), 400
+        except ValueError:
+            return jsonify({'success': False, 'message': '完成数量格式错误'}), 400
         
+        # 获取并验证原材料数据
+        materials_data = request.form.get('materials')
         if not materials_data:
             return jsonify({'success': False, 'message': '请提供原材料使用信息'}), 400
             
         try:
             materials = json.loads(materials_data)
+            if not isinstance(materials, list):
+                return jsonify({'success': False, 'message': '原材料数据格式错误'}), 400
         except json.JSONDecodeError:
             return jsonify({'success': False, 'message': '原材料数据格式错误'}), 400
             
@@ -2353,10 +2362,19 @@ def update_task_status(id):
         
         # 检查原材料库存
         for material in materials:
-            raw_material = RawMaterial.query.get(material['raw_material_id'])
+            if not isinstance(material, dict) or 'raw_material_id' not in material or 'quantity' not in material:
+                return jsonify({'success': False, 'message': '原材料数据格式错误'}), 400
+                
+            try:
+                material_id = int(material['raw_material_id'])
+                quantity = float(material['quantity'])
+            except (ValueError, TypeError):
+                return jsonify({'success': False, 'message': '原材料数据格式错误'}), 400
+                
+            raw_material = RawMaterial.query.get(material_id)
             if not raw_material:
                 return jsonify({'success': False, 'message': f'原材料不存在'}), 400
-            if raw_material.quantity < material['quantity']:
+            if raw_material.quantity < quantity:
                 return jsonify({'success': False, 'message': f'原材料 {raw_material.name} 库存不足'}), 400
         
         # 更新任务状态
@@ -2371,23 +2389,27 @@ def update_task_status(id):
                 process_id=task.process_id,
                 quantity=task.quantity,
                 global_sn=task.global_sn,
-                created_at=datetime.now()
+                created_at=datetime.now(),
+                production_date=datetime.now().date()  # 添加生产日期
             )
             db.session.add(production_record)
             db.session.flush()  # 获取生产记录ID
             
             # 添加原材料使用记录
             for material in materials:
-                material_usage = MaterialUsage(
+                material_usage = ProductionRecordMaterial(
                     production_record_id=production_record.id,
-                    raw_material_id=material['raw_material_id'],
-                    quantity=material['quantity']
+                    raw_material_id=int(material['raw_material_id']),
+                    quantity=float(material['quantity'])
                 )
                 db.session.add(material_usage)
                 
                 # 更新原材料库存
-                raw_material = RawMaterial.query.get(material['raw_material_id'])
-                raw_material.quantity -= material['quantity']
+                raw_material = RawMaterial.query.get(int(material['raw_material_id']))
+                raw_material.quantity -= float(material['quantity'])
+        else:
+            # 如果任务还未完成，但已经开始，更新状态为进行中
+            task.status = 'in_progress'
         
         # 记录审计日志
         audit_log = AuditLog(
@@ -2402,6 +2424,7 @@ def update_task_status(id):
         return jsonify({'success': True, 'message': '更新成功'})
     except Exception as e:
         db.session.rollback()
+        current_app.logger.error(f'更新任务状态失败: {str(e)}')
         return jsonify({'success': False, 'message': f'更新失败：{str(e)}'}), 500
 
 @bp.route('/tasks/<int:id>', methods=['DELETE'])
