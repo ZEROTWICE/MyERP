@@ -376,6 +376,7 @@ class FinishedProduct(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     status = db.Column(db.String(20), default='in_stock')  # in_stock: 在库, shipped: 已发货, scrapped: 报废, used: 已使用
     notes = db.Column(db.Text)  # 备注
+    is_archived = db.Column(db.Boolean, default=False)  # 是否已存档
     
     __table_args__ = (
         db.UniqueConstraint('serial_number', name='uq_finished_product_serial_number'),
@@ -403,6 +404,7 @@ class RawMaterial(db.Model):
     quantity = db.Column(db.Float, nullable=False)  # 数量
     notes = db.Column(db.Text)  # 备注
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    is_archived = db.Column(db.Boolean, default=False)  # 是否已存档
     
     __table_args__ = (
         db.UniqueConstraint('global_sn', name='uq_raw_material_global_sn'),

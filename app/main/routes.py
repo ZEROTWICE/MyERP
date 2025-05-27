@@ -2389,8 +2389,7 @@ def update_task_status(id):
                 process_id=task.process_id,
                 quantity=task.quantity,
                 global_sn=task.global_sn,
-                created_at=datetime.now(),
-                production_date=datetime.now().date()  # 添加生产日期
+                date=datetime.now().date()  # 使用 date 字段记录生产日期
             )
             db.session.add(production_record)
             db.session.flush()  # 获取生产记录ID
@@ -2415,8 +2414,7 @@ def update_task_status(id):
         audit_log = AuditLog(
             user_id=current_user.id,
             action='update_task',
-            details=f'更新任务 {task.id} 的完成数量为 {completed_quantity}',
-            ip_address=request.remote_addr
+            details=f'更新任务 {task.id} 的完成数量为 {completed_quantity}'
         )
         db.session.add(audit_log)
         
@@ -3476,6 +3474,7 @@ def manage_inventory():
     per_page = 20
     inventory_type = request.args.get('type', 'finished')
     search = request.args.get('search', '')
+    show_archived = request.args.get('show_archived', '0') == '1'
     
     if inventory_type == 'raw':
         query = RawMaterial.query
@@ -3487,6 +3486,8 @@ def manage_inventory():
                 RawMaterial.supplier_number.ilike(f'%{search}%'),
                 RawMaterial.internal_number.ilike(f'%{search}%')
             ))
+        if not show_archived:
+            query = query.filter_by(is_archived=False)
     else:
         query = FinishedProduct.query
         if search:
@@ -3496,18 +3497,17 @@ def manage_inventory():
                 FinishedProduct.model.ilike(f'%{search}%'),
                 FinishedProduct.inspector.ilike(f'%{search}%')
             ))
+        if not show_archived:
+            query = query.filter_by(is_archived=False)
     
     pagination = query.order_by(desc('id')).paginate(
         page=page, per_page=per_page, error_out=False
     )
     
-    # 获取可用的产品编码规则
-    code_rules = CodeRule.query.filter_by(code_type='product', is_active=True).all()
-    
     return render_template('main/inventory.html',
                          inventory=pagination.items,
                          pagination=pagination,
-                         code_rules=code_rules)
+                         show_archived=show_archived)
 
 @bp.route('/inventory/template')
 @login_required
@@ -4788,4 +4788,88 @@ def get_available_raw_materials():
         return jsonify({
             'success': False,
             'message': f'获取原材料列表失败: {str(e)}'
+        }), 500
+
+@bp.route('/inventory/raw/<int:id>/archive', methods=['POST'])
+@login_required
+def toggle_raw_material_archive(id):
+    """切换原材料存档状态"""
+    if current_user.role not in ['admin', 'manager']:
+        return jsonify({'success': False, 'message': '权限不足'}), 403
+    
+    try:
+        material = RawMaterial.query.get_or_404(id)
+        
+        # 切换存档状态
+        material.is_archived = not material.is_archived
+        action = '存档' if material.is_archived else '取消存档'
+        
+        # 记录审计日志
+        log = AuditLog(
+            user_id=current_user.id,
+            action=f'{action}原材料',
+            details=f'{action}原材料：{material.material_name}',
+            can_rollback=True,
+            rollback_type='edit',
+            target_model='RawMaterial',
+            target_id=material.id,
+            old_data={'is_archived': not material.is_archived},
+            new_data={'is_archived': material.is_archived}
+        )
+        db.session.add(log)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'原材料{action}成功'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f'原材料存档状态切换失败: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': f'操作失败：{str(e)}'
+        }), 500
+
+@bp.route('/inventory/finished/<int:id>/archive', methods=['POST'])
+@login_required
+def toggle_finished_product_archive(id):
+    """切换成品存档状态"""
+    if current_user.role not in ['admin', 'manager']:
+        return jsonify({'success': False, 'message': '权限不足'}), 403
+    
+    try:
+        product = FinishedProduct.query.get_or_404(id)
+        
+        # 切换存档状态
+        product.is_archived = not product.is_archived
+        action = '存档' if product.is_archived else '取消存档'
+        
+        # 记录审计日志
+        log = AuditLog(
+            user_id=current_user.id,
+            action=f'{action}成品',
+            details=f'{action}成品：{product.product_number}',
+            can_rollback=True,
+            rollback_type='edit',
+            target_model='FinishedProduct',
+            target_id=product.id,
+            old_data={'is_archived': not product.is_archived},
+            new_data={'is_archived': product.is_archived}
+        )
+        db.session.add(log)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'成品{action}成功'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f'成品存档状态切换失败: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': f'操作失败：{str(e)}'
         }), 500

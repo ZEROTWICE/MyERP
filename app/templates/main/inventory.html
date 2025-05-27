@@ -23,17 +23,30 @@
     <!-- 搜索和操作按钮 -->
     <div class="card mb-4">
         <div class="card-body">
-            <form method="get" class="row g-3">
+            <form method="get" class="row g-3 align-items-center">
                 <input type="hidden" name="type" value="{{ request.args.get('type', 'finished') }}">
-                <div class="col-md-6">
-                    <input type="text" class="form-control" name="search" 
-                           value="{{ request.args.get('search', '') }}" 
-                           placeholder="搜索...">
+                <div class="col-md-4">
+                    <div class="input-group">
+                        <input type="text" class="form-control" name="search" 
+                               value="{{ request.args.get('search', '') }}" 
+                               placeholder="搜索...">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-search"></i> 搜索
+                        </button>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="showArchived" 
+                               name="show_archived" value="1" 
+                               {% if request.args.get('show_archived') == '1' %}checked{% endif %}
+                               onchange="this.form.submit()">
+                        <label class="form-check-label" for="showArchived">
+                            显示已存档
+                        </label>
+                    </div>
                 </div>
                 <div class="col-md-6 text-end">
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-search"></i> 搜索
-                    </button>
                     {% if current_user.role in ['admin', 'manager'] %}
                     <a href="{{ url_for('main.download_inventory_template', type=request.args.get('type', 'finished')) }}" 
                        class="btn btn-info">
@@ -67,12 +80,14 @@
                     <th>内部编号</th>
                     <th>入库时间</th>
                     <th>数量</th>
+                    <th>样品</th>
+                    <th>状态</th>
                     <th>操作</th>
                 </tr>
             </thead>
             <tbody>
                 {% for item in inventory %}
-                <tr>
+                <tr class="{% if item.is_archived %}table-secondary{% endif %}">
                     <td>{{ item.supplier }}</td>
                     <td>{{ item.material_name }}</td>
                     <td>{{ item.melt_number }}</td>
@@ -80,14 +95,19 @@
                     <td>{{ item.internal_number }}</td>
                     <td>{{ item.storage_date.strftime('%Y-%m-%d') }}</td>
                     <td>{{ item.quantity }}</td>
+                    <td>{{ '是' if item.has_sample else '否' }}</td>
+                    <td>{{ '已存档' if item.is_archived else '在库' }}</td>
                     <td>
                         {% if current_user.role in ['admin', 'manager'] %}
-                        <button class="btn btn-sm btn-primary" onclick="editRawMaterial({{ item.id | tojson }})">
-                            <i class="fas fa-edit"></i>
-                        </button>
-                        <button class="btn btn-sm btn-danger" onclick="deleteRawMaterial({{ item.id | tojson }})">
-                            <i class="fas fa-trash"></i>
-                        </button>
+                        <div class="btn-group">
+                            <button class="btn btn-sm btn-primary edit-raw-material" data-id="{{ item.id }}">编辑</button>
+                            <button class="btn btn-sm {% if item.is_archived %}btn-success{% else %}btn-warning{% endif %} toggle-archive-raw-material" 
+                                    data-id="{{ item.id }}"
+                                    data-archived="{{ item.is_archived|tojson }}">
+                                {{ '取消存档' if item.is_archived else '存档' }}
+                            </button>
+                            <button class="btn btn-sm btn-danger delete-raw-material" data-id="{{ item.id }}">删除</button>
+                        </div>
                         {% endif %}
                     </td>
                 </tr>
@@ -105,12 +125,13 @@
                     <th>生产日期</th>
                     <th>检验员</th>
                     <th>数量</th>
+                    <th>状态</th>
                     <th>操作</th>
                 </tr>
             </thead>
             <tbody>
                 {% for item in inventory %}
-                <tr>
+                <tr class="{% if item.is_archived %}table-secondary{% endif %}">
                     <td>{{ item.product_number }}</td>
                     <td>{{ item.drawing_number }}</td>
                     <td>{{ item.model }}</td>
@@ -118,13 +139,23 @@
                     <td>{{ item.inspector }}</td>
                     <td>{{ item.quantity }}</td>
                     <td>
+                        {% if item.is_archived %}
+                            已存档
+                        {% else %}
+                            {{ item.status }}
+                        {% endif %}
+                    </td>
+                    <td>
                         {% if current_user.role in ['admin', 'manager'] %}
-                        <button class="btn btn-sm btn-primary" onclick="editFinishedProduct({{ item.id | tojson }})">
-                            <i class="fas fa-edit"></i>
-                        </button>
-                        <button class="btn btn-sm btn-danger" onclick="deleteFinishedProduct({{ item.id | tojson }})">
-                            <i class="fas fa-trash"></i>
-                        </button>
+                        <div class="btn-group">
+                            <button class="btn btn-sm btn-primary edit-finished-product" data-id="{{ item.id }}">编辑</button>
+                            <button class="btn btn-sm {% if item.is_archived %}btn-success{% else %}btn-warning{% endif %} toggle-archive-finished-product" 
+                                    data-id="{{ item.id }}"
+                                    data-archived="{{ item.is_archived|tojson }}">
+                                {{ '取消存档' if item.is_archived else '存档' }}
+                            </button>
+                            <button class="btn btn-sm btn-danger delete-finished-product" data-id="{{ item.id }}">删除</button>
+                        </div>
                         {% endif %}
                     </td>
                 </tr>
@@ -684,6 +715,68 @@ function showToast(type, message) {
     document.getElementById('toast').classList.add(type === 'success' ? 'bg-success' : 'bg-danger');
     toast.show();
 }
+
+// 切换原材料存档状态
+$('.toggle-archive-raw-material').click(function() {
+    const id = $(this).data('id');
+    const isArchived = $(this).data('archived');
+    const action = isArchived ? '取消存档' : '存档';
+    
+    if (confirm(`确定要${action}这个原材料吗？`)) {
+        fetch(`/inventory/raw/${id}/archive`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token() }}'
+            },
+            credentials: 'same-origin'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast('success', `${action}成功`);
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showToast('error', data.message || `${action}失败`);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showToast('error', `${action}失败，请重试`);
+        });
+    }
+});
+
+// 切换成品存档状态
+$('.toggle-archive-finished-product').click(function() {
+    const id = $(this).data('id');
+    const isArchived = $(this).data('archived');
+    const action = isArchived ? '取消存档' : '存档';
+    
+    if (confirm(`确定要${action}这个成品吗？`)) {
+        fetch(`/inventory/finished/${id}/archive`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token() }}'
+            },
+            credentials: 'same-origin'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast('success', `${action}成功`);
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showToast('error', data.message || `${action}失败`);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showToast('error', `${action}失败，请重试`);
+        });
+    }
+});
 </script>
 
 <!-- 添加成品模态框 -->
