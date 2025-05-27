@@ -1,0 +1,509 @@
+{% extends "base.html" %}
+
+{% block title %}质检任务详情{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>质检任务详情</h2>
+        <div>
+            <a href="{{ url_for('main.quality_tasks') }}" class="btn btn-secondary">
+                返回任务列表
+            </a>
+            {% if task.status == 'pending' and (current_user.role in ['admin', 'manager'] or (current_user.role == 'inspector' and task.inspector_id == current_user.id)) %}
+            <button class="btn btn-success" data-task-id="{{ task.id }}" onclick="startInspection(this.dataset.taskId)">
+                开始质检
+            </button>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- 任务基本信息 -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">任务基本信息</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-3">
+                    <p class="mb-1"><strong>任务编号</strong></p>
+                    <p>{{ task.global_sn }}</p>
+                </div>
+                <div class="col-md-3">
+                    <p class="mb-1"><strong>检验类型</strong></p>
+                    <p>
+                        {% if task.target_type == 'production_record' %}
+                        生产记录质检
+                        {% elif task.target_type == 'product' %}
+                        成品质检
+                        {% elif task.target_type == 'material' %}
+                        原材料质检
+                        {% else %}
+                        {{ task.target_type }}
+                        {% endif %}
+                    </p>
+                </div>
+                <div class="col-md-3">
+                    <p class="mb-1"><strong>任务状态</strong></p>
+                    <p>
+                        {% if task.status == 'pending' %}
+                        <span class="badge bg-secondary">待处理</span>
+                        {% elif task.status == 'in_progress' %}
+                        <span class="badge bg-primary">进行中</span>
+                        {% elif task.status == 'completed' %}
+                        <span class="badge bg-success">已完成</span>
+                        {% elif task.status == 'failed' %}
+                        <span class="badge bg-danger">不合格</span>
+                        {% else %}
+                        <span class="badge bg-secondary">{{ task.status }}</span>
+                        {% endif %}
+                    </p>
+                </div>
+                <div class="col-md-3">
+                    <p class="mb-1"><strong>优先级</strong></p>
+                    <p>
+                        {% if task.priority == 0 %}
+                        <span class="badge bg-info">低</span>
+                        {% elif task.priority == 1 %}
+                        <span class="badge bg-warning">中</span>
+                        {% elif task.priority == 2 %}
+                        <span class="badge bg-danger">高</span>
+                        {% else %}
+                        {{ task.priority }}
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+            <div class="row mt-3">
+                <div class="col-md-3">
+                    <p class="mb-1"><strong>检验员</strong></p>
+                    <p>{{ task.inspector.employee.name if task.inspector and task.inspector.employee else (task.inspector.username if task.inspector else '未分配') }}</p>
+                </div>
+                <div class="col-md-3">
+                    <p class="mb-1"><strong>创建时间</strong></p>
+                    <p>{{ task.created_at.strftime('%Y-%m-%d %H:%M') }}</p>
+                </div>
+                <div class="col-md-3">
+                    <p class="mb-1"><strong>计划完成时间</strong></p>
+                    <p>{{ task.deadline.strftime('%Y-%m-%d %H:%M') if task.deadline else '未设置' }}</p>
+                </div>
+                <div class="col-md-3">
+                    <p class="mb-1"><strong>完成时间</strong></p>
+                    <p>{{ task.completed_at.strftime('%Y-%m-%d %H:%M') if task.completed_at else '未完成' }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 检验对象信息 -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">检验对象信息</h5>
+        </div>
+        <div class="card-body">
+            {% if task.target_type == 'production_record' %}
+                {% set record = task.target_record %}
+                {% if record %}
+                <div class="row">
+                    <div class="col-md-3">
+                        <p class="mb-1"><strong>生产记录编号</strong></p>
+                        <p>{{ record.global_sn }}</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p class="mb-1"><strong>员工</strong></p>
+                        <p>{{ record.employee.name }} ({{ record.employee.employee_id }})</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p class="mb-1"><strong>工序</strong></p>
+                        <p>{{ record.process.process_name }}</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p class="mb-1"><strong>数量</strong></p>
+                        <p>{{ record.quantity }}</p>
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-md-3">
+                        <p class="mb-1"><strong>生产日期</strong></p>
+                        <p>{{ record.date.strftime('%Y-%m-%d') }}</p>
+                    </div>
+                    <div class="col-md-9">
+                        <p class="mb-1"><strong>备注</strong></p>
+                        <p>{{ record.notes or '无' }}</p>
+                    </div>
+                </div>
+                {% else %}
+                <p class="text-danger">生产记录不存在或已删除</p>
+                {% endif %}
+            {% elif task.target_type == 'product' %}
+                {% set product = task.target_product %}
+                {% if product %}
+                <div class="row">
+                    <div class="col-md-3">
+                        <p class="mb-1"><strong>产品编号</strong></p>
+                        <p>{{ product.product_number }}</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p class="mb-1"><strong>图纸编号</strong></p>
+                        <p>{{ product.drawing_number or '无' }}</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p class="mb-1"><strong>型号</strong></p>
+                        <p>{{ product.model or '无' }}</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p class="mb-1"><strong>数量</strong></p>
+                        <p>{{ product.quantity }}</p>
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-md-3">
+                        <p class="mb-1"><strong>生产日期</strong></p>
+                        <p>{{ product.production_date.strftime('%Y-%m-%d') }}</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p class="mb-1"><strong>状态</strong></p>
+                        <p>{{ product.status }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <p class="mb-1"><strong>检验员</strong></p>
+                        <p>{{ product.inspector or '无' }}</p>
+                    </div>
+                </div>
+                {% else %}
+                <p class="text-danger">成品不存在或已删除</p>
+                {% endif %}
+            {% elif task.target_type == 'material' %}
+                {% set material = task.target_material %}
+                {% if material %}
+                <div class="row">
+                    <div class="col-md-3">
+                        <p class="mb-1"><strong>内部编号</strong></p>
+                        <p>{{ material.internal_number }}</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p class="mb-1"><strong>材料名称</strong></p>
+                        <p>{{ material.material_name }}</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p class="mb-1"><strong>供应商</strong></p>
+                        <p>{{ material.supplier }}</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p class="mb-1"><strong>数量</strong></p>
+                        <p>{{ material.quantity }}</p>
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-md-3">
+                        <p class="mb-1"><strong>冶炼炉号</strong></p>
+                        <p>{{ material.melt_number }}</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p class="mb-1"><strong>供应商编号</strong></p>
+                        <p>{{ material.supplier_number }}</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p class="mb-1"><strong>入库时间</strong></p>
+                        <p>{{ material.storage_date.strftime('%Y-%m-%d %H:%M') }}</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p class="mb-1"><strong>状态</strong></p>
+                        <p>{{ material.status }}</p>
+                    </div>
+                </div>
+                {% else %}
+                <p class="text-danger">原材料不存在或已删除</p>
+                {% endif %}
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- 质检模板信息 -->
+    {% if task.template %}
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">质检模板信息</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-3">
+                    <p class="mb-1"><strong>模板编码</strong></p>
+                    <p>{{ task.template.template_code }}</p>
+                </div>
+                <div class="col-md-3">
+                    <p class="mb-1"><strong>模板名称</strong></p>
+                    <p>{{ task.template.name }}</p>
+                </div>
+                <div class="col-md-3">
+                    <p class="mb-1"><strong>模板类型</strong></p>
+                    <p>{{ task.template.type }}</p>
+                </div>
+                <div class="col-md-3">
+                    <p class="mb-1"><strong>状态</strong></p>
+                    <p>
+                        {% if task.template.is_active %}
+                        <span class="badge bg-success">启用</span>
+                        {% else %}
+                        <span class="badge bg-secondary">禁用</span>
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+            {% if task.template.description %}
+            <div class="row mt-3">
+                <div class="col-md-12">
+                    <p class="mb-1"><strong>模板描述</strong></p>
+                    <p>{{ task.template.description }}</p>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- 质检记录 -->
+    {% if task.record %}
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">质检记录</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-3">
+                    <p class="mb-1"><strong>记录编号</strong></p>
+                    <p>{{ task.record.global_sn }}</p>
+                </div>
+                <div class="col-md-3">
+                    <p class="mb-1"><strong>检验日期</strong></p>
+                    <p>{{ task.record.inspection_date.strftime('%Y-%m-%d') }}</p>
+                </div>
+                <div class="col-md-3">
+                    <p class="mb-1"><strong>检验结果</strong></p>
+                    <p>
+                        {% if task.record.result == 'pass' %}
+                        <span class="badge bg-success">合格</span>
+                        {% elif task.record.result == 'fail' %}
+                        <span class="badge bg-danger">不合格</span>
+                        {% else %}
+                        <span class="badge bg-secondary">{{ task.record.result }}</span>
+                        {% endif %}
+                    </p>
+                </div>
+                <div class="col-md-3">
+                    <p class="mb-1"><strong>操作</strong></p>
+                    <p>
+                        <a href="{{ url_for('main.quality_inspection', record_id=task.record.id) }}" class="btn btn-sm btn-primary">
+                            查看详情
+                        </a>
+                    </p>
+                </div>
+            </div>
+            {% if task.record.notes %}
+            <div class="row mt-3">
+                <div class="col-md-12">
+                    <p class="mb-1"><strong>备注</strong></p>
+                    <p>{{ task.record.notes }}</p>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- 操作按钮 -->
+    {% if current_user.role in ['admin', 'manager'] %}
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">操作</h5>
+        </div>
+        <div class="card-body">
+            <button class="btn btn-warning" data-task-id="{{ task.id }}" onclick="editTask(this.dataset.taskId)">
+                编辑任务
+            </button>
+            {% if task.status == 'pending' %}
+            <button class="btn btn-danger" data-task-id="{{ task.id }}" onclick="deleteTask(this.dataset.taskId)">
+                删除任务
+            </button>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- 开始质检模态框 -->
+<div class="modal fade" id="startInspectionModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">开始质检</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="startInspectionForm">
+                    <input type="hidden" id="inspectionTaskId" value="{{ task.id }}">
+                    
+                    <!-- 选择质检模板 -->
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <h6 class="mb-0">选择质检模板</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-12">
+                                    <label class="form-label">质检模板</label>
+                                    <select class="form-select" id="inspectionTemplateId" name="template_id" required>
+                                        <option value="">请选择质检模板</option>
+                                    </select>
+                                    <div class="form-text">选择适合的质检模板来进行检验</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">备注</label>
+                        <textarea class="form-control" id="inspectionNotes" name="notes" rows="2" placeholder="可以添加检验相关的备注信息"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="confirmStartInspection()">开始质检</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let startInspectionModal;
+
+document.addEventListener('DOMContentLoaded', function() {
+    startInspectionModal = new bootstrap.Modal(document.getElementById('startInspectionModal'));
+});
+
+// 开始质检
+function startInspection(taskId) {
+    // 加载适合的质检模板
+    loadInspectionTemplates('{{ task.target_type }}');
+    startInspectionModal.show();
+}
+
+// 加载质检模板
+function loadInspectionTemplates(taskType) {
+    fetch(`/api/quality/templates?type=${taskType}&is_active=true`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const select = document.getElementById('inspectionTemplateId');
+                select.innerHTML = '<option value="">请选择质检模板</option>';
+                
+                if (data.data && data.data.items) {
+                    data.data.items.forEach(template => {
+                        const option = document.createElement('option');
+                        option.value = template.id;
+                        option.textContent = `${template.template_code} - ${template.name}`;
+                        select.appendChild(option);
+                    });
+                }
+            } else {
+                showToast('error', data.message || '加载质检模板失败');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showToast('error', '加载质检模板失败');
+        });
+}
+
+// 确认开始质检
+function confirmStartInspection() {
+    const taskId = document.getElementById('inspectionTaskId').value;
+    const templateId = document.getElementById('inspectionTemplateId').value;
+    const notes = document.getElementById('inspectionNotes').value;
+    
+    if (!templateId) {
+        showToast('error', '请选择质检模板');
+        return;
+    }
+    
+    // 发送开始质检请求
+    fetch(`/api/quality/tasks/${taskId}/start-inspection`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            template_id: templateId,
+            notes: notes
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast('success', data.message);
+            startInspectionModal.hide();
+            
+            // 跳转到质检记录页面进行实际检验
+            if (data.record_id) {
+                window.location.href = `/quality/inspection/${data.record_id}`;
+            } else {
+                // 刷新页面显示最新状态
+                window.location.reload();
+            }
+        } else {
+            showToast('error', data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showToast('error', '开始质检失败');
+    });
+}
+
+// 编辑任务
+function editTask(id) {
+    window.location.href = `/quality/tasks?edit=${id}`;
+}
+
+// 删除任务
+function deleteTask(id) {
+    if (!confirm('确定要删除这个任务吗？')) return;
+    
+    fetch(`/api/quality/tasks/${id}`, {
+        method: 'DELETE'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast('success', data.message);
+            window.location.href = '/quality/tasks';
+        } else {
+            showToast('error', data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showToast('error', '删除失败');
+    });
+}
+
+// 显示提示消息
+function showToast(type, message) {
+    const toast = Swal.mixin({
+        toast: true,
+        position: 'top-end',
+        showConfirmButton: false,
+        timer: 3000,
+        timerProgressBar: true
+    });
+    
+    toast.fire({
+        icon: type,
+        title: message
+    });
+}
+</script>
+{% endblock %} 

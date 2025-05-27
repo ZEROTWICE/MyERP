@@ -116,16 +116,10 @@
                     <div class="row mb-3">
                         <div class="col-md-4">
                             <label class="form-label">任务类型</label>
-                            <select class="form-select" id="taskType" name="type" required onchange="loadTemplates()">
+                            <select class="form-select" id="taskType" name="type" required onchange="loadInspectionTargets()">
                                 <option value="production_record">生产记录质检</option>
                                 <option value="product">成品质检</option>
                                 <option value="material">原材料质检</option>
-                            </select>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label">质检模板</label>
-                            <select class="form-select" id="templateId" name="template_id" required>
-                                <option value="">请选择模板</option>
                             </select>
                         </div>
                         <div class="col-md-4">
@@ -134,25 +128,25 @@
                                 <option value="">请选择检验员</option>
                             </select>
                         </div>
+                        <div class="col-md-4">
+                            <label class="form-label">优先级</label>
+                            <select class="form-select" id="priority" name="priority">
+                                <option value="0">低</option>
+                                <option value="1" selected>中</option>
+                                <option value="2">高</option>
+                            </select>
+                        </div>
                     </div>
                     <div class="row mb-3">
-                        <div class="col-md-4">
+                        <div class="col-md-6">
                             <label class="form-label">检验对象</label>
                             <div id="inspectionTargetContainer">
                                 <!-- 根据任务类型动态加载不同的选择控件 -->
                             </div>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-6">
                             <label class="form-label">计划完成时间</label>
                             <input type="datetime-local" class="form-control" id="plannedCompletionTime" name="planned_completion_time" required>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label">优先级</label>
-                            <select class="form-select" id="priority" name="priority">
-                                <option value="low">低</option>
-                                <option value="medium" selected>中</option>
-                                <option value="high">高</option>
-                            </select>
                         </div>
                     </div>
                     <div class="mb-3">
@@ -198,6 +192,62 @@
     </div>
 </div>
 
+<!-- 开始质检模态框 -->
+<div class="modal fade" id="startInspectionModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">开始质检</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="startInspectionForm">
+                    <input type="hidden" id="inspectionTaskId">
+                    
+                    <!-- 任务信息 -->
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <h6 class="mb-0">任务信息</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row" id="taskInfo">
+                                <!-- 任务信息将通过JavaScript动态加载 -->
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 选择质检模板 -->
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <h6 class="mb-0">选择质检模板</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-12">
+                                    <label class="form-label">质检模板</label>
+                                    <select class="form-select" id="inspectionTemplateId" name="template_id" required>
+                                        <option value="">请选择质检模板</option>
+                                    </select>
+                                    <div class="form-text">选择适合的质检模板来进行检验</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">备注</label>
+                        <textarea class="form-control" id="inspectionNotes" name="notes" rows="2" placeholder="可以添加检验相关的备注信息"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="confirmStartInspection()">开始质检</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}
@@ -206,12 +256,14 @@ let currentPage = 1;
 let itemsPerPage = 20;
 let taskModal;
 let importModal;
+let startInspectionModal;
 
 // 页面加载完成后初始化
 document.addEventListener('DOMContentLoaded', function() {
     // 初始化模态框
     taskModal = new bootstrap.Modal(document.getElementById('taskModal'));
     importModal = new bootstrap.Modal(document.getElementById('importModal'));
+    startInspectionModal = new bootstrap.Modal(document.getElementById('startInspectionModal'));
     
     // 加载任务列表
     loadTasks();
@@ -230,7 +282,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const taskTypeSelect = document.getElementById('taskType');
     if (taskTypeSelect) {
         taskTypeSelect.addEventListener('change', function() {
-            loadTemplates();
             loadInspectionTargets();
         });
     }
@@ -407,7 +458,7 @@ function showCreateTaskModal() {
     document.getElementById('taskForm').reset();
     document.getElementById('taskId').value = '';
     
-    // 清理可能存在的Select2实例
+    // 清理可能存在的检验对象Select2实例
     $('.inspection-target-select').each(function() {
         if ($(this).hasClass('select2-hidden-accessible')) {
             $(this).select2('destroy');
@@ -415,18 +466,19 @@ function showCreateTaskModal() {
     });
     
     // 初始化检验员列表
-    loadInspectorOptions();
-    // 加载质检模板
-    loadTemplates();
-    // 加载检验对象
-    loadInspectionTargets();
+    loadInspectorOptions().then(() => {
+        // 加载检验对象
+        loadInspectionTargets();
+    }).catch(error => {
+        console.error('加载检验员失败:', error);
+    });
     
     taskModal.show();
 }
 
 // 加载检验员选项
 function loadInspectorOptions() {
-    fetch('/api/quality/inspectors')
+    return fetch('/api/quality/inspectors')
         .then(response => response.json())
         .then(data => {
             if (data.success) {
@@ -438,34 +490,15 @@ function loadInspectorOptions() {
                     option.textContent = inspector.name;
                     select.appendChild(option);
                 });
+                return data; // 返回数据以便链式调用
+            } else {
+                throw new Error(data.message || '加载检验员列表失败');
             }
         })
         .catch(error => {
             console.error('Error:', error);
             showToast('error', '加载检验员列表失败');
-        });
-}
-
-// 加载质检模板
-function loadTemplates() {
-    const type = document.getElementById('taskType').value;
-    fetch(`/api/quality/templates?type=${type}&is_active=true`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                const select = document.getElementById('templateId');
-                select.innerHTML = '<option value="">请选择模板</option>';
-                data.templates.forEach(template => {
-                    const option = document.createElement('option');
-                    option.value = template.id;
-                    option.textContent = template.name;
-                    select.appendChild(option);
-                });
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            showToast('error', '加载质检模板失败');
+            throw error; // 重新抛出错误
         });
 }
 
@@ -527,7 +560,7 @@ function loadInspectionTargets() {
                     </select>
                 `;
                 
-                // 初始化Select2搜索功能
+                // 初始化检验对象选择器的搜索功能
                 initializeInspectionTargetSelect();
             } else {
                 showToast('error', data.message || '加载检验对象失败');
@@ -550,7 +583,6 @@ function saveTask() {
     // 构建请求数据
     const data = {
         type: formData.get('type'),
-        template_id: formData.get('template_id'),
         inspector_id: formData.get('inspector_id'),
         inspection_target_id: formData.get('inspection_target_id'),
         planned_completion_time: formData.get('planned_completion_time'),
@@ -607,11 +639,6 @@ function deleteTask(id) {
     });
 }
 
-// 开始质检
-function startInspection(id) {
-    window.location.href = `/quality/inspection/${id}`;
-}
-
 // 导出任务
 function exportTasks() {
     const searchForm = document.getElementById('searchForm');
@@ -666,49 +693,68 @@ function submitImport() {
 // 编辑任务
 function editTask(id) {
     fetch(`/api/quality/tasks/${id}`)
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            return response.json();
+        })
         .then(data => {
             if (data.success) {
                 const task = data.data;
                 
                 // 填充表单
                 document.getElementById('taskModalTitle').textContent = '编辑质检任务';
-                document.getElementById('taskId').value = task.id;
-                document.getElementById('taskType').value = task.type;
-                document.getElementById('templateId').value = task.template_id;
-                document.getElementById('inspectorId').value = task.inspector_id;
-                document.getElementById('plannedCompletionTime').value = task.planned_completion_time;
-                document.getElementById('priority').value = task.priority;
+                document.getElementById('taskId').value = task.id || '';
+                document.getElementById('taskType').value = task.type || '';
+                
+                // 处理日期时间字段
+                const plannedTime = task.planned_completion_time;
+                if (plannedTime) {
+                    // 确保日期格式正确
+                    const date = new Date(plannedTime);
+                    if (!isNaN(date.getTime())) {
+                        const formattedDate = date.toISOString().slice(0, 16);
+                        document.getElementById('plannedCompletionTime').value = formattedDate;
+                    }
+                } else {
+                    document.getElementById('plannedCompletionTime').value = '';
+                }
+                
+                document.getElementById('priority').value = task.priority || 1;
                 document.getElementById('notes').value = task.notes || '';
                 
-                // 清理可能存在的Select2实例
-                $('.inspection-target-select').each(function() {
-                    if ($(this).hasClass('select2-hidden-accessible')) {
-                        $(this).select2('destroy');
-                    }
-                });
+                // 加载检验员选项并设置选中值
+                loadInspectorOptions()
+                    .then(() => {
+                        document.getElementById('inspectorId').value = task.inspector_id || '';
+                    })
+                    .catch(error => {
+                        console.error('加载检验员选项失败:', error);
+                        showToast('error', '加载检验员选项失败');
+                    });
                 
-                // 加载检验员列表
-                loadInspectorOptions();
-                // 加载质检模板
-                loadTemplates();
-                // 加载检验对象并设置选中值
-                loadInspectionTargetsForEdit(task.target_id);
+                // 根据类型加载检验对象并设置选中值
+                loadInspectionTargetsForEdit(task.type, task.target_id);
                 
+                // 显示模态框
                 taskModal.show();
             } else {
-                showToast('error', data.message);
+                showToast('error', data.message || '获取任务信息失败');
             }
         })
         .catch(error => {
             console.error('Error:', error);
-            showToast('error', '加载任务详情失败');
+            let errorMessage = '网络错误，请稍后重试';
+            if (error.message.includes('HTTP')) {
+                errorMessage = `请求失败: ${error.message}`;
+            }
+            showToast('error', errorMessage);
         });
 }
 
 // 为编辑模式加载检验对象
-function loadInspectionTargetsForEdit(selectedTargetId) {
-    const type = document.getElementById('taskType').value;
+function loadInspectionTargetsForEdit(type, selectedTargetId) {
     const container = document.getElementById('inspectionTargetContainer');
     
     // 显示加载中提示
@@ -726,10 +772,18 @@ function loadInspectionTargetsForEdit(selectedTargetId) {
         case 'material':
             url = '/api/inventory/raw-materials';
             break;
+        default:
+            container.innerHTML = '<div class="alert alert-warning">未知的检验对象类型</div>';
+            return;
     }
     
     fetch(url)
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            return response.json();
+        })
         .then(data => {
             if (data.success) {
                 let options = '<option value="">请选择检验对象</option>';
@@ -764,17 +818,22 @@ function loadInspectionTargetsForEdit(selectedTargetId) {
                     </select>
                 `;
                 
-                // 初始化Select2搜索功能
+                // 初始化检验对象选择器的搜索功能
                 initializeInspectionTargetSelect();
             } else {
-                showToast('error', data.message || '加载检验对象失败');
-                container.innerHTML = '<div class="alert alert-danger">加载检验对象失败：' + (data.message || '未知错误') + '</div>';
+                const errorMsg = data.message || '加载检验对象失败';
+                showToast('error', errorMsg);
+                container.innerHTML = `<div class="alert alert-danger">加载检验对象失败：${errorMsg}</div>`;
             }
         })
         .catch(error => {
             console.error('Error:', error);
-            showToast('error', '加载检验对象失败');
-            container.innerHTML = '<div class="alert alert-danger">加载检验对象失败，请稍后重试</div>';
+            let errorMessage = '加载检验对象失败';
+            if (error.message.includes('HTTP')) {
+                errorMessage = `请求失败: ${error.message}`;
+            }
+            showToast('error', errorMessage);
+            container.innerHTML = `<div class="alert alert-danger">${errorMessage}，请稍后重试</div>`;
         });
 }
 
@@ -838,6 +897,140 @@ function initializeInspectionTargetSelect() {
             }
         });
     }
+}
+
+// 开始质检
+function startInspection(taskId) {
+    // 获取任务详情
+    fetch(`/api/quality/tasks/${taskId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showStartInspectionModal(data.data);
+            } else {
+                showToast('error', data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showToast('error', '获取任务详情失败');
+        });
+}
+
+// 显示开始质检模态框
+function showStartInspectionModal(task) {
+    document.getElementById('inspectionTaskId').value = task.id;
+    
+    // 显示任务信息
+    const taskInfo = document.getElementById('taskInfo');
+    taskInfo.innerHTML = `
+        <div class="col-md-4">
+            <p class="mb-1"><strong>任务编号</strong></p>
+            <p>${task.task_code}</p>
+        </div>
+        <div class="col-md-4">
+            <p class="mb-1"><strong>检验类型</strong></p>
+            <p>${getTaskTypeName(task.type)}</p>
+        </div>
+        <div class="col-md-4">
+            <p class="mb-1"><strong>检验对象</strong></p>
+            <p>${task.inspection_target}</p>
+        </div>
+        <div class="col-md-4">
+            <p class="mb-1"><strong>检验员</strong></p>
+            <p>${task.inspector_name}</p>
+        </div>
+        <div class="col-md-4">
+            <p class="mb-1"><strong>计划完成时间</strong></p>
+            <p>${task.planned_completion_time}</p>
+        </div>
+        <div class="col-md-4">
+            <p class="mb-1"><strong>任务状态</strong></p>
+            <p>
+                <span class="badge ${getStatusBadgeClass(task.status)}">
+                    ${getStatusName(task.status)}
+                </span>
+            </p>
+        </div>
+    `;
+    
+    // 加载适合的质检模板
+    loadInspectionTemplates(task.type);
+    
+    // 清空备注
+    document.getElementById('inspectionNotes').value = '';
+    
+    startInspectionModal.show();
+}
+
+// 加载质检模板
+function loadInspectionTemplates(taskType) {
+    fetch(`/api/quality/templates?type=${taskType}&is_active=true`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const select = document.getElementById('inspectionTemplateId');
+                select.innerHTML = '<option value="">请选择质检模板</option>';
+                
+                if (data.data && data.data.items) {
+                    data.data.items.forEach(template => {
+                        const option = document.createElement('option');
+                        option.value = template.id;
+                        option.textContent = `${template.template_code} - ${template.name}`;
+                        select.appendChild(option);
+                    });
+                }
+            } else {
+                showToast('error', data.message || '加载质检模板失败');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showToast('error', '加载质检模板失败');
+        });
+}
+
+// 确认开始质检
+function confirmStartInspection() {
+    const taskId = document.getElementById('inspectionTaskId').value;
+    const templateId = document.getElementById('inspectionTemplateId').value;
+    const notes = document.getElementById('inspectionNotes').value;
+    
+    if (!templateId) {
+        showToast('error', '请选择质检模板');
+        return;
+    }
+    
+    // 发送开始质检请求
+    fetch(`/api/quality/tasks/${taskId}/start-inspection`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            template_id: templateId,
+            notes: notes
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast('success', data.message);
+            startInspectionModal.hide();
+            loadTasks();
+            
+            // 跳转到质检记录页面进行实际检验
+            if (data.record_id) {
+                window.location.href = `/quality/inspection/${data.record_id}`;
+            }
+        } else {
+            showToast('error', data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showToast('error', '开始质检失败');
+    });
 }
 
 // 显示提示消息

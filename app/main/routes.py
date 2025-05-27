@@ -2488,6 +2488,61 @@ def update_task_status(id):
             db.session.add(production_record)
             db.session.flush()  # 获取生产记录ID
             
+            # 检查工序是否需要检验，如果需要则自动创建质检任务
+            process = ProcessPrice.query.get(task.process_id)
+            if process and process.needs_inspection:
+                try:
+                    # 查找默认的质检员（可以是管理员或质检员角色）
+                    default_inspector = User.query.filter(
+                        db.or_(
+                            User.role == 'inspector',
+                            User.role == 'admin'
+                        )
+                    ).first()
+                    
+                    if default_inspector:
+                        # 创建质检任务
+                        from app.models import InspectionTask, SerialNumber
+                        inspection_task = InspectionTask(
+                            global_sn=SerialNumber.get_next_number(),
+                            target_type='production_record',
+                            target_id=production_record.id,
+                            inspector_id=default_inspector.id,
+                            priority=1,  # 中等优先级
+                            deadline=datetime.now() + timedelta(days=3),  # 3天内完成
+                            notes=f'工序 {process.process_name} 完成后自动创建的质检任务',
+                            created_by=current_user.id,
+                            status='pending'
+                        )
+                        db.session.add(inspection_task)
+                        
+                        # 记录质检任务创建的审计日志
+                        inspection_log = AuditLog(
+                            user_id=current_user.id,
+                            action='自动创建质检任务',
+                            details=f'工序 {process.process_name} 完成后自动创建质检任务：{inspection_task.global_sn}',
+                            can_rollback=True,
+                            rollback_type='add',
+                            target_model='InspectionTask',
+                            target_id=inspection_task.id,
+                            new_data={
+                                'target_type': 'production_record',
+                                'target_id': production_record.id,
+                                'inspector_id': default_inspector.id,
+                                'priority': 1,
+                                'auto_created': True
+                            }
+                        )
+                        db.session.add(inspection_log)
+                        
+                        current_app.logger.info(f'自动创建质检任务：{inspection_task.global_sn}，对应生产记录：{production_record.global_sn}')
+                    else:
+                        current_app.logger.warning(f'未找到可用的质检员，无法为生产记录 {production_record.global_sn} 创建质检任务')
+                        
+                except Exception as e:
+                    current_app.logger.error(f'自动创建质检任务失败: {str(e)}')
+                    # 不影响主流程，继续执行
+            
             # 添加原材料使用记录
             for material in materials:
                 material_usage = ProductionRecordMaterial(

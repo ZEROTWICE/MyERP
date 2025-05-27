@@ -521,7 +521,6 @@ class InspectionTemplate(db.Model):
     creator = db.relationship('User', backref=db.backref('created_templates', lazy='dynamic'))
     base_items = db.relationship('InspectionBaseItem', backref='template', lazy='dynamic')
     items = db.relationship('InspectionItem', backref='template', lazy='dynamic')
-    tasks = db.relationship('InspectionTask', backref='template', lazy='dynamic')
 
     def __repr__(self):
         return f'<InspectionTemplate {self.template_code}>'
@@ -584,21 +583,44 @@ class InspectionTask(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     global_sn = db.Column(db.String(50), unique=True, nullable=False, comment='全局流水号', index=True)
-    template_id = db.Column(db.Integer, db.ForeignKey('inspection_templates.id'), nullable=False, index=True)
+    template_id = db.Column(db.Integer, db.ForeignKey('inspection_templates.id'), nullable=True, index=True)
     inspector_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
     target_type = db.Column(db.String(20), nullable=False, comment='检验对象类型(product/production_record/material)', index=True)
     target_id = db.Column(db.Integer, nullable=False, comment='检验对象ID', index=True)
     status = db.Column(db.String(20), nullable=False, default='pending', comment='任务状态(pending/in_progress/completed/cancelled)', index=True)
     priority = db.Column(db.Integer, default=0, comment='优先级', index=True)
     deadline = db.Column(db.DateTime, comment='截止时间', index=True)
+    notes = db.Column(db.Text, comment='备注说明')
     created_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.now, index=True)
     completed_at = db.Column(db.DateTime, comment='完成时间', index=True)
 
     # 关联关系
+    template = db.relationship('InspectionTemplate', backref=db.backref('tasks', lazy='dynamic'))
     inspector = db.relationship('User', foreign_keys=[inspector_id], backref=db.backref('inspection_tasks', lazy='dynamic'))
     creator = db.relationship('User', foreign_keys=[created_by], backref=db.backref('created_tasks', lazy='dynamic'))
     record = db.relationship('InspectionRecord', backref='task', uselist=False)
+
+    @property
+    def target_record(self):
+        """获取生产记录对象"""
+        if self.target_type == 'production_record':
+            return ProductionRecord.query.get(self.target_id)
+        return None
+    
+    @property
+    def target_product(self):
+        """获取成品对象"""
+        if self.target_type == 'product':
+            return FinishedProduct.query.get(self.target_id)
+        return None
+    
+    @property
+    def target_material(self):
+        """获取原材料对象"""
+        if self.target_type == 'material':
+            return RawMaterial.query.get(self.target_id)
+        return None
 
     def __repr__(self):
         return f'<InspectionTask {self.global_sn}>'
@@ -610,6 +632,7 @@ class InspectionRecord(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     global_sn = db.Column(db.String(50), unique=True, nullable=False, comment='全局流水号', index=True)
     task_id = db.Column(db.Integer, db.ForeignKey('inspection_tasks.id'), nullable=False, unique=True)
+    template_id = db.Column(db.Integer, db.ForeignKey('inspection_templates.id'), nullable=True, index=True)
     inspector_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
     inspection_date = db.Column(db.Date, nullable=False, comment='检验日期', index=True)
     result = db.Column(db.String(20), nullable=False, comment='总体检验结果(pass/fail)', index=True)
@@ -617,6 +640,7 @@ class InspectionRecord(db.Model):
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.now, index=True)
 
     # 关联关系
+    template = db.relationship('InspectionTemplate', backref=db.backref('records', lazy='dynamic'))
     inspector = db.relationship('User', backref=db.backref('inspection_records', lazy='dynamic'))
     base_item_records = db.relationship('InspectionBaseItemRecord', backref='record', lazy='dynamic')
     item_records = db.relationship('InspectionItemRecord', backref='record', lazy='dynamic')

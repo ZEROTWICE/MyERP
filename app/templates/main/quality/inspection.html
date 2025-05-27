@@ -1,0 +1,317 @@
+{% extends "base.html" %}
+
+{% block title %}质检执行{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>质检执行</h2>
+        <div>
+            <a href="{{ url_for('main.quality_tasks') }}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> 返回任务列表
+            </a>
+        </div>
+    </div>
+
+    <!-- 任务信息 -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">任务信息</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-3">
+                    <p class="mb-1"><strong>任务编号</strong></p>
+                    <p>{{ record.task.global_sn }}</p>
+                </div>
+                <div class="col-md-3">
+                    <p class="mb-1"><strong>检验类型</strong></p>
+                    <p>{{ record.task.target_type }}</p>
+                </div>
+                <div class="col-md-3">
+                    <p class="mb-1"><strong>检验员</strong></p>
+                    <p>{{ record.inspector.employee.name if record.inspector.employee else record.inspector.username }}</p>
+                </div>
+                <div class="col-md-3">
+                    <p class="mb-1"><strong>检验日期</strong></p>
+                    <p>{{ record.inspection_date.strftime('%Y-%m-%d') }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 质检模板信息 -->
+    {% if record.template %}
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">质检模板：{{ record.template.name }}</h5>
+        </div>
+        <div class="card-body">
+            <p>{{ record.template.description or '暂无描述' }}</p>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- 质检表单 -->
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">质检项目</h5>
+        </div>
+        <div class="card-body">
+            <form id="inspectionForm">
+                <input type="hidden" id="recordId" value="{{ record.id }}">
+                
+                <!-- 基本信息项目 -->
+                {% if record.template and record.template.base_items %}
+                <div class="mb-4">
+                    <h6>基本信息</h6>
+                    {% for item in record.template.base_items.order_by('order_num') %}
+                    <div class="mb-3">
+                        <label class="form-label">
+                            {{ item.name }}
+                            {% if item.is_required %}<span class="text-danger">*</span>{% endif %}
+                        </label>
+                        {% if item.description %}
+                        <div class="form-text">{{ item.description }}</div>
+                        {% endif %}
+                        
+                        {% if item.input_type == 'text' %}
+                        <input type="text" class="form-control" name="base_item_{{ item.id }}" 
+                               value="{{ item.default_value or '' }}" 
+                               {% if item.is_required %}required{% endif %}>
+                        {% elif item.input_type == 'number' %}
+                        <input type="number" class="form-control" name="base_item_{{ item.id }}" 
+                               value="{{ item.default_value or '' }}" 
+                               {% if item.is_required %}required{% endif %}>
+                        {% elif item.input_type == 'date' %}
+                        <input type="date" class="form-control" name="base_item_{{ item.id }}" 
+                               value="{{ item.default_value or '' }}" 
+                               {% if item.is_required %}required{% endif %}>
+                        {% elif item.input_type == 'select' and item.options %}
+                        <select class="form-select" name="base_item_{{ item.id }}" 
+                                {% if item.is_required %}required{% endif %}>
+                            <option value="">请选择</option>
+                            {% for option in item.options %}
+                            <option value="{{ option }}" {% if option == item.default_value %}selected{% endif %}>{{ option }}</option>
+                            {% endfor %}
+                        </select>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <!-- 检验项目 -->
+                {% if record.template and record.template.items %}
+                <div class="mb-4">
+                    <h6>检验项目</h6>
+                    {% for item in record.template.items.order_by('order_num') %}
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <h6>{{ item.name }}</h6>
+                            {% if item.description %}
+                            <p class="text-muted">{{ item.description }}</p>
+                            {% endif %}
+                            
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <label class="form-label">检验方法</label>
+                                    <p>{{ item.inspection_method or '未指定' }}</p>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">检验标准</label>
+                                    <p>{{ item.standard or '未指定' }}</p>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">标准值</label>
+                                    <p>{{ item.standard_value or '未指定' }} {{ item.unit or '' }}</p>
+                                </div>
+                            </div>
+                            
+                            <div class="row mt-3">
+                                <div class="col-md-4">
+                                    <label class="form-label">实测值 <span class="text-danger">*</span></label>
+                                    <input type="number" step="0.01" class="form-control" 
+                                           name="item_{{ item.id }}_value" required>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">是否合格 <span class="text-danger">*</span></label>
+                                    <select class="form-select" name="item_{{ item.id }}_qualified" required>
+                                        <option value="">请选择</option>
+                                        <option value="1">合格</option>
+                                        <option value="0">不合格</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">备注</label>
+                                    <input type="text" class="form-control" name="item_{{ item.id }}_notes">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <!-- 总体结果 -->
+                <div class="mb-4">
+                    <h6>总体检验结果</h6>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <label class="form-label">检验结果 <span class="text-danger">*</span></label>
+                            <select class="form-select" id="overallResult" name="result" required>
+                                <option value="">请选择</option>
+                                <option value="pass">合格</option>
+                                <option value="fail">不合格</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">总体备注</label>
+                            <textarea class="form-control" name="notes" rows="3">{{ record.notes or '' }}</textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="text-end">
+                    <button type="button" class="btn btn-secondary" onclick="history.back()">取消</button>
+                    <button type="submit" class="btn btn-primary">提交检验结果</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('inspectionForm');
+    
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        submitInspectionResult();
+    });
+});
+
+function submitInspectionResult() {
+    const form = document.getElementById('inspectionForm');
+    const formData = new FormData(form);
+    const recordId = document.getElementById('recordId').value;
+    
+    // 验证必需字段
+    const result = formData.get('result');
+    if (!result) {
+        showToast('error', '请选择检验结果');
+        return;
+    }
+    
+    // 构建提交数据
+    const data = {
+        result: result,
+        notes: formData.get('notes') || '',
+        base_items: {},
+        items: {}
+    };
+    
+    // 收集基本信息项目数据
+    for (let [key, value] of formData.entries()) {
+        if (key.startsWith('base_item_')) {
+            const itemId = key.replace('base_item_', '');
+            if (value && value.trim()) {  // 只收集有值的项目
+                data.base_items[itemId] = value.trim();
+            }
+        } else if (key.includes('_value') || key.includes('_qualified') || key.includes('_notes')) {
+            const parts = key.split('_');
+            if (parts.length >= 3) {  // 确保格式正确
+                const itemId = parts[1];
+                const field = parts[2];
+                
+                if (!data.items[itemId]) {
+                    data.items[itemId] = {};
+                }
+                
+                // 根据字段类型处理值
+                if (field === 'value') {
+                    const numValue = parseFloat(value);
+                    if (!isNaN(numValue)) {
+                        data.items[itemId][field] = numValue;
+                    }
+                } else if (field === 'qualified') {
+                    if (value === '1' || value === '0') {
+                        data.items[itemId][field] = value;
+                    }
+                } else if (field === 'notes') {
+                    data.items[itemId][field] = value || '';
+                }
+            }
+        }
+    }
+    
+    // 验证检验项目数据
+    let hasValidItems = false;
+    for (const itemId in data.items) {
+        const item = data.items[itemId];
+        if (item.value !== undefined && item.qualified !== undefined) {
+            hasValidItems = true;
+            break;
+        }
+    }
+    
+    if (!hasValidItems && Object.keys(data.base_items).length === 0) {
+        showToast('error', '请至少填写一个检验项目或基本信息');
+        return;
+    }
+    
+    // 显示提交中状态
+    const submitBtn = document.querySelector('button[type="submit"]');
+    const originalText = submitBtn.textContent;
+    submitBtn.disabled = true;
+    submitBtn.textContent = '提交中...';
+    
+    // 提交数据
+    fetch(`/api/quality/records/${recordId}/submit`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast('success', data.message);
+            setTimeout(() => {
+                window.location.href = '/quality/tasks';
+            }, 2000);
+        } else {
+            showToast('error', data.message || '提交失败');
+            // 恢复按钮状态
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalText;
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showToast('error', '网络错误，请稍后重试');
+        // 恢复按钮状态
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+    });
+}
+
+function showToast(type, message) {
+    const toast = Swal.mixin({
+        toast: true,
+        position: 'top-end',
+        showConfirmButton: false,
+        timer: 3000,
+        timerProgressBar: true
+    });
+    
+    toast.fire({
+        icon: type,
+        title: message
+    });
+}
+</script>
+{% endblock %} 

@@ -3,7 +3,8 @@ from flask_login import login_required, current_user
 from app import db, csrf
 from app.models import (
     InspectionTemplate, InspectionBaseItem, InspectionItem,
-    InspectionTask, InspectionRecord, AuditLog, User, Employee,
+    InspectionTask, InspectionRecord, InspectionBaseItemRecord, 
+    InspectionItemRecord, NonconformityRecord, AuditLog, User, Employee,
     SerialNumber, ProcessPrice, FinishedProduct, RawMaterial, ProductionRecord
 )
 from datetime import datetime, timedelta
@@ -72,6 +73,42 @@ def quality_records():
                          inspection_tasks_pending=inspection_tasks_pending,
                          inspection_tasks_completed=inspection_tasks_completed,
                          templates_count=templates_count)
+
+@bp.route('/quality/tasks/<int:task_id>')
+@login_required
+def quality_task_detail(task_id):
+    """质检任务详情页面"""
+    if current_user.role not in ['admin', 'manager', 'inspector']:
+        flash('权限不足', 'danger')
+        return redirect(url_for('main.index'))
+    
+    # 获取质检任务
+    task = InspectionTask.query.get_or_404(task_id)
+    
+    # 检查权限
+    if current_user.role == 'inspector' and task.inspector_id != current_user.id:
+        flash('只能查看分配给自己的质检任务', 'danger')
+        return redirect(url_for('main.quality_tasks'))
+    
+    return render_template('main/quality/task_detail.html', task=task)
+
+@bp.route('/quality/inspection/<int:record_id>')
+@login_required
+def quality_inspection(record_id):
+    """质检执行页面"""
+    if current_user.role not in ['admin', 'manager', 'inspector']:
+        flash('权限不足', 'danger')
+        return redirect(url_for('main.index'))
+    
+    # 获取质检记录
+    record = InspectionRecord.query.get_or_404(record_id)
+    
+    # 检查权限
+    if current_user.role == 'inspector' and record.inspector_id != current_user.id:
+        flash('只能执行分配给自己的质检任务', 'danger')
+        return redirect(url_for('main.quality_tasks'))
+    
+    return render_template('main/quality/inspection.html', record=record)
 
 # API路由
 @bp.route('/api/quality/templates', methods=['GET'])
@@ -488,7 +525,8 @@ def get_tasks():
                 'task_code': t.global_sn,
                 'type': t.target_type,
                 'inspection_target': get_inspection_target_name(t),
-                'inspector_name': t.inspector.employee.name if t.inspector.employee else t.inspector.username,
+                'inspector_name': (t.inspector.employee.name if t.inspector and t.inspector.employee else 
+                                 t.inspector.username if t.inspector else '未分配'),
                 'created_at': t.created_at.strftime('%Y-%m-%d %H:%M'),
                 'planned_completion_time': t.deadline.strftime('%Y-%m-%d %H:%M') if t.deadline else None,
                 'status': t.status
@@ -513,13 +551,17 @@ def get_task_detail(task_id):
             'task_code': task.global_sn,
             'template_id': task.template_id,
             'type': task.target_type,
+            'target_id': task.target_id,
+            'inspector_id': task.inspector_id,
             'inspection_target': get_inspection_target_name(task),
-            'inspector_name': task.inspector.name,
+            'inspector_name': (task.inspector.employee.name if task.inspector and task.inspector.employee else 
+                             task.inspector.username if task.inspector else '未分配'),
             'status': task.status,
-            'completed_quantity': task.completed_quantity,
-            'total_quantity': task.total_quantity,
-            'inspection_date': task.inspection_date.strftime('%Y-%m-%d') if task.inspection_date else None,
-            'notes': task.notes
+            'priority': task.priority,
+            'planned_completion_time': task.deadline.strftime('%Y-%m-%dT%H:%M') if task.deadline else None,
+            'notes': task.notes or '',
+            'created_at': task.created_at.strftime('%Y-%m-%d %H:%M'),
+            'completed_at': task.completed_at.strftime('%Y-%m-%d %H:%M') if task.completed_at else None
         }
     })
 
@@ -537,12 +579,13 @@ def create_task():
         # 创建任务
         task = InspectionTask(
             global_sn=SerialNumber.get_next_number(),
-            template_id=data['template_id'],
+            template_id=data.get('template_id'),  # 模板ID现在是可选的
             target_type=data['type'],
             target_id=data['inspection_target_id'],
             inspector_id=data['inspector_id'],
-            priority={'low': 1, 'medium': 2, 'high': 3}.get(data.get('priority', 'medium'), 2),
+            priority=int(data.get('priority', 1)),  # 直接使用数字优先级
             deadline=datetime.strptime(data['planned_completion_time'], '%Y-%m-%dT%H:%M') if data.get('planned_completion_time') else None,
+            notes=data.get('notes', ''),
             created_by=current_user.id,
             status='pending'
         )
@@ -591,9 +634,12 @@ def manage_task(task_id):
 def get_inspectors():
     """获取质检员列表"""
     try:
-        # 查询具有inspector角色的用户
+        # 查询具有inspector角色或相关职位的用户
         inspectors = User.query.join(Employee).filter(
-            User.role.in_(['inspector', 'admin', 'manager'])
+            db.or_(
+                User.role.in_(['inspector', 'admin']),
+                Employee.position.in_(['质检员', '管理员'])
+            )
         ).all()
         
         return jsonify({
@@ -709,6 +755,202 @@ def get_production_records():
         current_app.logger.error(f'获取生产记录列表失败: {str(e)}')
         return jsonify({'success': False, 'message': f'获取生产记录列表失败：{str(e)}'}), 500
 
+@bp.route('/api/quality/tasks/<int:task_id>/start-inspection', methods=['POST'])
+@login_required
+@csrf.exempt
+def start_inspection(task_id):
+    """开始质检任务"""
+    try:
+        task = InspectionTask.query.get_or_404(task_id)
+        data = request.get_json()
+        
+        # 检查权限
+        if current_user.role not in ['admin', 'manager', 'inspector']:
+            return jsonify({'success': False, 'message': '权限不足'}), 403
+        
+        # 检查任务状态
+        if task.status not in ['pending', 'in_progress']:
+            status_names = {
+                'pending': '待处理',
+                'in_progress': '进行中', 
+                'completed': '已完成',
+                'cancelled': '已取消'
+            }
+            current_status = status_names.get(task.status, task.status)
+            return jsonify({
+                'success': False, 
+                'message': f'任务状态不允许开始质检，当前状态：{current_status}。只有待处理或进行中的任务可以开始质检。'
+            }), 400
+        
+        # 检查是否是指定的检验员
+        if current_user.role == 'inspector' and task.inspector_id != current_user.id:
+            return jsonify({'success': False, 'message': '只能执行分配给自己的质检任务'}), 403
+        
+        # 获取模板
+        template_id = data.get('template_id')
+        if not template_id:
+            return jsonify({'success': False, 'message': '请选择质检模板'}), 400
+        
+        template = InspectionTemplate.query.get(template_id)
+        if not template:
+            return jsonify({'success': False, 'message': '质检模板不存在'}), 404
+        
+        if not template.is_active:
+            return jsonify({'success': False, 'message': '质检模板已禁用'}), 400
+        
+        # 检查模板类型是否匹配
+        if template.type != task.target_type:
+            return jsonify({'success': False, 'message': '质检模板类型与任务类型不匹配'}), 400
+        
+        # 更新任务状态和模板
+        task.status = 'in_progress'
+        task.template_id = template_id
+        
+        # 检查是否已有质检记录
+        existing_record = InspectionRecord.query.filter_by(task_id=task.id).first()
+        if existing_record:
+            # 如果已有记录，更新模板ID和备注
+            existing_record.template_id = template_id
+            existing_record.notes = data.get('notes', existing_record.notes)
+            record = existing_record
+        else:
+            # 创建新的质检记录
+            record = InspectionRecord(
+                global_sn=SerialNumber.get_next_number(),
+                task_id=task.id,
+                template_id=template_id,
+                inspector_id=current_user.id,
+                inspection_date=datetime.now().date(),
+                result='pending',  # 初始状态为待检验
+                notes=data.get('notes', '')
+            )
+            db.session.add(record)
+        
+        # 记录审计日志
+        log = AuditLog(
+            user_id=current_user.id,
+            action='开始质检任务',
+            details=f'开始质检任务：{task.global_sn}，使用模板：{template.template_code}',
+            can_rollback=False,
+            target_model='InspectionTask',
+            target_id=task.id,
+            new_data={
+                'template_id': template_id,
+                'status': 'in_progress',
+                'record_id': record.id
+            }
+        )
+        db.session.add(log)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': '质检任务已开始',
+            'record_id': record.id
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f'开始质检任务失败: {str(e)}')
+        return jsonify({'success': False, 'message': f'开始质检失败：{str(e)}'}), 500
+
+@bp.route('/api/quality/records/<int:record_id>/submit', methods=['POST'])
+@login_required
+@csrf.exempt
+def submit_inspection_record(record_id):
+    """提交质检记录"""
+    try:
+        record = InspectionRecord.query.get_or_404(record_id)
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'success': False, 'message': '请求数据为空'}), 400
+        
+        # 检查权限
+        if current_user.role not in ['admin', 'manager', 'inspector']:
+            return jsonify({'success': False, 'message': '权限不足'}), 403
+        
+        # 检查是否是指定的检验员
+        if current_user.role == 'inspector' and record.inspector_id != current_user.id:
+            return jsonify({'success': False, 'message': '只能提交分配给自己的质检记录'}), 403
+        
+        # 验证必需字段
+        if not data.get('result'):
+            return jsonify({'success': False, 'message': '请选择检验结果'}), 400
+        
+        # 更新质检记录
+        record.result = data.get('result')
+        record.notes = data.get('notes', '')
+        
+        # 保存基本信息项目记录
+        base_items = data.get('base_items', {})
+        if base_items:
+            for item_id, value in base_items.items():
+                if value and str(value).strip():  # 只保存有值的项目
+                    try:
+                        base_record = InspectionBaseItemRecord(
+                            record_id=record.id,
+                            base_item_id=int(item_id),
+                            value=str(value).strip()
+                        )
+                        db.session.add(base_record)
+                    except (ValueError, TypeError) as e:
+                        current_app.logger.warning(f'保存基本信息项目记录失败: item_id={item_id}, error={str(e)}')
+                        continue
+        
+        # 保存检验项目记录
+        items = data.get('items', {})
+        if items:
+            for item_id, item_data in items.items():
+                if not isinstance(item_data, dict):
+                    continue
+                    
+                measured_value = item_data.get('value')
+                if measured_value is not None and str(measured_value).strip():  # 只保存有实测值的项目
+                    try:
+                        item_record = InspectionItemRecord(
+                            record_id=record.id,
+                            item_id=int(item_id),
+                            measured_value=float(measured_value),
+                            is_qualified=bool(int(item_data.get('qualified', 0))),
+                            notes=item_data.get('notes', '')
+                        )
+                        db.session.add(item_record)
+                    except (ValueError, TypeError) as e:
+                        current_app.logger.warning(f'保存检验项目记录失败: item_id={item_id}, error={str(e)}')
+                        continue
+        
+        # 更新任务状态
+        task = record.task
+        if task:
+            task.status = 'completed'
+            task.completed_at = datetime.now()
+        
+        # 记录审计日志
+        log = AuditLog(
+            user_id=current_user.id,
+            action='提交质检记录',
+            details=f'提交质检记录：{record.global_sn}，结果：{record.result}',
+            can_rollback=False,
+            target_model='InspectionRecord',
+            target_id=record.id,
+            new_data=data
+        )
+        db.session.add(log)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': '质检记录提交成功'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f'提交质检记录失败: {str(e)}')
+        return jsonify({'success': False, 'message': f'提交失败：{str(e)}'}), 500
+
 def get_inspection_target_name(task):
     """获取检验对象名称"""
     try:
@@ -801,17 +1043,33 @@ def update_task(task_id):
             'notes': task.notes
         }
         
-        # 更新任务
+        # 更新任务 - 支持两种字段名格式以保持兼容性
         if 'template_id' in data:
             task.template_id = data['template_id']
         if 'inspector_id' in data:
             task.inspector_id = data['inspector_id']
+        
+        # 支持两种字段名：target_id 和 inspection_target_id
         if 'target_id' in data:
             task.target_id = data['target_id']
+        elif 'inspection_target_id' in data:
+            task.target_id = data['inspection_target_id']
+            
+        # 支持两种字段名：target_type 和 type
+        if 'target_type' in data:
+            task.target_type = data['target_type']
+        elif 'type' in data:
+            task.target_type = data['type']
+            
         if 'priority' in data:
             task.priority = data['priority']
+            
+        # 支持两种字段名：deadline 和 planned_completion_time
         if 'deadline' in data and data['deadline']:
             task.deadline = datetime.strptime(data['deadline'], '%Y-%m-%dT%H:%M')
+        elif 'planned_completion_time' in data and data['planned_completion_time']:
+            task.deadline = datetime.strptime(data['planned_completion_time'], '%Y-%m-%dT%H:%M')
+            
         if 'notes' in data:
             task.notes = data['notes']
         
