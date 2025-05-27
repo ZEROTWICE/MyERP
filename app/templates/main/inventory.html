@@ -55,6 +55,9 @@
                     <button type="button" class="btn btn-success" onclick="document.getElementById('importFile').click()">
                         <i class="fas fa-file-import"></i> 导入
                     </button>
+                    <button type="button" class="btn btn-warning" onclick="showAutoArchiveModal()">
+                        <i class="fas fa-archive"></i> 自动存档
+                    </button>
                     <button type="button" class="btn btn-primary" data-bs-toggle="modal" 
                             data-bs-target="#{{ 'addFinishedProductModal' if request.args.get('type', 'finished') == 'finished' else 'addRawMaterialModal' }}">
                         <i class="fas fa-plus"></i> 添加
@@ -82,6 +85,7 @@
                     <th>数量</th>
                     <th>样品</th>
                     <th>状态</th>
+                    <th>是否存档</th>
                     <th>操作</th>
                 </tr>
             </thead>
@@ -96,7 +100,24 @@
                     <td>{{ item.storage_date.strftime('%Y-%m-%d') }}</td>
                     <td>{{ item.quantity }}</td>
                     <td>{{ '是' if item.has_sample else '否' }}</td>
-                    <td>{{ '已存档' if item.is_archived else '在库' }}</td>
+                    <td>
+                        {% if item.status == 'in_stock' %}
+                            <span class="badge bg-success">在库</span>
+                        {% elif item.status == 'used' %}
+                            <span class="badge bg-warning">已使用</span>
+                        {% elif item.status == 'scrapped' %}
+                            <span class="badge bg-danger">报废</span>
+                        {% else %}
+                            <span class="badge bg-secondary">{{ item.status }}</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if item.is_archived %}
+                            <span class="badge bg-secondary">已存档</span>
+                        {% else %}
+                            <span class="badge bg-info">未存档</span>
+                        {% endif %}
+                    </td>
                     <td>
                         {% if current_user.role in ['admin', 'manager'] %}
                         <div class="btn-group">
@@ -105,7 +126,7 @@
                                     data-id="{{ item.id }}"
                                     data-archived="{{ item.is_archived|tojson }}">
                                 {{ '取消存档' if item.is_archived else '存档' }}
-                        </button>
+                            </button>
                             <button class="btn btn-sm btn-danger delete-raw-material" data-id="{{ item.id }}">删除</button>
                         </div>
                         {% endif %}
@@ -126,6 +147,7 @@
                     <th>检验员</th>
                     <th>数量</th>
                     <th>状态</th>
+                    <th>是否存档</th>
                     <th>操作</th>
                 </tr>
             </thead>
@@ -139,10 +161,23 @@
                     <td>{{ item.inspector }}</td>
                     <td>{{ item.quantity }}</td>
                     <td>
-                        {% if item.is_archived %}
-                            已存档
+                        {% if item.status == 'in_stock' %}
+                            <span class="badge bg-success">在库</span>
+                        {% elif item.status == 'shipped' %}
+                            <span class="badge bg-primary">已发货</span>
+                        {% elif item.status == 'scrapped' %}
+                            <span class="badge bg-danger">报废</span>
+                        {% elif item.status == 'used' %}
+                            <span class="badge bg-warning">已使用</span>
                         {% else %}
-                            {{ item.status }}
+                            <span class="badge bg-secondary">{{ item.status }}</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if item.is_archived %}
+                            <span class="badge bg-secondary">已存档</span>
+                        {% else %}
+                            <span class="badge bg-info">未存档</span>
                         {% endif %}
                     </td>
                     <td>
@@ -153,7 +188,7 @@
                                     data-id="{{ item.id }}"
                                     data-archived="{{ item.is_archived|tojson }}">
                                 {{ '取消存档' if item.is_archived else '存档' }}
-                        </button>
+                            </button>
                             <button class="btn btn-sm btn-danger delete-finished-product" data-id="{{ item.id }}">删除</button>
                         </div>
                         {% endif %}
@@ -284,6 +319,7 @@ function editRawMaterial(id) {
                 const storageDate = new Date(data.data.storage_date);
                 document.getElementById('editStorageDate').value = storageDate.toISOString().split('T')[0];
                 document.getElementById('editRawQuantity').value = data.data.quantity;
+                document.getElementById('editRawStatus').value = data.data.status || 'in_stock';
                 document.getElementById('editHasSample').checked = data.data.has_sample;
                 document.getElementById('editRawNotes').value = data.data.notes || '';
                 
@@ -352,6 +388,7 @@ function submitEditRawMaterial() {
         supplier_number: document.getElementById('editSupplierNumber').value,
         storage_date: document.getElementById('editStorageDate').value,
         quantity: parseFloat(document.getElementById('editRawQuantity').value) || 0,
+        status: document.getElementById('editRawStatus').value,
         has_sample: document.getElementById('editHasSample').checked,
         notes: document.getElementById('editRawNotes').value
     };
@@ -549,6 +586,73 @@ document.addEventListener('DOMContentLoaded', function() {
             deleteFinishedProduct(id);
         });
     });
+
+    // 为存档按钮添加事件监听器
+    document.querySelectorAll('.toggle-archive-raw-material').forEach(button => {
+        button.addEventListener('click', function() {
+            const id = this.getAttribute('data-id');
+            const isArchived = this.getAttribute('data-archived') === 'true';
+            const action = isArchived ? '取消存档' : '存档';
+            console.log('原材料存档按钮被点击', 'ID:', id, 'isArchived:', isArchived, 'action:', action);
+            
+            if (confirm(`确定要${action}这个原材料吗？`)) {
+                fetch(`/inventory/raw/${id}/archive`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': '{{ csrf_token() }}'
+                    },
+                    credentials: 'same-origin'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showToast('success', `${action}成功`);
+                        setTimeout(() => location.reload(), 1000);
+                    } else {
+                        showToast('error', data.message || `${action}失败`);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    showToast('error', `${action}失败，请重试`);
+                });
+            }
+        });
+    });
+
+    document.querySelectorAll('.toggle-archive-finished-product').forEach(button => {
+        button.addEventListener('click', function() {
+            const id = this.getAttribute('data-id');
+            const isArchived = this.getAttribute('data-archived') === 'true';
+            const action = isArchived ? '取消存档' : '存档';
+            console.log('成品存档按钮被点击', 'ID:', id, 'isArchived:', isArchived, 'action:', action);
+            
+            if (confirm(`确定要${action}这个成品吗？`)) {
+                fetch(`/inventory/finished/${id}/archive`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': '{{ csrf_token() }}'
+                    },
+                    credentials: 'same-origin'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showToast('success', `${action}成功`);
+                        setTimeout(() => location.reload(), 1000);
+                    } else {
+                        showToast('error', data.message || `${action}失败`);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    showToast('error', `${action}失败，请重试`);
+                });
+            }
+        });
+    });
 });
 
 // 添加加载原材料编码规则的函数
@@ -742,75 +846,73 @@ function deleteFinishedProduct(id) {
 
 // 显示提示消息
 function showToast(type, message) {
-    // 如果使用了Bootstrap的Toast组件
-    const toast = new bootstrap.Toast(document.getElementById('toast'));
-    document.getElementById('toastBody').textContent = message;
-    document.getElementById('toast').classList.remove('bg-success', 'bg-danger');
-    document.getElementById('toast').classList.add(type === 'success' ? 'bg-success' : 'bg-danger');
-    toast.show();
+    // 使用toastr显示提示
+    if (type === 'success') {
+        toastr.success(message);
+    } else {
+        toastr.error(message);
+    }
 }
 
-// 切换原材料存档状态
-$('.toggle-archive-raw-material').click(function() {
-    const id = $(this).data('id');
-    const isArchived = $(this).data('archived');
-    const action = isArchived ? '取消存档' : '存档';
-    
-    if (confirm(`确定要${action}这个原材料吗？`)) {
-        fetch(`/inventory/raw/${id}/archive`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': '{{ csrf_token() }}'
-            },
-            credentials: 'same-origin'
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                showToast('success', `${action}成功`);
-                setTimeout(() => location.reload(), 1000);
-            } else {
-                showToast('error', data.message || `${action}失败`);
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            showToast('error', `${action}失败，请重试`);
-        });
-    }
-});
 
-// 切换成品存档状态
-$('.toggle-archive-finished-product').click(function() {
-    const id = $(this).data('id');
-    const isArchived = $(this).data('archived');
-    const action = isArchived ? '取消存档' : '存档';
+
+// 显示自动存档模态框
+function showAutoArchiveModal() {
+    const modal = new bootstrap.Modal(document.getElementById('autoArchiveModal'));
+    modal.show();
+}
+
+// 执行自动存档
+function executeAutoArchive() {
+    const days = parseInt(document.getElementById('archiveDays').value);
     
-    if (confirm(`确定要${action}这个成品吗？`)) {
-        fetch(`/inventory/finished/${id}/archive`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': '{{ csrf_token() }}'
-            },
-            credentials: 'same-origin'
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                showToast('success', `${action}成功`);
-                setTimeout(() => location.reload(), 1000);
-            } else {
-                showToast('error', data.message || `${action}失败`);
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            showToast('error', `${action}失败，请重试`);
-        });
+    if (!days || days < 1) {
+        toastr.error('请输入有效的天数');
+        return;
     }
-});
+    
+    if (!confirm(`确定要执行自动存档吗？\n将存档超过 ${days} 天的符合条件的库存记录。`)) {
+        return;
+    }
+    
+    // 显示加载状态
+    const button = event.target;
+    const originalText = button.innerHTML;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 执行中...';
+    button.disabled = true;
+    
+    fetch('/inventory/auto-archive', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify({
+            days: days
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            toastr.success(data.message);
+            const modal = bootstrap.Modal.getInstance(document.getElementById('autoArchiveModal'));
+            modal.hide();
+            setTimeout(() => location.reload(), 1500);
+        } else {
+            toastr.error(data.message || '自动存档失败');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        toastr.error('自动存档失败，请重试');
+    })
+    .finally(() => {
+        // 恢复按钮状态
+        button.innerHTML = originalText;
+        button.disabled = false;
+    });
+}
 </script>
 
 <!-- 添加成品模态框 -->
@@ -1043,6 +1145,14 @@ $('.toggle-archive-finished-product').click(function() {
                         <input type="number" class="form-control" id="editRawQuantity" name="quantity" min="0.01" step="0.01" required>
                     </div>
                     <div class="mb-3">
+                        <label for="editRawStatus" class="form-label">状态</label>
+                        <select class="form-control" id="editRawStatus" name="status" required>
+                            <option value="in_stock">在库</option>
+                            <option value="used">已使用</option>
+                            <option value="scrapped">报废</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
                         <label for="editHasSample" class="form-check-label">
                             <input type="checkbox" class="form-check-input" id="editHasSample" name="has_sample">
                             是否带样品
@@ -1062,13 +1172,33 @@ $('.toggle-archive-finished-product').click(function() {
     </div>
 </div>
 
-<!-- Toast提示框 -->
-<div class="position-fixed bottom-0 end-0 p-3" style="z-index: 11">
-    <div id="toast" class="toast align-items-center text-white border-0" role="alert" aria-live="assertive" aria-atomic="true">
-        <div class="d-flex">
-            <div class="toast-body" id="toastBody"></div>
-            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+<!-- 自动存档模态框 -->
+<div class="modal fade" id="autoArchiveModal" tabindex="-1" aria-labelledby="autoArchiveModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="autoArchiveModalLabel">自动存档设置</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="archiveDays" class="form-label">存档天数</label>
+                    <input type="number" class="form-control" id="archiveDays" value="90" min="1" max="365">
+                    <div class="form-text">
+                        系统将自动存档：<br>
+                        • 已发货、报废、已使用状态的成品（超过指定天数）<br>
+                        • 数量为0的原材料（超过指定天数）
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-warning" onclick="executeAutoArchive()">
+                    <i class="fas fa-archive"></i> 执行自动存档
+                </button>
+            </div>
         </div>
     </div>
 </div>
+
 {% endblock %} 

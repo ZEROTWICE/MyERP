@@ -23,7 +23,7 @@
                 <div class="col-md-2">
                     <select class="form-select" id="type" name="type">
                         <option value="">全部类型</option>
-                        <option value="process">工序质检</option>
+                        <option value="production_record">生产记录质检</option>
                         <option value="product">成品质检</option>
                         <option value="material">原材料质检</option>
                     </select>
@@ -101,7 +101,7 @@
                         <div class="col-md-4">
                             <label class="form-label">模板类型</label>
                             <select class="form-select" id="templateType" name="type" required>
-                                <option value="process">工序质检</option>
+                                <option value="production_record">生产记录质检</option>
                                 <option value="product">成品质检</option>
                                 <option value="material">原材料质检</option>
                             </select>
@@ -294,7 +294,7 @@ function changePage(page) {
 // 获取模板类型名称
 function getTemplateTypeName(type) {
     const types = {
-        'process': '工序质检',
+        'production_record': '生产记录质检',
         'product': '成品质检',
         'material': '原材料质检'
     };

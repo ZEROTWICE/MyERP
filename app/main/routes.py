@@ -947,7 +947,25 @@ def manage_production_records():
                             db.session.add(record_material)
                             
                             # 更新原材料库存
+                            old_quantity = raw_material.quantity
                             raw_material.quantity -= float(quantity)
+                            
+                            # 如果原材料数量耗尽（小于等于0），将状态修改为已使用
+                            if raw_material.quantity <= 0:
+                                raw_material.status = 'used'
+                                # 记录状态变更的审计日志
+                                status_log = AuditLog(
+                                    user_id=current_user.id,
+                                    action='自动更新原材料状态',
+                                    details=f'原材料 {raw_material.material_name} 数量耗尽，状态自动更新为已使用',
+                                    can_rollback=True,
+                                    rollback_type='edit',
+                                    target_model='RawMaterial',
+                                    target_id=raw_material.id,
+                                    old_data={'status': 'in_stock', 'quantity': old_quantity},
+                                    new_data={'status': 'used', 'quantity': raw_material.quantity}
+                                )
+                                db.session.add(status_log)
                         else:
                             db.session.rollback()
                             flash(f'原材料 {raw_material.material_name} 库存不足！', 'danger')
@@ -1094,7 +1112,26 @@ def delete_production_record(id):
             
             # 恢复库存
             if material.raw_material:
+                old_quantity = material.raw_material.quantity
+                old_status = material.raw_material.status
                 material.raw_material.quantity += material.quantity
+                
+                # 如果原材料状态是"已使用"且恢复库存后数量大于0，将状态改回"在库"
+                if material.raw_material.status == 'used' and material.raw_material.quantity > 0:
+                    material.raw_material.status = 'in_stock'
+                    # 记录状态变更的审计日志
+                    status_log = AuditLog(
+                        user_id=current_user.id,
+                        action='自动恢复原材料状态',
+                        details=f'删除生产记录后，原材料 {material.raw_material.material_name} 库存恢复，状态自动更新为在库',
+                        can_rollback=True,
+                        rollback_type='edit',
+                        target_model='RawMaterial',
+                        target_id=material.raw_material.id,
+                        old_data={'status': old_status, 'quantity': old_quantity},
+                        new_data={'status': 'in_stock', 'quantity': material.raw_material.quantity}
+                    )
+                    db.session.add(status_log)
         
         # 如果使用旧方式存储了原材料，也需要恢复
         if record.raw_material and record.raw_material_quantity:
@@ -1103,7 +1140,26 @@ def delete_production_record(id):
             old_data['raw_material_quantity'] = record.raw_material_quantity
             
             # 恢复库存
+            old_quantity = record.raw_material.quantity
+            old_status = record.raw_material.status
             record.raw_material.quantity += record.raw_material_quantity
+            
+            # 如果原材料状态是"已使用"且恢复库存后数量大于0，将状态改回"在库"
+            if record.raw_material.status == 'used' and record.raw_material.quantity > 0:
+                record.raw_material.status = 'in_stock'
+                # 记录状态变更的审计日志
+                status_log = AuditLog(
+                    user_id=current_user.id,
+                    action='自动恢复原材料状态',
+                    details=f'删除生产记录后，原材料 {record.raw_material.material_name} 库存恢复，状态自动更新为在库',
+                    can_rollback=True,
+                    rollback_type='edit',
+                    target_model='RawMaterial',
+                    target_id=record.raw_material.id,
+                    old_data={'status': old_status, 'quantity': old_quantity},
+                    new_data={'status': 'in_stock', 'quantity': record.raw_material.quantity}
+                )
+                db.session.add(status_log)
         
         # 记录审计日志
         log = AuditLog(
@@ -2443,7 +2499,25 @@ def update_task_status(id):
                 
                 # 更新原材料库存
                 raw_material = RawMaterial.query.get(int(material['raw_material_id']))
+                old_quantity = raw_material.quantity
                 raw_material.quantity -= float(material['quantity'])
+                
+                # 如果原材料数量耗尽（小于等于0），将状态修改为已使用
+                if raw_material.quantity <= 0:
+                    raw_material.status = 'used'
+                    # 记录状态变更的审计日志
+                    status_log = AuditLog(
+                        user_id=current_user.id,
+                        action='自动更新原材料状态',
+                        details=f'原材料 {raw_material.material_name} 数量耗尽，状态自动更新为已使用',
+                        can_rollback=True,
+                        rollback_type='edit',
+                        target_model='RawMaterial',
+                        target_id=raw_material.id,
+                        old_data={'status': 'in_stock', 'quantity': old_quantity},
+                        new_data={'status': 'used', 'quantity': raw_material.quantity}
+                    )
+                    db.session.add(status_log)
         else:
             # 如果任务还未完成，但已经开始，更新状态为进行中
                 task.status = 'in_progress'
@@ -2990,7 +3064,25 @@ def add_production_record():
                             db.session.add(record_material)
                             
                             # 更新原材料库存
+                            old_quantity = raw_material.quantity
                             raw_material.quantity -= float(quantity)
+                            
+                            # 如果原材料数量耗尽（小于等于0），将状态修改为已使用
+                            if raw_material.quantity <= 0:
+                                raw_material.status = 'used'
+                                # 记录状态变更的审计日志
+                                status_log = AuditLog(
+                                    user_id=current_user.id,
+                                    action='自动更新原材料状态',
+                                    details=f'原材料 {raw_material.material_name} 数量耗尽，状态自动更新为已使用',
+                                    can_rollback=True,
+                                    rollback_type='edit',
+                                    target_model='RawMaterial',
+                                    target_id=raw_material.id,
+                                    old_data={'status': 'in_stock', 'quantity': old_quantity},
+                                    new_data={'status': 'used', 'quantity': raw_material.quantity}
+                                )
+                                db.session.add(status_log)
                         else:
                             db.session.rollback()
                             flash(f'原材料 {raw_material.material_name} 库存不足！', 'danger')
@@ -4155,7 +4247,8 @@ def add_raw_material():
                 'melt_number': material.melt_number,
                 'supplier_number': material.supplier_number,
                 'internal_number': material.internal_number,
-                'quantity': material.quantity
+                'quantity': material.quantity,
+                'status': material.status
             }
         )
         db.session.add(log)
@@ -4531,6 +4624,7 @@ def get_raw_material(id):
                 'internal_number': material.internal_number,
                 'storage_date': material.storage_date.strftime('%Y-%m-%d'),
                 'quantity': material.quantity,
+                'status': material.status,
                 'has_sample': material.has_sample,
                 'notes': material.notes or ''
             }
@@ -4561,6 +4655,7 @@ def update_raw_material(id):
             'internal_number': material.internal_number,
             'storage_date': material.storage_date.strftime('%Y-%m-%d'),
             'quantity': material.quantity,
+            'status': material.status,
             'has_sample': material.has_sample,
             'notes': material.notes
         }
@@ -4572,6 +4667,7 @@ def update_raw_material(id):
         material.supplier_number = data['supplier_number']
         material.storage_date = datetime.strptime(data['storage_date'], '%Y-%m-%d').date()
         material.quantity = float(data['quantity'])
+        material.status = data.get('status', 'in_stock')
         material.has_sample = data.get('has_sample', False)
         material.notes = data.get('notes', '')
         
@@ -4593,6 +4689,7 @@ def update_raw_material(id):
                 'internal_number': material.internal_number,
                 'storage_date': material.storage_date.strftime('%Y-%m-%d'),
                 'quantity': material.quantity,
+                'status': material.status,
                 'has_sample': material.has_sample,
                 'notes': material.notes
             }
@@ -4666,6 +4763,7 @@ def delete_raw_material(id):
             'internal_number': material.internal_number,
             'storage_date': material.storage_date.strftime('%Y-%m-%d'),
             'quantity': material.quantity,
+            'status': material.status,
             'has_sample': material.has_sample,
             'notes': material.notes
         }
@@ -4839,6 +4937,7 @@ def toggle_raw_material_archive(id):
         material = RawMaterial.query.get_or_404(id)
         
         # 切换存档状态
+        old_archived = material.is_archived
         material.is_archived = not material.is_archived
         action = '存档' if material.is_archived else '取消存档'
         
@@ -4851,7 +4950,7 @@ def toggle_raw_material_archive(id):
             rollback_type='edit',
             target_model='RawMaterial',
             target_id=material.id,
-            old_data={'is_archived': not material.is_archived},
+            old_data={'is_archived': old_archived},
             new_data={'is_archived': material.is_archived}
         )
         db.session.add(log)
@@ -4881,6 +4980,7 @@ def toggle_finished_product_archive(id):
         product = FinishedProduct.query.get_or_404(id)
         
         # 切换存档状态
+        old_archived = product.is_archived
         product.is_archived = not product.is_archived
         action = '存档' if product.is_archived else '取消存档'
         
@@ -4893,7 +4993,7 @@ def toggle_finished_product_archive(id):
             rollback_type='edit',
             target_model='FinishedProduct',
             target_id=product.id,
-            old_data={'is_archived': not product.is_archived},
+            old_data={'is_archived': old_archived},
             new_data={'is_archived': product.is_archived}
         )
         db.session.add(log)
@@ -4910,4 +5010,88 @@ def toggle_finished_product_archive(id):
         return jsonify({
             'success': False,
             'message': f'操作失败：{str(e)}'
+        }), 500
+
+@bp.route('/inventory/auto-archive', methods=['POST'])
+@login_required
+def auto_archive_inventory():
+    """自动存档库存"""
+    if current_user.role not in ['admin', 'manager']:
+        return jsonify({'success': False, 'message': '权限不足'}), 403
+    
+    try:
+        from datetime import datetime, timedelta
+        
+        # 获取配置的自动存档天数（默认90天）
+        archive_days = request.json.get('days', 90)
+        cutoff_date = datetime.now() - timedelta(days=archive_days)
+        
+        # 自动存档成品（已发货、报废、已使用的成品超过指定天数）
+        finished_products = FinishedProduct.query.filter(
+            FinishedProduct.is_archived == False,
+            FinishedProduct.status.in_(['shipped', 'scrapped', 'used']),
+            FinishedProduct.created_at < cutoff_date
+        ).all()
+        
+        # 自动存档原材料（数量为0的原材料超过指定天数）
+        raw_materials = RawMaterial.query.filter(
+            RawMaterial.is_archived == False,
+            RawMaterial.quantity <= 0,
+            RawMaterial.created_at < cutoff_date
+        ).all()
+        
+        archived_count = 0
+        
+        # 存档成品
+        for product in finished_products:
+            product.is_archived = True
+            archived_count += 1
+            
+            # 记录审计日志
+            log = AuditLog(
+                user_id=current_user.id,
+                action='自动存档成品',
+                details=f'自动存档成品：{product.product_number}（状态：{product.status}，超过{archive_days}天）',
+                can_rollback=True,
+                rollback_type='edit',
+                target_model='FinishedProduct',
+                target_id=product.id,
+                old_data={'is_archived': False},
+                new_data={'is_archived': True}
+            )
+            db.session.add(log)
+        
+        # 存档原材料
+        for material in raw_materials:
+            material.is_archived = True
+            archived_count += 1
+            
+            # 记录审计日志
+            log = AuditLog(
+                user_id=current_user.id,
+                action='自动存档原材料',
+                details=f'自动存档原材料：{material.material_name}（数量为0，超过{archive_days}天）',
+                can_rollback=True,
+                rollback_type='edit',
+                target_model='RawMaterial',
+                target_id=material.id,
+                old_data={'is_archived': False},
+                new_data={'is_archived': True}
+            )
+            db.session.add(log)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'自动存档完成，共存档 {archived_count} 条记录',
+            'archived_count': archived_count
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f'自动存档失败: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': f'自动存档失败：{str(e)}'
         }), 500

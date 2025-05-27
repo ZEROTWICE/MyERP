@@ -404,6 +404,7 @@ class RawMaterial(db.Model):
     quantity = db.Column(db.Float, nullable=False)  # 数量
     notes = db.Column(db.Text)  # 备注
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    status = db.Column(db.String(20), nullable=False, default='in_stock', index=True)  # 状态: in_stock: 在库, used: 已使用, scrapped: 报废
     is_archived = db.Column(db.Boolean, default=False)  # 是否已存档
     
     __table_args__ = (
@@ -509,7 +510,7 @@ class InspectionTemplate(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     template_code = db.Column(db.String(50), unique=True, nullable=False, comment='模板编码', index=True)
     name = db.Column(db.String(100), nullable=False, comment='模板名称')
-    type = db.Column(db.String(20), nullable=False, comment='模板类型(product/process/material)', index=True)
+    type = db.Column(db.String(20), nullable=False, comment='模板类型(product/production_record/material)', index=True)
     description = db.Column(db.Text, comment='模板描述')
     is_active = db.Column(db.Boolean, default=True, comment='是否启用', index=True)
     created_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
@@ -585,7 +586,7 @@ class InspectionTask(db.Model):
     global_sn = db.Column(db.String(50), unique=True, nullable=False, comment='全局流水号', index=True)
     template_id = db.Column(db.Integer, db.ForeignKey('inspection_templates.id'), nullable=False, index=True)
     inspector_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
-    target_type = db.Column(db.String(20), nullable=False, comment='检验对象类型(product/process/material)', index=True)
+    target_type = db.Column(db.String(20), nullable=False, comment='检验对象类型(product/production_record/material)', index=True)
     target_id = db.Column(db.Integer, nullable=False, comment='检验对象ID', index=True)
     status = db.Column(db.String(20), nullable=False, default='pending', comment='任务状态(pending/in_progress/completed/cancelled)', index=True)
     priority = db.Column(db.Integer, default=0, comment='优先级', index=True)

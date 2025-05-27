@@ -407,6 +407,13 @@ function showCreateTaskModal() {
     document.getElementById('taskForm').reset();
     document.getElementById('taskId').value = '';
     
+    // 清理可能存在的Select2实例
+    $('.inspection-target-select').each(function() {
+        if ($(this).hasClass('select2-hidden-accessible')) {
+            $(this).select2('destroy');
+        }
+    });
+    
     // 初始化检验员列表
     loadInspectorOptions();
     // 加载质检模板
@@ -515,10 +522,13 @@ function loadInspectionTargets() {
                 }
                 
                 container.innerHTML = `
-                    <select class="form-select" name="inspection_target_id" required>
+                    <select class="form-select inspection-target-select" name="inspection_target_id" required>
                         ${options}
                     </select>
                 `;
+                
+                // 初始化Select2搜索功能
+                initializeInspectionTargetSelect();
             } else {
                 showToast('error', data.message || '加载检验对象失败');
                 container.innerHTML = '<div class="alert alert-danger">加载检验对象失败：' + (data.message || '未知错误') + '</div>';
@@ -651,6 +661,183 @@ function submitImport() {
         console.error('Error:', error);
         showToast('error', '导入失败');
     });
+}
+
+// 编辑任务
+function editTask(id) {
+    fetch(`/api/quality/tasks/${id}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const task = data.data;
+                
+                // 填充表单
+                document.getElementById('taskModalTitle').textContent = '编辑质检任务';
+                document.getElementById('taskId').value = task.id;
+                document.getElementById('taskType').value = task.type;
+                document.getElementById('templateId').value = task.template_id;
+                document.getElementById('inspectorId').value = task.inspector_id;
+                document.getElementById('plannedCompletionTime').value = task.planned_completion_time;
+                document.getElementById('priority').value = task.priority;
+                document.getElementById('notes').value = task.notes || '';
+                
+                // 清理可能存在的Select2实例
+                $('.inspection-target-select').each(function() {
+                    if ($(this).hasClass('select2-hidden-accessible')) {
+                        $(this).select2('destroy');
+                    }
+                });
+                
+                // 加载检验员列表
+                loadInspectorOptions();
+                // 加载质检模板
+                loadTemplates();
+                // 加载检验对象并设置选中值
+                loadInspectionTargetsForEdit(task.target_id);
+                
+                taskModal.show();
+            } else {
+                showToast('error', data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showToast('error', '加载任务详情失败');
+        });
+}
+
+// 为编辑模式加载检验对象
+function loadInspectionTargetsForEdit(selectedTargetId) {
+    const type = document.getElementById('taskType').value;
+    const container = document.getElementById('inspectionTargetContainer');
+    
+    // 显示加载中提示
+    container.innerHTML = '<div class="text-center"><div class="spinner-border text-primary" role="status"></div></div>';
+    
+    // 根据类型加载不同的检验对象
+    let url = '';
+    switch (type) {
+        case 'production_record':
+            url = '/api/quality/production-records';
+            break;
+        case 'product':
+            url = '/api/quality/finished-products';
+            break;
+        case 'material':
+            url = '/api/inventory/raw-materials';
+            break;
+    }
+    
+    fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                let options = '<option value="">请选择检验对象</option>';
+                
+                switch (type) {
+                    case 'production_record':
+                        if (data.data && Array.isArray(data.data)) {
+                            options += data.data.map(record => 
+                                `<option value="${record.id}" ${record.id == selectedTargetId ? 'selected' : ''}>${record.global_sn} - ${record.employee_name} - ${record.process_name}</option>`
+                            ).join('');
+                        }
+                        break;
+                    case 'product':
+                        if (data.data && Array.isArray(data.data)) {
+                            options += data.data.map(product => 
+                                `<option value="${product.id}" ${product.id == selectedTargetId ? 'selected' : ''}>${product.product_number} - ${product.model || ''}</option>`
+                            ).join('');
+                        }
+                        break;
+                    case 'material':
+                        if (data.data && Array.isArray(data.data)) {
+                            options += data.data.map(material => 
+                                `<option value="${material.id}" ${material.id == selectedTargetId ? 'selected' : ''}>${material.internal_number} - ${material.material_name || ''}</option>`
+                            ).join('');
+                        }
+                        break;
+                }
+                
+                container.innerHTML = `
+                    <select class="form-select inspection-target-select" name="inspection_target_id" required>
+                        ${options}
+                    </select>
+                `;
+                
+                // 初始化Select2搜索功能
+                initializeInspectionTargetSelect();
+            } else {
+                showToast('error', data.message || '加载检验对象失败');
+                container.innerHTML = '<div class="alert alert-danger">加载检验对象失败：' + (data.message || '未知错误') + '</div>';
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showToast('error', '加载检验对象失败');
+            container.innerHTML = '<div class="alert alert-danger">加载检验对象失败，请稍后重试</div>';
+        });
+}
+
+// 查看任务详情
+function viewTask(id) {
+    window.location.href = `/quality/tasks/${id}`;
+}
+
+// 初始化检验对象选择器的搜索功能
+function initializeInspectionTargetSelect() {
+    const selectElement = document.querySelector('.inspection-target-select');
+    if (selectElement) {
+        // 销毁现有的Select2实例（如果存在）
+        if ($(selectElement).hasClass('select2-hidden-accessible')) {
+            $(selectElement).select2('destroy');
+        }
+        
+        // 初始化Select2
+        $(selectElement).select2({
+            theme: 'bootstrap-5',
+            width: '100%',
+            placeholder: '请选择检验对象',
+            allowClear: true,
+            dropdownParent: $('#taskModal'),
+            language: {
+                noResults: function() {
+                    return "未找到匹配的检验对象";
+                },
+                searching: function() {
+                    return "搜索中...";
+                },
+                inputTooShort: function() {
+                    return "请输入至少1个字符进行搜索";
+                }
+            },
+            // 启用搜索功能
+            minimumInputLength: 0,
+            // 自定义搜索匹配逻辑
+            matcher: function(params, data) {
+                // 如果没有搜索词，显示所有选项
+                if ($.trim(params.term) === '') {
+                    return data;
+                }
+                
+                // 如果没有文本内容，跳过
+                if (typeof data.text === 'undefined') {
+                    return null;
+                }
+                
+                // 进行不区分大小写的搜索
+                const searchTerm = params.term.toLowerCase();
+                const optionText = data.text.toLowerCase();
+                
+                // 检查是否包含搜索词
+                if (optionText.indexOf(searchTerm) > -1) {
+                    return data;
+                }
+                
+                // 如果没有匹配，返回null
+                return null;
+            }
+        });
+    }
 }
 
 // 显示提示消息

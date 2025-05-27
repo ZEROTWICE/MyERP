@@ -1,13 +1,27 @@
 {% extends "base.html" %}
-{% from 'bootstrap5/form.html' import render_form %}
-{% from 'bootstrap5/pagination.html' import render_pagination %}
 
-{% block title %}生产记录管理{% endblock %}
+{% macro sort_link(column, text) %}
+    {% if current_sort == column %}
+        {% if current_direction == 'asc' %}
+            <a href="{{ url_for('main.manage_production_records', sort=column, direction='desc', search=search_form.search.data) }}" class="text-dark text-decoration-none">
+                {{ text }} <i class="bi bi-arrow-up"></i>
+            </a>
+        {% else %}
+            <a href="{{ url_for('main.manage_production_records', sort=column, direction='asc', search=search_form.search.data) }}" class="text-dark text-decoration-none">
+                {{ text }} <i class="bi bi-arrow-down"></i>
+            </a>
+        {% endif %}
+    {% else %}
+        <a href="{{ url_for('main.manage_production_records', sort=column, direction='asc', search=search_form.search.data) }}" class="text-dark text-decoration-none">
+            {{ text }}
+        </a>
+    {% endif %}
+{% endmacro %}
 
 {% block content %}
 <div class="container mt-4">
     <h2>生产记录管理</h2>
-
+    
     {% if current_user.role in ['admin', 'hr'] %}
     <div class="mb-3">
         <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addProductionRecordModal">
@@ -30,9 +44,18 @@
     <div class="card mb-4">
         <div class="card-body">
             <form method="get" action="{{ url_for('main.manage_production_records') }}" class="row g-3" id="searchForm">
-                <div class="col-md-10">
+                <div class="col-md-8">
                     {{ search_form.search.label(class="form-label") }}
                     {{ search_form.search(class="form-control", value=request.args.get('search', '')) }}
+                </div>
+                <div class="col-md-2">
+                    <label for="per_page" class="form-label">每页显示</label>
+                    <select name="per_page" id="per_page" class="form-control">
+                        <option value="10" {% if request.args.get('per_page', '10') == '10' %}selected{% endif %}>10</option>
+                        <option value="25" {% if request.args.get('per_page', '10') == '25' %}selected{% endif %}>25</option>
+                        <option value="50" {% if request.args.get('per_page', '10') == '50' %}selected{% endif %}>50</option>
+                        <option value="100" {% if request.args.get('per_page', '10') == '100' %}selected{% endif %}>100</option>
+                    </select>
                 </div>
                 <div class="col-md-2 d-flex align-items-end">
                     {{ search_form.submit(class="btn btn-primary") }}
@@ -41,207 +64,206 @@
         </div>
     </div>
 
-    <!-- 生产记录列表 -->
-    <div class="card">
-        <div class="card-body">
-            <div class="table-responsive">
-                <table class="table table-striped">
-                    <thead>
-                        <tr>
-                            {% macro sort_link(column, text) %}
-                                {% if current_sort == column %}
-                                    {% if current_direction == 'asc' %}
-                                        <a href="{{ url_for('main.manage_production_records', sort=column, direction='desc', search=request.args.get('search', ''), per_page=request.args.get('per_page', 20)) }}" class="text-dark text-decoration-none">
-                                            {{ text }} <i class="bi bi-arrow-up"></i>
-                                        </a>
-                                    {% else %}
-                                        <a href="{{ url_for('main.manage_production_records', sort=column, direction='asc', search=request.args.get('search', ''), per_page=request.args.get('per_page', 20)) }}" class="text-dark text-decoration-none">
-                                            {{ text }} <i class="bi bi-arrow-down"></i>
-                                        </a>
-                                    {% endif %}
-                                {% else %}
-                                    <a href="{{ url_for('main.manage_production_records', sort=column, direction='asc', search=request.args.get('search', ''), per_page=request.args.get('per_page', 20)) }}" class="text-dark text-decoration-none">
-                                        {{ text }}
-                                    </a>
-                                {% endif %}
-                            {% endmacro %}
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>{{ sort_link('global_sn', '流水号') }}</th>
+                    <th>{{ sort_link('date', '日期') }}</th>
+                    <th>{{ sort_link('employee_name', '员工') }}</th>
+                    <th>{{ sort_link('process_name', '工序') }}</th>
+                    <th>{{ sort_link('quantity', '数量') }}</th>
+                    <th>原材料</th>
+                    <th>原材料编号</th>
+                    <th>原材料用量</th>
+                    <th>成品编号</th>
+                    <th>备注</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for record in records %}
+                <tr>
+                    <td>{{ record.global_sn }}</td>
+                    <td>{{ record.date.strftime('%Y-%m-%d') }}</td>
+                    <td>{{ record.employee.name }} ({{ record.employee.employee_id }})</td>
+                    <td>{{ record.process.process_name }} ({{ record.process.process_code }})</td>
+                    <td>{{ record.quantity }}</td>
+                    <td>
+                        {% if record.materials and record.materials|length > 0 %}
+                            <ul class="list-unstyled mb-0">
+                                {% for material in record.materials %}
+                                    <li>{{ material.raw_material.material_name }}</li>
+                                {% endfor %}
+                            </ul>
+                        {% elif record.raw_material %}
+                            {{ record.raw_material.material_name }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if record.materials and record.materials|length > 0 %}
+                            <ul class="list-unstyled mb-0">
+                                {% for material in record.materials %}
+                                    <li>{{ material.raw_material.internal_number }}</li>
+                                {% endfor %}
+                            </ul>
+                        {% elif record.raw_material %}
+                            {{ record.raw_material.internal_number }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if record.materials and record.materials|length > 0 %}
+                            <ul class="list-unstyled mb-0">
+                                {% for material in record.materials %}
+                                    <li>{{ material.quantity }}</li>
+                                {% endfor %}
+                            </ul>
+                        {% elif record.raw_material_quantity %}
+                            {{ record.raw_material_quantity }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if record.finished_product %}
+                            {{ record.finished_product.product_number }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    <td>{{ record.notes or '-' }}</td>
+                    <td>
+                        {% if current_user.role in ['admin', 'hr'] %}
+                        <button class="btn btn-sm btn-danger delete-record" data-id="{{ record.id }}">删除</button>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 
-                            <th>{{ sort_link('global_sn', '流水号') }}</th>
-                            <th>{{ sort_link('date', '生产日期') }}</th>
-                            <th>{{ sort_link('employee_name', '员工') }}</th>
-                            <th>{{ sort_link('process_name', '工序') }}</th>
-                            <th>{{ sort_link('quantity', '数量') }}</th>
-                            <th>原材料</th>
-                            <th>原材料编号</th>
-                            <th>原材料用量</th>
-                            <th>成品编号</th>
-                            <th>备注</th>
-                            <th>操作</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for record in records %}
-                        <tr>
-                            <td>{{ record.global_sn }}</td>
-                            <td>{{ record.date.strftime('%Y-%m-%d') }}</td>
-                            <td>{{ record.employee.name }} ({{ record.employee.employee_id }})</td>
-                            <td>{{ record.process.process_name }} ({{ record.process.process_code }})</td>
-                            <td>{{ record.quantity }}</td>
-                            <td>
-                                {% if record.materials and record.materials|length > 0 %}
-                                    <ul class="list-unstyled mb-0">
-                                        {% for material in record.materials %}
-                                            <li>{{ material.raw_material.material_name }}</li>
-                                        {% endfor %}
-                                    </ul>
-                                {% elif record.raw_material %}
-                                    {{ record.raw_material.material_name }}
-                                {% else %}
-                                    -
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if record.materials and record.materials|length > 0 %}
-                                    <ul class="list-unstyled mb-0">
-                                        {% for material in record.materials %}
-                                            <li>{{ material.raw_material.internal_number }}</li>
-                                        {% endfor %}
-                                    </ul>
-                                {% elif record.raw_material %}
-                                    {{ record.raw_material.internal_number }}
-                                {% else %}
-                                    -
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if record.materials and record.materials|length > 0 %}
-                                    <ul class="list-unstyled mb-0">
-                                        {% for material in record.materials %}
-                                            <li>{{ "%.2f"|format(material.quantity) }}</li>
-                                        {% endfor %}
-                                    </ul>
-                                {% elif record.raw_material_quantity %}
-                                    {{ "%.2f"|format(record.raw_material_quantity) }}
-                                {% else %}
-                                    -
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if record.finished_product %}
-                                    {{ record.finished_product.product_number }}
-                                {% endif %}
-                            </td>
-                            <td>{{ record.notes }}</td>
-                            <td>
-                                {% if current_user.role in ['admin', 'manager'] %}
-                                <button class="btn btn-danger btn-sm delete-record" data-id="{{ record.id }}">
-                                    删除
-                                </button>
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+    <!-- 分页 -->
+    <nav aria-label="Page navigation">
+        <ul class="pagination justify-content-center">
+            {% if pagination.has_prev %}
+            <li class="page-item">
+                <a class="page-link" href="{{ url_for('main.manage_production_records', page=pagination.prev_num, sort=current_sort, direction=current_direction, search=search_form.search.data) }}">上一页</a>
+            </li>
+            {% endif %}
+            
+            {% for page in pagination.iter_pages() %}
+                {% if page %}
+                    <li class="page-item {% if page == pagination.page %}active{% endif %}">
+                        <a class="page-link" href="{{ url_for('main.manage_production_records', page=page, sort=current_sort, direction=current_direction, search=search_form.search.data) }}">{{ page }}</a>
+                    </li>
+                {% else %}
+                    <li class="page-item disabled"><span class="page-link">...</span></li>
+                {% endif %}
+            {% endfor %}
+            
+            {% if pagination.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="{{ url_for('main.manage_production_records', page=pagination.next_num, sort=current_sort, direction=current_direction, search=search_form.search.data) }}">下一页</a>
+            </li>
+            {% endif %}
+        </ul>
+    </nav>
+</div>
+
+<!-- 添加生产记录模态框 -->
+<div class="modal fade" id="addProductionRecordModal" tabindex="-1" aria-labelledby="addProductionRecordModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addProductionRecordModalLabel">添加生产记录</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-
-            <!-- 分页 -->
-            <div class="d-flex justify-content-center mt-3">
-                {{ render_pagination(pagination) }}
+            <div class="modal-body">
+                <form method="POST" action="{{ url_for('main.manage_production_records') }}">
+                    {{ form.csrf_token }}
+                    <div class="mb-3">
+                        {{ form.employee_id.label(class="form-label") }}
+                        {{ form.employee_id(class="form-control select2") }}
+                    </div>
+                    <div class="mb-3">
+                        {{ form.process_id.label(class="form-label") }}
+                        {{ form.process_id(class="form-control select2", onchange="handleProcessChange(this.value)") }}
+                    </div>
+                    <div class="mb-3">
+                        {{ form.quantity.label(class="form-label") }}
+                        {{ form.quantity(class="form-control", type="number", min="1") }}
+                    </div>
+                    <div class="mb-3">
+                        {{ form.date.label(class="form-label") }}
+                        {{ form.date(class="form-control", type="date") }}
+                    </div>
+                    
+                    <!-- 多原材料管理部分 -->
+                    <div class="mb-3">
+                        <label class="form-label">原材料列表</label>
+                        <div class="table-responsive">
+                            <table class="table table-sm" id="materialsTable">
+                                <thead>
+                                    <tr>
+                                        <th>原材料</th>
+                                        <th>数量</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="materialsList">
+                                    <!-- 原材料列表将在这里动态添加 -->
+                                </tbody>
+                            </table>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-primary" id="addMaterialBtn">
+                            <i class="fas fa-plus"></i> 添加原材料
+                        </button>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                {{ form.inspector.label(class="form-label") }}
+                                {{ form.inspector(class="form-control") }}
+                            </div>
+                        </div>
+                        <div class="col-md-12">
+                            <div class="mb-3">
+                                {{ form.notes.label(class="form-label") }}
+                                {{ form.notes(class="form-control", rows="3") }}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                        {{ form.submit(class="btn btn-primary") }}
+                    </div>
+                </form>
             </div>
         </div>
     </div>
+</div>
 
-    <!-- 添加生产记录模态框 -->
-    <div class="modal fade" id="addProductionRecordModal" tabindex="-1" aria-labelledby="addProductionRecordModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="addProductionRecordModalLabel">添加生产记录</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <form method="POST" action="{{ url_for('main.manage_production_records') }}">
-                        {{ form.csrf_token }}
-                        <div class="mb-3">
-                            {{ form.employee_id.label(class="form-label") }}
-                            {{ form.employee_id(class="form-control select2") }}
-                        </div>
-                        <div class="mb-3">
-                            {{ form.process_id.label(class="form-label") }}
-                            {{ form.process_id(class="form-control select2", onchange="handleProcessChange(this.value)") }}
-                        </div>
-                        <div class="mb-3">
-                            {{ form.quantity.label(class="form-label") }}
-                            {{ form.quantity(class="form-control", type="number", min="1") }}
-                        </div>
-                        <div class="mb-3">
-                            {{ form.date.label(class="form-label") }}
-                            {{ form.date(class="form-control", type="date") }}
-                        </div>
-                        
-                        <!-- 多原材料管理部分 -->
-                        <div class="mb-3">
-                            <label class="form-label">原材料列表</label>
-                            <div class="table-responsive">
-                                <table class="table table-sm" id="materialsTable">
-                                    <thead>
-                                        <tr>
-                                            <th>原材料</th>
-                                            <th>数量</th>
-                                            <th>操作</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="materialsList">
-                                        <!-- 原材料列表将在这里动态添加 -->
-                                    </tbody>
-                                </table>
-                            </div>
-                            <button type="button" class="btn btn-sm btn-primary" id="addMaterialBtn">
-                                <i class="fas fa-plus"></i> 添加原材料
-                            </button>
-                        </div>
-                        
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    {{ form.inspector.label(class="form-label") }}
-                                    {{ form.inspector(class="form-control") }}
-                                </div>
-                            </div>
-                            <div class="col-md-12">
-                                <div class="mb-3">
-                                    {{ form.notes.label(class="form-label") }}
-                                    {{ form.notes(class="form-control", rows="3") }}
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                            {{ form.submit(class="btn btn-primary") }}
-                        </div>
-                    </form>
-                </div>
+<!-- 删除确认对话框 -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteModalLabel">确认删除</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-        </div>
-    </div>
-
-    <!-- 删除确认对话框 -->
-    <div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="deleteModalLabel">确认删除</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    确定要删除这条生产记录吗？此操作不可恢复。
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                    <button type="button" class="btn btn-danger" id="confirmDelete">删除</button>
-                </div>
+            <div class="modal-body">
+                确定要删除这条生产记录吗？此操作不可恢复。
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-danger" id="confirmDelete">删除</button>
             </div>
         </div>
     </div>
@@ -252,7 +274,7 @@
 {{ super() }}
 <script>
 let recordToDelete = null;
-let availableRawMaterials = {{ raw_materials|default([])|tojson|safe }};
+// 原材料数据将通过AJAX动态加载
 
 $(document).ready(function() {
     // 初始化模态框内的 Select2
@@ -314,7 +336,7 @@ $(document).ready(function() {
 // 初始化Select2插件
 function initializeSelect2() {
     $('.select2').select2({
-        theme: 'bootstrap4',
+        theme: 'bootstrap-5',
         width: '100%',
         dropdownParent: $('#addProductionRecordModal'),
         placeholder: '请选择...'
@@ -335,53 +357,93 @@ function addMaterialRow() {
         type: 'GET',
         success: function(result) {
             if (result.success) {
-    // 创建一个原材料选择下拉框
-    let materialSelect = '<select class="form-control material-select" onchange="updateAvailableQuantity(this)">';
-    materialSelect += '<option value="">请选择原材料</option>';
+                // 获取已选择的原材料ID列表
+                const selectedMaterialIds = getSelectedMaterialIds();
+                
+                // 创建一个原材料选择下拉框
+                let materialSelect = '<select class="form-control material-select" onchange="handleMaterialChange(this)">';
+                materialSelect += '<option value="">请选择原材料</option>';
                 result.data.forEach(material => {
-                    materialSelect += `<option value="${material.id}" data-quantity="${material.quantity}">${material.name} (${material.specification}) - 库存: ${material.quantity}</option>`;
-    });
-    materialSelect += '</select>';
-    
-    // 创建行HTML
-    const rowHtml = `
-        <tr class="material-row">
-            <td>${materialSelect}</td>
-            <td>
-                <input type="number" class="form-control material-quantity" min="0.01" step="0.01" placeholder="数量">
-                <small class="form-text text-muted available-quantity"></small>
-            </td>
-            <td>
-                <button type="button" class="btn btn-sm btn-danger remove-material">
-                    <i class="fas fa-times"></i>
-                </button>
-            </td>
-        </tr>
-    `;
-    
-    // 添加到表格中
-    $('#materialsList').append(rowHtml);
-    
-    // 为新添加的行绑定事件
-    const $newRow = $('#materialsList').find('tr:last');
-    $newRow.find('.remove-material').click(function() {
-        $(this).closest('tr').remove();
-    });
-    
-    // 初始化新添加的select
-    $newRow.find('.material-select').select2({
-        theme: 'bootstrap4',
-        width: '100%',
-        placeholder: '请选择原材料'
+                    // 只显示未被选择的原材料
+                    if (!selectedMaterialIds.includes(material.id.toString())) {
+                        materialSelect += `<option value="${material.id}" data-quantity="${material.quantity}">${material.name} (${material.specification}) - 库存: ${material.quantity}</option>`;
+                    }
+                });
+                materialSelect += '</select>';
+                
+                // 检查是否还有可选的原材料
+                if (result.data.length === selectedMaterialIds.length) {
+                    showAlert('warning', '所有可用原材料都已添加');
+                    return;
+                }
+                
+                // 创建行HTML
+                const rowHtml = `
+                    <tr class="material-row">
+                        <td>${materialSelect}</td>
+                        <td>
+                            <input type="number" class="form-control material-quantity" min="0.01" step="0.01" placeholder="数量">
+                            <small class="form-text text-muted available-quantity"></small>
+                        </td>
+                        <td>
+                            <button type="button" class="btn btn-sm btn-danger remove-material">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+                
+                // 添加到表格中
+                $('#materialsList').append(rowHtml);
+                
+                // 为新添加的行绑定事件
+                const $newRow = $('#materialsList').find('tr:last');
+                $newRow.find('.remove-material').click(function() {
+                    $(this).closest('tr').remove();
+                    // 删除行后刷新所有下拉框选项
+                    refreshAllMaterialSelects();
+                });
+                
+                // 初始化新添加的select
+                $newRow.find('.material-select').select2({
+                    theme: 'bootstrap-5',
+                    width: '100%',
+                    placeholder: '请选择原材料',
+                    dropdownParent: $('#addProductionRecordModal')
                 });
             } else {
-                toastr.error('加载原材料列表失败');
+                showAlert('danger', '加载原材料列表失败');
             }
         },
         error: function() {
-            toastr.error('加载原材料列表失败');
+            showAlert('danger', '加载原材料列表失败');
         }
     });
+}
+
+// 获取已选择的原材料ID列表
+function getSelectedMaterialIds() {
+    const selectedIds = [];
+    $('.material-select').each(function() {
+        const value = $(this).val();
+        if (value) {
+            selectedIds.push(value);
+        }
+    });
+    return selectedIds;
+}
+
+// 处理原材料选择变更
+function handleMaterialChange(selectElement) {
+    const selectedValue = $(selectElement).val();
+    
+    // 更新可用数量提示
+    updateAvailableQuantity(selectElement);
+    
+    // 如果选择了原材料，刷新其他下拉框选项
+    if (selectedValue) {
+        refreshAllMaterialSelects();
+    }
 }
 
 // 更新可用数量提示
@@ -397,6 +459,59 @@ function updateAvailableQuantity(selectElement) {
         $row.find('.available-quantity').text('');
         $row.find('.material-quantity').removeAttr('max');
     }
+}
+
+// 刷新所有原材料下拉框选项
+function refreshAllMaterialSelects() {
+    // 获取当前已选择的原材料ID
+    const selectedMaterialIds = getSelectedMaterialIds();
+    
+    // 重新加载原材料列表
+    $.ajax({
+        url: '/api/inventory/raw-materials?only_available=true',
+        type: 'GET',
+        success: function(result) {
+            if (result.success) {
+                $('.material-select').each(function() {
+                    const $select = $(this);
+                    const currentValue = $select.val();
+                    
+                    // 保存当前选择的值
+                    let newOptions = '<option value="">请选择原材料</option>';
+                    
+                    result.data.forEach(material => {
+                        // 显示未被其他下拉框选择的原材料，或者是当前下拉框已选择的原材料
+                        if (!selectedMaterialIds.includes(material.id.toString()) || material.id.toString() === currentValue) {
+                            const selected = material.id.toString() === currentValue ? 'selected' : '';
+                            newOptions += `<option value="${material.id}" data-quantity="${material.quantity}" ${selected}>${material.name} (${material.specification}) - 库存: ${material.quantity}</option>`;
+                        }
+                    });
+                    
+                    // 销毁现有的Select2实例
+                    $select.select2('destroy');
+                    
+                    // 更新选项
+                    $select.html(newOptions);
+                    
+                    // 重新初始化Select2
+                    $select.select2({
+                        theme: 'bootstrap-5',
+                        width: '100%',
+                        placeholder: '请选择原材料',
+                        dropdownParent: $('#addProductionRecordModal')
+                    });
+                    
+                    // 如果有选中值，更新数量提示
+                    if (currentValue) {
+                        updateAvailableQuantity($select[0]);
+                    }
+                });
+            }
+        },
+        error: function() {
+            console.error('刷新原材料列表失败');
+        }
+    });
 }
 
 // 收集所有原材料数据并添加到表单中
@@ -495,10 +610,20 @@ function showAlert(type, message) {
 
 .select2-container--bootstrap-5 .select2-dropdown {
     border-color: #dee2e6;
+    z-index: 9999;
 }
 
 .raw-material-fields {
     transition: all 0.3s ease;
+}
+
+/* 确保模态框中的Select2正常显示 */
+.modal .select2-container {
+    z-index: 9999;
+}
+
+.modal .select2-dropdown {
+    z-index: 10000;
 }
 </style>
 {% endblock %} 

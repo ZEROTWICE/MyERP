@@ -25,7 +25,7 @@
                 <div class="col-md-2">
                     <select class="form-select" id="type" name="type">
                         <option value="">全部类型</option>
-                        <option value="process">工序质检</option>
+                        <option value="production_record">生产记录质检</option>
                         <option value="product">成品质检</option>
                         <option value="material">原材料质检</option>
                     </select>
@@ -254,7 +254,7 @@ function renderRecords(data) {
 // 获取记录类型名称
 function getRecordTypeName(type) {
     const types = {
-        'process': '工序质检',
+        'production_record': '生产记录质检',
         'product': '成品质检',
         'material': '原材料质检'
     };
