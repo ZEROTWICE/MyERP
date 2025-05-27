@@ -23,7 +23,7 @@
                 <div class="col-md-2">
                     <select class="form-select" id="type" name="type">
                         <option value="">全部类型</option>
-                        <option value="process">工序质检</option>
+                        <option value="production_record">生产记录质检</option>
                         <option value="product">成品质检</option>
                         <option value="material">原材料质检</option>
                     </select>
@@ -117,7 +117,7 @@
                         <div class="col-md-4">
                             <label class="form-label">任务类型</label>
                             <select class="form-select" id="taskType" name="type" required onchange="loadTemplates()">
-                                <option value="process">工序质检</option>
+                                <option value="production_record">生产记录质检</option>
                                 <option value="product">成品质检</option>
                                 <option value="material">原材料质检</option>
                             </select>
@@ -225,6 +225,15 @@ document.addEventListener('DOMContentLoaded', function() {
         currentPage = 1;
         loadTasks();
     });
+
+    // 监听任务类型变更
+    const taskTypeSelect = document.getElementById('taskType');
+    if (taskTypeSelect) {
+        taskTypeSelect.addEventListener('change', function() {
+            loadTemplates();
+            loadInspectionTargets();
+        });
+    }
 });
 
 // 加载任务列表
@@ -300,7 +309,7 @@ function renderTasks(data) {
 // 获取任务类型名称
 function getTaskTypeName(type) {
     const types = {
-        'process': '工序质检',
+        'production_record': '生产记录质检',
         'product': '成品质检',
         'material': '原材料质检'
     };
@@ -397,7 +406,37 @@ function showCreateTaskModal() {
     document.getElementById('taskModalTitle').textContent = '新建质检任务';
     document.getElementById('taskForm').reset();
     document.getElementById('taskId').value = '';
+    
+    // 初始化检验员列表
+    loadInspectorOptions();
+    // 加载质检模板
+    loadTemplates();
+    // 加载检验对象
+    loadInspectionTargets();
+    
     taskModal.show();
+}
+
+// 加载检验员选项
+function loadInspectorOptions() {
+    fetch('/api/quality/inspectors')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const select = document.getElementById('inspectorId');
+                select.innerHTML = '<option value="">请选择检验员</option>';
+                data.inspectors.forEach(inspector => {
+                    const option = document.createElement('option');
+                    option.value = inspector.id;
+                    option.textContent = inspector.name;
+                    select.appendChild(option);
+                });
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showToast('error', '加载检验员列表失败');
+        });
 }
 
 // 加载质检模板
@@ -419,6 +458,76 @@ function loadTemplates() {
         })
         .catch(error => {
             console.error('Error:', error);
+            showToast('error', '加载质检模板失败');
+        });
+}
+
+// 加载检验对象
+function loadInspectionTargets() {
+    const type = document.getElementById('taskType').value;
+    const container = document.getElementById('inspectionTargetContainer');
+    
+    // 显示加载中提示
+    container.innerHTML = '<div class="text-center"><div class="spinner-border text-primary" role="status"></div></div>';
+    
+    // 根据类型加载不同的检验对象
+    let url = '';
+    switch (type) {
+        case 'production_record':
+            url = '/api/quality/production-records';  // 生产记录列表API
+            break;
+        case 'product':
+            url = '/api/quality/finished-products';   // 成品列表API
+            break;
+        case 'material':
+            url = '/api/inventory/raw-materials';  // 原材料列表API（已存在）
+            break;
+    }
+    
+    fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                let options = '<option value="">请选择检验对象</option>';
+                
+                switch (type) {
+                    case 'production_record':
+                        if (data.data && Array.isArray(data.data)) {
+                            options += data.data.map(record => 
+                                `<option value="${record.id}">${record.global_sn} - ${record.employee_name} - ${record.process_name}</option>`
+                            ).join('');
+                        }
+                        break;
+                    case 'product':
+                        if (data.data && Array.isArray(data.data)) {
+                            options += data.data.map(product => 
+                                `<option value="${product.id}">${product.product_number} - ${product.model || ''}</option>`
+                            ).join('');
+                        }
+                        break;
+                    case 'material':
+                        if (data.data && Array.isArray(data.data)) {
+                            options += data.data.map(material => 
+                                `<option value="${material.id}">${material.internal_number} - ${material.material_name || ''}</option>`
+                            ).join('');
+                        }
+                        break;
+                }
+                
+                container.innerHTML = `
+                    <select class="form-select" name="inspection_target_id" required>
+                        ${options}
+                    </select>
+                `;
+            } else {
+                showToast('error', data.message || '加载检验对象失败');
+                container.innerHTML = '<div class="alert alert-danger">加载检验对象失败：' + (data.message || '未知错误') + '</div>';
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showToast('error', '加载检验对象失败');
+            container.innerHTML = '<div class="alert alert-danger">加载检验对象失败，请稍后重试</div>';
         });
 }
 

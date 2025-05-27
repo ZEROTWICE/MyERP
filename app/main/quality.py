@@ -4,9 +4,9 @@ from app import db, csrf
 from app.models import (
     InspectionTemplate, InspectionBaseItem, InspectionItem,
     InspectionTask, InspectionRecord, AuditLog, User, Employee,
-    SerialNumber
+    SerialNumber, ProcessPrice, FinishedProduct, RawMaterial, ProductionRecord
 )
-from datetime import datetime
+from datetime import datetime, timedelta
 from . import bp
 
 @bp.route('/quality')
@@ -488,9 +488,10 @@ def get_tasks():
                 'task_code': t.global_sn,
                 'type': t.target_type,
                 'inspection_target': get_inspection_target_name(t),
-                'inspector_name': t.inspector.name,
-                'status': t.status,
-                'inspection_date': t.inspection_date.strftime('%Y-%m-%d') if t.inspection_date else None
+                'inspector_name': t.inspector.employee.name if t.inspector.employee else t.inspector.username,
+                'created_at': t.created_at.strftime('%Y-%m-%d %H:%M'),
+                'planned_completion_time': t.deadline.strftime('%Y-%m-%d %H:%M') if t.deadline else None,
+                'status': t.status
             } for t in tasks],
             'total': pagination.total,
             'page': page,
@@ -538,10 +539,11 @@ def create_task():
             global_sn=SerialNumber.get_next_number(),
             template_id=data['template_id'],
             target_type=data['type'],
+            target_id=data['inspection_target_id'],
             inspector_id=data['inspector_id'],
-            total_quantity=data['total_quantity'],
-            inspection_date=datetime.strptime(data['inspection_date'], '%Y-%m-%d').date() if data['inspection_date'] else None,
-            notes=data.get('notes', ''),
+            priority={'low': 1, 'medium': 2, 'high': 3}.get(data.get('priority', 'medium'), 2),
+            deadline=datetime.strptime(data['planned_completion_time'], '%Y-%m-%dT%H:%M') if data.get('planned_completion_time') else None,
+            created_by=current_user.id,
             status='pending'
         )
         db.session.add(task)
@@ -596,7 +598,7 @@ def get_inspectors():
         
         return jsonify({
             'success': True,
-            'data': [{
+            'inspectors': [{
                 'id': inspector.id,
                 'name': inspector.employee.name if inspector.employee else inspector.username,
                 'employee_id': inspector.employee.employee_id if inspector.employee else None,
@@ -607,12 +609,233 @@ def get_inspectors():
         current_app.logger.error(f'获取质检员列表失败: {str(e)}')
         return jsonify({'success': False, 'message': f'获取质检员列表失败：{str(e)}'}), 500
 
+@bp.route('/api/quality/processes', methods=['GET'])
+@login_required
+def get_processes():
+    """获取工序列表"""
+    try:
+        # 获取当前有效的工序价格（最新版本）
+        today = datetime.now().date()
+        
+        # 子查询：获取每个工序编号的最新有效日期
+        latest_versions = db.session.query(
+            ProcessPrice.process_code,
+            db.func.max(ProcessPrice.effective_date).label('max_date')
+        ).filter(ProcessPrice.effective_date <= today + timedelta(days=1))\
+        .group_by(ProcessPrice.process_code)\
+        .subquery()
+        
+        # 主查询：获取最新版本的工序
+        processes = ProcessPrice.query.join(
+            latest_versions,
+            db.and_(
+                ProcessPrice.process_code == latest_versions.c.process_code,
+                ProcessPrice.effective_date == latest_versions.c.max_date
+            )
+        ).order_by(ProcessPrice.process_code).all()
+        
+        return jsonify({
+            'success': True,
+            'data': [{
+                'id': process.id,
+                'process_code': process.process_code,
+                'process_name': process.process_name,
+                'component': process.component,
+                'drawing_no': process.drawing_no,
+                'model_no': process.model_no,
+                'price': process.price,
+                'needs_inspection': process.needs_inspection
+            } for process in processes]
+        })
+    except Exception as e:
+        current_app.logger.error(f'获取工序列表失败: {str(e)}')
+        return jsonify({'success': False, 'message': f'获取工序列表失败：{str(e)}'}), 500
+
+@bp.route('/api/quality/finished-products', methods=['GET'])
+@login_required
+def get_finished_products():
+    """获取成品列表"""
+    try:
+        # 获取未存档的成品
+        products = FinishedProduct.query.filter(
+            FinishedProduct.is_archived == False
+        ).order_by(FinishedProduct.created_at.desc()).all()
+        
+        return jsonify({
+            'success': True,
+            'data': [{
+                'id': product.id,
+                'product_number': product.product_number,
+                'drawing_number': product.drawing_number,
+                'model': product.model,
+                'production_date': product.production_date.strftime('%Y-%m-%d'),
+                'inspector': product.inspector,
+                'quantity': product.quantity,
+                'status': product.status
+            } for product in products]
+        })
+    except Exception as e:
+        current_app.logger.error(f'获取成品列表失败: {str(e)}')
+        return jsonify({'success': False, 'message': f'获取成品列表失败：{str(e)}'}), 500
+
+@bp.route('/api/quality/production-records', methods=['GET'])
+@login_required
+def get_production_records():
+    """获取生产记录列表"""
+    try:
+        # 获取最近的生产记录，按日期倒序排列
+        records = ProductionRecord.query.join(Employee).join(ProcessPrice).order_by(
+            ProductionRecord.date.desc(),
+            ProductionRecord.id.desc()
+        ).limit(200).all()  # 限制返回最近200条记录
+        
+        return jsonify({
+            'success': True,
+            'data': [{
+                'id': record.id,
+                'global_sn': record.global_sn,
+                'employee_name': record.employee.name,
+                'employee_id': record.employee.employee_id,
+                'process_name': record.process.process_name,
+                'process_code': record.process.process_code,
+                'quantity': record.quantity,
+                'date': record.date.strftime('%Y-%m-%d'),
+                'notes': record.notes or '',
+                'component': record.process.component or '',
+                'drawing_no': record.process.drawing_no or ''
+            } for record in records]
+        })
+    except Exception as e:
+        current_app.logger.error(f'获取生产记录列表失败: {str(e)}')
+        return jsonify({'success': False, 'message': f'获取生产记录列表失败：{str(e)}'}), 500
+
 def get_inspection_target_name(task):
     """获取检验对象名称"""
-    if task.target_type == 'process':
-        return f'工序：{task.process.process_name}'
-    elif task.target_type == 'product':
-        return f'成品：{task.product.product_number}'
-    elif task.target_type == 'material':
-        return f'原材料：{task.material.material_name}'
-    return '未知'
+    try:
+        if task.target_type == 'production_record':
+            record = ProductionRecord.query.get(task.target_id)
+            if record:
+                return f'生产记录：{record.global_sn} - {record.employee.name} - {record.process.process_name}'
+            else:
+                return '生产记录：未知'
+        elif task.target_type == 'product':
+            product = FinishedProduct.query.get(task.target_id)
+            return f'成品：{product.product_number}' if product else '成品：未知'
+        elif task.target_type == 'material':
+            material = RawMaterial.query.get(task.target_id)
+            return f'原材料：{material.material_name}' if material else '原材料：未知'
+        return '未知'
+    except Exception as e:
+        current_app.logger.error(f'获取检验对象名称失败: {str(e)}')
+        return '未知'
+
+def delete_inspection_task(task_id):
+    """删除质检任务"""
+    try:
+        task = InspectionTask.query.get_or_404(task_id)
+        
+        # 检查权限
+        if current_user.role not in ['admin', 'manager']:
+            return jsonify({'success': False, 'message': '权限不足'}), 403
+        
+        # 检查任务状态
+        if task.status in ['in_progress', 'completed']:
+            return jsonify({'success': False, 'message': '进行中或已完成的任务不能删除'}), 400
+        
+        # 保存旧数据用于审计日志
+        old_data = {
+            'global_sn': task.global_sn,
+            'template_id': task.template_id,
+            'target_type': task.target_type,
+            'target_id': task.target_id,
+            'inspector_id': task.inspector_id,
+            'status': task.status
+        }
+        
+        # 记录审计日志
+        log = AuditLog(
+            user_id=current_user.id,
+            action='删除质检任务',
+            details=f'删除质检任务：{task.global_sn}',
+            can_rollback=True,
+            rollback_type='delete',
+            target_model='InspectionTask',
+            target_id=task.id,
+            old_data=old_data
+        )
+        db.session.add(log)
+        
+        # 删除任务
+        db.session.delete(task)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': '任务删除成功'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f'删除质检任务失败: {str(e)}')
+        return jsonify({'success': False, 'message': f'删除失败：{str(e)}'}), 500
+
+def update_task(task_id):
+    """更新质检任务"""
+    try:
+        task = InspectionTask.query.get_or_404(task_id)
+        data = request.get_json()
+        
+        # 检查权限
+        if current_user.role not in ['admin', 'manager']:
+            return jsonify({'success': False, 'message': '权限不足'}), 403
+        
+        # 保存旧数据用于审计日志
+        old_data = {
+            'template_id': task.template_id,
+            'target_type': task.target_type,
+            'target_id': task.target_id,
+            'inspector_id': task.inspector_id,
+            'status': task.status,
+            'priority': task.priority,
+            'deadline': task.deadline.isoformat() if task.deadline else None,
+            'notes': task.notes
+        }
+        
+        # 更新任务
+        if 'template_id' in data:
+            task.template_id = data['template_id']
+        if 'inspector_id' in data:
+            task.inspector_id = data['inspector_id']
+        if 'target_id' in data:
+            task.target_id = data['target_id']
+        if 'priority' in data:
+            task.priority = data['priority']
+        if 'deadline' in data and data['deadline']:
+            task.deadline = datetime.strptime(data['deadline'], '%Y-%m-%dT%H:%M')
+        if 'notes' in data:
+            task.notes = data['notes']
+        
+        # 记录审计日志
+        log = AuditLog(
+            user_id=current_user.id,
+            action='更新质检任务',
+            details=f'更新质检任务：{task.global_sn}',
+            can_rollback=True,
+            rollback_type='edit',
+            target_model='InspectionTask',
+            target_id=task.id,
+            old_data=old_data,
+            new_data=data
+        )
+        db.session.add(log)
+        
+        db.session.commit()
+        return jsonify({
+            'success': True,
+            'message': '任务更新成功'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f'更新质检任务失败: {str(e)}')
+        return jsonify({'success': False, 'message': f'更新失败：{str(e)}'}), 500

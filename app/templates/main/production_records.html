@@ -51,29 +51,30 @@
                             {% macro sort_link(column, text) %}
                                 {% if current_sort == column %}
                                     {% if current_direction == 'asc' %}
-                                        <a href="{{ url_for('main.manage_production_records', sort=column, direction='desc', search=search_form.search.data, per_page=request.args.get('per_page', 20)) }}" class="text-dark text-decoration-none">
+                                        <a href="{{ url_for('main.manage_production_records', sort=column, direction='desc', search=request.args.get('search', ''), per_page=request.args.get('per_page', 20)) }}" class="text-dark text-decoration-none">
                                             {{ text }} <i class="bi bi-arrow-up"></i>
                                         </a>
                                     {% else %}
-                                        <a href="{{ url_for('main.manage_production_records', sort=column, direction='asc', search=search_form.search.data, per_page=request.args.get('per_page', 20)) }}" class="text-dark text-decoration-none">
+                                        <a href="{{ url_for('main.manage_production_records', sort=column, direction='asc', search=request.args.get('search', ''), per_page=request.args.get('per_page', 20)) }}" class="text-dark text-decoration-none">
                                             {{ text }} <i class="bi bi-arrow-down"></i>
                                         </a>
                                     {% endif %}
                                 {% else %}
-                                    <a href="{{ url_for('main.manage_production_records', sort=column, direction='asc', search=search_form.search.data, per_page=request.args.get('per_page', 20)) }}" class="text-dark text-decoration-none">
+                                    <a href="{{ url_for('main.manage_production_records', sort=column, direction='asc', search=request.args.get('search', ''), per_page=request.args.get('per_page', 20)) }}" class="text-dark text-decoration-none">
                                         {{ text }}
                                     </a>
                                 {% endif %}
                             {% endmacro %}
 
+                            <th>{{ sort_link('global_sn', '流水号') }}</th>
                             <th>{{ sort_link('date', '生产日期') }}</th>
                             <th>{{ sort_link('employee_name', '员工') }}</th>
                             <th>{{ sort_link('process_name', '工序') }}</th>
                             <th>{{ sort_link('quantity', '数量') }}</th>
                             <th>原材料</th>
+                            <th>原材料编号</th>
                             <th>原材料用量</th>
                             <th>成品编号</th>
-                            <th>检验员</th>
                             <th>备注</th>
                             <th>操作</th>
                         </tr>
@@ -81,6 +82,7 @@
                     <tbody>
                         {% for record in records %}
                         <tr>
+                            <td>{{ record.global_sn }}</td>
                             <td>{{ record.date.strftime('%Y-%m-%d') }}</td>
                             <td>{{ record.employee.name }} ({{ record.employee.employee_id }})</td>
                             <td>{{ record.process.process_name }} ({{ record.process.process_code }})</td>
@@ -102,6 +104,19 @@
                                 {% if record.materials and record.materials|length > 0 %}
                                     <ul class="list-unstyled mb-0">
                                         {% for material in record.materials %}
+                                            <li>{{ material.raw_material.internal_number }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                {% elif record.raw_material %}
+                                    {{ record.raw_material.internal_number }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if record.materials and record.materials|length > 0 %}
+                                    <ul class="list-unstyled mb-0">
+                                        {% for material in record.materials %}
                                             <li>{{ "%.2f"|format(material.quantity) }}</li>
                                         {% endfor %}
                                     </ul>
@@ -114,11 +129,6 @@
                             <td>
                                 {% if record.finished_product %}
                                     {{ record.finished_product.product_number }}
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if record.finished_product %}
-                                    {{ record.finished_product.inspector }}
                                 {% endif %}
                             </td>
                             <td>{{ record.notes }}</td>
@@ -325,44 +335,44 @@ function addMaterialRow() {
         type: 'GET',
         success: function(result) {
             if (result.success) {
-                // 创建一个原材料选择下拉框
-                let materialSelect = '<select class="form-control material-select" onchange="updateAvailableQuantity(this)">';
-                materialSelect += '<option value="">请选择原材料</option>';
+    // 创建一个原材料选择下拉框
+    let materialSelect = '<select class="form-control material-select" onchange="updateAvailableQuantity(this)">';
+    materialSelect += '<option value="">请选择原材料</option>';
                 result.data.forEach(material => {
                     materialSelect += `<option value="${material.id}" data-quantity="${material.quantity}">${material.name} (${material.specification}) - 库存: ${material.quantity}</option>`;
-                });
-                materialSelect += '</select>';
-                
-                // 创建行HTML
-                const rowHtml = `
-                    <tr class="material-row">
-                        <td>${materialSelect}</td>
-                        <td>
-                            <input type="number" class="form-control material-quantity" min="0.01" step="0.01" placeholder="数量">
-                            <small class="form-text text-muted available-quantity"></small>
-                        </td>
-                        <td>
-                            <button type="button" class="btn btn-sm btn-danger remove-material">
-                                <i class="fas fa-times"></i>
-                            </button>
-                        </td>
-                    </tr>
-                `;
-                
-                // 添加到表格中
-                $('#materialsList').append(rowHtml);
-                
-                // 为新添加的行绑定事件
-                const $newRow = $('#materialsList').find('tr:last');
-                $newRow.find('.remove-material').click(function() {
-                    $(this).closest('tr').remove();
-                });
-                
-                // 初始化新添加的select
-                $newRow.find('.material-select').select2({
-                    theme: 'bootstrap4',
-                    width: '100%',
-                    placeholder: '请选择原材料'
+    });
+    materialSelect += '</select>';
+    
+    // 创建行HTML
+    const rowHtml = `
+        <tr class="material-row">
+            <td>${materialSelect}</td>
+            <td>
+                <input type="number" class="form-control material-quantity" min="0.01" step="0.01" placeholder="数量">
+                <small class="form-text text-muted available-quantity"></small>
+            </td>
+            <td>
+                <button type="button" class="btn btn-sm btn-danger remove-material">
+                    <i class="fas fa-times"></i>
+                </button>
+            </td>
+        </tr>
+    `;
+    
+    // 添加到表格中
+    $('#materialsList').append(rowHtml);
+    
+    // 为新添加的行绑定事件
+    const $newRow = $('#materialsList').find('tr:last');
+    $newRow.find('.remove-material').click(function() {
+        $(this).closest('tr').remove();
+    });
+    
+    // 初始化新添加的select
+    $newRow.find('.material-select').select2({
+        theme: 'bootstrap4',
+        width: '100%',
+        placeholder: '请选择原材料'
                 });
             } else {
                 toastr.error('加载原材料列表失败');

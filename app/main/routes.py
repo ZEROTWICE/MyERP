@@ -826,7 +826,7 @@ def salary_details(employee_id):
 def manage_production_records():
     """管理生产记录"""
     form = ProductionRecordForm()
-    search_form = ProductionRecordSearchForm()
+    search_form = ProductionRecordSearchForm(request.args)
     
     # 获取所有员工
     employees = Employee.query.filter_by(is_active=True).all()
@@ -977,9 +977,14 @@ def manage_production_records():
     # 处理搜索和排序
     query = ProductionRecord.query.join(Employee).join(ProcessPrice)
     
-    if search_form.search.data:
-        search_term = f"%{search_form.search.data}%"
-        query = query.filter(db.or_(
+    # 获取搜索参数
+    search_term_input = request.args.get('search', '').strip()
+    if search_term_input:
+        search_term = f"%{search_term_input}%"
+        
+        # 构建基本搜索条件
+        search_conditions = [
+            ProductionRecord.global_sn.like(search_term),
             Employee.name.like(search_term),
             Employee.employee_id.like(search_term),
             ProcessPrice.process_code.like(search_term),
@@ -987,7 +992,39 @@ def manage_production_records():
             ProcessPrice.component.like(search_term),
             ProcessPrice.drawing_no.like(search_term),
             ProcessPrice.model_no.like(search_term)
-        ))
+        ]
+        
+        # 添加原材料搜索条件
+        try:
+            # 搜索通过 ProductionRecordMaterial 关联的原材料
+            material_ids = db.session.query(ProductionRecordMaterial.production_record_id).join(
+                RawMaterial, ProductionRecordMaterial.raw_material_id == RawMaterial.id
+            ).filter(db.or_(
+                RawMaterial.material_name.like(search_term),
+                RawMaterial.internal_number.like(search_term)
+            )).distinct().all()
+            
+            if material_ids:
+                material_record_ids = [row[0] for row in material_ids]
+                search_conditions.append(ProductionRecord.id.in_(material_record_ids))
+            
+            # 搜索直接关联的原材料
+            direct_material_ids = db.session.query(ProductionRecord.id).join(
+                RawMaterial, ProductionRecord.raw_material_id == RawMaterial.id
+            ).filter(db.or_(
+                RawMaterial.material_name.like(search_term),
+                RawMaterial.internal_number.like(search_term)
+            )).distinct().all()
+            
+            if direct_material_ids:
+                direct_record_ids = [row[0] for row in direct_material_ids]
+                search_conditions.append(ProductionRecord.id.in_(direct_record_ids))
+                
+        except Exception as e:
+            current_app.logger.error(f'原材料搜索失败: {str(e)}')
+            # 如果原材料搜索失败，继续使用基本搜索条件
+        
+        query = query.filter(db.or_(*search_conditions))
 
     # 处理排序
     sort_column = request.args.get('sort', 'date')
@@ -995,6 +1032,7 @@ def manage_production_records():
     
     # 定义排序映射
     sort_mapping = {
+        'global_sn': ProductionRecord.global_sn,
         'date': ProductionRecord.date,
         'employee_name': Employee.name,
         'process_code': ProcessPrice.process_code,
@@ -2408,7 +2446,7 @@ def update_task_status(id):
                 raw_material.quantity -= float(material['quantity'])
         else:
             # 如果任务还未完成，但已经开始，更新状态为进行中
-            task.status = 'in_progress'
+                task.status = 'in_progress'
         
         # 记录审计日志
         audit_log = AuditLog(
@@ -4770,7 +4808,7 @@ def get_available_raw_materials():
             
         raw_materials = query.all()
         materials_list = [{
-            'id': material.id,
+                'id': material.id,
             'name': material.material_name,
             'material_name': material.material_name,  # 为了兼容性保留
             'specification': f"{material.internal_number} - {material.melt_number}",

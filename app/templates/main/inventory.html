@@ -27,12 +27,12 @@
                 <input type="hidden" name="type" value="{{ request.args.get('type', 'finished') }}">
                 <div class="col-md-4">
                     <div class="input-group">
-                        <input type="text" class="form-control" name="search" 
-                               value="{{ request.args.get('search', '') }}" 
-                               placeholder="搜索...">
-                        <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-search"></i> 搜索
-                        </button>
+                    <input type="text" class="form-control" name="search" 
+                           value="{{ request.args.get('search', '') }}" 
+                           placeholder="搜索...">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-search"></i> 搜索
+                    </button>
                     </div>
                 </div>
                 <div class="col-md-2">
@@ -105,7 +105,7 @@
                                     data-id="{{ item.id }}"
                                     data-archived="{{ item.is_archived|tojson }}">
                                 {{ '取消存档' if item.is_archived else '存档' }}
-                            </button>
+                        </button>
                             <button class="btn btn-sm btn-danger delete-raw-material" data-id="{{ item.id }}">删除</button>
                         </div>
                         {% endif %}
@@ -153,7 +153,7 @@
                                     data-id="{{ item.id }}"
                                     data-archived="{{ item.is_archived|tojson }}">
                                 {{ '取消存档' if item.is_archived else '存档' }}
-                            </button>
+                        </button>
                             <button class="btn btn-sm btn-danger delete-finished-product" data-id="{{ item.id }}">删除</button>
                         </div>
                         {% endif %}
@@ -233,82 +233,6 @@ function importInventory(input) {
     });
 }
 
-function editRawMaterial(id) {
-    console.log('编辑原材料:', id);
-    // 获取原材料详情
-    fetch(`/inventory/raw/${id}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                // 填充表单数据
-                document.getElementById('editRawMaterialId').value = data.data.id;
-                document.getElementById('editInternalNumber').value = data.data.internal_number;
-                document.getElementById('editSupplier').value = data.data.supplier;
-                document.getElementById('editMaterialName').value = data.data.material_name;
-                document.getElementById('editMeltNumber').value = data.data.melt_number;
-                document.getElementById('editSupplierNumber').value = data.data.supplier_number;
-                document.getElementById('editStorageDate').value = data.data.storage_date;
-                document.getElementById('editRawQuantity').value = data.data.quantity;
-                document.getElementById('editHasSample').checked = data.data.has_sample;
-                document.getElementById('editRawNotes').value = data.data.notes;
-                
-                // 显示模态框
-                const modal = new bootstrap.Modal(document.getElementById('editRawMaterialModal'));
-                modal.show();
-            } else {
-                alert('获取原材料详情失败：' + data.message);
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('获取原材料详情失败，请重试');
-        });
-}
-
-function submitEditRawMaterial() {
-    const id = document.getElementById('editRawMaterialId').value;
-    const formData = {
-        supplier: document.getElementById('editSupplier').value,
-        material_name: document.getElementById('editMaterialName').value,
-        melt_number: document.getElementById('editMeltNumber').value,
-        supplier_number: document.getElementById('editSupplierNumber').value,
-        storage_date: document.getElementById('editStorageDate').value,
-        quantity: parseFloat(document.getElementById('editRawQuantity').value) || 0,
-        has_sample: document.getElementById('editHasSample').checked,
-        notes: document.getElementById('editRawNotes').value
-    };
-    
-    if (formData.quantity <= 0) {
-        alert('数量必须大于0');
-        return;
-    }
-    
-    fetch(`/inventory/raw/${id}`, {
-        method: 'PUT',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': '{{ csrf_token() }}'
-        },
-        credentials: 'same-origin',
-        body: JSON.stringify(formData)
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            alert('成功更新原材料信息！');
-            const modal = bootstrap.Modal.getInstance(document.getElementById('editRawMaterialModal'));
-            modal.hide();
-            location.reload();
-        } else {
-            alert('更新失败：' + data.message);
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('更新失败，请重试');
-    });
-}
-
 function editFinishedProduct(id) {
     console.log('编辑成品:', id);
     // 获取成品详情
@@ -321,22 +245,58 @@ function editFinishedProduct(id) {
                 document.getElementById('editProductNumber').value = data.data.product_number;
                 document.getElementById('editDrawingNumber').value = data.data.drawing_number;
                 document.getElementById('editModel').value = data.data.model;
-                document.getElementById('editProductionDate').value = data.data.production_date;
+                // 转换日期格式
+                const productionDate = new Date(data.data.production_date);
+                document.getElementById('editProductionDate').value = productionDate.toISOString().split('T')[0];
                 document.getElementById('editInspector').value = data.data.inspector;
                 document.getElementById('editQuantity').value = data.data.quantity;
-                document.getElementById('editStatus').value = data.data.status;
-                document.getElementById('editNotes').value = data.data.notes;
+                document.getElementById('editStatus').value = data.data.status || 'in_stock';
+                document.getElementById('editNotes').value = data.data.notes || '';
                 
                 // 显示模态框
                 const modal = new bootstrap.Modal(document.getElementById('editFinishedProductModal'));
                 modal.show();
             } else {
-                alert('获取成品详情失败：' + data.message);
+                showToast('error', data.message || '获取成品详情失败');
             }
         })
         .catch(error => {
             console.error('Error:', error);
-            alert('获取成品详情失败，请重试');
+            showToast('error', '获取成品详情失败，请重试');
+    });
+}
+
+function editRawMaterial(id) {
+    console.log('编辑原材料:', id);
+    // 获取原材料详情
+    fetch(`/inventory/raw/${id}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // 填充表单数据
+                document.getElementById('editRawMaterialId').value = data.data.id;
+                document.getElementById('editInternalNumber').value = data.data.internal_number;
+                document.getElementById('editSupplier').value = data.data.supplier;
+                document.getElementById('editMaterialName').value = data.data.material_name;
+                document.getElementById('editMeltNumber').value = data.data.melt_number || '';
+                document.getElementById('editSupplierNumber').value = data.data.supplier_number;
+                // 转换日期格式
+                const storageDate = new Date(data.data.storage_date);
+                document.getElementById('editStorageDate').value = storageDate.toISOString().split('T')[0];
+                document.getElementById('editRawQuantity').value = data.data.quantity;
+                document.getElementById('editHasSample').checked = data.data.has_sample;
+                document.getElementById('editRawNotes').value = data.data.notes || '';
+                
+                // 显示模态框
+                const modal = new bootstrap.Modal(document.getElementById('editRawMaterialModal'));
+                modal.show();
+            } else {
+                showToast('error', data.message || '获取原材料详情失败');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showToast('error', '获取原材料详情失败，请重试');
         });
 }
 
@@ -371,6 +331,50 @@ function submitEditFinishedProduct() {
         if (data.success) {
             alert('成功更新成品信息！');
             const modal = bootstrap.Modal.getInstance(document.getElementById('editFinishedProductModal'));
+            modal.hide();
+            location.reload();
+        } else {
+            alert('更新失败：' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('更新失败，请重试');
+    });
+}
+
+function submitEditRawMaterial() {
+    const id = document.getElementById('editRawMaterialId').value;
+    const formData = {
+        supplier: document.getElementById('editSupplier').value,
+        material_name: document.getElementById('editMaterialName').value,
+        melt_number: document.getElementById('editMeltNumber').value,
+        supplier_number: document.getElementById('editSupplierNumber').value,
+        storage_date: document.getElementById('editStorageDate').value,
+        quantity: parseFloat(document.getElementById('editRawQuantity').value) || 0,
+        has_sample: document.getElementById('editHasSample').checked,
+        notes: document.getElementById('editRawNotes').value
+    };
+    
+    if (formData.quantity <= 0) {
+        alert('数量必须大于0');
+        return;
+    }
+    
+    fetch(`/inventory/raw/${id}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('成功更新原材料信息！');
+            const modal = bootstrap.Modal.getInstance(document.getElementById('editRawMaterialModal'));
             modal.hide();
             location.reload();
         } else {
@@ -515,6 +519,36 @@ document.addEventListener('DOMContentLoaded', function() {
     } else {
         console.error('找不到添加成品模态框元素');
     }
+
+    // 为编辑按钮添加事件监听器
+    document.querySelectorAll('.edit-raw-material').forEach(button => {
+        button.addEventListener('click', function() {
+            const id = this.getAttribute('data-id');
+            editRawMaterial(id);
+        });
+    });
+
+    document.querySelectorAll('.edit-finished-product').forEach(button => {
+        button.addEventListener('click', function() {
+            const id = this.getAttribute('data-id');
+            editFinishedProduct(id);
+        });
+    });
+
+    // 为删除按钮添加事件监听器
+    document.querySelectorAll('.delete-raw-material').forEach(button => {
+        button.addEventListener('click', function() {
+            const id = this.getAttribute('data-id');
+            deleteRawMaterial(id);
+        });
+    });
+
+    document.querySelectorAll('.delete-finished-product').forEach(button => {
+        button.addEventListener('click', function() {
+            const id = this.getAttribute('data-id');
+            deleteFinishedProduct(id);
+        });
+    });
 });
 
 // 添加加载原材料编码规则的函数
