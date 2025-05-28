@@ -1,0 +1,456 @@
+{% extends "base.html" %}
+
+{% block title %}{{ product.product_name }} - BOM管理{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2>{{ product.product_name }} - BOM管理</h2>
+            <p class="text-muted">产品编码：{{ product.product_code }}</p>
+        </div>
+        <div>
+            <a href="{{ url_for('main.manage_products') }}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> 返回产品列表
+            </a>
+        </div>
+    </div>
+
+    <!-- 产品信息卡片 -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">产品信息</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-3">
+                    <p><strong>图号：</strong>{{ product.drawing_number or '-' }}</p>
+                </div>
+                <div class="col-md-3">
+                    <p><strong>型号：</strong>{{ product.model or '-' }}</p>
+                </div>
+                <div class="col-md-3">
+                    <p><strong>类别：</strong>{{ product.category or '-' }}</p>
+                </div>
+                <div class="col-md-3">
+                    <p><strong>版本：</strong>{{ product.version }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- BOM操作按钮 -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h5 class="mb-0">物料清单 (BOM)</h5>
+                </div>
+                <div class="col-md-4 text-end">
+                    {% if current_user.role in ['admin', 'manager'] %}
+                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addBomModal">
+                        <i class="fas fa-plus"></i> 添加物料
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- BOM列表 -->
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>序号</th>
+                    <th>物料类型</th>
+                    <th>物料名称</th>
+                    <th>用量</th>
+                    <th>单位</th>
+                    <th>单价</th>
+                    <th>损耗率(%)</th>
+                    <th>实际用量</th>
+                    <th>总成本</th>
+                    <th>备注</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in bom_items %}
+                <tr>
+                    <td>{{ item.sequence }}</td>
+                    <td>
+                        {% if item.material_type == 'raw' %}
+                            <span class="badge bg-warning">原材料</span>
+                        {% elif item.material_type == 'finished' %}
+                            <span class="badge bg-info">成品</span>
+                        {% elif item.material_type == 'product' %}
+                            <span class="badge bg-success">产品</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ item.material_name }}</td>
+                    <td>{{ item.quantity }}</td>
+                    <td>{{ item.unit }}</td>
+                    <td>¥{{ "%.2f"|format(item.unit_cost) }}</td>
+                    <td>{{ item.waste_rate }}%</td>
+                    <td>{{ "%.2f"|format(item.actual_quantity) }}</td>
+                    <td>¥{{ "%.2f"|format(item.total_cost) }}</td>
+                    <td>{{ item.notes or '-' }}</td>
+                    <td>
+                        {% if current_user.role in ['admin', 'manager'] %}
+                        <div class="btn-group">
+                            <button class="btn btn-sm btn-primary" onclick="editBomItem({{ item.id }})">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteBomItem({{ item.id }})">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr class="table-info">
+                    <td colspan="8"><strong>总原材料成本</strong></td>
+                    <td><strong>¥{{ "%.2f"|format(product.total_material_cost) }}</strong></td>
+                    <td colspan="2"></td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+</div>
+
+<!-- 添加BOM项模态框 -->
+<div class="modal fade" id="addBomModal" tabindex="-1" aria-labelledby="addBomModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addBomModalLabel">添加物料</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addBomForm">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="materialType" class="form-label">物料类型 *</label>
+                                <select class="form-control" id="materialType" name="material_type" required onchange="loadMaterials()">
+                                    <option value="">请选择</option>
+                                    <option value="raw">原材料</option>
+                                    <option value="finished">成品</option>
+                                    <option value="product">产品</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="materialId" class="form-label">物料 *</label>
+                                <select class="form-control" id="materialId" name="material_id" required>
+                                    <option value="">请先选择物料类型</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="quantity" class="form-label">用量 *</label>
+                                <input type="number" class="form-control" id="quantity" name="quantity" step="0.01" min="0.01" required>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="unit" class="form-label">单位</label>
+                                <input type="text" class="form-control" id="unit" name="unit" value="件">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="unitCost" class="form-label">单价</label>
+                                <input type="number" class="form-control" id="unitCost" name="unit_cost" step="0.01" min="0" value="0">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="wasteRate" class="form-label">损耗率(%)</label>
+                                <input type="number" class="form-control" id="wasteRate" name="waste_rate" step="0.1" min="0" max="100" value="0">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="bomNotes" class="form-label">备注</label>
+                        <textarea class="form-control" id="bomNotes" name="notes" rows="2"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="submitBomItem()">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 编辑BOM项模态框 -->
+<div class="modal fade" id="editBomModal" tabindex="-1" aria-labelledby="editBomModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editBomModalLabel">编辑物料</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editBomForm">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="editMaterialType" class="form-label">物料类型</label>
+                                <select class="form-control" id="editMaterialType" name="material_type" disabled>
+                                    <option value="raw">原材料</option>
+                                    <option value="finished">成品</option>
+                                    <option value="product">产品</option>
+                                </select>
+                                <small class="form-text text-muted">物料类型不可修改，如需更换请删除后重新添加</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="editMaterialId" class="form-label">物料</label>
+                                <input type="text" class="form-control" id="editMaterialName" readonly>
+                                <small class="form-text text-muted">物料不可修改，如需更换请删除后重新添加</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="editQuantity" class="form-label">用量 *</label>
+                                <input type="number" class="form-control" id="editQuantity" name="quantity" step="0.01" min="0.01" required>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="editUnit" class="form-label">单位</label>
+                                <input type="text" class="form-control" id="editUnit" name="unit">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="editUnitCost" class="form-label">单价</label>
+                                <input type="number" class="form-control" id="editUnitCost" name="unit_cost" step="0.01" min="0">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="editWasteRate" class="form-label">损耗率(%)</label>
+                                <input type="number" class="form-control" id="editWasteRate" name="waste_rate" step="0.1" min="0" max="100">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editBomNotes" class="form-label">备注</label>
+                        <textarea class="form-control" id="editBomNotes" name="notes" rows="2"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="submitEditBomItem()">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// 加载物料列表
+function loadMaterials() {
+    const materialType = document.getElementById('materialType').value;
+    const materialSelect = document.getElementById('materialId');
+    
+    // 清空选项
+    materialSelect.innerHTML = '<option value="">加载中...</option>';
+    
+    if (!materialType) {
+        materialSelect.innerHTML = '<option value="">请先选择物料类型</option>';
+        return;
+    }
+    
+    let url = '';
+    if (materialType === 'raw') {
+        url = "{{ url_for('main.get_available_raw_materials') }}?only_available=true";
+    } else if (materialType === 'finished') {
+        url = '/api/inventory/finished-products?only_available=true';
+    } else if (materialType === 'product') {
+        url = "{{ url_for('main.search_products') }}?exclude_current={{ product.id }}";
+    }
+    
+    fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            materialSelect.innerHTML = '<option value="">请选择物料</option>';
+            
+            if (data.success && data.data) {
+                data.data.forEach(material => {
+                    const option = document.createElement('option');
+                    option.value = material.id;
+                    if (materialType === 'raw') {
+                        option.textContent = `${material.material_name} (${material.internal_number})`;
+                    } else if (materialType === 'finished') {
+                        option.textContent = `${material.product_number}`;
+                    } else if (materialType === 'product') {
+                        option.textContent = `${material.product_name} (${material.product_code})`;
+                    }
+                    materialSelect.appendChild(option);
+                });
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            materialSelect.innerHTML = '<option value="">加载失败</option>';
+        });
+}
+
+// 添加BOM项
+function submitBomItem() {
+    const formData = {
+        material_type: document.getElementById('materialType').value,
+        material_id: document.getElementById('materialId').value,
+        quantity: document.getElementById('quantity').value,
+        unit: document.getElementById('unit').value,
+        unit_cost: document.getElementById('unitCost').value,
+        waste_rate: document.getElementById('wasteRate').value,
+        notes: document.getElementById('bomNotes').value
+    };
+    
+    fetch(`{{ url_for('main.add_product_bom', product_id=product.id) }}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('BOM项添加成功！');
+            const modal = bootstrap.Modal.getInstance(document.getElementById('addBomModal'));
+            modal.hide();
+            location.reload();
+        } else {
+            alert('添加失败：' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('添加失败，请重试');
+    });
+}
+
+// 编辑BOM项
+function editBomItem(id) {
+    // 获取BOM项详情
+    fetch(`{{ url_for('main.get_product_bom_item', product_id=product.id, bom_item_id=0) }}`.replace('0', id))
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const bomData = data.data;
+            
+            // 填充编辑表单
+            document.getElementById('editMaterialType').value = bomData.material_type;
+            document.getElementById('editMaterialName').value = bomData.material_name;
+            document.getElementById('editQuantity').value = bomData.quantity;
+            document.getElementById('editUnit').value = bomData.unit;
+            document.getElementById('editUnitCost').value = bomData.unit_cost;
+            document.getElementById('editWasteRate').value = bomData.waste_rate;
+            document.getElementById('editBomNotes').value = bomData.notes;
+            
+            // 设置当前编辑的BOM项ID
+            document.getElementById('editBomForm').setAttribute('data-bom-id', id);
+            
+            // 显示编辑模态框
+            const editModal = new bootstrap.Modal(document.getElementById('editBomModal'));
+            editModal.show();
+        } else {
+            alert('获取BOM项详情失败：' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('获取BOM项详情失败，请重试');
+    });
+}
+
+// 提交编辑BOM项
+function submitEditBomItem() {
+    const bomId = document.getElementById('editBomForm').getAttribute('data-bom-id');
+    const formData = {
+        quantity: document.getElementById('editQuantity').value,
+        unit: document.getElementById('editUnit').value,
+        unit_cost: document.getElementById('editUnitCost').value,
+        waste_rate: document.getElementById('editWasteRate').value,
+        notes: document.getElementById('editBomNotes').value
+    };
+    
+    fetch(`{{ url_for('main.update_product_bom_item', product_id=product.id, bom_item_id=0) }}`.replace('0', bomId), {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('BOM项更新成功！');
+            const modal = bootstrap.Modal.getInstance(document.getElementById('editBomModal'));
+            modal.hide();
+            location.reload();
+        } else {
+            alert('更新失败：' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('更新失败，请重试');
+    });
+}
+
+// 删除BOM项
+function deleteBomItem(id) {
+    if (confirm('确定要删除这个BOM项吗？')) {
+        fetch(`{{ url_for('main.delete_product_bom_item', product_id=product.id, bom_item_id=0) }}`.replace('0', id), {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token() }}'
+            },
+            credentials: 'same-origin'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('BOM项删除成功！');
+                location.reload();
+            } else {
+                alert('删除失败：' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('删除失败，请重试');
+        });
+    }
+}
+</script>
+
+{% endblock %} 

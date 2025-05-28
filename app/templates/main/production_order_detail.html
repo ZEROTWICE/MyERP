@@ -1,0 +1,295 @@
+{% extends "base.html" %}
+
+{% block title %}生产订单详情{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>生产订单详情</h2>
+        <a href="{{ url_for('main.manage_production_orders') }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> 返回列表
+        </a>
+    </div>
+
+    <!-- 订单基本信息 -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">订单信息</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <table class="table table-borderless">
+                        <tr>
+                            <td><strong>订单编号:</strong></td>
+                            <td>{{ order.order_number }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>产品名称:</strong></td>
+                            <td>{{ order.product.product_name }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>产品编码:</strong></td>
+                            <td>{{ order.product.product_code }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>计划数量:</strong></td>
+                            <td>{{ order.planned_quantity }}件</td>
+                        </tr>
+                        <tr>
+                            <td><strong>完成数量:</strong></td>
+                            <td>{{ order.completed_quantity }}件</td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="col-md-6">
+                    <table class="table table-borderless">
+                        <tr>
+                            <td><strong>订单状态:</strong></td>
+                            <td>
+                                {% if order.status == 'pending' %}
+                                    <span class="badge bg-secondary">待开始</span>
+                                {% elif order.status == 'in_progress' %}
+                                    <span class="badge bg-primary">进行中</span>
+                                {% elif order.status == 'completed' %}
+                                    <span class="badge bg-success">已完成</span>
+                                {% elif order.status == 'cancelled' %}
+                                    <span class="badge bg-danger">已取消</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><strong>优先级:</strong></td>
+                            <td>
+                                {% if order.priority == 0 %}
+                                    <span class="badge bg-light text-dark">普通</span>
+                                {% elif order.priority > 0 %}
+                                    <span class="badge bg-warning">高优先级</span>
+                                {% else %}
+                                    <span class="badge bg-info">低优先级</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><strong>计划开始:</strong></td>
+                            <td>{{ order.planned_start_date.strftime('%Y-%m-%d') }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>计划完成:</strong></td>
+                            <td>{{ order.planned_end_date.strftime('%Y-%m-%d') }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>完成率:</strong></td>
+                            <td>
+                                <div class="progress" style="width: 200px;">
+                                    <div class="progress-bar" role="progressbar" 
+                                         style="width: {{ order.completion_rate }}%"
+                                         aria-valuenow="{{ order.completion_rate }}" 
+                                         aria-valuemin="0" aria-valuemax="100">
+                                        {{ "%.1f"|format(order.completion_rate) }}%
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            {% if order.notes %}
+            <div class="row">
+                <div class="col-12">
+                    <strong>备注:</strong>
+                    <p class="text-muted">{{ order.notes }}</p>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- 物料分配 -->
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">物料分配</h5>
+            <a href="{{ url_for('main.production_order_materials', order_id=order.id) }}" class="btn btn-sm btn-info">
+                <i class="fas fa-list"></i> 详细分配
+            </a>
+        </div>
+        <div class="card-body">
+            {% if material_allocations %}
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>物料名称</th>
+                            <th>类型</th>
+                            <th>需求数量</th>
+                            <th>已分配</th>
+                            <th>已消耗</th>
+                            <th>状态</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for allocation in material_allocations %}
+                        <tr>
+                            <td>{{ allocation.material_name }}</td>
+                            <td>
+                                {% if allocation.material_type == 'raw' %}
+                                    <span class="badge bg-warning">原材料</span>
+                                {% elif allocation.material_type == 'finished' %}
+                                    <span class="badge bg-info">成品</span>
+                                {% elif allocation.material_type == 'product' %}
+                                    <span class="badge bg-success">产品</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ allocation.required_quantity }}{{ allocation.unit }}</td>
+                            <td>{{ allocation.allocated_quantity }}{{ allocation.unit }}</td>
+                            <td>{{ allocation.consumed_quantity }}{{ allocation.unit }}</td>
+                            <td>
+                                {% if allocation.status == 'pending' %}
+                                    <span class="badge bg-secondary">待分配</span>
+                                {% elif allocation.status == 'allocated' %}
+                                    <span class="badge bg-primary">已分配</span>
+                                {% elif allocation.status == 'consumed' %}
+                                    <span class="badge bg-success">已消耗</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-muted">暂无物料分配记录</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- 生产批次 -->
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">生产批次</h5>
+            {% if current_user.role in ['admin', 'manager'] and order.status != 'completed' %}
+            <button class="btn btn-sm btn-primary" onclick="addBatch()">
+                <i class="fas fa-plus"></i> 添加批次
+            </button>
+            {% endif %}
+        </div>
+        <div class="card-body">
+            {% if batches %}
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>批次号</th>
+                            <th>批次数量</th>
+                            <th>状态</th>
+                            <th>开始日期</th>
+                            <th>完成日期</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for batch in batches %}
+                        <tr>
+                            <td>{{ batch.batch_number }}</td>
+                            <td>{{ batch.batch_quantity }}件</td>
+                            <td>
+                                {% if batch.status == 'pending' %}
+                                    <span class="badge bg-secondary">待开始</span>
+                                {% elif batch.status == 'in_progress' %}
+                                    <span class="badge bg-primary">进行中</span>
+                                {% elif batch.status == 'completed' %}
+                                    <span class="badge bg-success">已完成</span>
+                                {% elif batch.status == 'cancelled' %}
+                                    <span class="badge bg-danger">已取消</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ batch.start_date.strftime('%Y-%m-%d') if batch.start_date else '-' }}</td>
+                            <td>{{ batch.end_date.strftime('%Y-%m-%d') if batch.end_date else '-' }}</td>
+                            <td>
+                                <a href="{{ url_for('main.production_batch_detail', batch_id=batch.id) }}" class="btn btn-sm btn-info">
+                                    <i class="fas fa-eye"></i> 详情
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-muted">暂无生产批次</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- 添加批次模态框 -->
+<div class="modal fade" id="addBatchModal" tabindex="-1" aria-labelledby="addBatchModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addBatchModalLabel">添加生产批次</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addBatchForm">
+                    <div class="mb-3">
+                        <label for="batchQuantity" class="form-label">批次数量 *</label>
+                        <input type="number" class="form-control" id="batchQuantity" name="batch_quantity" min="1" max="{{ order.remaining_quantity }}" required>
+                        <small class="form-text text-muted">剩余数量：{{ order.remaining_quantity }}件</small>
+                    </div>
+                    <div class="mb-3">
+                        <label for="batchNotes" class="form-label">批次备注</label>
+                        <textarea class="form-control" id="batchNotes" name="notes" rows="2"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="submitBatch()">创建批次</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// 添加生产批次
+function addBatch() {
+    const modal = new bootstrap.Modal(document.getElementById('addBatchModal'));
+    modal.show();
+}
+
+// 提交批次
+function submitBatch() {
+    const formData = {
+        batch_quantity: document.getElementById('batchQuantity').value,
+        notes: document.getElementById('batchNotes').value
+    };
+    
+    fetch(`/production_orders/{{ order.id }}/batches/add`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            const modal = bootstrap.Modal.getInstance(document.getElementById('addBatchModal'));
+            modal.hide();
+            location.reload();
+        } else {
+            alert('创建失败：' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('创建失败，请重试');
+    });
+}
+</script>
+
+{% endblock %} 

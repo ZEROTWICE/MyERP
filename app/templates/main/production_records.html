@@ -21,7 +21,7 @@
 {% block content %}
 <div class="container mt-4">
     <h2>生产记录管理</h2>
-    
+
     {% if current_user.role in ['admin', 'hr'] %}
     <div class="mb-3">
         <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addProductionRecordModal">
@@ -64,48 +64,48 @@
         </div>
     </div>
 
-    <div class="table-responsive">
-        <table class="table table-striped">
-            <thead>
-                <tr>
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
                     <th>{{ sort_link('global_sn', '流水号') }}</th>
                     <th>{{ sort_link('date', '日期') }}</th>
-                    <th>{{ sort_link('employee_name', '员工') }}</th>
-                    <th>{{ sort_link('process_name', '工序') }}</th>
-                    <th>{{ sort_link('quantity', '数量') }}</th>
-                    <th>原材料</th>
+                            <th>{{ sort_link('employee_name', '员工') }}</th>
+                            <th>{{ sort_link('process_name', '工序') }}</th>
+                            <th>{{ sort_link('quantity', '数量') }}</th>
+                            <th>原材料</th>
                     <th>原材料编号</th>
-                    <th>原材料用量</th>
-                    <th>成品编号</th>
-                    <th>备注</th>
-                    <th>操作</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for record in records %}
-                <tr>
+                            <th>原材料用量</th>
+                            <th>成品编号</th>
+                            <th>备注</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for record in records %}
+                        <tr>
                     <td>{{ record.global_sn }}</td>
-                    <td>{{ record.date.strftime('%Y-%m-%d') }}</td>
-                    <td>{{ record.employee.name }} ({{ record.employee.employee_id }})</td>
-                    <td>{{ record.process.process_name }} ({{ record.process.process_code }})</td>
-                    <td>{{ record.quantity }}</td>
-                    <td>
-                        {% if record.materials and record.materials|length > 0 %}
-                            <ul class="list-unstyled mb-0">
-                                {% for material in record.materials %}
-                                    <li>{{ material.raw_material.material_name }}</li>
-                                {% endfor %}
-                            </ul>
-                        {% elif record.raw_material %}
-                            {{ record.raw_material.material_name }}
-                        {% else %}
-                            -
-                        {% endif %}
-                    </td>
-                    <td>
-                        {% if record.materials and record.materials|length > 0 %}
-                            <ul class="list-unstyled mb-0">
-                                {% for material in record.materials %}
+                            <td>{{ record.date.strftime('%Y-%m-%d') }}</td>
+                            <td>{{ record.employee.name }} ({{ record.employee.employee_id }})</td>
+                            <td>{{ record.process.process_name }} ({{ record.process.process_code }})</td>
+                            <td>{{ record.quantity }}</td>
+                            <td>
+                                {% if record.materials and record.materials|length > 0 %}
+                                    <ul class="list-unstyled mb-0">
+                                        {% for material in record.materials %}
+                                            <li>{{ material.raw_material.material_name }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                {% elif record.raw_material %}
+                                    {{ record.raw_material.material_name }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if record.materials and record.materials|length > 0 %}
+                                    <ul class="list-unstyled mb-0">
+                                        {% for material in record.materials %}
                                     <li>{{ material.raw_material.internal_number }}</li>
                                 {% endfor %}
                             </ul>
@@ -120,34 +120,34 @@
                             <ul class="list-unstyled mb-0">
                                 {% for material in record.materials %}
                                     <li>{{ material.quantity }}</li>
-                                {% endfor %}
-                            </ul>
-                        {% elif record.raw_material_quantity %}
+                                        {% endfor %}
+                                    </ul>
+                                {% elif record.raw_material_quantity %}
                             {{ record.raw_material_quantity }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if record.finished_product %}
+                                    {{ record.finished_product.product_number }}
                         {% else %}
                             -
-                        {% endif %}
-                    </td>
-                    <td>
-                        {% if record.finished_product %}
-                            {{ record.finished_product.product_number }}
-                        {% else %}
-                            -
-                        {% endif %}
-                    </td>
+                                {% endif %}
+                            </td>
                     <td>{{ record.notes or '-' }}</td>
-                    <td>
+                            <td>
                         {% if current_user.role in ['admin', 'hr'] %}
                         <button class="btn btn-sm btn-danger delete-record" data-id="{{ record.id }}">删除</button>
-                        {% endif %}
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
 
-    <!-- 分页 -->
+            <!-- 分页 -->
     <nav aria-label="Page navigation">
         <ul class="pagination justify-content-center">
             {% if pagination.has_prev %}
@@ -173,97 +173,97 @@
             {% endif %}
         </ul>
     </nav>
-</div>
+    </div>
 
-<!-- 添加生产记录模态框 -->
-<div class="modal fade" id="addProductionRecordModal" tabindex="-1" aria-labelledby="addProductionRecordModalLabel" aria-hidden="true">
+    <!-- 添加生产记录模态框 -->
+    <div class="modal fade" id="addProductionRecordModal" tabindex="-1" aria-labelledby="addProductionRecordModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="addProductionRecordModalLabel">添加生产记录</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <form method="POST" action="{{ url_for('main.manage_production_records') }}">
-                    {{ form.csrf_token }}
-                    <div class="mb-3">
-                        {{ form.employee_id.label(class="form-label") }}
-                        {{ form.employee_id(class="form-control select2") }}
-                    </div>
-                    <div class="mb-3">
-                        {{ form.process_id.label(class="form-label") }}
-                        {{ form.process_id(class="form-control select2", onchange="handleProcessChange(this.value)") }}
-                    </div>
-                    <div class="mb-3">
-                        {{ form.quantity.label(class="form-label") }}
-                        {{ form.quantity(class="form-control", type="number", min="1") }}
-                    </div>
-                    <div class="mb-3">
-                        {{ form.date.label(class="form-label") }}
-                        {{ form.date(class="form-control", type="date") }}
-                    </div>
-                    
-                    <!-- 多原材料管理部分 -->
-                    <div class="mb-3">
-                        <label class="form-label">原材料列表</label>
-                        <div class="table-responsive">
-                            <table class="table table-sm" id="materialsTable">
-                                <thead>
-                                    <tr>
-                                        <th>原材料</th>
-                                        <th>数量</th>
-                                        <th>操作</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="materialsList">
-                                    <!-- 原材料列表将在这里动态添加 -->
-                                </tbody>
-                            </table>
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="addProductionRecordModalLabel">添加生产记录</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form method="POST" action="{{ url_for('main.manage_production_records') }}">
+                        {{ form.csrf_token }}
+                        <div class="mb-3">
+                            {{ form.employee_id.label(class="form-label") }}
+                            {{ form.employee_id(class="form-control select2") }}
                         </div>
-                        <button type="button" class="btn btn-sm btn-primary" id="addMaterialBtn">
-                            <i class="fas fa-plus"></i> 添加原材料
-                        </button>
-                    </div>
-                    
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                {{ form.inspector.label(class="form-label") }}
-                                {{ form.inspector(class="form-control") }}
+                        <div class="mb-3">
+                            {{ form.process_id.label(class="form-label") }}
+                            {{ form.process_id(class="form-control select2", onchange="handleProcessChange(this.value)") }}
+                        </div>
+                        <div class="mb-3">
+                            {{ form.quantity.label(class="form-label") }}
+                            {{ form.quantity(class="form-control", type="number", min="1") }}
+                        </div>
+                        <div class="mb-3">
+                            {{ form.date.label(class="form-label") }}
+                            {{ form.date(class="form-control", type="date") }}
+                        </div>
+                        
+                        <!-- 多原材料管理部分 -->
+                        <div class="mb-3">
+                            <label class="form-label">原材料列表</label>
+                            <div class="table-responsive">
+                                <table class="table table-sm" id="materialsTable">
+                                    <thead>
+                                        <tr>
+                                            <th>原材料</th>
+                                            <th>数量</th>
+                                            <th>操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="materialsList">
+                                        <!-- 原材料列表将在这里动态添加 -->
+                                    </tbody>
+                                </table>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-primary" id="addMaterialBtn">
+                                <i class="fas fa-plus"></i> 添加原材料
+                            </button>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    {{ form.inspector.label(class="form-label") }}
+                                    {{ form.inspector(class="form-control") }}
+                                </div>
+                            </div>
+                            <div class="col-md-12">
+                                <div class="mb-3">
+                                    {{ form.notes.label(class="form-label") }}
+                                    {{ form.notes(class="form-control", rows="3") }}
+                                </div>
                             </div>
                         </div>
-                        <div class="col-md-12">
-                            <div class="mb-3">
-                                {{ form.notes.label(class="form-label") }}
-                                {{ form.notes(class="form-control", rows="3") }}
-                            </div>
+                        
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                            {{ form.submit(class="btn btn-primary") }}
                         </div>
-                    </div>
-                    
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                        {{ form.submit(class="btn btn-primary") }}
-                    </div>
-                </form>
+                    </form>
+                </div>
             </div>
         </div>
     </div>
-</div>
 
-<!-- 删除确认对话框 -->
-<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="deleteModalLabel">确认删除</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                确定要删除这条生产记录吗？此操作不可恢复。
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                <button type="button" class="btn btn-danger" id="confirmDelete">删除</button>
+    <!-- 删除确认对话框 -->
+    <div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="deleteModalLabel">确认删除</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    确定要删除这条生产记录吗？此操作不可恢复。
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-danger" id="confirmDelete">删除</button>
             </div>
         </div>
     </div>
@@ -360,54 +360,54 @@ function addMaterialRow() {
                 // 获取已选择的原材料ID列表
                 const selectedMaterialIds = getSelectedMaterialIds();
                 
-                // 创建一个原材料选择下拉框
+    // 创建一个原材料选择下拉框
                 let materialSelect = '<select class="form-control material-select" onchange="handleMaterialChange(this)">';
-                materialSelect += '<option value="">请选择原材料</option>';
+    materialSelect += '<option value="">请选择原材料</option>';
                 result.data.forEach(material => {
                     // 只显示未被选择的原材料
                     if (!selectedMaterialIds.includes(material.id.toString())) {
                         materialSelect += `<option value="${material.id}" data-quantity="${material.quantity}">${material.name} (${material.specification}) - 库存: ${material.quantity}</option>`;
                     }
-                });
-                materialSelect += '</select>';
+    });
+    materialSelect += '</select>';
                 
                 // 检查是否还有可选的原材料
                 if (result.data.length === selectedMaterialIds.length) {
                     showAlert('warning', '所有可用原材料都已添加');
                     return;
                 }
-                
-                // 创建行HTML
-                const rowHtml = `
-                    <tr class="material-row">
-                        <td>${materialSelect}</td>
-                        <td>
-                            <input type="number" class="form-control material-quantity" min="0.01" step="0.01" placeholder="数量">
-                            <small class="form-text text-muted available-quantity"></small>
-                        </td>
-                        <td>
-                            <button type="button" class="btn btn-sm btn-danger remove-material">
-                                <i class="fas fa-times"></i>
-                            </button>
-                        </td>
-                    </tr>
-                `;
-                
-                // 添加到表格中
-                $('#materialsList').append(rowHtml);
-                
-                // 为新添加的行绑定事件
-                const $newRow = $('#materialsList').find('tr:last');
-                $newRow.find('.remove-material').click(function() {
-                    $(this).closest('tr').remove();
+    
+    // 创建行HTML
+    const rowHtml = `
+        <tr class="material-row">
+            <td>${materialSelect}</td>
+            <td>
+                <input type="number" class="form-control material-quantity" min="0.01" step="0.01" placeholder="数量">
+                <small class="form-text text-muted available-quantity"></small>
+            </td>
+            <td>
+                <button type="button" class="btn btn-sm btn-danger remove-material">
+                    <i class="fas fa-times"></i>
+                </button>
+            </td>
+        </tr>
+    `;
+    
+    // 添加到表格中
+    $('#materialsList').append(rowHtml);
+    
+    // 为新添加的行绑定事件
+    const $newRow = $('#materialsList').find('tr:last');
+    $newRow.find('.remove-material').click(function() {
+        $(this).closest('tr').remove();
                     // 删除行后刷新所有下拉框选项
                     refreshAllMaterialSelects();
-                });
-                
-                // 初始化新添加的select
-                $newRow.find('.material-select').select2({
+    });
+    
+    // 初始化新添加的select
+    $newRow.find('.material-select').select2({
                     theme: 'bootstrap-5',
-                    width: '100%',
+        width: '100%',
                     placeholder: '请选择原材料',
                     dropdownParent: $('#addProductionRecordModal')
                 });

@@ -1,0 +1,342 @@
+{% extends "base.html" %}
+
+{% block title %}生产订单管理{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>生产订单管理</h2>
+
+    <!-- 搜索和操作按钮 -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3 align-items-center">
+                <div class="col-md-3">
+                    <div class="input-group">
+                        <input type="text" class="form-control" name="product" 
+                               value="{{ product_filter }}" 
+                               placeholder="搜索产品名称或编码...">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-search"></i> 搜索
+                        </button>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <select class="form-control" name="status" onchange="this.form.submit()">
+                        <option value="">所有状态</option>
+                        <option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>待开始</option>
+                        <option value="in_progress" {% if status_filter == 'in_progress' %}selected{% endif %}>进行中</option>
+                        <option value="completed" {% if status_filter == 'completed' %}selected{% endif %}>已完成</option>
+                        <option value="cancelled" {% if status_filter == 'cancelled' %}selected{% endif %}>已取消</option>
+                    </select>
+                </div>
+                <div class="col-md-7 text-end">
+                    {% if current_user.role in ['admin', 'manager'] %}
+                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addOrderModal">
+                        <i class="fas fa-plus"></i> 创建订单
+                    </button>
+                    {% endif %}
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 订单列表 -->
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>订单编号</th>
+                    <th>产品信息</th>
+                    <th>计划数量</th>
+                    <th>完成数量</th>
+                    <th>完成率</th>
+                    <th>状态</th>
+                    <th>优先级</th>
+                    <th>计划日期</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for order in orders.items %}
+                <tr>
+                    <td>{{ order.order_number }}</td>
+                    <td>
+                        <strong>{{ order.product.product_name }}</strong><br>
+                        <small class="text-muted">{{ order.product.product_code }}</small>
+                    </td>
+                    <td>{{ order.planned_quantity }}</td>
+                    <td>{{ order.completed_quantity }}</td>
+                    <td>
+                        <div class="progress" style="height: 20px;">
+                            <div class="progress-bar" role="progressbar" 
+                                 style="width: {{ order.completion_rate }}%"
+                                 aria-valuenow="{{ order.completion_rate }}" 
+                                 aria-valuemin="0" aria-valuemax="100">
+                                {{ "%.1f"|format(order.completion_rate) }}%
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        {% if order.status == 'pending' %}
+                            <span class="badge bg-secondary">待开始</span>
+                        {% elif order.status == 'in_progress' %}
+                            <span class="badge bg-primary">进行中</span>
+                        {% elif order.status == 'completed' %}
+                            <span class="badge bg-success">已完成</span>
+                        {% elif order.status == 'cancelled' %}
+                            <span class="badge bg-danger">已取消</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if order.priority == 0 %}
+                            <span class="badge bg-light text-dark">普通</span>
+                        {% elif order.priority > 0 %}
+                            <span class="badge bg-warning">高优先级</span>
+                        {% else %}
+                            <span class="badge bg-info">低优先级</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {{ order.planned_start_date.strftime('%Y-%m-%d') }} 至<br>
+                        {{ order.planned_end_date.strftime('%Y-%m-%d') }}
+                    </td>
+                    <td>
+                        <div class="btn-group">
+                            <a href="{{ url_for('main.production_order_detail', order_id=order.id) }}" class="btn btn-sm btn-info">
+                                <i class="fas fa-eye"></i> 详情
+                            </a>
+                            {% if current_user.role in ['admin', 'manager'] and order.status != 'completed' %}
+                            <button class="btn btn-sm btn-success" onclick="addBatch({{ order.id }})">
+                                <i class="fas fa-plus"></i> 批次
+                            </button>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="9" class="text-center text-muted">暂无生产订单</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- 分页 -->
+    {% if orders.pages > 1 %}
+    <nav aria-label="Page navigation" class="mt-4">
+        <ul class="pagination justify-content-center">
+            {% for page in orders.iter_pages() %}
+                {% if page %}
+                    <li class="page-item {{ 'active' if page == orders.page else '' }}">
+                        <a class="page-link" href="{{ url_for('main.manage_production_orders', page=page, status=status_filter, product=product_filter) }}">{{ page }}</a>
+                    </li>
+                {% else %}
+                    <li class="page-item disabled">
+                        <span class="page-link">...</span>
+                    </li>
+                {% endif %}
+            {% endfor %}
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+
+<!-- 创建订单模态框 -->
+<div class="modal fade" id="addOrderModal" tabindex="-1" aria-labelledby="addOrderModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addOrderModalLabel">创建生产订单</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addOrderForm">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="productSelect" class="form-label">产品 *</label>
+                                <select class="form-control" id="productSelect" name="product_id" required>
+                                    <option value="">请选择产品</option>
+                                    {% for product in products %}
+                                    <option value="{{ product.id }}">{{ product.product_name }} ({{ product.product_code }})</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="plannedQuantity" class="form-label">计划数量 *</label>
+                                <input type="number" class="form-control" id="plannedQuantity" name="planned_quantity" min="1" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="plannedStartDate" class="form-label">计划开始日期 *</label>
+                                <input type="date" class="form-control" id="plannedStartDate" name="planned_start_date" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="plannedEndDate" class="form-label">计划完成日期 *</label>
+                                <input type="date" class="form-control" id="plannedEndDate" name="planned_end_date" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="priority" class="form-label">优先级</label>
+                                <select class="form-control" id="priority" name="priority">
+                                    <option value="-1">低优先级</option>
+                                    <option value="0" selected>普通</option>
+                                    <option value="1">高优先级</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="orderNotes" class="form-label">备注</label>
+                        <textarea class="form-control" id="orderNotes" name="notes" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="submitOrder()">创建订单</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 添加批次模态框 -->
+<div class="modal fade" id="addBatchModal" tabindex="-1" aria-labelledby="addBatchModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addBatchModalLabel">添加生产批次</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addBatchForm">
+                    <input type="hidden" id="batchOrderId">
+                    <div class="mb-3">
+                        <label for="batchQuantity" class="form-label">批次数量 *</label>
+                        <input type="number" class="form-control" id="batchQuantity" name="batch_quantity" min="1" required>
+                        <small class="form-text text-muted">剩余数量：<span id="remainingQuantity">0</span></small>
+                    </div>
+                    <div class="mb-3">
+                        <label for="batchNotes" class="form-label">批次备注</label>
+                        <textarea class="form-control" id="batchNotes" name="notes" rows="2"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="submitBatch()">创建批次</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// 创建生产订单
+function submitOrder() {
+    const formData = {
+        product_id: document.getElementById('productSelect').value,
+        planned_quantity: document.getElementById('plannedQuantity').value,
+        planned_start_date: document.getElementById('plannedStartDate').value,
+        planned_end_date: document.getElementById('plannedEndDate').value,
+        priority: document.getElementById('priority').value,
+        notes: document.getElementById('orderNotes').value
+    };
+    
+    fetch("{{ url_for('main.add_production_order') }}", {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            const modal = bootstrap.Modal.getInstance(document.getElementById('addOrderModal'));
+            modal.hide();
+            location.reload();
+        } else {
+            alert('创建失败：' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('创建失败，请重试');
+    });
+}
+
+// 添加生产批次
+function addBatch(orderId) {
+    // 获取订单信息
+    const row = event.target.closest('tr');
+    const plannedQuantity = parseInt(row.cells[2].textContent);
+    const completedQuantity = parseInt(row.cells[3].textContent);
+    const remainingQuantity = plannedQuantity - completedQuantity;
+    
+    document.getElementById('batchOrderId').value = orderId;
+    document.getElementById('remainingQuantity').textContent = remainingQuantity;
+    document.getElementById('batchQuantity').max = remainingQuantity;
+    
+    const modal = new bootstrap.Modal(document.getElementById('addBatchModal'));
+    modal.show();
+}
+
+// 提交批次
+function submitBatch() {
+    const orderId = document.getElementById('batchOrderId').value;
+    const formData = {
+        batch_quantity: document.getElementById('batchQuantity').value,
+        notes: document.getElementById('batchNotes').value
+    };
+    
+    fetch(`/production_orders/${orderId}/batches/add`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            const modal = bootstrap.Modal.getInstance(document.getElementById('addBatchModal'));
+            modal.hide();
+            location.reload();
+        } else {
+            alert('创建失败：' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('创建失败，请重试');
+    });
+}
+
+// 设置默认日期
+document.addEventListener('DOMContentLoaded', function() {
+    const today = new Date().toISOString().split('T')[0];
+    const nextWeek = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    
+    document.getElementById('plannedStartDate').value = today;
+    document.getElementById('plannedEndDate').value = nextWeek;
+});
+</script>
+
+{% endblock %} 

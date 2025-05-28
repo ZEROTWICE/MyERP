@@ -84,6 +84,7 @@
                     <th>入库时间</th>
                     <th>数量</th>
                     <th>样品</th>
+                    <th>备注</th>
                     <th>状态</th>
                     <th>是否存档</th>
                     <th>操作</th>
@@ -100,6 +101,11 @@
                     <td>{{ item.storage_date.strftime('%Y-%m-%d') }}</td>
                     <td>{{ item.quantity }}</td>
                     <td>{{ '是' if item.has_sample else '否' }}</td>
+                    <td>
+                        <span class="text-muted" title="{{ item.notes or '' }}">
+                            {{ (item.notes[:20] + '...') if item.notes and item.notes|length > 20 else (item.notes or '-') }}
+                        </span>
+                    </td>
                     <td>
                         {% if item.status == 'in_stock' %}
                             <span class="badge bg-success">在库</span>
@@ -146,6 +152,7 @@
                     <th>生产日期</th>
                     <th>检验员</th>
                     <th>数量</th>
+                    <th>备注</th>
                     <th>状态</th>
                     <th>是否存档</th>
                     <th>操作</th>
@@ -160,6 +167,11 @@
                     <td>{{ item.production_date.strftime('%Y-%m-%d') }}</td>
                     <td>{{ item.inspector }}</td>
                     <td>{{ item.quantity }}</td>
+                    <td>
+                        <span class="text-muted" title="{{ item.notes or '' }}">
+                            {{ (item.notes[:20] + '...') if item.notes and item.notes|length > 20 else (item.notes or '-') }}
+                        </span>
+                    </td>
                     <td>
                         {% if item.status == 'in_stock' %}
                             <span class="badge bg-success">在库</span>

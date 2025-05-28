@@ -1,0 +1,443 @@
+{% extends "base.html" %}
+
+{% block title %}{{ product.product_name }} - 工序管理{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2>{{ product.product_name }} - 工序管理</h2>
+            <p class="text-muted">产品编码：{{ product.product_code }}</p>
+        </div>
+        <div>
+            <a href="{{ url_for('main.manage_products') }}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> 返回产品列表
+            </a>
+        </div>
+    </div>
+
+    <!-- 产品信息卡片 -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">产品信息</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-3">
+                    <p><strong>图号：</strong>{{ product.drawing_number or '-' }}</p>
+                </div>
+                <div class="col-md-3">
+                    <p><strong>型号：</strong>{{ product.model or '-' }}</p>
+                </div>
+                <div class="col-md-3">
+                    <p><strong>类别：</strong>{{ product.category or '-' }}</p>
+                </div>
+                <div class="col-md-3">
+                    <p><strong>版本：</strong>{{ product.version }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 工序操作按钮 -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row align-items-center">
+                <div class="col-md-6">
+                    <h5 class="mb-0">工序列表</h5>
+                    <p class="text-muted mb-0">配置产品的加工工序流程</p>
+                </div>
+                <div class="col-md-6 text-end">
+                    <a href="{{ url_for('main.process_prices') }}" class="btn btn-outline-info me-2">
+                        <i class="fas fa-cogs"></i> 工序价格管理
+                    </a>
+                    {% if current_user.role in ['admin', 'manager'] %}
+                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addProcessModal">
+                        <i class="fas fa-plus"></i> 添加工序
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 工序列表 -->
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>序号</th>
+                    <th>工序名称</th>
+                    <th>工序编号</th>
+                    <th>数量</th>
+                    <th>单价</th>
+                    <th>准备时间(分钟)</th>
+                    <th>加工时间(分钟)</th>
+                    <th>总时间</th>
+                    <th>总成本</th>
+                    <th>必需</th>
+                    <th>备注</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in process_items %}
+                <tr>
+                    <td>{{ item.sequence }}</td>
+                    <td>{{ item.process.process_name }}</td>
+                    <td>{{ item.process.process_code }}</td>
+                    <td>{{ item.quantity }}</td>
+                    <td>¥{{ "%.2f"|format(item.effective_price) }}</td>
+                    <td>{{ item.setup_time }}</td>
+                    <td>{{ item.process_time }}</td>
+                    <td>{{ "%.1f"|format(item.total_time) }}</td>
+                    <td>¥{{ "%.2f"|format(item.total_cost) }}</td>
+                    <td>
+                        {% if item.is_required %}
+                            <span class="badge bg-success">是</span>
+                        {% else %}
+                            <span class="badge bg-secondary">否</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ item.notes or '-' }}</td>
+                    <td>
+                        {% if current_user.role in ['admin', 'manager'] %}
+                        <div class="btn-group">
+                            <button class="btn btn-sm btn-primary" onclick="editProcessItem({{ item.id }})">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteProcessItem({{ item.id }})">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr class="table-info">
+                    <td colspan="8"><strong>总工序成本</strong></td>
+                    <td><strong>¥{{ "%.2f"|format(product.total_process_cost) }}</strong></td>
+                    <td colspan="3"></td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+</div>
+
+<!-- 添加工序模态框 -->
+<div class="modal fade" id="addProcessModal" tabindex="-1" aria-labelledby="addProcessModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addProcessModalLabel">添加工序</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addProcessForm">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="processId" class="form-label">工序 *</label>
+                                <select class="form-control" id="processId" name="process_id" required>
+                                    <option value="">请选择工序</option>
+                                    {% for process in processes %}
+                                    <option value="{{ process.id }}" data-price="{{ process.price }}">
+                                        {{ process.process_name }} ({{ process.process_code }}) - ¥{{ "%.2f"|format(process.price) }}
+                                        {% if process.component %} - {{ process.component }}{% endif %}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                                <small class="form-text text-muted">选择工序后会自动填入默认单价，您可以根据需要修改</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="sequence" class="form-label">序号 *</label>
+                                <input type="number" class="form-control" id="sequence" name="sequence" min="1" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="processQuantity" class="form-label">数量</label>
+                                <input type="number" class="form-control" id="processQuantity" name="quantity" min="1" value="1">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="unitPrice" class="form-label">单价(覆盖默认价格)</label>
+                                <input type="number" class="form-control" id="unitPrice" name="unit_price" step="0.01" min="0">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="isRequired" class="form-check-label">
+                                    <input type="checkbox" class="form-check-input" id="isRequired" name="is_required" checked>
+                                    必需工序
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="setupTime" class="form-label">准备时间(分钟)</label>
+                                <input type="number" class="form-control" id="setupTime" name="setup_time" step="0.1" min="0" value="0">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="processTime" class="form-label">加工时间(分钟)</label>
+                                <input type="number" class="form-control" id="processTime" name="process_time" step="0.1" min="0" value="0">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="processNotes" class="form-label">备注</label>
+                        <textarea class="form-control" id="processNotes" name="notes" rows="2"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="submitProcessItem()">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 编辑工序模态框 -->
+<div class="modal fade" id="editProcessModal" tabindex="-1" aria-labelledby="editProcessModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editProcessModalLabel">编辑工序</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editProcessForm">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="editProcessId" class="form-label">工序</label>
+                                <select class="form-control" id="editProcessId" name="process_id" disabled>
+                                    <option value="">请选择工序</option>
+                                    {% for process in processes %}
+                                    <option value="{{ process.id }}">{{ process.process_name }} ({{ process.process_code }})</option>
+                                    {% endfor %}
+                                </select>
+                                <small class="form-text text-muted">工序不可修改，如需更换请删除后重新添加</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="editSequence" class="form-label">序号 *</label>
+                                <input type="number" class="form-control" id="editSequence" name="sequence" min="1" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="editProcessQuantity" class="form-label">数量</label>
+                                <input type="number" class="form-control" id="editProcessQuantity" name="quantity" min="1" value="1">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="editUnitPrice" class="form-label">单价(覆盖默认价格)</label>
+                                <input type="number" class="form-control" id="editUnitPrice" name="unit_price" step="0.01" min="0">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="editIsRequired" class="form-check-label">
+                                    <input type="checkbox" class="form-check-input" id="editIsRequired" name="is_required" checked>
+                                    必需工序
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="editSetupTime" class="form-label">准备时间(分钟)</label>
+                                <input type="number" class="form-control" id="editSetupTime" name="setup_time" step="0.1" min="0" value="0">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="editProcessTime" class="form-label">加工时间(分钟)</label>
+                                <input type="number" class="form-control" id="editProcessTime" name="process_time" step="0.1" min="0" value="0">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editProcessNotes" class="form-label">备注</label>
+                        <textarea class="form-control" id="editProcessNotes" name="notes" rows="2"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="submitEditProcessItem()">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// 当选择工序时自动填入默认价格
+document.getElementById('processId').addEventListener('change', function() {
+    const selectedOption = this.options[this.selectedIndex];
+    const price = selectedOption.getAttribute('data-price');
+    if (price) {
+        document.getElementById('unitPrice').value = price;
+    }
+});
+
+// 添加工序项
+function submitProcessItem() {
+    const formData = {
+        process_id: document.getElementById('processId').value,
+        sequence: document.getElementById('sequence').value,
+        quantity: document.getElementById('processQuantity').value,
+        unit_price: document.getElementById('unitPrice').value,
+        setup_time: document.getElementById('setupTime').value,
+        process_time: document.getElementById('processTime').value,
+        is_required: document.getElementById('isRequired').checked,
+        notes: document.getElementById('processNotes').value
+    };
+    
+    fetch(`{{ url_for('main.add_product_process', product_id=product.id) }}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('工序添加成功！');
+            const modal = bootstrap.Modal.getInstance(document.getElementById('addProcessModal'));
+            modal.hide();
+            location.reload();
+        } else {
+            alert('添加失败：' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('添加失败，请重试');
+    });
+}
+
+// 编辑工序项
+function editProcessItem(id) {
+    // 获取工序详情
+    fetch(`{{ url_for('main.get_product_process', product_id=product.id, process_item_id=0) }}`.replace('0', id))
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const processData = data.data;
+            
+            // 填充编辑表单
+            document.getElementById('editProcessId').value = processData.process_id;
+            document.getElementById('editSequence').value = processData.sequence;
+            document.getElementById('editProcessQuantity').value = processData.quantity;
+            document.getElementById('editUnitPrice').value = processData.unit_price || '';
+            document.getElementById('editSetupTime').value = processData.setup_time;
+            document.getElementById('editProcessTime').value = processData.process_time;
+            document.getElementById('editIsRequired').checked = processData.is_required;
+            document.getElementById('editProcessNotes').value = processData.notes;
+            
+            // 设置当前编辑的工序ID
+            document.getElementById('editProcessForm').setAttribute('data-process-id', id);
+            
+            // 显示编辑模态框
+            const editModal = new bootstrap.Modal(document.getElementById('editProcessModal'));
+            editModal.show();
+        } else {
+            alert('获取工序详情失败：' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('获取工序详情失败，请重试');
+    });
+}
+
+// 提交编辑工序
+function submitEditProcessItem() {
+    const processId = document.getElementById('editProcessForm').getAttribute('data-process-id');
+    const formData = {
+        sequence: document.getElementById('editSequence').value,
+        quantity: document.getElementById('editProcessQuantity').value,
+        unit_price: document.getElementById('editUnitPrice').value,
+        setup_time: document.getElementById('editSetupTime').value,
+        process_time: document.getElementById('editProcessTime').value,
+        is_required: document.getElementById('editIsRequired').checked,
+        notes: document.getElementById('editProcessNotes').value
+    };
+    
+    fetch(`{{ url_for('main.update_product_process', product_id=product.id, process_item_id=0) }}`.replace('0', processId), {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('工序更新成功！');
+            const modal = bootstrap.Modal.getInstance(document.getElementById('editProcessModal'));
+            modal.hide();
+            location.reload();
+        } else {
+            alert('更新失败：' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('更新失败，请重试');
+    });
+}
+
+// 删除工序项
+function deleteProcessItem(id) {
+    if (confirm('确定要删除这个工序吗？')) {
+        fetch(`{{ url_for('main.delete_product_process', product_id=product.id, process_item_id=0) }}`.replace('0', id), {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token() }}'
+            },
+            credentials: 'same-origin'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('工序删除成功！');
+                location.reload();
+            } else {
+                alert('删除失败：' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('删除失败，请重试');
+        });
+    }
+}
+</script>
+
+{% endblock %} 

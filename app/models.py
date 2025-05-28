@@ -693,4 +693,430 @@ class NonconformityRecord(db.Model):
     handler = db.relationship('User', backref=db.backref('handled_nonconformities', lazy='dynamic'))
 
     def __repr__(self):
-        return f'<NonconformityRecord {self.id}>'
+        return f'<NonconformityRecord {self.id}: {self.type}>'
+
+class Product(db.Model):
+    """产品管理"""
+    __tablename__ = 'products'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    global_sn = db.Column(db.String(8), unique=True, nullable=False)  # 全局流水号
+    product_code = db.Column(db.String(50), unique=True, nullable=False, index=True)  # 产品编码
+    product_name = db.Column(db.String(100), nullable=False)  # 产品名称
+    drawing_number = db.Column(db.String(100))  # 图号
+    model = db.Column(db.String(100))  # 型号
+    specification = db.Column(db.Text)  # 规格说明
+    unit = db.Column(db.String(20), default='件')  # 单位
+    category = db.Column(db.String(50))  # 产品类别
+    version = db.Column(db.String(20), default='1.0')  # 版本号
+    status = db.Column(db.String(20), default='active')  # 状态: active, inactive, obsolete
+    notes = db.Column(db.Text)  # 备注
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_by = db.Column(db.Integer, db.ForeignKey('user.id'))
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # 新增编码规则关联
+    code_rule_id = db.Column(db.Integer, db.ForeignKey('code_rule.id', ondelete='SET NULL'), nullable=True)  # 产品编码规则
+    
+    __table_args__ = (
+        db.UniqueConstraint('global_sn', name='uq_product_global_sn'),
+        db.UniqueConstraint('product_code', name='uq_product_code'),
+    )
+    
+    # 关系
+    creator = db.relationship('User', backref=db.backref('created_products', lazy='dynamic'))
+    bom_items = db.relationship('ProductBOM', backref='product', lazy='dynamic', cascade='all, delete-orphan')
+    process_items = db.relationship('ProductProcess', backref='product', lazy='dynamic', cascade='all, delete-orphan')
+    code_rule = db.relationship('CodeRule', backref=db.backref('products', lazy='dynamic'))
+    production_orders = db.relationship('ProductionOrder', backref='product', lazy='dynamic')
+    
+    def __init__(self, **kwargs):
+        super(Product, self).__init__(**kwargs)
+        if not self.global_sn:
+            self.global_sn = SerialNumber.get_next_number()
+    
+    @property
+    def total_material_cost(self):
+        """计算总原材料成本（包括原材料、成品和产品）"""
+        return sum(bom.total_cost for bom in self.bom_items)
+    
+    @property
+    def total_process_cost(self):
+        """计算总工序成本"""
+        return sum(process.total_cost for process in self.process_items)
+    
+    @property
+    def total_cost(self):
+        """计算总成本"""
+        return self.total_material_cost + self.total_process_cost
+    
+    def generate_product_code(self, batch_size=1):
+        """根据关联的编码规则生成产品编码"""
+        if not self.code_rule or not self.code_rule.is_active:
+            return None
+        
+        codes = []
+        for i in range(batch_size):
+            code = self.code_rule.generate_code()
+            # 记录编码生成日志
+            log = CodeGenerationLog(
+                rule_id=self.code_rule.id,
+                generated_code=code,
+                target_type='product',
+                target_id=self.id
+            )
+            db.session.add(log)
+            codes.append(code)
+        
+        return codes if batch_size > 1 else codes[0]
+    
+    def __repr__(self):
+        return f'<Product {self.product_code}: {self.product_name}>'
+
+class ProductBOM(db.Model):
+    """产品物料清单"""
+    __tablename__ = 'product_bom'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    global_sn = db.Column(db.String(8), unique=True, nullable=False)  # 全局流水号
+    product_id = db.Column(db.Integer, db.ForeignKey('products.id', ondelete='CASCADE'), nullable=False)
+    material_type = db.Column(db.String(20), nullable=False)  # raw: 原材料, finished: 成品
+    material_id = db.Column(db.Integer, nullable=False)  # 原材料或成品ID
+    quantity = db.Column(db.Float, nullable=False)  # 用量
+    unit = db.Column(db.String(20), default='件')  # 单位
+    unit_cost = db.Column(db.Float, default=0)  # 单价
+    waste_rate = db.Column(db.Float, default=0)  # 损耗率(%)
+    notes = db.Column(db.Text)  # 备注
+    sequence = db.Column(db.Integer, default=0)  # 排序序号
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    __table_args__ = (
+        db.UniqueConstraint('global_sn', name='uq_product_bom_global_sn'),
+        db.Index('ix_product_bom_material', 'material_type', 'material_id'),
+    )
+    
+    def __init__(self, **kwargs):
+        super(ProductBOM, self).__init__(**kwargs)
+        if not self.global_sn:
+            self.global_sn = SerialNumber.get_next_number()
+    
+    @property
+    def actual_quantity(self):
+        """实际用量（含损耗）"""
+        return self.quantity * (1 + self.waste_rate / 100)
+    
+    @property
+    def total_cost(self):
+        """总成本"""
+        return self.actual_quantity * self.unit_cost
+    
+    @property
+    def material_info(self):
+        """获取物料信息"""
+        if self.material_type == 'raw':
+            return RawMaterial.query.get(self.material_id)
+        elif self.material_type == 'finished':
+            return FinishedProduct.query.get(self.material_id)
+        elif self.material_type == 'product':
+            return Product.query.get(self.material_id)
+        return None
+    
+    @property
+    def material_name(self):
+        """获取物料名称"""
+        material = self.material_info
+        if material:
+            if self.material_type == 'raw':
+                return material.material_name
+            elif self.material_type == 'finished':
+                return material.product_number
+            elif self.material_type == 'product':
+                return f"{material.product_name} ({material.product_code})"
+        return '未知物料'
+    
+    def __repr__(self):
+        return f'<ProductBOM {self.id}: {self.product.product_code} -> {self.material_name}>'
+
+class ProductProcess(db.Model):
+    """产品工序"""
+    __tablename__ = 'product_processes'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    global_sn = db.Column(db.String(8), unique=True, nullable=False)  # 全局流水号
+    product_id = db.Column(db.Integer, db.ForeignKey('products.id', ondelete='CASCADE'), nullable=False)
+    process_id = db.Column(db.Integer, db.ForeignKey('process_price.id'), nullable=False)
+    sequence = db.Column(db.Integer, nullable=False)  # 工序顺序
+    quantity = db.Column(db.Integer, default=1)  # 加工数量
+    unit_price = db.Column(db.Float)  # 单价（可覆盖工序价格表中的价格）
+    setup_time = db.Column(db.Float, default=0)  # 准备时间（分钟）
+    process_time = db.Column(db.Float, default=0)  # 加工时间（分钟）
+    notes = db.Column(db.Text)  # 备注
+    is_required = db.Column(db.Boolean, default=True)  # 是否必需工序
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    __table_args__ = (
+        db.UniqueConstraint('global_sn', name='uq_product_process_global_sn'),
+        db.UniqueConstraint('product_id', 'sequence', name='uq_product_process_sequence'),
+    )
+    
+    # 关系
+    process = db.relationship('ProcessPrice', backref=db.backref('product_processes', lazy='dynamic'))
+    
+    def __init__(self, **kwargs):
+        super(ProductProcess, self).__init__(**kwargs)
+        if not self.global_sn:
+            self.global_sn = SerialNumber.get_next_number()
+    
+    @property
+    def effective_price(self):
+        """有效价格"""
+        return self.unit_price if self.unit_price is not None else self.process.price
+    
+    @property
+    def total_cost(self):
+        """总成本"""
+        return self.quantity * self.effective_price
+    
+    @property
+    def total_time(self):
+        """总时间（分钟）"""
+        return self.setup_time + self.process_time
+    
+    def __repr__(self):
+        return f'<ProductProcess {self.id}: {self.product.product_code} -> {self.process.process_name}>'
+
+class ProductionOrder(db.Model):
+    """生产订单"""
+    __tablename__ = 'production_orders'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    global_sn = db.Column(db.String(8), unique=True, nullable=False)  # 全局流水号
+    order_number = db.Column(db.String(50), unique=True, nullable=False, index=True)  # 订单编号
+    product_id = db.Column(db.Integer, db.ForeignKey('products.id', ondelete='CASCADE'), nullable=False)
+    planned_quantity = db.Column(db.Integer, nullable=False)  # 计划生产数量
+    completed_quantity = db.Column(db.Integer, default=0)  # 已完成数量
+    status = db.Column(db.String(20), default='pending')  # pending, in_progress, completed, cancelled
+    priority = db.Column(db.Integer, default=0)  # 优先级
+    planned_start_date = db.Column(db.Date, nullable=False)  # 计划开始日期
+    planned_end_date = db.Column(db.Date, nullable=False)  # 计划完成日期
+    actual_start_date = db.Column(db.Date)  # 实际开始日期
+    actual_end_date = db.Column(db.Date)  # 实际完成日期
+    notes = db.Column(db.Text)  # 备注
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_by = db.Column(db.Integer, db.ForeignKey('user.id'))
+    
+    __table_args__ = (
+        db.UniqueConstraint('global_sn', name='uq_production_order_global_sn'),
+        db.UniqueConstraint('order_number', name='uq_production_order_number'),
+    )
+    
+    # 关系
+    creator = db.relationship('User', backref=db.backref('created_production_orders', lazy='dynamic'))
+    batches = db.relationship('ProductionBatch', backref='production_order', lazy='dynamic', cascade='all, delete-orphan')
+    material_allocations = db.relationship('MaterialAllocation', backref='production_order', lazy='dynamic', cascade='all, delete-orphan')
+    
+    def __init__(self, **kwargs):
+        super(ProductionOrder, self).__init__(**kwargs)
+        if not self.global_sn:
+            self.global_sn = SerialNumber.get_next_number()
+        if not self.order_number:
+            self.order_number = f"PO{SerialNumber.get_next_number()}"
+    
+    @property
+    def completion_rate(self):
+        """完成率"""
+        if self.planned_quantity == 0:
+            return 0
+        return (self.completed_quantity / self.planned_quantity) * 100
+    
+    @property
+    def remaining_quantity(self):
+        """剩余数量"""
+        return max(0, self.planned_quantity - self.completed_quantity)
+    
+    def allocate_materials(self):
+        """根据产品BOM分配原材料"""
+        try:
+            # 清除现有分配
+            MaterialAllocation.query.filter_by(production_order_id=self.id).delete()
+            
+            # 根据BOM分配材料
+            for bom_item in self.product.bom_items:
+                required_quantity = bom_item.actual_quantity * self.planned_quantity
+                
+                allocation = MaterialAllocation(
+                    production_order_id=self.id,
+                    material_type=bom_item.material_type,
+                    material_id=bom_item.material_id,
+                    required_quantity=required_quantity,
+                    unit=bom_item.unit,
+                    notes=f"根据BOM自动分配 - {bom_item.material_name}"
+                )
+                db.session.add(allocation)
+            
+            db.session.commit()
+            return True
+        except Exception as e:
+            db.session.rollback()
+            return False
+    
+    def __repr__(self):
+        return f'<ProductionOrder {self.order_number}: {self.product.product_name}>'
+
+class ProductionBatch(db.Model):
+    """生产批次"""
+    __tablename__ = 'production_batches'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    global_sn = db.Column(db.String(8), unique=True, nullable=False)  # 全局流水号
+    batch_number = db.Column(db.String(50), unique=True, nullable=False, index=True)  # 批次号
+    production_order_id = db.Column(db.Integer, db.ForeignKey('production_orders.id', ondelete='CASCADE'), nullable=False)
+    batch_quantity = db.Column(db.Integer, nullable=False)  # 批次数量
+    status = db.Column(db.String(20), default='pending')  # pending, in_progress, completed, cancelled
+    start_date = db.Column(db.Date)  # 开始日期
+    end_date = db.Column(db.Date)  # 完成日期
+    notes = db.Column(db.Text)  # 备注
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    __table_args__ = (
+        db.UniqueConstraint('global_sn', name='uq_production_batch_global_sn'),
+        db.UniqueConstraint('batch_number', name='uq_production_batch_number'),
+    )
+    
+    # 关系
+    batch_items = db.relationship('ProductionBatchItem', backref='batch', lazy='dynamic', cascade='all, delete-orphan')
+    
+    def __init__(self, **kwargs):
+        super(ProductionBatch, self).__init__(**kwargs)
+        if not self.global_sn:
+            self.global_sn = SerialNumber.get_next_number()
+        if not self.batch_number:
+            # 生成批次号：订单号 + 批次序号
+            order = ProductionOrder.query.get(kwargs.get('production_order_id'))
+            if order:
+                batch_count = ProductionBatch.query.filter_by(production_order_id=order.id).count()
+                self.batch_number = f"{order.order_number}-B{batch_count + 1:03d}"
+    
+    def generate_product_codes(self):
+        """为批次中的产品生成编码"""
+        try:
+            product = self.production_order.product
+            if not product.code_rule:
+                return False
+            
+            # 生成产品编码
+            codes = product.generate_product_code(self.batch_quantity)
+            if not codes:
+                return False
+            
+            # 如果只有一个编码，转换为列表
+            if not isinstance(codes, list):
+                codes = [codes]
+            
+            # 创建批次项目
+            for i, code in enumerate(codes):
+                batch_item = ProductionBatchItem(
+                    batch_id=self.id,
+                    item_sequence=i + 1,
+                    product_code=code,
+                    status='pending'
+                )
+                db.session.add(batch_item)
+            
+            db.session.commit()
+            return True
+        except Exception as e:
+            db.session.rollback()
+            return False
+    
+    def __repr__(self):
+        return f'<ProductionBatch {self.batch_number}: {self.batch_quantity}件>'
+
+class ProductionBatchItem(db.Model):
+    """生产批次项目"""
+    __tablename__ = 'production_batch_items'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    global_sn = db.Column(db.String(8), unique=True, nullable=False)  # 全局流水号
+    batch_id = db.Column(db.Integer, db.ForeignKey('production_batches.id', ondelete='CASCADE'), nullable=False)
+    item_sequence = db.Column(db.Integer, nullable=False)  # 项目序号
+    product_code = db.Column(db.String(100), unique=True, nullable=False, index=True)  # 产品编码
+    status = db.Column(db.String(20), default='pending')  # pending, in_progress, completed, scrapped
+    production_date = db.Column(db.Date)  # 生产日期
+    inspector = db.Column(db.String(50))  # 检验员
+    quality_status = db.Column(db.String(20))  # pass, fail, pending
+    notes = db.Column(db.Text)  # 备注
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    __table_args__ = (
+        db.UniqueConstraint('global_sn', name='uq_production_batch_item_global_sn'),
+        db.UniqueConstraint('product_code', name='uq_production_batch_item_code'),
+        db.UniqueConstraint('batch_id', 'item_sequence', name='uq_batch_item_sequence'),
+    )
+    
+    def __init__(self, **kwargs):
+        super(ProductionBatchItem, self).__init__(**kwargs)
+        if not self.global_sn:
+            self.global_sn = SerialNumber.get_next_number()
+    
+    def __repr__(self):
+        return f'<ProductionBatchItem {self.product_code}>'
+
+class MaterialAllocation(db.Model):
+    """物料分配"""
+    __tablename__ = 'material_allocations'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    global_sn = db.Column(db.String(8), unique=True, nullable=False)  # 全局流水号
+    production_order_id = db.Column(db.Integer, db.ForeignKey('production_orders.id', ondelete='CASCADE'), nullable=False)
+    material_type = db.Column(db.String(20), nullable=False)  # raw, finished, product
+    material_id = db.Column(db.Integer, nullable=False)  # 物料ID
+    required_quantity = db.Column(db.Float, nullable=False)  # 需求数量
+    allocated_quantity = db.Column(db.Float, default=0)  # 已分配数量
+    consumed_quantity = db.Column(db.Float, default=0)  # 已消耗数量
+    unit = db.Column(db.String(20), default='件')  # 单位
+    status = db.Column(db.String(20), default='pending')  # pending, allocated, consumed
+    notes = db.Column(db.Text)  # 备注
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    __table_args__ = (
+        db.UniqueConstraint('global_sn', name='uq_material_allocation_global_sn'),
+        db.Index('ix_material_allocation_material', 'material_type', 'material_id'),
+    )
+    
+    def __init__(self, **kwargs):
+        super(MaterialAllocation, self).__init__(**kwargs)
+        if not self.global_sn:
+            self.global_sn = SerialNumber.get_next_number()
+    
+    @property
+    def material_info(self):
+        """获取物料信息"""
+        if self.material_type == 'raw':
+            return RawMaterial.query.get(self.material_id)
+        elif self.material_type == 'finished':
+            return FinishedProduct.query.get(self.material_id)
+        elif self.material_type == 'product':
+            return Product.query.get(self.material_id)
+        return None
+    
+    @property
+    def material_name(self):
+        """获取物料名称"""
+        material = self.material_info
+        if material:
+            if self.material_type == 'raw':
+                return material.material_name
+            elif self.material_type == 'finished':
+                return material.product_number
+            elif self.material_type == 'product':
+                return f"{material.product_name} ({material.product_code})"
+        return '未知物料'
+    
+    @property
+    def shortage_quantity(self):
+        """短缺数量"""
+        return max(0, self.required_quantity - self.allocated_quantity)
+    
+    def __repr__(self):
+        return f'<MaterialAllocation {self.material_name}: {self.required_quantity}{self.unit}>'

@@ -1,0 +1,332 @@
+{% extends "base.html" %}
+
+{% block title %}生产批次详情{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>生产批次详情</h2>
+        <div>
+            <a href="{{ url_for('main.production_order_detail', order_id=batch.production_order_id) }}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> 返回订单
+            </a>
+            <a href="{{ url_for('main.manage_production_orders') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-list"></i> 订单列表
+            </a>
+        </div>
+    </div>
+
+    <!-- 批次基本信息 -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">批次信息</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <table class="table table-borderless">
+                        <tr>
+                            <td><strong>批次号:</strong></td>
+                            <td>{{ batch.batch_number }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>生产订单:</strong></td>
+                            <td>{{ batch.production_order.order_number }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>产品名称:</strong></td>
+                            <td>{{ batch.production_order.product.product_name }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>产品编码:</strong></td>
+                            <td>{{ batch.production_order.product.product_code }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>批次数量:</strong></td>
+                            <td>{{ batch.batch_quantity }}件</td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="col-md-6">
+                    <table class="table table-borderless">
+                        <tr>
+                            <td><strong>批次状态:</strong></td>
+                            <td>
+                                {% if batch.status == 'pending' %}
+                                    <span class="badge bg-secondary">待开始</span>
+                                {% elif batch.status == 'in_progress' %}
+                                    <span class="badge bg-primary">进行中</span>
+                                {% elif batch.status == 'completed' %}
+                                    <span class="badge bg-success">已完成</span>
+                                {% elif batch.status == 'cancelled' %}
+                                    <span class="badge bg-danger">已取消</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><strong>开始日期:</strong></td>
+                            <td>{{ batch.start_date.strftime('%Y-%m-%d %H:%M') if batch.start_date else '-' }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>完成日期:</strong></td>
+                            <td>{{ batch.end_date.strftime('%Y-%m-%d %H:%M') if batch.end_date else '-' }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>创建时间:</strong></td>
+                            <td>{{ batch.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>更新时间:</strong></td>
+                            <td>{{ batch.updated_at.strftime('%Y-%m-%d %H:%M') if batch.updated_at else '-' }}</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            {% if batch.notes %}
+            <div class="row">
+                <div class="col-12">
+                    <strong>批次备注:</strong>
+                    <p class="text-muted">{{ batch.notes }}</p>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- 批次项目（产品编码） -->
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">批次项目 ({{ batch_items|length }}/{{ batch.batch_quantity }})</h5>
+            {% if current_user.role in ['admin', 'manager'] and batch.status != 'completed' %}
+            <div class="btn-group">
+                {% if batch_items|length < batch.batch_quantity %}
+                <button class="btn btn-sm btn-primary" onclick="generateCodes()">
+                    <i class="fas fa-barcode"></i> 生成编码
+                </button>
+                {% endif %}
+                <button class="btn btn-sm btn-success" onclick="updateBatchStatus('in_progress')" 
+                        {% if batch.status == 'in_progress' or batch.status == 'completed' %}disabled{% endif %}>
+                    <i class="fas fa-play"></i> 开始生产
+                </button>
+                <button class="btn btn-sm btn-warning" onclick="updateBatchStatus('completed')" 
+                        {% if batch.status != 'in_progress' %}disabled{% endif %}>
+                    <i class="fas fa-check"></i> 完成批次
+                </button>
+            </div>
+            {% endif %}
+        </div>
+        <div class="card-body">
+            {% if batch_items %}
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>序号</th>
+                            <th>产品编码</th>
+                            <th>状态</th>
+                            <th>生成时间</th>
+                            <th>完成时间</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in batch_items %}
+                        <tr>
+                            <td>{{ item.sequence_number }}</td>
+                            <td>
+                                <code>{{ item.product_code }}</code>
+                                <button class="btn btn-sm btn-outline-secondary ms-2" onclick="copyCode('{{ item.product_code }}')">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </td>
+                            <td>
+                                {% if item.status == 'pending' %}
+                                    <span class="badge bg-secondary">待生产</span>
+                                {% elif item.status == 'in_progress' %}
+                                    <span class="badge bg-primary">生产中</span>
+                                {% elif item.status == 'completed' %}
+                                    <span class="badge bg-success">已完成</span>
+                                {% elif item.status == 'defective' %}
+                                    <span class="badge bg-danger">不良品</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ item.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                            <td>{{ item.completed_at.strftime('%Y-%m-%d %H:%M') if item.completed_at else '-' }}</td>
+                            <td>
+                                {% if current_user.role in ['admin', 'manager', 'operator'] and item.status != 'completed' %}
+                                <div class="btn-group">
+                                    <button class="btn btn-sm btn-outline-primary" onclick="updateItemStatus({{ item.id }}, 'in_progress')"
+                                            {% if item.status == 'in_progress' or item.status == 'completed' %}disabled{% endif %}>
+                                        开始
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-success" onclick="updateItemStatus({{ item.id }}, 'completed')"
+                                            {% if item.status != 'in_progress' %}disabled{% endif %}>
+                                        完成
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger" onclick="updateItemStatus({{ item.id }}, 'defective')"
+                                            {% if item.status == 'completed' %}disabled{% endif %}>
+                                        不良
+                                    </button>
+                                </div>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- 统计信息 -->
+            <div class="row mt-3">
+                <div class="col-md-12">
+                    <div class="d-flex justify-content-around">
+                        <div class="text-center">
+                            <h6 class="text-muted">待生产</h6>
+                            <span class="badge bg-secondary fs-6">{{ batch_items|selectattr('status', 'equalto', 'pending')|list|length }}</span>
+                        </div>
+                        <div class="text-center">
+                            <h6 class="text-muted">生产中</h6>
+                            <span class="badge bg-primary fs-6">{{ batch_items|selectattr('status', 'equalto', 'in_progress')|list|length }}</span>
+                        </div>
+                        <div class="text-center">
+                            <h6 class="text-muted">已完成</h6>
+                            <span class="badge bg-success fs-6">{{ batch_items|selectattr('status', 'equalto', 'completed')|list|length }}</span>
+                        </div>
+                        <div class="text-center">
+                            <h6 class="text-muted">不良品</h6>
+                            <span class="badge bg-danger fs-6">{{ batch_items|selectattr('status', 'equalto', 'defective')|list|length }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="text-center py-4">
+                <p class="text-muted">暂无批次项目</p>
+                {% if current_user.role in ['admin', 'manager'] and batch.status != 'completed' %}
+                <button class="btn btn-primary" onclick="generateCodes()">
+                    <i class="fas fa-barcode"></i> 生成产品编码
+                </button>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+// 生成产品编码
+function generateCodes() {
+    if (!confirm('确定要为此批次生成产品编码吗？')) return;
+    
+    fetch(`/api/production/generate-codes`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify({
+            batch_id: {{ batch.id }},
+            quantity: {{ batch.batch_quantity - batch_items|length }}
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(`成功生成 ${data.generated_count} 个产品编码`);
+            location.reload();
+        } else {
+            alert('生成失败：' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('生成失败，请重试');
+    });
+}
+
+// 更新批次状态
+function updateBatchStatus(status) {
+    const statusText = {
+        'in_progress': '开始生产',
+        'completed': '完成批次',
+        'cancelled': '取消批次'
+    };
+    
+    if (!confirm(`确定要${statusText[status]}吗？`)) return;
+    
+    fetch(`/production_batches/{{ batch.id }}/status`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify({ status: status })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            location.reload();
+        } else {
+            alert('操作失败：' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('操作失败，请重试');
+    });
+}
+
+// 更新批次项目状态
+function updateItemStatus(itemId, status) {
+    const statusText = {
+        'in_progress': '开始生产',
+        'completed': '完成',
+        'defective': '标记为不良品'
+    };
+    
+    if (!confirm(`确定要${statusText[status]}此项目吗？`)) return;
+    
+    fetch(`/production_batch_items/${itemId}/update`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify({ status: status })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('操作失败：' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('操作失败，请重试');
+    });
+}
+
+// 复制编码
+function copyCode(code) {
+    navigator.clipboard.writeText(code).then(function() {
+        // 显示复制成功提示
+        const button = event.target.closest('button');
+        const originalIcon = button.innerHTML;
+        button.innerHTML = '<i class="fas fa-check text-success"></i>';
+        setTimeout(() => {
+            button.innerHTML = originalIcon;
+        }, 1000);
+    }).catch(function(err) {
+        console.error('复制失败:', err);
+        alert('复制失败，请手动复制');
+    });
+}
+</script>
+
+{% endblock %} 

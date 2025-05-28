@@ -1,0 +1,715 @@
+{% extends "base.html" %}
+
+{% block title %}产品管理{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>产品管理</h2>
+
+    <!-- 搜索和操作按钮 -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3 align-items-center">
+                <div class="col-md-3">
+                    <div class="input-group">
+                        <input type="text" class="form-control" name="search" 
+                               value="{{ request.args.get('search', '') }}" 
+                               placeholder="搜索产品编码、名称、图号...">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-search"></i> 搜索
+                        </button>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <select class="form-control" name="status" onchange="this.form.submit()">
+                        <option value="">所有状态</option>
+                        <option value="active" {% if request.args.get('status') == 'active' %}selected{% endif %}>启用</option>
+                        <option value="inactive" {% if request.args.get('status') == 'inactive' %}selected{% endif %}>停用</option>
+                        <option value="obsolete" {% if request.args.get('status') == 'obsolete' %}selected{% endif %}>淘汰</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <select class="form-control" name="category" onchange="this.form.submit()">
+                        <option value="">所有类别</option>
+                        {% for category in categories %}
+                        <option value="{{ category }}" {% if request.args.get('category') == category %}selected{% endif %}>{{ category }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-5 text-end">
+                    {% if current_user.role in ['admin', 'manager'] %}
+                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addProductModal">
+                        <i class="fas fa-plus"></i> 添加产品
+                    </button>
+                    {% endif %}
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 产品列表 -->
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>产品编码</th>
+                    <th>产品名称</th>
+                    <th>图号</th>
+                    <th>型号</th>
+                    <th>类别</th>
+                    <th>版本</th>
+                    <th>状态</th>
+                    <th>总成本</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for product in products %}
+                <tr>
+                    <td>{{ product.product_code }}</td>
+                    <td>{{ product.product_name }}</td>
+                    <td>{{ product.drawing_number or '-' }}</td>
+                    <td>{{ product.model or '-' }}</td>
+                    <td>{{ product.category or '-' }}</td>
+                    <td>{{ product.version }}</td>
+                    <td>
+                        {% if product.status == 'active' %}
+                            <span class="badge bg-success">启用</span>
+                        {% elif product.status == 'inactive' %}
+                            <span class="badge bg-warning">停用</span>
+                        {% elif product.status == 'obsolete' %}
+                            <span class="badge bg-danger">淘汰</span>
+                        {% else %}
+                            <span class="badge bg-secondary">{{ product.status }}</span>
+                        {% endif %}
+                    </td>
+                    <td>¥{{ "%.2f"|format(product.total_cost) }}</td>
+                    <td>
+                        <div class="btn-group">
+                            <button class="btn btn-sm btn-info" onclick="viewProduct({{ product.id }})">
+                                <i class="fas fa-eye"></i> 查看
+                            </button>
+                            <a href="{{ url_for('main.product_bom', id=product.id) }}" class="btn btn-sm btn-warning">
+                                <i class="fas fa-list"></i> BOM
+                            </a>
+                            <a href="{{ url_for('main.product_processes', product_id=product.id) }}" class="btn btn-sm btn-info">
+                                <i class="fas fa-cogs"></i> 工序
+                            </a>
+                            {% if current_user.role in ['admin', 'manager'] %}
+                            <button class="btn btn-sm btn-secondary" onclick="setCodeRule({{ product.id }})">
+                                <i class="fas fa-barcode"></i> 编码
+                            </button>
+                            <button class="btn btn-sm btn-success" onclick="generateCodes({{ product.id }})">
+                                <i class="fas fa-magic"></i> 生成
+                            </button>
+                            <button class="btn btn-sm btn-primary" onclick="editProduct({{ product.id }})">
+                                <i class="fas fa-edit"></i> 编辑
+                            </button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteProduct({{ product.id }})">
+                                <i class="fas fa-trash"></i> 删除
+                            </button>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- 分页 -->
+    {% if pagination %}
+    <nav aria-label="Page navigation" class="mt-4">
+        <ul class="pagination justify-content-center">
+            {% for page in pagination.iter_pages() %}
+                {% if page %}
+                    <li class="page-item {{ 'active' if page == pagination.page else '' }}">
+                        <a class="page-link" href="{{ url_for('main.manage_products', page=page, search=request.args.get('search', ''), status=request.args.get('status', ''), category=request.args.get('category', '')) }}">{{ page }}</a>
+                    </li>
+                {% else %}
+                    <li class="page-item disabled">
+                        <span class="page-link">...</span>
+                    </li>
+                {% endif %}
+            {% endfor %}
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+
+<!-- 添加产品模态框 -->
+<div class="modal fade" id="addProductModal" tabindex="-1" aria-labelledby="addProductModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addProductModalLabel">添加产品</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addProductForm">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="productCode" class="form-label">产品编码 *</label>
+                                <input type="text" class="form-control" id="productCode" name="product_code" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="productName" class="form-label">产品名称 *</label>
+                                <input type="text" class="form-control" id="productName" name="product_name" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="drawingNumber" class="form-label">图号</label>
+                                <input type="text" class="form-control" id="drawingNumber" name="drawing_number">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="model" class="form-label">型号</label>
+                                <input type="text" class="form-control" id="model" name="model">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="unit" class="form-label">单位</label>
+                                <input type="text" class="form-control" id="unit" name="unit" value="件">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="category" class="form-label">类别</label>
+                                <input type="text" class="form-control" id="category" name="category">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="version" class="form-label">版本</label>
+                                <input type="text" class="form-control" id="version" name="version" value="1.0">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="specification" class="form-label">规格说明</label>
+                        <textarea class="form-control" id="specification" name="specification" rows="3"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="notes" class="form-label">备注</label>
+                        <textarea class="form-control" id="notes" name="notes" rows="2"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="submitProduct()">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 编辑产品模态框 -->
+<div class="modal fade" id="editProductModal" tabindex="-1" aria-labelledby="editProductModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editProductModalLabel">编辑产品</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editProductForm">
+                    <input type="hidden" id="editProductId">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">产品编码</label>
+                                <input type="text" class="form-control" id="editProductCode" disabled>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="editProductName" class="form-label">产品名称 *</label>
+                                <input type="text" class="form-control" id="editProductName" name="product_name" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="editDrawingNumber" class="form-label">图号</label>
+                                <input type="text" class="form-control" id="editDrawingNumber" name="drawing_number">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="editModel" class="form-label">型号</label>
+                                <input type="text" class="form-control" id="editModel" name="model">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="mb-3">
+                                <label for="editUnit" class="form-label">单位</label>
+                                <input type="text" class="form-control" id="editUnit" name="unit">
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="mb-3">
+                                <label for="editCategory" class="form-label">类别</label>
+                                <input type="text" class="form-control" id="editCategory" name="category">
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="mb-3">
+                                <label for="editVersion" class="form-label">版本</label>
+                                <input type="text" class="form-control" id="editVersion" name="version">
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="mb-3">
+                                <label for="editStatus" class="form-label">状态</label>
+                                <select class="form-control" id="editStatus" name="status">
+                                    <option value="active">启用</option>
+                                    <option value="inactive">停用</option>
+                                    <option value="obsolete">淘汰</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editSpecification" class="form-label">规格说明</label>
+                        <textarea class="form-control" id="editSpecification" name="specification" rows="3"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editNotes" class="form-label">备注</label>
+                        <textarea class="form-control" id="editNotes" name="notes" rows="2"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="submitEditProduct()">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 查看产品模态框 -->
+<div class="modal fade" id="viewProductModal" tabindex="-1" aria-labelledby="viewProductModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="viewProductModalLabel">产品详情</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <p><strong>产品编码：</strong><span id="viewProductCode"></span></p>
+                        <p><strong>产品名称：</strong><span id="viewProductName"></span></p>
+                        <p><strong>图号：</strong><span id="viewDrawingNumber"></span></p>
+                        <p><strong>型号：</strong><span id="viewModel"></span></p>
+                    </div>
+                    <div class="col-md-6">
+                        <p><strong>单位：</strong><span id="viewUnit"></span></p>
+                        <p><strong>类别：</strong><span id="viewCategory"></span></p>
+                        <p><strong>版本：</strong><span id="viewVersion"></span></p>
+                        <p><strong>状态：</strong><span id="viewStatus"></span></p>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-12">
+                        <p><strong>规格说明：</strong></p>
+                        <p id="viewSpecification" class="text-muted"></p>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-4">
+                        <p><strong>原材料成本：</strong>¥<span id="viewMaterialCost"></span></p>
+                    </div>
+                    <div class="col-md-4">
+                        <p><strong>工序成本：</strong>¥<span id="viewProcessCost"></span></p>
+                    </div>
+                    <div class="col-md-4">
+                        <p><strong>总成本：</strong>¥<span id="viewTotalCost"></span></p>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-12">
+                        <p><strong>备注：</strong></p>
+                        <p id="viewNotes" class="text-muted"></p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// 添加产品
+function submitProduct() {
+    const formData = {
+        product_code: document.getElementById('productCode').value,
+        product_name: document.getElementById('productName').value,
+        drawing_number: document.getElementById('drawingNumber').value,
+        model: document.getElementById('model').value,
+        unit: document.getElementById('unit').value,
+        category: document.getElementById('category').value,
+        version: document.getElementById('version').value,
+        specification: document.getElementById('specification').value,
+        notes: document.getElementById('notes').value
+    };
+    
+    fetch("{{ url_for('main.add_product') }}", {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('产品添加成功！');
+            const modal = bootstrap.Modal.getInstance(document.getElementById('addProductModal'));
+            modal.hide();
+            location.reload();
+        } else {
+            alert('添加失败：' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('添加失败，请重试');
+    });
+}
+
+// 编辑产品
+function editProduct(id) {
+    fetch(`/products/${id}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const product = data.data;
+                document.getElementById('editProductId').value = product.id;
+                document.getElementById('editProductCode').value = product.product_code;
+                document.getElementById('editProductName').value = product.product_name;
+                document.getElementById('editDrawingNumber').value = product.drawing_number;
+                document.getElementById('editModel').value = product.model;
+                document.getElementById('editUnit').value = product.unit;
+                document.getElementById('editCategory').value = product.category;
+                document.getElementById('editVersion').value = product.version;
+                document.getElementById('editStatus').value = product.status;
+                document.getElementById('editSpecification').value = product.specification;
+                document.getElementById('editNotes').value = product.notes;
+                
+                const modal = new bootstrap.Modal(document.getElementById('editProductModal'));
+                modal.show();
+            } else {
+                alert('获取产品详情失败：' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('获取产品详情失败，请重试');
+        });
+}
+
+// 提交编辑
+function submitEditProduct() {
+    const id = document.getElementById('editProductId').value;
+    const formData = {
+        product_name: document.getElementById('editProductName').value,
+        drawing_number: document.getElementById('editDrawingNumber').value,
+        model: document.getElementById('editModel').value,
+        unit: document.getElementById('editUnit').value,
+        category: document.getElementById('editCategory').value,
+        version: document.getElementById('editVersion').value,
+        status: document.getElementById('editStatus').value,
+        specification: document.getElementById('editSpecification').value,
+        notes: document.getElementById('editNotes').value
+    };
+    
+    fetch(`/products/${id}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('产品更新成功！');
+            const modal = bootstrap.Modal.getInstance(document.getElementById('editProductModal'));
+            modal.hide();
+            location.reload();
+        } else {
+            alert('更新失败：' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('更新失败，请重试');
+    });
+}
+
+// 查看产品
+function viewProduct(id) {
+    fetch(`/products/${id}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const product = data.data;
+                document.getElementById('viewProductCode').textContent = product.product_code;
+                document.getElementById('viewProductName').textContent = product.product_name;
+                document.getElementById('viewDrawingNumber').textContent = product.drawing_number || '-';
+                document.getElementById('viewModel').textContent = product.model || '-';
+                document.getElementById('viewUnit').textContent = product.unit;
+                document.getElementById('viewCategory').textContent = product.category || '-';
+                document.getElementById('viewVersion').textContent = product.version;
+                
+                // 状态显示
+                let statusText = '';
+                if (product.status === 'active') statusText = '启用';
+                else if (product.status === 'inactive') statusText = '停用';
+                else if (product.status === 'obsolete') statusText = '淘汰';
+                else statusText = product.status;
+                document.getElementById('viewStatus').textContent = statusText;
+                
+                document.getElementById('viewSpecification').textContent = product.specification || '-';
+                document.getElementById('viewMaterialCost').textContent = product.total_material_cost.toFixed(2);
+                document.getElementById('viewProcessCost').textContent = product.total_process_cost.toFixed(2);
+                document.getElementById('viewTotalCost').textContent = product.total_cost.toFixed(2);
+                document.getElementById('viewNotes').textContent = product.notes || '-';
+                
+                const modal = new bootstrap.Modal(document.getElementById('viewProductModal'));
+                modal.show();
+            } else {
+                alert('获取产品详情失败：' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('获取产品详情失败，请重试');
+        });
+}
+
+// 删除产品
+function deleteProduct(id) {
+    if (confirm('确定要删除这个产品吗？此操作不可恢复！')) {
+        fetch(`/products/${id}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token() }}'
+            },
+            credentials: 'same-origin'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('产品删除成功！');
+                location.reload();
+            } else {
+                alert('删除失败：' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('删除失败，请重试');
+        });
+    }
+}
+
+// 设置编码规则
+function setCodeRule(productId) {
+    // 加载编码规则列表
+    fetch('/api/production/code-rules')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const select = document.getElementById('codeRuleSelect');
+                select.innerHTML = '<option value="">请选择编码规则</option>';
+                
+                data.data.forEach(rule => {
+                    const option = document.createElement('option');
+                    option.value = rule.id;
+                    option.textContent = `${rule.name} (${rule.format_pattern})`;
+                    select.appendChild(option);
+                });
+                
+                document.getElementById('codeRuleProductId').value = productId;
+                const modal = new bootstrap.Modal(document.getElementById('codeRuleModal'));
+                modal.show();
+            } else {
+                alert('获取编码规则失败：' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('获取编码规则失败，请重试');
+        });
+}
+
+// 提交编码规则设置
+function submitCodeRule() {
+    const productId = document.getElementById('codeRuleProductId').value;
+    const codeRuleId = document.getElementById('codeRuleSelect').value;
+    
+    fetch(`/products/${productId}/set-code-rule`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify({
+            code_rule_id: codeRuleId || null
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('编码规则设置成功！');
+            const modal = bootstrap.Modal.getInstance(document.getElementById('codeRuleModal'));
+            modal.hide();
+        } else {
+            alert('设置失败：' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('设置失败，请重试');
+    });
+}
+
+// 生成产品编码
+function generateCodes(productId) {
+    document.getElementById('generateProductId').value = productId;
+    const modal = new bootstrap.Modal(document.getElementById('generateCodesModal'));
+    modal.show();
+}
+
+// 提交生成编码
+function submitGenerateCodes() {
+    const productId = document.getElementById('generateProductId').value;
+    const quantity = document.getElementById('generateQuantity').value;
+    
+    if (!quantity || quantity < 1) {
+        alert('请输入有效的生成数量');
+        return;
+    }
+    
+    fetch('/api/production/generate-codes', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify({
+            product_id: productId,
+            quantity: parseInt(quantity)
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // 显示生成的编码
+            const codesList = document.getElementById('generatedCodesList');
+            codesList.innerHTML = '';
+            data.codes.forEach(code => {
+                const li = document.createElement('li');
+                li.className = 'list-group-item';
+                li.textContent = code;
+                codesList.appendChild(li);
+            });
+            
+            document.getElementById('generateResult').style.display = 'block';
+            alert(data.message);
+        } else {
+            alert('生成失败：' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('生成失败，请重试');
+    });
+}
+</script>
+
+<!-- 编码规则设置模态框 -->
+<div class="modal fade" id="codeRuleModal" tabindex="-1" aria-labelledby="codeRuleModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="codeRuleModalLabel">设置编码规则</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="codeRuleForm">
+                    <input type="hidden" id="codeRuleProductId">
+                    <div class="mb-3">
+                        <label for="codeRuleSelect" class="form-label">选择编码规则</label>
+                        <select class="form-control" id="codeRuleSelect" required>
+                            <option value="">请选择编码规则</option>
+                        </select>
+                        <small class="form-text text-muted">选择空值将清除当前编码规则设置</small>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="submitCodeRule()">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 生成编码模态框 -->
+<div class="modal fade" id="generateCodesModal" tabindex="-1" aria-labelledby="generateCodesModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="generateCodesModalLabel">生成产品编码</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="generateCodesForm">
+                    <input type="hidden" id="generateProductId">
+                    <div class="mb-3">
+                        <label for="generateQuantity" class="form-label">生成数量</label>
+                        <input type="number" class="form-control" id="generateQuantity" min="1" max="1000" value="1" required>
+                        <small class="form-text text-muted">一次最多生成1000个编码</small>
+                    </div>
+                    
+                    <div id="generateResult" style="display: none;">
+                        <h6>生成的编码：</h6>
+                        <ul id="generatedCodesList" class="list-group">
+                        </ul>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                <button type="button" class="btn btn-primary" onclick="submitGenerateCodes()">生成</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %} 

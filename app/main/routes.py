@@ -2,7 +2,7 @@ from flask import render_template, redirect, url_for, flash, request, jsonify, c
 from sqlalchemy.exc import SQLAlchemyError
 from flask_login import login_required, current_user
 from app import db, csrf
-from app.models import Employee, ProcessPrice, ProductionRecord, BonusPenalty, AuditLog, ProcessPrice, User, TaskAssignment, SerialNumber, SalaryChange, CoefficientChange, EmployeeSalaryHistory, EmployeeCoefficientHistory, ProcessPriceGroup, FinishedProduct, RawMaterial, CodeRule, CodeGenerationLog, ProductionRecordMaterial, InspectionTemplate, InspectionBaseItem, InspectionItem, InspectionTask, InspectionRecord
+from app.models import Employee, ProcessPrice, ProductionRecord, BonusPenalty, AuditLog, ProcessPrice, User, TaskAssignment, SerialNumber, SalaryChange, CoefficientChange, EmployeeSalaryHistory, EmployeeCoefficientHistory, ProcessPriceGroup, FinishedProduct, RawMaterial, CodeRule, CodeGenerationLog, ProductionRecordMaterial, InspectionTemplate, InspectionBaseItem, InspectionItem, InspectionTask, InspectionRecord, Product, ProductBOM, ProductProcess, ProductionOrder, MaterialAllocation, ProductionBatch, ProductionBatchItem
 from datetime import datetime, timedelta, date
 from . import bp
 from app.main.forms import (
@@ -2518,14 +2518,14 @@ def update_task_status(id):
                         
                         # 记录质检任务创建的审计日志
                         inspection_log = AuditLog(
-                            user_id=current_user.id,
+            user_id=current_user.id,
                             action='自动创建质检任务',
                             details=f'工序 {process.process_name} 完成后自动创建质检任务：{inspection_task.global_sn}',
-                            can_rollback=True,
+            can_rollback=True,
                             rollback_type='add',
                             target_model='InspectionTask',
                             target_id=inspection_task.id,
-                            new_data={
+            new_data={
                                 'target_type': 'production_record',
                                 'target_id': production_record.id,
                                 'inspector_id': default_inspector.id,
@@ -2575,7 +2575,7 @@ def update_task_status(id):
                     db.session.add(status_log)
         else:
             # 如果任务还未完成，但已经开始，更新状态为进行中
-                task.status = 'in_progress'
+            task.status = 'in_progress'
         
         # 记录审计日志
         audit_log = AuditLog(
@@ -4981,6 +4981,45 @@ def get_available_raw_materials():
             'message': f'获取原材料列表失败: {str(e)}'
         }), 500
 
+@bp.route('/api/inventory/finished-products')
+@login_required
+def get_available_finished_products():
+    """获取可用的成品列表
+    
+    Query Parameters:
+        only_available (bool): 是否只返回有库存的成品
+    """
+    try:
+        query = FinishedProduct.query
+        
+        # 如果指定了only_available参数，只返回有库存的成品
+        if request.args.get('only_available', 'false').lower() == 'true':
+            query = query.filter(FinishedProduct.status == 'in_stock')
+            
+        finished_products = query.all()
+        products_list = [{
+            'id': product.id,
+            'name': product.product_number,
+            'product_number': product.product_number,  # 为了兼容性保留
+            'drawing_number': product.drawing_number,
+            'model': product.model,
+            'serial_number': product.serial_number,
+            'quantity': product.quantity,
+            'status': product.status,
+            'inspector': product.inspector,
+            'production_date': product.production_date.strftime('%Y-%m-%d') if product.production_date else ''
+        } for product in finished_products]
+        
+        return jsonify({
+            'success': True,
+            'data': products_list
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'获取成品列表失败: {str(e)}'
+        }), 500
+
 @bp.route('/inventory/raw/<int:id>/archive', methods=['POST'])
 @login_required
 def toggle_raw_material_archive(id):
@@ -5071,28 +5110,27 @@ def toggle_finished_product_archive(id):
 @login_required
 def auto_archive_inventory():
     """自动存档库存"""
-    if current_user.role not in ['admin', 'manager']:
-        return jsonify({'success': False, 'message': '权限不足'}), 403
-    
     try:
-        from datetime import datetime, timedelta
+        data = request.get_json()
+        days = data.get('days', 90)
         
-        # 获取配置的自动存档天数（默认90天）
-        archive_days = request.json.get('days', 90)
-        cutoff_date = datetime.now() - timedelta(days=archive_days)
+        if not days or days < 1:
+            return jsonify({'success': False, 'message': '天数必须大于0'})
         
-        # 自动存档成品（已发货、报废、已使用的成品超过指定天数）
+        cutoff_date = datetime.now() - timedelta(days=days)
+        
+        # 存档成品：已发货、报废、已使用状态且超过指定天数
         finished_products = FinishedProduct.query.filter(
-            FinishedProduct.is_archived == False,
             FinishedProduct.status.in_(['shipped', 'scrapped', 'used']),
-            FinishedProduct.created_at < cutoff_date
+            FinishedProduct.created_at < cutoff_date,
+            FinishedProduct.is_archived == False
         ).all()
         
-        # 自动存档原材料（数量为0的原材料超过指定天数）
+        # 存档原材料：数量为0且超过指定天数
         raw_materials = RawMaterial.query.filter(
-            RawMaterial.is_archived == False,
             RawMaterial.quantity <= 0,
-            RawMaterial.created_at < cutoff_date
+            RawMaterial.created_at < cutoff_date,
+            RawMaterial.is_archived == False
         ).all()
         
         archived_count = 0
@@ -5101,52 +5139,1066 @@ def auto_archive_inventory():
         for product in finished_products:
             product.is_archived = True
             archived_count += 1
-            
-            # 记录审计日志
-            log = AuditLog(
-                user_id=current_user.id,
-                action='自动存档成品',
-                details=f'自动存档成品：{product.product_number}（状态：{product.status}，超过{archive_days}天）',
-                can_rollback=True,
-                rollback_type='edit',
-                target_model='FinishedProduct',
-                target_id=product.id,
-                old_data={'is_archived': False},
-                new_data={'is_archived': True}
-            )
-            db.session.add(log)
         
         # 存档原材料
         for material in raw_materials:
             material.is_archived = True
             archived_count += 1
-            
-            # 记录审计日志
-            log = AuditLog(
-                user_id=current_user.id,
-                action='自动存档原材料',
-                details=f'自动存档原材料：{material.material_name}（数量为0，超过{archive_days}天）',
-                can_rollback=True,
-                rollback_type='edit',
-                target_model='RawMaterial',
-                target_id=material.id,
-                old_data={'is_archived': False},
-                new_data={'is_archived': True}
-            )
-            db.session.add(log)
         
         db.session.commit()
         
         return jsonify({
             'success': True,
-            'message': f'自动存档完成，共存档 {archived_count} 条记录',
-            'archived_count': archived_count
+            'message': f'成功存档 {archived_count} 条记录'
         })
         
     except Exception as e:
         db.session.rollback()
-        current_app.logger.error(f'自动存档失败: {str(e)}')
+        return jsonify({'success': False, 'message': f'自动存档失败: {str(e)}'})
+
+# 产品管理路由
+@bp.route('/products')
+@login_required
+@handle_pagination_args
+def manage_products():
+    """产品管理页面"""
+    search = request.args.get('search', '')
+    status_filter = request.args.get('status', '')
+    category_filter = request.args.get('category', '')
+    
+    query = Product.query
+    
+    # 搜索过滤
+    if search:
+        query = query.filter(
+            db.or_(
+                Product.product_code.contains(search),
+                Product.product_name.contains(search),
+                Product.drawing_number.contains(search),
+                Product.model.contains(search)
+            )
+        )
+    
+    # 状态过滤
+    if status_filter:
+        query = query.filter(Product.status == status_filter)
+    
+    # 类别过滤
+    if category_filter:
+        query = query.filter(Product.category == category_filter)
+    
+    # 分页
+    page = request.args.get('page', 1, type=int)
+    per_page = current_app.config.get('ITEMS_PER_PAGE', 10)
+    
+    products = query.order_by(Product.created_at.desc()).paginate(
+        page=page, per_page=per_page, error_out=False
+    )
+    
+    # 获取所有类别用于过滤
+    categories = db.session.query(Product.category).distinct().filter(Product.category.isnot(None)).all()
+    categories = [cat[0] for cat in categories if cat[0]]
+    
+    return render_template('main/products.html', 
+                         products=products.items,
+                         pagination=products,
+                         categories=categories)
+
+@bp.route('/products/add', methods=['POST'])
+@login_required
+def add_product():
+    """添加产品"""
+    try:
+        data = request.get_json()
+        
+        # 验证必填字段
+        required_fields = ['product_code', 'product_name']
+        for field in required_fields:
+            if not data.get(field):
+                return jsonify({'success': False, 'message': f'{field} 是必填字段'})
+        
+        # 检查产品编码是否已存在
+        existing = Product.query.filter_by(product_code=data['product_code']).first()
+        if existing:
+            return jsonify({'success': False, 'message': '产品编码已存在'})
+        
+        # 创建产品
+        product = Product(
+            product_code=data['product_code'],
+            product_name=data['product_name'],
+            drawing_number=data.get('drawing_number', ''),
+            model=data.get('model', ''),
+            specification=data.get('specification', ''),
+            unit=data.get('unit', '件'),
+            category=data.get('category', ''),
+            version=data.get('version', '1.0'),
+            notes=data.get('notes', ''),
+            created_by=current_user.id
+        )
+        
+        db.session.add(product)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': '产品添加成功'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'添加失败: {str(e)}'})
+
+@bp.route('/products/<int:id>', methods=['GET'])
+@login_required
+def get_product(id):
+    """获取产品详情"""
+    try:
+        product = Product.query.get_or_404(id)
+        
         return jsonify({
-            'success': False,
-            'message': f'自动存档失败：{str(e)}'
-        }), 500
+            'success': True,
+            'data': {
+                'id': product.id,
+                'product_code': product.product_code,
+                'product_name': product.product_name,
+                'drawing_number': product.drawing_number or '',
+                'model': product.model or '',
+                'specification': product.specification or '',
+                'unit': product.unit,
+                'category': product.category or '',
+                'version': product.version,
+                'status': product.status,
+                'notes': product.notes or '',
+                'total_material_cost': product.total_material_cost,
+                'total_process_cost': product.total_process_cost,
+                'total_cost': product.total_cost
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'获取产品详情失败: {str(e)}'})
+
+@bp.route('/products/<int:id>', methods=['PUT'])
+@login_required
+def update_product(id):
+    """更新产品"""
+    try:
+        product = Product.query.get_or_404(id)
+        data = request.get_json()
+        
+        # 验证必填字段
+        required_fields = ['product_name']
+        for field in required_fields:
+            if not data.get(field):
+                return jsonify({'success': False, 'message': f'{field} 是必填字段'})
+        
+        # 更新产品信息
+        product.product_name = data['product_name']
+        product.drawing_number = data.get('drawing_number', '')
+        product.model = data.get('model', '')
+        product.specification = data.get('specification', '')
+        product.unit = data.get('unit', '件')
+        product.category = data.get('category', '')
+        product.version = data.get('version', '1.0')
+        product.status = data.get('status', 'active')
+        product.notes = data.get('notes', '')
+        product.updated_at = datetime.utcnow()
+        
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': '产品更新成功'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'更新失败: {str(e)}'})
+
+@bp.route('/products/<int:id>', methods=['DELETE'])
+@login_required
+@csrf.exempt
+def delete_product(id):
+    """删除产品"""
+    try:
+        product = Product.query.get_or_404(id)
+        
+        # 检查是否有关联的BOM或工序
+        if product.bom_items.count() > 0 or product.process_items.count() > 0:
+            return jsonify({'success': False, 'message': '该产品存在BOM或工序信息，无法删除'})
+        
+        db.session.delete(product)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': '产品删除成功'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'删除失败: {str(e)}'})
+
+@bp.route('/products/<int:id>/bom')
+@login_required
+def product_bom(id):
+    """产品BOM管理页面"""
+    product = Product.query.get_or_404(id)
+    
+    # 获取BOM列表
+    bom_items = ProductBOM.query.filter_by(product_id=id).order_by(ProductBOM.sequence).all()
+    
+    # 获取可用的原材料和成品
+    raw_materials = RawMaterial.query.filter_by(status='in_stock').all()
+    finished_products = FinishedProduct.query.filter_by(status='in_stock').all()
+    
+    return render_template('main/product_bom.html',
+                         product=product,
+                         bom_items=bom_items,
+                         raw_materials=raw_materials,
+                         finished_products=finished_products)
+
+@bp.route('/products/<int:product_id>/bom/add', methods=['POST'])
+@login_required
+def add_product_bom(product_id):
+    """添加产品BOM项"""
+    try:
+        product = Product.query.get_or_404(product_id)
+        data = request.get_json()
+        
+        # 验证必填字段
+        required_fields = ['material_type', 'material_id', 'quantity']
+        for field in required_fields:
+            if not data.get(field):
+                return jsonify({'success': False, 'message': f'{field} 是必填字段'})
+        
+        # 检查产品类型时避免循环引用
+        if data['material_type'] == 'product' and int(data['material_id']) == product_id:
+            return jsonify({'success': False, 'message': '不能将产品自身添加到BOM中'})
+        
+        # 检查是否已存在相同的物料
+        existing = ProductBOM.query.filter_by(
+            product_id=product_id,
+            material_type=data['material_type'],
+            material_id=data['material_id']
+        ).first()
+        
+        if existing:
+            return jsonify({'success': False, 'message': '该物料已存在于BOM中'})
+        
+        # 获取下一个序号
+        max_sequence = db.session.query(db.func.max(ProductBOM.sequence)).filter_by(product_id=product_id).scalar() or 0
+        
+        # 创建BOM项
+        bom_item = ProductBOM(
+            product_id=product_id,
+            material_type=data['material_type'],
+            material_id=data['material_id'],
+            quantity=float(data['quantity']),
+            unit=data.get('unit', '件'),
+            unit_cost=float(data.get('unit_cost', 0)),
+            waste_rate=float(data.get('waste_rate', 0)),
+            notes=data.get('notes', ''),
+            sequence=max_sequence + 1
+        )
+        
+        db.session.add(bom_item)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': 'BOM项添加成功'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'添加失败: {str(e)}'})
+
+@bp.route('/products/<int:product_id>/bom/<int:bom_item_id>', methods=['GET'])
+@login_required
+def get_product_bom_item(product_id, bom_item_id):
+    """获取BOM项详情"""
+    try:
+        bom_item = ProductBOM.query.filter_by(
+            id=bom_item_id, 
+            product_id=product_id
+        ).first_or_404()
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'id': bom_item.id,
+                'material_type': bom_item.material_type,
+                'material_id': bom_item.material_id,
+                'quantity': bom_item.quantity,
+                'unit': bom_item.unit,
+                'unit_cost': bom_item.unit_cost,
+                'waste_rate': bom_item.waste_rate,
+                'notes': bom_item.notes or '',
+                'material_name': bom_item.material_name
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'获取BOM项详情失败: {str(e)}'})
+
+@bp.route('/products/<int:product_id>/bom/<int:bom_item_id>', methods=['PUT'])
+@login_required
+def update_product_bom_item(product_id, bom_item_id):
+    """更新BOM项"""
+    try:
+        bom_item = ProductBOM.query.filter_by(
+            id=bom_item_id, 
+            product_id=product_id
+        ).first_or_404()
+        
+        data = request.get_json()
+        
+        # 验证必填字段
+        required_fields = ['quantity']
+        for field in required_fields:
+            if not data.get(field):
+                return jsonify({'success': False, 'message': f'{field} 是必填字段'})
+        
+        # 更新BOM项
+        bom_item.quantity = float(data['quantity'])
+        bom_item.unit = data.get('unit', '件')
+        bom_item.unit_cost = float(data.get('unit_cost', 0))
+        bom_item.waste_rate = float(data.get('waste_rate', 0))
+        bom_item.notes = data.get('notes', '')
+        
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': 'BOM项更新成功'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'更新失败: {str(e)}'})
+
+@bp.route('/products/<int:product_id>/bom/<int:bom_item_id>', methods=['DELETE'])
+@login_required
+@csrf.exempt
+def delete_product_bom_item(product_id, bom_item_id):
+    """删除BOM项"""
+    try:
+        bom_item = ProductBOM.query.filter_by(
+            id=bom_item_id, 
+            product_id=product_id
+        ).first_or_404()
+        
+        db.session.delete(bom_item)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': 'BOM项删除成功'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'删除失败: {str(e)}'})
+
+@bp.route('/products/<int:product_id>/processes')
+@login_required
+def product_processes(product_id):
+    """产品工序管理页面"""
+    product = Product.query.get_or_404(product_id)
+    
+    # 获取工序列表
+    process_items = ProductProcess.query.filter_by(product_id=product_id).order_by(ProductProcess.sequence).all()
+    
+    # 获取可用的工序
+    processes = ProcessPrice.query.filter_by(is_current=True).all()
+    
+    return render_template('main/product_processes.html',
+                         product=product,
+                         process_items=process_items,
+                         processes=processes)
+
+@bp.route('/products/<int:product_id>/processes/add', methods=['POST'])
+@login_required
+def add_product_process(product_id):
+    """添加产品工序"""
+    try:
+        product = Product.query.get_or_404(product_id)
+        data = request.get_json()
+        
+        # 验证必填字段
+        required_fields = ['process_id', 'sequence']
+        for field in required_fields:
+            if not data.get(field):
+                return jsonify({'success': False, 'message': f'{field} 是必填字段'})
+        
+        # 检查序号是否已存在
+        existing = ProductProcess.query.filter_by(
+            product_id=product_id,
+            sequence=data['sequence']
+        ).first()
+        
+        if existing:
+            return jsonify({'success': False, 'message': '该序号已存在'})
+        
+        # 创建工序项
+        process_item = ProductProcess(
+            product_id=product_id,
+            process_id=data['process_id'],
+            sequence=int(data['sequence']),
+            quantity=int(data.get('quantity', 1)),
+            unit_price=float(data['unit_price']) if data.get('unit_price') else None,
+            setup_time=float(data.get('setup_time', 0)),
+            process_time=float(data.get('process_time', 0)),
+            notes=data.get('notes', ''),
+            is_required=data.get('is_required', True)
+        )
+        
+        db.session.add(process_item)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': '工序添加成功'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'添加失败: {str(e)}'})
+
+@bp.route('/products/<int:product_id>/processes/<int:process_item_id>', methods=['DELETE'])
+@login_required
+@csrf.exempt
+def delete_product_process(product_id, process_item_id):
+    """删除产品工序"""
+    try:
+        process_item = ProductProcess.query.filter_by(
+            id=process_item_id, 
+            product_id=product_id
+        ).first_or_404()
+        
+        db.session.delete(process_item)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': '工序删除成功'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'删除失败: {str(e)}'})
+
+@bp.route('/products/<int:product_id>/processes/<int:process_item_id>', methods=['PUT'])
+@login_required
+def update_product_process(product_id, process_item_id):
+    """更新产品工序"""
+    try:
+        process_item = ProductProcess.query.filter_by(
+            id=process_item_id, 
+            product_id=product_id
+        ).first_or_404()
+        
+        data = request.get_json()
+        
+        # 验证必填字段
+        required_fields = ['sequence']
+        for field in required_fields:
+            if not data.get(field):
+                return jsonify({'success': False, 'message': f'{field} 是必填字段'})
+        
+        # 检查序号是否与其他工序冲突
+        existing = ProductProcess.query.filter_by(
+            product_id=product_id,
+            sequence=data['sequence']
+        ).filter(ProductProcess.id != process_item_id).first()
+        
+        if existing:
+            return jsonify({'success': False, 'message': '该序号已存在'})
+        
+        # 更新工序项
+        process_item.sequence = int(data['sequence'])
+        process_item.quantity = int(data.get('quantity', 1))
+        process_item.unit_price = float(data['unit_price']) if data.get('unit_price') else None
+        process_item.setup_time = float(data.get('setup_time', 0))
+        process_item.process_time = float(data.get('process_time', 0))
+        process_item.notes = data.get('notes', '')
+        process_item.is_required = data.get('is_required', True)
+        
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': '工序更新成功'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'更新失败: {str(e)}'})
+
+@bp.route('/products/<int:product_id>/processes/<int:process_item_id>', methods=['GET'])
+@login_required
+def get_product_process(product_id, process_item_id):
+    """获取产品工序详情"""
+    try:
+        process_item = ProductProcess.query.filter_by(
+            id=process_item_id, 
+            product_id=product_id
+        ).first_or_404()
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'id': process_item.id,
+                'process_id': process_item.process_id,
+                'sequence': process_item.sequence,
+                'quantity': process_item.quantity,
+                'unit_price': process_item.unit_price,
+                'setup_time': process_item.setup_time,
+                'process_time': process_item.process_time,
+                'notes': process_item.notes or '',
+                'is_required': process_item.is_required,
+                'process_name': process_item.process.process_name,
+                'process_code': process_item.process.process_code,
+                'default_price': process_item.process.price
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'获取工序详情失败: {str(e)}'})
+
+@bp.route('/api/products/search')
+@login_required
+def search_products():
+    """搜索产品"""
+    try:
+        search_term = request.args.get('search', '').strip()
+        exclude_current = request.args.get('exclude_current', type=int)
+        
+        query = Product.query.filter(Product.status == 'active')
+        
+        if search_term:
+            query = query.filter(
+                db.or_(
+                    Product.product_name.contains(search_term),
+                    Product.product_code.contains(search_term)
+                )
+            )
+        
+        if exclude_current:
+            query = query.filter(Product.id != exclude_current)
+        
+        products = query.limit(50).all()
+        
+        return jsonify({
+            'success': True,
+            'data': [{
+                'id': product.id,
+                'product_code': product.product_code,
+                'product_name': product.product_name,
+                'drawing_number': product.drawing_number or '',
+                'model': product.model or '',
+                'category': product.category or '',
+                'total_cost': product.total_cost
+            } for product in products]
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'搜索失败: {str(e)}'})
+
+# 生产订单管理路由
+@bp.route('/production_orders')
+@login_required
+@handle_pagination_args
+def manage_production_orders():
+    """生产订单管理页面"""
+    # 获取筛选参数
+    status_filter = request.args.get('status', '')
+    product_filter = request.args.get('product', '')
+    
+    # 构建查询
+    query = ProductionOrder.query.join(Product)
+    
+    if status_filter:
+        query = query.filter(ProductionOrder.status == status_filter)
+    
+    if product_filter:
+        query = query.filter(
+            db.or_(
+                Product.product_name.contains(product_filter),
+                Product.product_code.contains(product_filter)
+            )
+        )
+    
+    # 排序和分页
+    query = query.order_by(ProductionOrder.created_at.desc())
+    orders = query.paginate(
+        page=request.args.get('page', 1, type=int),
+        per_page=request.args.get('per_page', 20, type=int),
+        error_out=False
+    )
+    
+    # 获取产品列表用于筛选
+    products = Product.query.filter(Product.status == 'active').all()
+    
+    return render_template('main/production_orders.html',
+                         orders=orders,
+                         products=products,
+                         status_filter=status_filter,
+                         product_filter=product_filter)
+
+@bp.route('/production_orders/add', methods=['POST'])
+@login_required
+def add_production_order():
+    """添加生产订单"""
+    try:
+        data = request.get_json()
+        
+        # 验证必填字段
+        required_fields = ['product_id', 'planned_quantity', 'planned_start_date', 'planned_end_date']
+        for field in required_fields:
+            if not data.get(field):
+                return jsonify({'success': False, 'message': f'{field} 是必填字段'})
+        
+        # 验证产品存在
+        product = Product.query.get(data['product_id'])
+        if not product:
+            return jsonify({'success': False, 'message': '产品不存在'})
+        
+        # 创建生产订单
+        order = ProductionOrder(
+            product_id=data['product_id'],
+            planned_quantity=int(data['planned_quantity']),
+            planned_start_date=datetime.strptime(data['planned_start_date'], '%Y-%m-%d').date(),
+            planned_end_date=datetime.strptime(data['planned_end_date'], '%Y-%m-%d').date(),
+            priority=int(data.get('priority', 0)),
+            notes=data.get('notes', ''),
+            created_by=current_user.id
+        )
+        
+        db.session.add(order)
+        db.session.flush()  # 获取订单ID
+        
+        # 自动分配物料
+        if order.allocate_materials():
+            db.session.commit()
+            return jsonify({'success': True, 'message': '生产订单创建成功，物料已自动分配'})
+        else:
+            db.session.commit()
+            return jsonify({'success': True, 'message': '生产订单创建成功，但物料分配失败，请手动分配'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'创建失败: {str(e)}'})
+
+@bp.route('/production_orders/<int:order_id>')
+@login_required
+def production_order_detail(order_id):
+    """生产订单详情页面"""
+    order = ProductionOrder.query.get_or_404(order_id)
+    
+    # 获取物料分配
+    material_allocations = MaterialAllocation.query.filter_by(production_order_id=order_id).all()
+    
+    # 获取生产批次
+    batches = ProductionBatch.query.filter_by(production_order_id=order_id).order_by(ProductionBatch.created_at).all()
+    
+    return render_template('main/production_order_detail.html',
+                         order=order,
+                         material_allocations=material_allocations,
+                         batches=batches)
+
+@bp.route('/production_orders/<int:order_id>/batches/add', methods=['POST'])
+@login_required
+def add_production_batch(order_id):
+    """添加生产批次"""
+    try:
+        order = ProductionOrder.query.get_or_404(order_id)
+        data = request.get_json()
+        
+        # 验证必填字段
+        if not data.get('batch_quantity'):
+            return jsonify({'success': False, 'message': '批次数量是必填字段'})
+        
+        batch_quantity = int(data['batch_quantity'])
+        
+        # 检查剩余数量
+        if batch_quantity > order.remaining_quantity:
+            return jsonify({'success': False, 'message': f'批次数量不能超过剩余数量({order.remaining_quantity})'})
+        
+        # 创建生产批次
+        batch = ProductionBatch(
+            production_order_id=order_id,
+            batch_quantity=batch_quantity,
+            notes=data.get('notes', '')
+        )
+        
+        db.session.add(batch)
+        db.session.flush()  # 获取批次ID
+        
+        # 生成产品编码
+        if batch.generate_product_codes():
+            # 更新订单完成数量
+            order.completed_quantity += batch_quantity
+            if order.completed_quantity >= order.planned_quantity:
+                order.status = 'completed'
+                order.actual_end_date = datetime.now().date()
+            elif order.status == 'pending':
+                order.status = 'in_progress'
+                order.actual_start_date = datetime.now().date()
+            
+            db.session.commit()
+            return jsonify({'success': True, 'message': '生产批次创建成功，产品编码已自动生成'})
+        else:
+            db.session.rollback()
+            return jsonify({'success': False, 'message': '生产批次创建失败，无法生成产品编码'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'创建失败: {str(e)}'})
+
+@bp.route('/production_batches/<int:batch_id>')
+@login_required
+def production_batch_detail(batch_id):
+    """生产批次详情页面"""
+    batch = ProductionBatch.query.get_or_404(batch_id)
+    
+    # 获取批次项目
+    batch_items = ProductionBatchItem.query.filter_by(batch_id=batch_id).order_by(ProductionBatchItem.item_sequence).all()
+    
+    return render_template('main/production_batch_detail.html',
+                         batch=batch,
+                         batch_items=batch_items)
+
+@bp.route('/production_batch_items/<int:item_id>/update', methods=['PUT'])
+@login_required
+def update_batch_item(item_id):
+    """更新批次项目状态"""
+    try:
+        item = ProductionBatchItem.query.get_or_404(item_id)
+        data = request.get_json()
+        
+        # 更新状态
+        if 'status' in data:
+            item.status = data['status']
+        
+        if 'production_date' in data and data['production_date']:
+            item.production_date = datetime.strptime(data['production_date'], '%Y-%m-%d').date()
+        
+        if 'inspector' in data:
+            item.inspector = data['inspector']
+        
+        if 'quality_status' in data:
+            item.quality_status = data['quality_status']
+        
+        if 'notes' in data:
+            item.notes = data['notes']
+        
+        db.session.commit()
+        return jsonify({'success': True, 'message': '批次项目更新成功'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'更新失败: {str(e)}'})
+
+@bp.route('/api/production/code-rules')
+@login_required
+def get_production_code_rules():
+    """获取可用于产品编码的规则"""
+    try:
+        rules = CodeRule.query.filter(
+            CodeRule.is_active == True,
+            CodeRule.code_type.in_(['product', 'custom'])
+        ).all()
+        
+        return jsonify({
+            'success': True,
+            'data': [{
+                'id': rule.id,
+                'name': rule.name,
+                'code_type': rule.code_type,
+                'format_pattern': rule.format_pattern,
+                'notes': rule.notes or ''
+            } for rule in rules]
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'获取编码规则失败: {str(e)}'})
+
+@bp.route('/products/<int:product_id>/set-code-rule', methods=['POST'])
+@login_required
+def set_product_code_rule(product_id):
+    """为产品设置编码规则"""
+    try:
+        product = Product.query.get_or_404(product_id)
+        data = request.get_json()
+        
+        code_rule_id = data.get('code_rule_id')
+        if code_rule_id:
+            # 验证编码规则存在
+            code_rule = CodeRule.query.get(code_rule_id)
+            if not code_rule or not code_rule.is_active:
+                return jsonify({'success': False, 'message': '编码规则不存在或已禁用'})
+            
+            product.code_rule_id = code_rule_id
+        else:
+            product.code_rule_id = None
+        
+        db.session.commit()
+        return jsonify({'success': True, 'message': '编码规则设置成功'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'设置失败: {str(e)}'})
+
+@bp.route('/api/production/generate-codes', methods=['POST'])
+@login_required
+def generate_production_codes():
+    """手动生成产品编码"""
+    try:
+        data = request.get_json()
+        product_id = data.get('product_id')
+        quantity = int(data.get('quantity', 1))
+        
+        product = Product.query.get_or_404(product_id)
+        
+        if not product.code_rule:
+            return jsonify({'success': False, 'message': '产品未设置编码规则'})
+        
+        # 生成编码
+        codes = product.generate_product_code(quantity)
+        if not codes:
+            return jsonify({'success': False, 'message': '编码生成失败'})
+        
+        # 如果只有一个编码，转换为列表
+        if not isinstance(codes, list):
+            codes = [codes]
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'成功生成{len(codes)}个产品编码',
+            'codes': codes
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'生成失败: {str(e)}'})
+
+@bp.route('/production_orders/<int:order_id>/materials')
+@login_required
+def production_order_materials(order_id):
+    """生产订单物料分配页面"""
+    order = ProductionOrder.query.get_or_404(order_id)
+    material_allocations = MaterialAllocation.query.filter_by(production_order_id=order_id).all()
+    
+    # 为每个物料分配计算可用库存
+    for allocation in material_allocations:
+        if allocation.material_type == 'raw':
+            material = RawMaterial.query.filter_by(material_name=allocation.material_name).first()
+            allocation.available_stock = material.quantity if material else 0
+        elif allocation.material_type == 'finished':
+            material = FinishedProduct.query.filter_by(product_name=allocation.material_name).first()
+            allocation.available_stock = material.quantity if material else 0
+        else:
+            allocation.available_stock = 0
+    
+    # 计算总成本
+    total_cost = 0
+    for allocation in material_allocations:
+        # 从产品BOM中获取单价信息
+        bom_item = None
+        for item in order.product.bom_items:
+            if (item.material_type == allocation.material_type and 
+                item.material_id == allocation.material_id):
+                bom_item = item
+                break
+        
+        if bom_item:
+            total_cost += allocation.required_quantity * bom_item.unit_cost
+    
+    return render_template('main/production_order_materials.html',
+                         order=order,
+                         material_allocations=material_allocations,
+                         total_cost=total_cost)
+
+@bp.route('/production_batches/<int:batch_id>/status', methods=['PUT'])
+@login_required
+def update_batch_status(batch_id):
+    """更新生产批次状态"""
+    try:
+        batch = ProductionBatch.query.get_or_404(batch_id)
+        data = request.get_json()
+        
+        new_status = data.get('status')
+        if not new_status:
+            return jsonify({'success': False, 'message': '状态参数缺失'})
+        
+        # 更新批次状态
+        batch.status = new_status
+        
+        # 根据状态更新时间戳
+        if new_status == 'in_progress':
+            batch.start_date = datetime.now()
+            # 同时更新订单状态
+            if batch.production_order.status == 'pending':
+                batch.production_order.status = 'in_progress'
+                batch.production_order.actual_start_date = datetime.now().date()
+        elif new_status == 'completed':
+            batch.end_date = datetime.now()
+            # 更新所有批次项目为完成状态
+            ProductionBatchItem.query.filter_by(batch_id=batch_id).update({
+                'status': 'completed',
+                'completed_at': datetime.now()
+            })
+            
+            # 检查订单是否全部完成
+            order = batch.production_order
+            total_completed = sum(b.batch_quantity for b in order.batches if b.status == 'completed')
+            if total_completed >= order.planned_quantity:
+                order.status = 'completed'
+                order.actual_end_date = datetime.now().date()
+        
+        db.session.commit()
+        
+        status_text = {
+            'in_progress': '已开始生产',
+            'completed': '批次已完成',
+            'cancelled': '批次已取消'
+        }
+        
+        return jsonify({'success': True, 'message': status_text.get(new_status, '状态更新成功')})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'状态更新失败: {str(e)}'})
+
+@bp.route('/production_orders/<int:order_id>/materials/refresh', methods=['POST'])
+@login_required
+def refresh_material_allocations(order_id):
+    """刷新生产订单的物料分配"""
+    try:
+        order = ProductionOrder.query.get_or_404(order_id)
+        
+        # 删除现有的物料分配
+        MaterialAllocation.query.filter_by(production_order_id=order_id).delete()
+        
+        # 重新生成物料分配
+        if order.allocate_materials():
+            db.session.commit()
+            return jsonify({'success': True, 'message': '物料分配已刷新'})
+        else:
+            db.session.rollback()
+            return jsonify({'success': False, 'message': '物料分配刷新失败'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'刷新失败: {str(e)}'})
+
+@bp.route('/material_allocations/<int:allocation_id>/allocate', methods=['POST'])
+@login_required
+def allocate_material(allocation_id):
+    """分配物料"""
+    try:
+        allocation = MaterialAllocation.query.get_or_404(allocation_id)
+        
+        # 检查库存是否充足
+        if allocation.material_type == 'raw':
+            material = RawMaterial.query.filter_by(material_name=allocation.material_name).first()
+            if not material or material.quantity < allocation.required_quantity:
+                return jsonify({'success': False, 'message': '库存不足，无法分配'})
+            
+            # 扣减库存
+            material.quantity -= allocation.required_quantity
+            allocation.allocated_quantity = allocation.required_quantity
+            allocation.status = 'allocated'
+            
+        elif allocation.material_type == 'finished':
+            material = FinishedProduct.query.filter_by(product_name=allocation.material_name).first()
+            if not material or material.quantity < allocation.required_quantity:
+                return jsonify({'success': False, 'message': '库存不足，无法分配'})
+            
+            # 扣减库存
+            material.quantity -= allocation.required_quantity
+            allocation.allocated_quantity = allocation.required_quantity
+            allocation.status = 'allocated'
+        
+        db.session.commit()
+        return jsonify({'success': True, 'message': '物料分配成功'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'分配失败: {str(e)}'})
+
+@bp.route('/material_allocations/<int:allocation_id>/consume', methods=['POST'])
+@login_required
+def consume_material(allocation_id):
+    """消耗物料"""
+    try:
+        allocation = MaterialAllocation.query.get_or_404(allocation_id)
+        data = request.get_json()
+        
+        consume_quantity = float(data.get('quantity', 0))
+        if consume_quantity <= 0:
+            return jsonify({'success': False, 'message': '消耗数量必须大于0'})
+        
+        # 检查是否超过已分配数量
+        remaining = allocation.allocated_quantity - allocation.consumed_quantity
+        if consume_quantity > remaining:
+            return jsonify({'success': False, 'message': f'消耗数量不能超过剩余数量({remaining})'})
+        
+        # 更新消耗数量
+        allocation.consumed_quantity += consume_quantity
+        
+        # 如果全部消耗完，更新状态
+        if allocation.consumed_quantity >= allocation.allocated_quantity:
+            allocation.status = 'consumed'
+        
+        db.session.commit()
+        return jsonify({'success': True, 'message': f'成功消耗{consume_quantity}{allocation.unit}物料'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'消耗失败: {str(e)}'})
+
+@bp.route('/material_allocations/<int:allocation_id>/detail', methods=['GET'])
+@login_required
+def get_material_allocation_detail(allocation_id):
+    """获取物料分配详情"""
+    try:
+        allocation = MaterialAllocation.query.get_or_404(allocation_id)
+        
+        # 获取物料详细信息
+        material_detail = None
+        if allocation.material_type == 'raw':
+            material = RawMaterial.query.filter_by(material_name=allocation.material_name).first()
+            material_detail = {
+                'name': material.material_name if material else allocation.material_name,
+                'supplier': material.supplier if material else '未知',
+                'internal_number': material.internal_number if material else '未知',
+                'current_stock': material.quantity if material else 0,
+                'unit': allocation.unit,
+                'status': material.status if material else '未知'
+            }
+        elif allocation.material_type == 'finished':
+            material = FinishedProduct.query.filter_by(product_number=allocation.material_name).first()
+            material_detail = {
+                'name': material.product_number if material else allocation.material_name,
+                'drawing_number': material.drawing_number if material else '未知',
+                'model': material.model if material else '未知',
+                'current_stock': material.quantity if material else 0,
+                'unit': allocation.unit,
+                'status': material.status if material else '未知'
+            }
+        
+        # 生成HTML内容
+        html_content = f"""
+        <div class="row">
+            <div class="col-md-6">
+                <h6>分配信息</h6>
+                <table class="table table-sm">
+                    <tr><td>物料名称:</td><td>{allocation.material_name}</td></tr>
+                    <tr><td>物料类型:</td><td>{'原材料' if allocation.material_type == 'raw' else '成品'}</td></tr>
+                    <tr><td>需求数量:</td><td>{allocation.required_quantity}{allocation.unit}</td></tr>
+                    <tr><td>已分配:</td><td>{allocation.allocated_quantity}{allocation.unit}</td></tr>
+                    <tr><td>已消耗:</td><td>{allocation.consumed_quantity}{allocation.unit}</td></tr>
+                    <tr><td>分配状态:</td><td>
+                        {'待分配' if allocation.status == 'pending' else 
+                         '已分配' if allocation.status == 'allocated' else 
+                         '已消耗' if allocation.status == 'consumed' else '缺料'}
+                    </td></tr>
+                </table>
+            </div>
+            <div class="col-md-6">
+                <h6>物料详情</h6>
+                <table class="table table-sm">
+                    <tr><td>物料名称:</td><td>{material_detail.get('name', '-') if material_detail else '-'}</td></tr>
+                    <tr><td>当前库存:</td><td>{material_detail.get('current_stock', 0) if material_detail else 0}{material_detail.get('unit', '') if material_detail else ''}</td></tr>
+                    <tr><td>状态:</td><td>{material_detail.get('status', '-') if material_detail else '-'}</td></tr>
+                    {('<tr><td>供应商:</td><td>' + material_detail.get('supplier', '-') + '</td></tr>') if material_detail and allocation.material_type == 'raw' else ''}
+                    {('<tr><td>内部编号:</td><td>' + material_detail.get('internal_number', '-') + '</td></tr>') if material_detail and allocation.material_type == 'raw' else ''}
+                    {('<tr><td>图号:</td><td>' + material_detail.get('drawing_number', '-') + '</td></tr>') if material_detail and allocation.material_type == 'finished' else ''}
+                    {('<tr><td>型号:</td><td>' + material_detail.get('model', '-') + '</td></tr>') if material_detail and allocation.material_type == 'finished' else ''}
+                </table>
+            </div>
+        </div>
+        """
+        
+        return jsonify({'success': True, 'html': html_content})
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'获取详情失败: {str(e)}'})
