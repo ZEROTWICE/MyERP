@@ -96,12 +96,6 @@
                                 <i class="fas fa-cogs"></i> 工序
                             </a>
                             {% if current_user.role in ['admin', 'manager'] %}
-                            <button class="btn btn-sm btn-secondary" onclick="setCodeRule({{ product.id }})">
-                                <i class="fas fa-barcode"></i> 编码
-                            </button>
-                            <button class="btn btn-sm btn-success" onclick="generateCodes({{ product.id }})">
-                                <i class="fas fa-magic"></i> 生成
-                            </button>
                             <button class="btn btn-sm btn-primary" onclick="editProduct({{ product.id }})">
                                 <i class="fas fa-edit"></i> 编辑
                             </button>
@@ -195,6 +189,17 @@
                             </div>
                         </div>
                     </div>
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="mb-3">
+                                <label for="codeRule" class="form-label">编码规则</label>
+                                <select class="form-control" id="codeRule" name="code_rule_id">
+                                    <option value="">请选择编码规则（可选）</option>
+                                </select>
+                                <small class="form-text text-muted">选择编码规则用于自动生成产品编码</small>
+                            </div>
+                        </div>
+                    </div>
                     <div class="mb-3">
                         <label for="specification" class="form-label">规格说明</label>
                         <textarea class="form-control" id="specification" name="specification" rows="3"></textarea>
@@ -282,6 +287,17 @@
                             </div>
                         </div>
                     </div>
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="mb-3">
+                                <label for="editCodeRule" class="form-label">编码规则</label>
+                                <select class="form-control" id="editCodeRule" name="code_rule_id">
+                                    <option value="">请选择编码规则（可选）</option>
+                                </select>
+                                <small class="form-text text-muted">选择编码规则用于自动生成产品编码</small>
+                            </div>
+                        </div>
+                    </div>
                     <div class="mb-3">
                         <label for="editSpecification" class="form-label">规格说明</label>
                         <textarea class="form-control" id="editSpecification" name="specification" rows="3"></textarea>
@@ -366,7 +382,8 @@ function submitProduct() {
         category: document.getElementById('category').value,
         version: document.getElementById('version').value,
         specification: document.getElementById('specification').value,
-        notes: document.getElementById('notes').value
+        notes: document.getElementById('notes').value,
+        code_rule_id: document.getElementById('codeRule').value || null
     };
     
     fetch("{{ url_for('main.add_product') }}", {
@@ -397,7 +414,25 @@ function submitProduct() {
 
 // 编辑产品
 function editProduct(id) {
-    fetch(`/products/${id}`)
+    // 先加载编码规则列表
+    fetch('/api/production/code-rules')
+        .then(response => response.json())
+        .then(codeRulesData => {
+            const editCodeRuleSelect = document.getElementById('editCodeRule');
+            editCodeRuleSelect.innerHTML = '<option value="">请选择编码规则（可选）</option>';
+            
+            if (codeRulesData.success) {
+                codeRulesData.data.forEach(rule => {
+                    const option = document.createElement('option');
+                    option.value = rule.id;
+                    option.textContent = `${rule.name} (${rule.format_pattern})`;
+                    editCodeRuleSelect.appendChild(option);
+                });
+            }
+            
+            // 然后加载产品详情
+            return fetch(`/products/${id}`);
+        })
         .then(response => response.json())
         .then(data => {
             if (data.success) {
@@ -413,6 +448,11 @@ function editProduct(id) {
                 document.getElementById('editStatus').value = product.status;
                 document.getElementById('editSpecification').value = product.specification;
                 document.getElementById('editNotes').value = product.notes;
+                
+                // 设置编码规则
+                if (product.code_rule_id) {
+                    document.getElementById('editCodeRule').value = product.code_rule_id;
+                }
                 
                 const modal = new bootstrap.Modal(document.getElementById('editProductModal'));
                 modal.show();
@@ -438,7 +478,8 @@ function submitEditProduct() {
         version: document.getElementById('editVersion').value,
         status: document.getElementById('editStatus').value,
         specification: document.getElementById('editSpecification').value,
-        notes: document.getElementById('editNotes').value
+        notes: document.getElementById('editNotes').value,
+        code_rule_id: document.getElementById('editCodeRule').value || null
     };
     
     fetch(`/products/${id}`, {
@@ -535,181 +576,38 @@ function deleteProduct(id) {
     }
 }
 
-// 设置编码规则
-function setCodeRule(productId) {
-    // 加载编码规则列表
+// 加载编码规则列表
+function loadCodeRules() {
     fetch('/api/production/code-rules')
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                const select = document.getElementById('codeRuleSelect');
-                select.innerHTML = '<option value="">请选择编码规则</option>';
+                const addCodeRuleSelect = document.getElementById('codeRule');
+                addCodeRuleSelect.innerHTML = '<option value="">请选择编码规则（可选）</option>';
                 
                 data.data.forEach(rule => {
                     const option = document.createElement('option');
                     option.value = rule.id;
                     option.textContent = `${rule.name} (${rule.format_pattern})`;
-                    select.appendChild(option);
+                    addCodeRuleSelect.appendChild(option);
                 });
-                
-                document.getElementById('codeRuleProductId').value = productId;
-                const modal = new bootstrap.Modal(document.getElementById('codeRuleModal'));
-                modal.show();
-            } else {
-                alert('获取编码规则失败：' + data.message);
             }
         })
         .catch(error => {
-            console.error('Error:', error);
-            alert('获取编码规则失败，请重试');
+            console.error('Error loading code rules:', error);
         });
 }
 
-// 提交编码规则设置
-function submitCodeRule() {
-    const productId = document.getElementById('codeRuleProductId').value;
-    const codeRuleId = document.getElementById('codeRuleSelect').value;
-    
-    fetch(`/products/${productId}/set-code-rule`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': '{{ csrf_token() }}'
-        },
-        credentials: 'same-origin',
-        body: JSON.stringify({
-            code_rule_id: codeRuleId || null
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            alert('编码规则设置成功！');
-            const modal = bootstrap.Modal.getInstance(document.getElementById('codeRuleModal'));
-            modal.hide();
-        } else {
-            alert('设置失败：' + data.message);
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('设置失败，请重试');
-    });
-}
-
-// 生成产品编码
-function generateCodes(productId) {
-    document.getElementById('generateProductId').value = productId;
-    const modal = new bootstrap.Modal(document.getElementById('generateCodesModal'));
-    modal.show();
-}
-
-// 提交生成编码
-function submitGenerateCodes() {
-    const productId = document.getElementById('generateProductId').value;
-    const quantity = document.getElementById('generateQuantity').value;
-    
-    if (!quantity || quantity < 1) {
-        alert('请输入有效的生成数量');
-        return;
+// 页面加载完成后绑定事件
+document.addEventListener('DOMContentLoaded', function() {
+    // 当添加产品模态框显示时加载编码规则
+    const addProductModal = document.getElementById('addProductModal');
+    if (addProductModal) {
+        addProductModal.addEventListener('show.bs.modal', function() {
+            loadCodeRules();
+        });
     }
-    
-    fetch('/api/production/generate-codes', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': '{{ csrf_token() }}'
-        },
-        credentials: 'same-origin',
-        body: JSON.stringify({
-            product_id: productId,
-            quantity: parseInt(quantity)
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            // 显示生成的编码
-            const codesList = document.getElementById('generatedCodesList');
-            codesList.innerHTML = '';
-            data.codes.forEach(code => {
-                const li = document.createElement('li');
-                li.className = 'list-group-item';
-                li.textContent = code;
-                codesList.appendChild(li);
-            });
-            
-            document.getElementById('generateResult').style.display = 'block';
-            alert(data.message);
-        } else {
-            alert('生成失败：' + data.message);
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('生成失败，请重试');
-    });
-}
+});
 </script>
-
-<!-- 编码规则设置模态框 -->
-<div class="modal fade" id="codeRuleModal" tabindex="-1" aria-labelledby="codeRuleModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="codeRuleModalLabel">设置编码规则</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <form id="codeRuleForm">
-                    <input type="hidden" id="codeRuleProductId">
-                    <div class="mb-3">
-                        <label for="codeRuleSelect" class="form-label">选择编码规则</label>
-                        <select class="form-control" id="codeRuleSelect" required>
-                            <option value="">请选择编码规则</option>
-                        </select>
-                        <small class="form-text text-muted">选择空值将清除当前编码规则设置</small>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                <button type="button" class="btn btn-primary" onclick="submitCodeRule()">保存</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- 生成编码模态框 -->
-<div class="modal fade" id="generateCodesModal" tabindex="-1" aria-labelledby="generateCodesModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="generateCodesModalLabel">生成产品编码</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <form id="generateCodesForm">
-                    <input type="hidden" id="generateProductId">
-                    <div class="mb-3">
-                        <label for="generateQuantity" class="form-label">生成数量</label>
-                        <input type="number" class="form-control" id="generateQuantity" min="1" max="1000" value="1" required>
-                        <small class="form-text text-muted">一次最多生成1000个编码</small>
-                    </div>
-                    
-                    <div id="generateResult" style="display: none;">
-                        <h6>生成的编码：</h6>
-                        <ul id="generatedCodesList" class="list-group">
-                        </ul>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
-                <button type="button" class="btn btn-primary" onclick="submitGenerateCodes()">生成</button>
-            </div>
-        </div>
-    </div>
-</div>
 
 {% endblock %} 

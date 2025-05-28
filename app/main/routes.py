@@ -4625,6 +4625,8 @@ def update_finished_product(id):
         product.quantity = data['quantity']
         product.status = data['status']
         product.notes = data.get('notes', '')
+        product.code_rule_id = data.get('code_rule_id') if data.get('code_rule_id') else None
+        product.updated_at = datetime.utcnow()
         
         # 记录审计日志
         log = AuditLog(
@@ -5240,6 +5242,7 @@ def add_product():
             category=data.get('category', '').strip(),
             version=data.get('version', '1.0').strip(),
             notes=data.get('notes', '').strip(),
+            code_rule_id=data.get('code_rule_id') if data.get('code_rule_id') else None,
             created_by=current_user.id
         )
         
@@ -5299,6 +5302,7 @@ def get_product(id):
                 'version': product.version,
                 'status': product.status,
                 'notes': product.notes or '',
+                'code_rule_id': product.code_rule_id,
                 'total_material_cost': product.total_material_cost,
                 'total_process_cost': product.total_process_cost,
                 'total_cost': product.total_cost
@@ -5332,6 +5336,7 @@ def update_product(id):
         product.version = data.get('version', '1.0')
         product.status = data.get('status', 'active')
         product.notes = data.get('notes', '')
+        product.code_rule_id = data.get('code_rule_id') if data.get('code_rule_id') else None
         product.updated_at = datetime.utcnow()
         
         db.session.commit()
