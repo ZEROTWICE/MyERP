@@ -5799,6 +5799,9 @@ def add_production_batch(order_id):
         if batch_quantity > order.remaining_quantity:
             return jsonify({'success': False, 'message': f'批次数量不能超过剩余数量({order.remaining_quantity})'})
         
+        # 检查物料需求并处理不足情况
+        material_shortage_info = check_and_handle_material_shortage(order, batch_quantity)
+        
         # 创建生产批次
         batch = ProductionBatch(
             production_order_id=order_id,
@@ -5821,7 +5824,18 @@ def add_production_batch(order_id):
                 order.actual_start_date = datetime.now().date()
             
             db.session.commit()
-            return jsonify({'success': True, 'message': '生产批次创建成功，产品编码已自动生成'})
+            
+            # 构建返回消息
+            message = '生产批次创建成功，产品编码已自动生成'
+            if material_shortage_info['created_orders']:
+                message += f'。已自动创建{len(material_shortage_info["created_orders"])}个子生产订单来补充不足的产品物料'
+                message += f'：{", ".join(material_shortage_info["created_orders"])}'
+            
+            return jsonify({
+                'success': True, 
+                'message': message,
+                'created_orders': material_shortage_info['created_orders']
+            })
         else:
             db.session.rollback()
             return jsonify({'success': False, 'message': '生产批次创建失败，无法生成产品编码'})
@@ -5854,6 +5868,9 @@ def update_batch_item(item_id):
         # 更新状态
         if 'status' in data:
             item.status = data['status']
+            # 如果状态更新为完成，设置完成时间
+            if data['status'] == 'completed':
+                item.completed_at = datetime.now()
         
         if 'production_date' in data and data['production_date']:
             item.production_date = datetime.strptime(data['production_date'], '%Y-%m-%d').date()
@@ -6202,3 +6219,259 @@ def get_material_allocation_detail(allocation_id):
         
     except Exception as e:
         return jsonify({'success': False, 'message': f'获取详情失败: {str(e)}'})
+
+def check_and_handle_material_shortage(order, batch_quantity, max_depth=5, current_depth=0):
+    """
+    检查物料需求并处理不足情况
+    如果物料是产品且库存不足，递归创建生产订单
+    
+    Args:
+        order: 生产订单对象
+        batch_quantity: 批次数量
+        max_depth: 最大递归深度，防止无限递归
+        current_depth: 当前递归深度
+    
+    Returns:
+        dict: 包含创建的订单信息
+    """
+    created_orders = []
+    
+    if current_depth >= max_depth:
+        return {'created_orders': created_orders}
+    
+    try:
+        # 获取产品BOM
+        bom_items = order.product.bom_items
+        
+        for bom_item in bom_items:
+            # 计算此批次需要的物料数量
+            required_quantity = bom_item.actual_quantity * batch_quantity
+            
+            # 检查物料类型和库存
+            if bom_item.material_type == 'product':
+                # 获取产品库存信息
+                product = Product.query.get(bom_item.material_id)
+                if not product:
+                    continue
+                
+                # 计算当前可用库存（这里简化处理，实际应该考虑已分配但未消耗的数量）
+                available_stock = get_available_product_stock(product.id)
+                
+                # 如果库存不足
+                if available_stock < required_quantity:
+                    shortage_quantity = required_quantity - available_stock
+                    
+                    # 创建子生产订单来补充不足的产品
+                    sub_order = create_sub_production_order(
+                        product=product,
+                        required_quantity=shortage_quantity,
+                        parent_order=order,
+                        current_depth=current_depth
+                    )
+                    
+                    if sub_order:
+                        created_orders.append(sub_order.order_number)
+                        
+                        # 递归检查子订单的物料需求
+                        sub_shortage_info = check_and_handle_material_shortage(
+                            sub_order, 
+                            shortage_quantity, 
+                            max_depth, 
+                            current_depth + 1
+                        )
+                        created_orders.extend(sub_shortage_info['created_orders'])
+            
+            elif bom_item.material_type == 'raw':
+                # 原材料不足时记录但不自动创建订单
+                material = RawMaterial.query.get(bom_item.material_id)
+                if material and material.quantity < required_quantity:
+                    # 记录原材料不足的审计日志
+                    log = AuditLog(
+                        user_id=current_user.id,
+                        action='原材料库存不足警告',
+                        details=f'生产订单 {order.order_number} 需要原材料 {material.material_name} {required_quantity}，但库存仅有 {material.quantity}',
+                        target_model='ProductionOrder',
+                        target_id=order.id
+                    )
+                    db.session.add(log)
+            
+            elif bom_item.material_type == 'finished':
+                # 成品不足时记录但不自动创建订单
+                finished_product = FinishedProduct.query.get(bom_item.material_id)
+                if finished_product and finished_product.quantity < required_quantity:
+                    # 记录成品不足的审计日志
+                    log = AuditLog(
+                        user_id=current_user.id,
+                        action='成品库存不足警告',
+                        details=f'生产订单 {order.order_number} 需要成品 {finished_product.product_number} {required_quantity}，但库存仅有 {finished_product.quantity}',
+                        target_model='ProductionOrder',
+                        target_id=order.id
+                    )
+                    db.session.add(log)
+        
+        return {'created_orders': created_orders}
+        
+    except Exception as e:
+        # 记录错误但不影响主流程
+        log = AuditLog(
+            user_id=current_user.id,
+            action='物料需求检查失败',
+            details=f'生产订单 {order.order_number} 物料需求检查时发生错误: {str(e)}',
+            target_model='ProductionOrder',
+            target_id=order.id
+        )
+        db.session.add(log)
+        return {'created_orders': created_orders}
+
+def get_available_product_stock(product_id):
+    """
+    获取产品的可用库存数量
+    这里简化处理，实际应该考虑：
+    1. 成品库存中该产品的数量
+    2. 已分配但未消耗的数量
+    3. 正在生产中的数量
+    """
+    # 从成品库存中查找该产品
+    finished_products = FinishedProduct.query.filter_by(
+        status='in_stock'
+    ).all()
+    
+    # 这里需要根据产品编码或其他方式匹配成品和产品
+    # 简化处理：假设产品名称和成品产品编号有对应关系
+    product = Product.query.get(product_id)
+    if not product:
+        return 0
+    
+    total_stock = 0
+    for finished_product in finished_products:
+        # 简化匹配逻辑：如果成品的产品编号包含产品编码，则认为是同一产品
+        if product.product_code in finished_product.product_number:
+            total_stock += finished_product.quantity
+    
+    return total_stock
+
+def create_sub_production_order(product, required_quantity, parent_order, current_depth):
+    """
+    创建子生产订单来补充不足的产品
+    
+    Args:
+        product: 需要生产的产品对象
+        required_quantity: 需要的数量
+        parent_order: 父生产订单
+        current_depth: 当前递归深度
+    
+    Returns:
+        ProductionOrder: 创建的子订单对象，失败时返回None
+    """
+    try:
+        # 计算计划日期（比父订单提前开始）
+        planned_start_date = parent_order.planned_start_date - timedelta(days=7)  # 提前7天开始
+        planned_end_date = parent_order.planned_start_date - timedelta(days=1)   # 在父订单开始前1天完成
+        
+        # 创建子生产订单
+        sub_order = ProductionOrder(
+            product_id=product.id,
+            planned_quantity=int(required_quantity),
+            planned_start_date=planned_start_date,
+            planned_end_date=planned_end_date,
+            priority=parent_order.priority + 1,  # 子订单优先级更高
+            notes=f'自动创建的子订单，用于补充父订单 {parent_order.order_number} 的物料需求（递归深度：{current_depth + 1}）',
+            created_by=current_user.id
+        )
+        
+        db.session.add(sub_order)
+        db.session.flush()  # 获取订单ID
+        
+        # 自动分配子订单的物料
+        sub_order.allocate_materials()
+        
+        # 记录审计日志
+        log = AuditLog(
+            user_id=current_user.id,
+            action='自动创建子生产订单',
+            details=f'为补充父订单 {parent_order.order_number} 的产品物料需求，自动创建子订单 {sub_order.order_number}，数量：{required_quantity}',
+            target_model='ProductionOrder',
+            target_id=sub_order.id,
+            can_rollback=True,
+            rollback_type='add',
+            new_data={
+                'order_number': sub_order.order_number,
+                'product_id': product.id,
+                'planned_quantity': required_quantity,
+                'parent_order': parent_order.order_number
+            }
+        )
+        db.session.add(log)
+        
+        return sub_order
+        
+    except Exception as e:
+        # 记录错误
+        log = AuditLog(
+            user_id=current_user.id,
+            action='自动创建子生产订单失败',
+            details=f'为父订单 {parent_order.order_number} 创建子订单时失败: {str(e)}',
+            target_model='ProductionOrder',
+            target_id=parent_order.id
+        )
+        db.session.add(log)
+        return None
+
+@bp.route('/production_orders/<int:order_id>', methods=['DELETE'])
+@login_required
+@csrf.exempt
+def delete_production_order(order_id):
+    """删除生产订单"""
+    if current_user.role not in ['admin', 'manager']:
+        return jsonify({'success': False, 'message': '权限不足'}), 403
+    
+    try:
+        order = ProductionOrder.query.get_or_404(order_id)
+        
+        # 检查订单状态，只允许删除待开始或已取消的订单
+        if order.status in ['in_progress', 'completed']:
+            return jsonify({'success': False, 'message': '无法删除进行中或已完成的订单'})
+        
+        # 检查是否有关联的生产批次
+        batch_count = ProductionBatch.query.filter_by(production_order_id=order_id).count()
+        if batch_count > 0:
+            return jsonify({'success': False, 'message': f'该订单已有{batch_count}个生产批次，无法删除'})
+        
+        # 保存旧数据用于回滚
+        old_data = {
+            'order_number': order.order_number,
+            'product_id': order.product_id,
+            'planned_quantity': order.planned_quantity,
+            'planned_start_date': order.planned_start_date.isoformat(),
+            'planned_end_date': order.planned_end_date.isoformat(),
+            'priority': order.priority,
+            'notes': order.notes,
+            'status': order.status,
+            'created_by': order.created_by
+        }
+        
+        # 记录可回滚的审计日志
+        log = AuditLog(
+            user_id=current_user.id,
+            action='删除生产订单',
+            details=f'删除生产订单：{order.order_number}（产品：{order.product.product_name}）',
+            can_rollback=True,
+            rollback_type='delete',
+            target_model='ProductionOrder',
+            target_id=order.id,
+            old_data=old_data
+        )
+        db.session.add(log)
+        
+        # 删除关联的物料分配
+        MaterialAllocation.query.filter_by(production_order_id=order_id).delete()
+        
+        # 删除订单
+        db.session.delete(order)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': '生产订单删除成功'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'删除失败: {str(e)}'})

@@ -110,6 +110,11 @@
                                 <i class="fas fa-plus"></i> 批次
                             </button>
                             {% endif %}
+                            {% if current_user.role in ['admin', 'manager'] and order.status in ['pending', 'cancelled'] %}
+                            <button class="btn btn-sm btn-danger" onclick="deleteOrder({{ order.id }}, '{{ order.order_number }}')">
+                                <i class="fas fa-trash"></i> 删除
+                            </button>
+                            {% endif %}
                         </div>
                     </td>
                 </tr>
@@ -297,11 +302,12 @@ function addBatch(orderId) {
 
 // 提交批次
 function submitBatch() {
-    const orderId = document.getElementById('batchOrderId').value;
     const formData = {
         batch_quantity: document.getElementById('batchQuantity').value,
         notes: document.getElementById('batchNotes').value
     };
+    
+    const orderId = document.getElementById('batchOrderId').value;
     
     fetch(`/production_orders/${orderId}/batches/add`, {
         method: 'POST',
@@ -326,6 +332,34 @@ function submitBatch() {
     .catch(error => {
         console.error('Error:', error);
         alert('创建失败，请重试');
+    });
+}
+
+// 删除生产订单
+function deleteOrder(orderId, orderNumber) {
+    if (!confirm(`确定要删除生产订单 ${orderNumber} 吗？\n\n注意：只能删除待开始或已取消状态的订单，且删除后无法恢复。`)) {
+        return;
+    }
+    
+    fetch(`/production_orders/${orderId}`, {
+        method: 'DELETE',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token() }}'
+        },
+        credentials: 'same-origin'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            location.reload();
+        } else {
+            alert('删除失败：' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('删除失败，请重试');
     });
 }
 

@@ -1047,6 +1047,7 @@ class ProductionBatchItem(db.Model):
     quality_status = db.Column(db.String(20))  # pass, fail, pending
     notes = db.Column(db.Text)  # 备注
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    completed_at = db.Column(db.DateTime)  # 完成时间
     
     __table_args__ = (
         db.UniqueConstraint('global_sn', name='uq_production_batch_item_global_sn'),
