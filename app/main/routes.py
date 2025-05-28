@@ -5209,41 +5209,74 @@ def manage_products():
 def add_product():
     """添加产品"""
     try:
+        # 检查请求内容类型
+        if not request.is_json:
+            return jsonify({'success': False, 'message': '请求必须是JSON格式'}), 400
+            
         data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'message': '请求数据为空'}), 400
         
         # 验证必填字段
         required_fields = ['product_code', 'product_name']
         for field in required_fields:
-            if not data.get(field):
-                return jsonify({'success': False, 'message': f'{field} 是必填字段'})
+            if not data.get(field) or not str(data.get(field)).strip():
+                return jsonify({'success': False, 'message': f'{field} 是必填字段'}), 400
         
         # 检查产品编码是否已存在
-        existing = Product.query.filter_by(product_code=data['product_code']).first()
+        existing = Product.query.filter_by(product_code=data['product_code'].strip()).first()
         if existing:
-            return jsonify({'success': False, 'message': '产品编码已存在'})
+            return jsonify({'success': False, 'message': '产品编码已存在'}), 400
         
         # 创建产品
         product = Product(
-            product_code=data['product_code'],
-            product_name=data['product_name'],
-            drawing_number=data.get('drawing_number', ''),
-            model=data.get('model', ''),
-            specification=data.get('specification', ''),
-            unit=data.get('unit', '件'),
-            category=data.get('category', ''),
-            version=data.get('version', '1.0'),
-            notes=data.get('notes', ''),
+            global_sn=SerialNumber.get_next_number(),  # 明确设置全局流水号
+            product_code=data['product_code'].strip(),
+            product_name=data['product_name'].strip(),
+            drawing_number=data.get('drawing_number', '').strip(),
+            model=data.get('model', '').strip(),
+            specification=data.get('specification', '').strip(),
+            unit=data.get('unit', '件').strip(),
+            category=data.get('category', '').strip(),
+            version=data.get('version', '1.0').strip(),
+            notes=data.get('notes', '').strip(),
             created_by=current_user.id
         )
         
+        # 添加到数据库
         db.session.add(product)
+        
+        # 记录审计日志
+        log = AuditLog(
+            user_id=current_user.id,
+            action='添加产品',
+            details=f'添加产品：{product.product_name}（编码：{product.product_code}）',
+            can_rollback=True,
+            rollback_type='add',
+            target_model='Product',
+            target_id=product.id,
+            new_data={
+                'product_code': product.product_code,
+                'product_name': product.product_name,
+                'drawing_number': product.drawing_number,
+                'model': product.model,
+                'specification': product.specification,
+                'unit': product.unit,
+                'category': product.category,
+                'version': product.version,
+                'notes': product.notes
+            }
+        )
+        db.session.add(log)
+        
         db.session.commit()
         
-        return jsonify({'success': True, 'message': '产品添加成功'})
+        return jsonify({'success': True, 'message': '产品添加成功', 'id': product.id})
         
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': f'添加失败: {str(e)}'})
+        current_app.logger.error(f'添加产品失败: {str(e)}')
+        return jsonify({'success': False, 'message': f'添加失败: {str(e)}'}), 500
 
 @bp.route('/products/<int:id>', methods=['GET'])
 @login_required
