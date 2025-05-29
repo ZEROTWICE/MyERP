@@ -155,15 +155,15 @@
                             <td>
                                 {% if current_user.role in ['admin', 'manager', 'operator'] and item.status != 'completed' %}
                                 <div class="btn-group">
-                                    <button class="btn btn-sm btn-outline-primary" onclick="updateItemStatus({{ item.id }}, 'in_progress')"
+                                    <button class="btn btn-sm btn-outline-primary" onclick="updateItemStatus({{ item.id }}, &quot;in_progress&quot;)"
                                             {% if item.status == 'in_progress' or item.status == 'completed' %}disabled{% endif %}>
                                         开始
                                     </button>
-                                    <button class="btn btn-sm btn-outline-success" onclick="updateItemStatus({{ item.id }}, 'completed')"
+                                    <button class="btn btn-sm btn-outline-success" onclick="updateItemStatus({{ item.id }}, &quot;completed&quot;)"
                                             {% if item.status != 'in_progress' %}disabled{% endif %}>
                                         完成
                                     </button>
-                                    <button class="btn btn-sm btn-outline-danger" onclick="updateItemStatus({{ item.id }}, 'defective')"
+                                    <button class="btn btn-sm btn-outline-danger" onclick="updateItemStatus({{ item.id }}, &quot;defective&quot;)"
                                             {% if item.status == 'completed' %}disabled{% endif %}>
                                         不良
                                     </button>
@@ -211,12 +211,104 @@
             {% endif %}
         </div>
     </div>
+
+    <!-- 关联的生产任务 -->
+    <div class="card mt-4">
+        <div class="card-header">
+            <h5 class="mb-0">关联的生产任务 ({{ batch.tasks.count() }}个)</h5>
+        </div>
+        <div class="card-body">
+            {% if batch.tasks.count() > 0 %}
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>任务编号</th>
+                            <th>员工</th>
+                            <th>工序</th>
+                            <th>数量</th>
+                            <th>已完成</th>
+                            <th>完成率</th>
+                            <th>目标日期</th>
+                            <th>状态</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for task in batch.tasks.order_by('id') %}
+                        <tr>
+                            <td>{{ task.global_sn }}</td>
+                            <td>{{ task.employee.name }} ({{ task.employee.employee_id }})</td>
+                            <td>{{ task.process.process_name }}</td>
+                            <td>{{ task.quantity }}</td>
+                            <td>{{ task.completed_quantity }}</td>
+                            <td>{{ "%.1f"|format(task.completion_rate) }}%</td>
+                            <td>{{ task.target_date.strftime('%Y-%m-%d') }}</td>
+                            <td>
+                                {% if task.status == 'pending' %}
+                                    <span class="badge bg-warning">待完成</span>
+                                {% elif task.status == 'in_progress' %}
+                                    <span class="badge bg-primary">进行中</span>
+                                {% elif task.status == 'completed' %}
+                                    <span class="badge bg-success">已完成</span>
+                                {% elif task.status == 'cancelled' %}
+                                    <span class="badge bg-danger">已取消</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if current_user.role in ['admin', 'manager'] and task.status != 'completed' %}
+                                <button class="btn btn-sm btn-outline-primary" onclick="updateTaskProgress({{ task.id }})">
+                                    更新进度
+                                </button>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- 任务统计信息 -->
+            <div class="row mt-3">
+                <div class="col-md-12">
+                    <div class="d-flex justify-content-around">
+                        <div class="text-center">
+                            <h6 class="text-muted">待完成</h6>
+                            <span class="badge bg-warning fs-6">{{ batch.tasks.filter_by(status='pending').count() }}</span>
+                        </div>
+                        <div class="text-center">
+                            <h6 class="text-muted">进行中</h6>
+                            <span class="badge bg-primary fs-6">{{ batch.tasks.filter_by(status='in_progress').count() }}</span>
+                        </div>
+                        <div class="text-center">
+                            <h6 class="text-muted">已完成</h6>
+                            <span class="badge bg-success fs-6">{{ batch.tasks.filter_by(status='completed').count() }}</span>
+                        </div>
+                        <div class="text-center">
+                            <h6 class="text-muted">已取消</h6>
+                            <span class="badge bg-danger fs-6">{{ batch.tasks.filter_by(status='cancelled').count() }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="text-center text-muted py-4">
+                <i class="fas fa-tasks fa-3x mb-3"></i>
+                <p>该批次暂无关联的生产任务</p>
+                <small>生产任务会在创建批次时自动生成，或者可以手动创建</small>
+            </div>
+            {% endif %}
+        </div>
+    </div>
 </div>
 
 <script>
 // 生成产品编码
 function generateCodes() {
     if (!confirm('确定要为此批次生成产品编码吗？')) return;
+    
+    const batchId = {{ batch.id }};
+    const remainingQuantity = {{ batch.batch_quantity - batch_items|length }};
     
     fetch(`/api/production/generate-codes`, {
         method: 'POST',
@@ -226,8 +318,8 @@ function generateCodes() {
         },
         credentials: 'same-origin',
         body: JSON.stringify({
-            batch_id: {{ batch.id }},
-            quantity: {{ batch.batch_quantity - batch_items|length }}
+            batch_id: batchId,
+            quantity: remainingQuantity
         })
     })
     .then(response => response.json())
@@ -255,7 +347,9 @@ function updateBatchStatus(status) {
     
     if (!confirm(`确定要${statusText[status]}吗？`)) return;
     
-    fetch(`/production_batches/{{ batch.id }}/status`, {
+    const batchId = {{ batch.id }};
+    
+    fetch(`/production_batches/${batchId}/status`, {
         method: 'PUT',
         headers: {
             'Content-Type': 'application/json',
@@ -310,6 +404,13 @@ function updateItemStatus(itemId, status) {
         console.error('Error:', error);
         alert('操作失败，请重试');
     });
+}
+
+// 更新任务进度
+function updateTaskProgress(taskId) {
+    // 这里可以打开一个模态框来更新任务进度
+    // 暂时跳转到任务管理页面
+    window.open(`/tasks/${taskId}/get`, '_blank');
 }
 
 // 复制编码

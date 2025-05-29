@@ -74,6 +74,8 @@
                             <th>{{ sort_link('quantity', '数量') }}</th>
                             <th>已完成</th>
                             <th>完成率</th>
+                            <th>生产批次</th>
+                            <th>任务类型</th>
                             <th>{{ sort_link('status', '状态') }}</th>
                             <th>操作</th>
                         </tr>
@@ -89,6 +91,22 @@
                             <td>{{ task.quantity }}</td>
                             <td>{{ task.completed_quantity }}</td>
                             <td>{{ "%.1f"|format(task.completion_rate) }}%</td>
+                            <td>
+                                {% if task.production_batch %}
+                                    <a href="{{ url_for('main.production_batch_detail', batch_id=task.production_batch.id) }}" class="text-decoration-none">
+                                        {{ task.production_batch.batch_number }}
+                                    </a>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if task.task_type == 'auto' %}
+                                    <span class="badge bg-info">自动创建</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">手动创建</span>
+                                {% endif %}
+                            </td>
                             <td>
                                 {% if task.status == 'pending' %}
                                 <span class="badge bg-warning">待完成</span>

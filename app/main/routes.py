@@ -2565,6 +2565,59 @@ def update_task_status(id):
         )
         db.session.add(audit_log)
         
+        # 如果任务关联了生产批次，同步更新批次状态
+        if task.production_batch_id:
+            try:
+                # 获取同一批次的所有任务
+                batch_tasks = TaskAssignment.query.filter_by(production_batch_id=task.production_batch_id).all()
+                
+                # 计算批次任务的完成情况
+                total_tasks = len(batch_tasks)
+                completed_tasks = len([t for t in batch_tasks if t.status == 'completed'])
+                in_progress_tasks = len([t for t in batch_tasks if t.status in ['in_progress', 'completed']])
+                
+                # 获取生产批次
+                batch = ProductionBatch.query.get(task.production_batch_id)
+                if batch:
+                    old_status = batch.status
+                    
+                    # 根据任务完成情况更新批次状态
+                    if completed_tasks == total_tasks:
+                        # 所有任务都完成了
+                        batch.status = 'completed'
+                        if not batch.end_date:
+                            batch.end_date = datetime.now().date()
+                    elif in_progress_tasks > 0:
+                        # 有任务在进行中
+                        batch.status = 'in_progress'
+                        if not batch.start_date:
+                            batch.start_date = datetime.now().date()
+                    else:
+                        # 所有任务都是待开始状态
+                        batch.status = 'pending'
+                    
+                    # 如果状态发生变化，记录审计日志
+                    if old_status != batch.status:
+                        batch_log = AuditLog(
+                            user_id=current_user.id,
+                            action='自动更新生产批次状态',
+                            details=f'由于任务状态变化，生产批次 {batch.batch_number} 状态从 {old_status} 更新为 {batch.status}',
+                            target_model='ProductionBatch',
+                            target_id=batch.id,
+                            old_data={'status': old_status},
+                            new_data={'status': batch.status}
+                        )
+                        db.session.add(batch_log)
+                        
+                        current_app.logger.info(f'生产批次 {batch.batch_number} 状态自动更新：{old_status} -> {batch.status}')
+                
+                # 更新生产状态层次结构
+                update_production_status_hierarchy()
+                
+            except Exception as e:
+                current_app.logger.error(f'同步更新生产批次状态失败: {str(e)}')
+                # 不影响主流程，继续执行
+        
         db.session.commit()
         return jsonify({'success': True, 'message': '更新成功'})
     except Exception as e:
@@ -5832,6 +5885,9 @@ def add_production_batch(order_id):
         
         # 生成产品编码
         if batch.generate_product_codes():
+            # 自动为生产批次创建生产任务
+            tasks_created = create_tasks_for_production_batch(batch)
+            
             # 创建批次时不更新订单的完成数量，只有当批次实际完成时才更新
             # 如果订单状态还是待开始，且有了第一个批次，可以考虑更新为进行中
             if order.status == 'pending':
@@ -5842,6 +5898,11 @@ def add_production_batch(order_id):
             
             # 构建返回消息
             message = '生产批次创建成功，产品编码已自动生成'
+            if tasks_created:
+                message += '，生产任务已自动创建'
+            else:
+                message += '，但生产任务创建失败（可能是产品未配置工序或无可用员工）'
+                
             if material_shortage_info['created_orders']:
                 message += f'。已自动创建{len(material_shortage_info["created_orders"])}个子生产订单来补充不足的产品物料'
                 message += f'：{", ".join(material_shortage_info["created_orders"])}'
@@ -5849,7 +5910,8 @@ def add_production_batch(order_id):
             return jsonify({
                 'success': True, 
                 'message': message,
-                'created_orders': material_shortage_info['created_orders']
+                'created_orders': material_shortage_info['created_orders'],
+                'tasks_created': tasks_created
             })
         else:
             db.session.rollback()
@@ -5858,6 +5920,90 @@ def add_production_batch(order_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': f'创建失败: {str(e)}'})
+
+def create_tasks_for_production_batch(batch):
+    """为生产批次自动创建生产任务"""
+    try:
+        # 获取产品的工序列表
+        product = batch.production_order.product
+        process_items = product.process_items.order_by(ProductProcess.sequence).all()
+        
+        if not process_items:
+            current_app.logger.warning(f'产品 {product.product_name} 没有配置工序，无法创建生产任务')
+            return False
+        
+        # 获取可用的员工（在职员工）
+        available_employees = Employee.query.filter_by(is_active=True).all()
+        if not available_employees:
+            current_app.logger.warning('没有可用的员工，无法创建生产任务')
+            return False
+        
+        # 为每个工序创建任务
+        created_tasks = []
+        for process_item in process_items:
+            # 选择一个员工（这里可以根据业务逻辑优化分配策略）
+            # 暂时使用简单的轮询分配
+            employee = available_employees[len(created_tasks) % len(available_employees)]
+            
+            # 计算目标完成日期（根据工序顺序递增）
+            days_offset = process_item.sequence * 2  # 每个工序间隔2天
+            target_date = batch.production_order.planned_end_date + timedelta(days=days_offset)
+            
+            # 创建任务
+            task = TaskAssignment(
+                employee_id=employee.id,
+                process_id=process_item.process_id,
+                quantity=batch.batch_quantity,
+                target_date=target_date,
+                production_batch_id=batch.id,
+                task_type='auto',
+                notes=f'自动创建 - 生产批次: {batch.batch_number}, 工序序号: {process_item.sequence}'
+            )
+            
+            db.session.add(task)
+            created_tasks.append(task)
+            
+            # 记录审计日志
+            log = AuditLog(
+                user_id=current_user.id,
+                action='自动创建生产任务',
+                details=f'为生产批次 {batch.batch_number} 的工序 {process_item.process.process_name} 自动创建任务，分配给员工 {employee.name}',
+                can_rollback=True,
+                rollback_type='add',
+                target_model='TaskAssignment',
+                target_id=None,  # 将在flush后更新
+                new_data={
+                    'employee_id': employee.id,
+                    'process_id': process_item.process_id,
+                    'quantity': batch.batch_quantity,
+                    'target_date': target_date.isoformat(),
+                    'production_batch_id': batch.id,
+                    'task_type': 'auto'
+                }
+            )
+            db.session.add(log)
+        
+        # 提交以获取任务ID
+        db.session.flush()
+        
+        # 更新审计日志中的target_id
+        for i, task in enumerate(created_tasks):
+            logs = AuditLog.query.filter_by(
+                user_id=current_user.id,
+                action='自动创建生产任务',
+                target_model='TaskAssignment',
+                target_id=None
+            ).order_by(AuditLog.id.desc()).limit(len(created_tasks)).all()
+            
+            if i < len(logs):
+                logs[i].target_id = task.id
+        
+        current_app.logger.info(f'为生产批次 {batch.batch_number} 成功创建了 {len(created_tasks)} 个生产任务')
+        return True
+        
+    except Exception as e:
+        current_app.logger.error(f'为生产批次 {batch.batch_number} 创建生产任务失败: {str(e)}')
+        return False 
 
 @bp.route('/production_batches/<int:batch_id>')
 @login_required
@@ -5910,128 +6056,6 @@ def update_batch_item(item_id):
         db.session.rollback()
         return jsonify({'success': False, 'message': f'更新失败: {str(e)}'})
 
-@bp.route('/api/production/code-rules')
-@login_required
-def get_production_code_rules():
-    """获取可用于产品编码的规则"""
-    try:
-        rules = CodeRule.query.filter(
-            CodeRule.is_active == True,
-            CodeRule.code_type.in_(['product', 'custom'])
-        ).all()
-        
-        return jsonify({
-            'success': True,
-            'data': [{
-                'id': rule.id,
-                'name': rule.name,
-                'code_type': rule.code_type,
-                'format_pattern': rule.format_pattern,
-                'notes': rule.notes or ''
-            } for rule in rules]
-        })
-        
-    except Exception as e:
-        return jsonify({'success': False, 'message': f'获取编码规则失败: {str(e)}'})
-
-@bp.route('/products/<int:product_id>/set-code-rule', methods=['POST'])
-@login_required
-def set_product_code_rule(product_id):
-    """为产品设置编码规则"""
-    try:
-        product = Product.query.get_or_404(product_id)
-        data = request.get_json()
-        
-        code_rule_id = data.get('code_rule_id')
-        if code_rule_id:
-            # 验证编码规则存在
-            code_rule = CodeRule.query.get(code_rule_id)
-            if not code_rule or not code_rule.is_active:
-                return jsonify({'success': False, 'message': '编码规则不存在或已禁用'})
-            
-            product.code_rule_id = code_rule_id
-        else:
-            product.code_rule_id = None
-        
-        db.session.commit()
-        return jsonify({'success': True, 'message': '编码规则设置成功'})
-        
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'message': f'设置失败: {str(e)}'})
-
-@bp.route('/api/production/generate-codes', methods=['POST'])
-@login_required
-def generate_production_codes():
-    """手动生成产品编码"""
-    try:
-        data = request.get_json()
-        product_id = data.get('product_id')
-        quantity = int(data.get('quantity', 1))
-        
-        product = Product.query.get_or_404(product_id)
-        
-        if not product.code_rule:
-            return jsonify({'success': False, 'message': '产品未设置编码规则'})
-        
-        # 生成编码
-        codes = product.generate_product_code(quantity)
-        if not codes:
-            return jsonify({'success': False, 'message': '编码生成失败'})
-        
-        # 如果只有一个编码，转换为列表
-        if not isinstance(codes, list):
-            codes = [codes]
-        
-        db.session.commit()
-        
-        return jsonify({
-            'success': True,
-            'message': f'成功生成{len(codes)}个产品编码',
-            'codes': codes
-        })
-        
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'message': f'生成失败: {str(e)}'})
-
-@bp.route('/production_orders/<int:order_id>/materials')
-@login_required
-def production_order_materials(order_id):
-    """生产订单物料分配页面"""
-    order = ProductionOrder.query.get_or_404(order_id)
-    material_allocations = MaterialAllocation.query.filter_by(production_order_id=order_id).all()
-    
-    # 为每个物料分配计算可用库存
-    for allocation in material_allocations:
-        if allocation.material_type == 'raw':
-            material = RawMaterial.query.filter_by(material_name=allocation.material_name).first()
-            allocation.available_stock = material.quantity if material else 0
-        elif allocation.material_type == 'finished':
-            material = FinishedProduct.query.filter_by(product_name=allocation.material_name).first()
-            allocation.available_stock = material.quantity if material else 0
-        else:
-            allocation.available_stock = 0
-    
-    # 计算总成本
-    total_cost = 0
-    for allocation in material_allocations:
-        # 从产品BOM中获取单价信息
-        bom_item = None
-        for item in order.product.bom_items:
-            if (item.material_type == allocation.material_type and 
-                item.material_id == allocation.material_id):
-                bom_item = item
-                break
-        
-        if bom_item:
-            total_cost += allocation.required_quantity * bom_item.unit_cost
-    
-    return render_template('main/production_order_materials.html',
-                         order=order,
-                         material_allocations=material_allocations,
-                         total_cost=total_cost)
-
 @bp.route('/production_batches/<int:batch_id>/status', methods=['PUT'])
 @login_required
 def update_batch_status(batch_id):
@@ -6083,504 +6107,3 @@ def update_batch_status(batch_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': f'状态更新失败: {str(e)}'})
-
-@bp.route('/production_orders/<int:order_id>/materials/refresh', methods=['POST'])
-@login_required
-def refresh_material_allocations(order_id):
-    """刷新生产订单的物料分配"""
-    try:
-        order = ProductionOrder.query.get_or_404(order_id)
-        
-        # 删除现有的物料分配
-        MaterialAllocation.query.filter_by(production_order_id=order_id).delete()
-        
-        # 重新生成物料分配
-        if order.allocate_materials():
-            db.session.commit()
-            return jsonify({'success': True, 'message': '物料分配已刷新'})
-        else:
-            db.session.rollback()
-            return jsonify({'success': False, 'message': '物料分配刷新失败'})
-        
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'message': f'刷新失败: {str(e)}'})
-
-@bp.route('/material_allocations/<int:allocation_id>/allocate', methods=['POST'])
-@login_required
-def allocate_material(allocation_id):
-    """分配物料"""
-    try:
-        allocation = MaterialAllocation.query.get_or_404(allocation_id)
-        
-        # 检查库存是否充足
-        if allocation.material_type == 'raw':
-            material = RawMaterial.query.filter_by(material_name=allocation.material_name).first()
-            if not material or material.quantity < allocation.required_quantity:
-                return jsonify({'success': False, 'message': '库存不足，无法分配'})
-            
-            # 扣减库存
-            material.quantity -= allocation.required_quantity
-            allocation.allocated_quantity = allocation.required_quantity
-            allocation.status = 'allocated'
-            
-        elif allocation.material_type == 'finished':
-            material = FinishedProduct.query.filter_by(product_name=allocation.material_name).first()
-            if not material or material.quantity < allocation.required_quantity:
-                return jsonify({'success': False, 'message': '库存不足，无法分配'})
-            
-            # 扣减库存
-            material.quantity -= allocation.required_quantity
-            allocation.allocated_quantity = allocation.required_quantity
-            allocation.status = 'allocated'
-        
-        db.session.commit()
-        return jsonify({'success': True, 'message': '物料分配成功'})
-        
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'message': f'分配失败: {str(e)}'})
-
-@bp.route('/material_allocations/<int:allocation_id>/consume', methods=['POST'])
-@login_required
-def consume_material(allocation_id):
-    """消耗物料"""
-    try:
-        allocation = MaterialAllocation.query.get_or_404(allocation_id)
-        data = request.get_json()
-        
-        consume_quantity = float(data.get('quantity', 0))
-        if consume_quantity <= 0:
-            return jsonify({'success': False, 'message': '消耗数量必须大于0'})
-        
-        # 检查是否超过已分配数量
-        remaining = allocation.allocated_quantity - allocation.consumed_quantity
-        if consume_quantity > remaining:
-            return jsonify({'success': False, 'message': f'消耗数量不能超过剩余数量({remaining})'})
-        
-        # 更新消耗数量
-        allocation.consumed_quantity += consume_quantity
-        
-        # 如果全部消耗完，更新状态
-        if allocation.consumed_quantity >= allocation.allocated_quantity:
-            allocation.status = 'consumed'
-        
-        db.session.commit()
-        return jsonify({'success': True, 'message': f'成功消耗{consume_quantity}{allocation.unit}物料'})
-        
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'message': f'消耗失败: {str(e)}'})
-
-@bp.route('/material_allocations/<int:allocation_id>/detail', methods=['GET'])
-@login_required
-def get_material_allocation_detail(allocation_id):
-    """获取物料分配详情"""
-    try:
-        allocation = MaterialAllocation.query.get_or_404(allocation_id)
-        
-        # 获取物料详细信息
-        material_detail = None
-        if allocation.material_type == 'raw':
-            material = RawMaterial.query.filter_by(material_name=allocation.material_name).first()
-            material_detail = {
-                'name': material.material_name if material else allocation.material_name,
-                'supplier': material.supplier if material else '未知',
-                'internal_number': material.internal_number if material else '未知',
-                'current_stock': material.quantity if material else 0,
-                'unit': allocation.unit,
-                'status': material.status if material else '未知'
-            }
-        elif allocation.material_type == 'finished':
-            material = FinishedProduct.query.filter_by(product_number=allocation.material_name).first()
-            material_detail = {
-                'name': material.product_number if material else allocation.material_name,
-                'drawing_number': material.drawing_number if material else '未知',
-                'model': material.model if material else '未知',
-                'current_stock': material.quantity if material else 0,
-                'unit': allocation.unit,
-                'status': material.status if material else '未知'
-            }
-        
-        # 生成HTML内容
-        html_content = f"""
-        <div class="row">
-            <div class="col-md-6">
-                <h6>分配信息</h6>
-                <table class="table table-sm">
-                    <tr><td>物料名称:</td><td>{allocation.material_name}</td></tr>
-                    <tr><td>物料类型:</td><td>{'原材料' if allocation.material_type == 'raw' else '成品'}</td></tr>
-                    <tr><td>需求数量:</td><td>{allocation.required_quantity}{allocation.unit}</td></tr>
-                    <tr><td>已分配:</td><td>{allocation.allocated_quantity}{allocation.unit}</td></tr>
-                    <tr><td>已消耗:</td><td>{allocation.consumed_quantity}{allocation.unit}</td></tr>
-                    <tr><td>分配状态:</td><td>
-                        {'待分配' if allocation.status == 'pending' else 
-                         '已分配' if allocation.status == 'allocated' else 
-                         '已消耗' if allocation.status == 'consumed' else '缺料'}
-                    </td></tr>
-                </table>
-            </div>
-            <div class="col-md-6">
-                <h6>物料详情</h6>
-                <table class="table table-sm">
-                    <tr><td>物料名称:</td><td>{material_detail.get('name', '-') if material_detail else '-'}</td></tr>
-                    <tr><td>当前库存:</td><td>{material_detail.get('current_stock', 0) if material_detail else 0}{material_detail.get('unit', '') if material_detail else ''}</td></tr>
-                    <tr><td>状态:</td><td>{material_detail.get('status', '-') if material_detail else '-'}</td></tr>
-                    {('<tr><td>供应商:</td><td>' + material_detail.get('supplier', '-') + '</td></tr>') if material_detail and allocation.material_type == 'raw' else ''}
-                    {('<tr><td>内部编号:</td><td>' + material_detail.get('internal_number', '-') + '</td></tr>') if material_detail and allocation.material_type == 'raw' else ''}
-                    {('<tr><td>图号:</td><td>' + material_detail.get('drawing_number', '-') + '</td></tr>') if material_detail and allocation.material_type == 'finished' else ''}
-                    {('<tr><td>型号:</td><td>' + material_detail.get('model', '-') + '</td></tr>') if material_detail and allocation.material_type == 'finished' else ''}
-                </table>
-            </div>
-        </div>
-        """
-        
-        return jsonify({'success': True, 'html': html_content})
-        
-    except Exception as e:
-        return jsonify({'success': False, 'message': f'获取详情失败: {str(e)}'})
-
-def check_and_handle_material_shortage(order, batch_quantity, max_depth=5, current_depth=0):
-    """
-    检查物料需求并处理不足情况
-    如果物料是产品且库存不足，递归创建生产订单
-    
-    Args:
-        order: 生产订单对象
-        batch_quantity: 批次数量
-        max_depth: 最大递归深度，防止无限递归
-        current_depth: 当前递归深度
-    
-    Returns:
-        dict: 包含创建的订单信息
-    """
-    created_orders = []
-    
-    if current_depth >= max_depth:
-        return {'created_orders': created_orders}
-    
-    try:
-        # 获取产品BOM
-        bom_items = order.product.bom_items
-        
-        for bom_item in bom_items:
-            # 计算此批次需要的物料数量
-            required_quantity = bom_item.actual_quantity * batch_quantity
-            
-            # 检查物料类型和库存
-            if bom_item.material_type == 'product':
-                # 获取产品库存信息
-                product = Product.query.get(bom_item.material_id)
-                if not product:
-                    continue
-                
-                # 计算当前可用库存（这里简化处理，实际应该考虑已分配但未消耗的数量）
-                available_stock = get_available_product_stock(product.id)
-                
-                # 如果库存不足
-                if available_stock < required_quantity:
-                    shortage_quantity = required_quantity - available_stock
-                    
-                    # 创建子生产订单来补充不足的产品
-                    sub_order = create_sub_production_order(
-                        product=product,
-                        required_quantity=shortage_quantity,
-                        parent_order=order,
-                        current_depth=current_depth
-                    )
-                    
-                    if sub_order:
-                        created_orders.append(sub_order.order_number)
-                        
-                        # 递归检查子订单的物料需求
-                        sub_shortage_info = check_and_handle_material_shortage(
-                            sub_order, 
-                            shortage_quantity, 
-                            max_depth, 
-                            current_depth + 1
-                        )
-                        created_orders.extend(sub_shortage_info['created_orders'])
-            
-            elif bom_item.material_type == 'raw':
-                # 原材料不足时记录但不自动创建订单
-                material = RawMaterial.query.get(bom_item.material_id)
-                if material and material.quantity < required_quantity:
-                    # 记录原材料不足的审计日志
-                    log = AuditLog(
-                        user_id=current_user.id,
-                        action='原材料库存不足警告',
-                        details=f'生产订单 {order.order_number} 需要原材料 {material.material_name} {required_quantity}，但库存仅有 {material.quantity}',
-                        target_model='ProductionOrder',
-                        target_id=order.id
-                    )
-                    db.session.add(log)
-            
-            elif bom_item.material_type == 'finished':
-                # 成品不足时记录但不自动创建订单
-                finished_product = FinishedProduct.query.get(bom_item.material_id)
-                if finished_product and finished_product.quantity < required_quantity:
-                    # 记录成品不足的审计日志
-                    log = AuditLog(
-                        user_id=current_user.id,
-                        action='成品库存不足警告',
-                        details=f'生产订单 {order.order_number} 需要成品 {finished_product.product_number} {required_quantity}，但库存仅有 {finished_product.quantity}',
-                        target_model='ProductionOrder',
-                        target_id=order.id
-                    )
-                    db.session.add(log)
-        
-        return {'created_orders': created_orders}
-        
-    except Exception as e:
-        # 记录错误但不影响主流程
-        log = AuditLog(
-            user_id=current_user.id,
-            action='物料需求检查失败',
-            details=f'生产订单 {order.order_number} 物料需求检查时发生错误: {str(e)}',
-            target_model='ProductionOrder',
-            target_id=order.id
-        )
-        db.session.add(log)
-        return {'created_orders': created_orders}
-
-def get_available_product_stock(product_id):
-    """
-    获取产品的可用库存数量
-    这里简化处理，实际应该考虑：
-    1. 成品库存中该产品的数量
-    2. 已分配但未消耗的数量
-    3. 正在生产中的数量
-    """
-    # 从成品库存中查找该产品
-    finished_products = FinishedProduct.query.filter_by(
-        status='in_stock'
-    ).all()
-    
-    # 这里需要根据产品编码或其他方式匹配成品和产品
-    # 简化处理：假设产品名称和成品产品编号有对应关系
-    product = Product.query.get(product_id)
-    if not product:
-        return 0
-    
-    total_stock = 0
-    for finished_product in finished_products:
-        # 简化匹配逻辑：如果成品的产品编号包含产品编码，则认为是同一产品
-        if product.product_code in finished_product.product_number:
-            total_stock += finished_product.quantity
-    
-    return total_stock
-
-def create_sub_production_order(product, required_quantity, parent_order, current_depth):
-    """
-    创建子生产订单来补充不足的产品
-    
-    Args:
-        product: 需要生产的产品对象
-        required_quantity: 需要的数量
-        parent_order: 父生产订单
-        current_depth: 当前递归深度
-    
-    Returns:
-        ProductionOrder: 创建的子订单对象，失败时返回None
-    """
-    try:
-        # 计算计划日期（比父订单提前开始）
-        planned_start_date = parent_order.planned_start_date - timedelta(days=7)  # 提前7天开始
-        planned_end_date = parent_order.planned_start_date - timedelta(days=1)   # 在父订单开始前1天完成
-        
-        # 创建子生产订单
-        sub_order = ProductionOrder(
-            product_id=product.id,
-            planned_quantity=int(required_quantity),
-            planned_start_date=planned_start_date,
-            planned_end_date=planned_end_date,
-            priority=parent_order.priority + 1,  # 子订单优先级更高
-            notes=f'自动创建的子订单，用于补充父订单 {parent_order.order_number} 的物料需求（递归深度：{current_depth + 1}）',
-            created_by=current_user.id
-        )
-        
-        db.session.add(sub_order)
-        db.session.flush()  # 获取订单ID
-        
-        # 自动分配子订单的物料
-        sub_order.allocate_materials()
-        
-        # 记录审计日志
-        log = AuditLog(
-            user_id=current_user.id,
-            action='自动创建子生产订单',
-            details=f'为补充父订单 {parent_order.order_number} 的产品物料需求，自动创建子订单 {sub_order.order_number}，数量：{required_quantity}',
-            target_model='ProductionOrder',
-            target_id=sub_order.id,
-            can_rollback=True,
-            rollback_type='add',
-            new_data={
-                'order_number': sub_order.order_number,
-                'product_id': product.id,
-                'planned_quantity': required_quantity,
-                'parent_order': parent_order.order_number
-            }
-        )
-        db.session.add(log)
-        
-        return sub_order
-        
-    except Exception as e:
-        # 记录错误
-        log = AuditLog(
-            user_id=current_user.id,
-            action='自动创建子生产订单失败',
-            details=f'为父订单 {parent_order.order_number} 创建子订单时失败: {str(e)}',
-            target_model='ProductionOrder',
-            target_id=parent_order.id
-        )
-        db.session.add(log)
-        return None
-
-@bp.route('/production_orders/<int:order_id>', methods=['DELETE'])
-@login_required
-@csrf.exempt
-def delete_production_order(order_id):
-    """删除生产订单"""
-    if current_user.role not in ['admin', 'manager']:
-        return jsonify({'success': False, 'message': '权限不足'}), 403
-    
-    try:
-        order = ProductionOrder.query.get_or_404(order_id)
-        
-        # 检查订单状态，只允许删除待开始或已取消的订单
-        if order.status in ['in_progress', 'completed']:
-            return jsonify({'success': False, 'message': '无法删除进行中或已完成的订单'})
-        
-        # 检查是否有关联的生产批次
-        batch_count = ProductionBatch.query.filter_by(production_order_id=order_id).count()
-        if batch_count > 0:
-            return jsonify({'success': False, 'message': f'该订单已有{batch_count}个生产批次，无法删除'})
-        
-        # 保存旧数据用于回滚
-        old_data = {
-            'order_number': order.order_number,
-            'product_id': order.product_id,
-            'planned_quantity': order.planned_quantity,
-            'planned_start_date': order.planned_start_date.isoformat(),
-            'planned_end_date': order.planned_end_date.isoformat(),
-            'priority': order.priority,
-            'notes': order.notes,
-            'status': order.status,
-            'created_by': order.created_by
-        }
-        
-        # 记录可回滚的审计日志
-        log = AuditLog(
-            user_id=current_user.id,
-            action='删除生产订单',
-            details=f'删除生产订单：{order.order_number}（产品：{order.product.product_name}）',
-            can_rollback=True,
-            rollback_type='delete',
-            target_model='ProductionOrder',
-            target_id=order.id,
-            old_data=old_data
-        )
-        db.session.add(log)
-        
-        # 删除关联的物料分配
-        MaterialAllocation.query.filter_by(production_order_id=order_id).delete()
-        
-        # 删除订单
-        db.session.delete(order)
-        db.session.commit()
-        
-        return jsonify({'success': True, 'message': '生产订单删除成功'})
-        
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'message': f'删除失败: {str(e)}'})
-
-def update_production_status_hierarchy():
-    """更新生产状态层次结构：批次项目 -> 批次 -> 订单"""
-    try:
-        # 第一步：更新所有批次状态
-        batches = ProductionBatch.query.all()
-        
-        for batch in batches:
-            # 检查批次项目状态
-            total_items = batch.batch_items.count()
-            if total_items == 0:
-                continue
-                
-            completed_items = batch.batch_items.filter_by(status='completed').count()
-            in_progress_items = batch.batch_items.filter(
-                ProductionBatchItem.status.in_(['in_progress', 'completed'])
-            ).count()
-            
-            # 更新批次状态
-            if completed_items == total_items:
-                # 所有项目都完成了
-                batch.status = 'completed'
-                if not batch.end_date:
-                    batch.end_date = datetime.now().date()
-            elif in_progress_items > 0:
-                # 有项目在进行中
-                batch.status = 'in_progress'
-                if not batch.start_date:
-                    batch.start_date = datetime.now().date()
-            else:
-                # 所有项目都是待开始状态
-                batch.status = 'pending'
-        
-        # 第二步：更新所有订单状态
-        orders = ProductionOrder.query.all()
-        
-        for order in orders:
-            order_batches = order.batches.all()
-            total_batches = len(order_batches)
-            
-            if total_batches == 0:
-                # 没有批次的订单保持原状态
-                continue
-                
-            completed_batches = len([b for b in order_batches if b.status == 'completed'])
-            in_progress_batches = len([b for b in order_batches if b.status in ['in_progress', 'completed']])
-            
-            # 计算实际完成数量（基于已完成的批次）
-            actual_completed_quantity = sum(b.batch_quantity for b in order_batches if b.status == 'completed')
-            order.completed_quantity = actual_completed_quantity
-            
-            # 更新订单状态
-            if completed_batches == total_batches:
-                # 所有批次都完成了
-                order.status = 'completed'
-                if not order.actual_end_date:
-                    order.actual_end_date = datetime.now().date()
-            elif in_progress_batches > 0:
-                # 有批次在进行中
-                order.status = 'in_progress'
-                if not order.actual_start_date:
-                    order.actual_start_date = datetime.now().date()
-            else:
-                # 所有批次都是待开始状态
-                order.status = 'pending'
-        
-        db.session.commit()
-        return True
-        
-    except Exception as e:
-        db.session.rollback()
-        current_app.logger.error(f'更新生产状态层次结构失败: {str(e)}')
-        return False
-
-@bp.route('/api/production/update-status-hierarchy', methods=['POST'])
-@login_required
-def trigger_status_hierarchy_update():
-    """手动触发生产状态层次结构更新"""
-    if current_user.role not in ['admin', 'manager']:
-        return jsonify({'success': False, 'message': '权限不足'}), 403
-    
-    try:
-        success = update_production_status_hierarchy()
-        if success:
-            return jsonify({'success': True, 'message': '生产状态层次结构更新成功'})
-        else:
-            return jsonify({'success': False, 'message': '生产状态层次结构更新失败'})
-    except Exception as e:
-        return jsonify({'success': False, 'message': f'更新失败: {str(e)}'})

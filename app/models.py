@@ -270,6 +270,11 @@ class TaskAssignment(db.Model):
     status = db.Column(db.String(20), default='pending')  # pending, in_progress, completed, cancelled
     notes = db.Column(db.Text)  # 备注
     
+    # 新增字段：关联生产批次
+    production_batch_id = db.Column(db.Integer, db.ForeignKey('production_batches.id', ondelete='SET NULL'), nullable=True)
+    batch_item_id = db.Column(db.Integer, db.ForeignKey('production_batch_items.id', ondelete='SET NULL'), nullable=True)
+    task_type = db.Column(db.String(20), default='manual')  # manual: 手动创建, auto: 自动创建
+    
     __table_args__ = (
         db.UniqueConstraint('global_sn', name='uq_task_assignment_global_sn'),
     )
@@ -277,6 +282,8 @@ class TaskAssignment(db.Model):
     # 关系
     employee = db.relationship('Employee', backref='task_assignments')
     process = db.relationship('ProcessPrice', backref='task_assignments')
+    production_batch = db.relationship('ProductionBatch', backref=db.backref('tasks', lazy='dynamic'))
+    batch_item = db.relationship('ProductionBatchItem', backref=db.backref('tasks', lazy='dynamic'))
     
     def __repr__(self):
         return f'<TaskAssignment {self.id}: {self.employee.name} - {self.process.process_name}>'
