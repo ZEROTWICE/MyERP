@@ -2420,41 +2420,21 @@ def manage_tasks():
 @bp.route('/tasks/<int:id>/update_status', methods=['POST'])
 @login_required
 def update_task_status(id):
-    """更新任务状态和完成数量"""
+    """更新任务状态"""
     try:
         task = TaskAssignment.query.get_or_404(id)
+        data = request.get_json()
         
-        # 检查权限：管理员可以更新所有任务，普通用户只能更新自己的任务
-        if current_user.role not in ['admin', 'hr']:
-            # 获取当前用户的员工记录
-            employee = Employee.query.filter_by(user_id=current_user.id).first()
-            if not employee or employee.id != task.employee_id:
-                return jsonify({'success': False, 'message': '权限不足'}), 403
+        completed_quantity = int(data.get('completed_quantity', 0))
+        materials = data.get('materials', [])
         
-        # 获取并验证完成数量
-        try:
-            completed_quantity = int(request.form.get('completed_quantity', 0))
-            if completed_quantity < 0:
-                return jsonify({'success': False, 'message': '完成数量不能为负数'}), 400
-        except ValueError:
-            return jsonify({'success': False, 'message': '完成数量格式错误'}), 400
+        # 验证完成数量
+        if completed_quantity < 0:
+            return jsonify({'success': False, 'message': '完成数量不能为负数'}), 400
+        if completed_quantity > task.quantity:
+            return jsonify({'success': False, 'message': '完成数量不能超过任务数量'}), 400
         
-        # 获取并验证原材料数据
-        materials_data = request.form.get('materials')
-        if not materials_data:
-            return jsonify({'success': False, 'message': '请提供原材料使用信息'}), 400
-            
-        try:
-            materials = json.loads(materials_data)
-            if not isinstance(materials, list):
-                return jsonify({'success': False, 'message': '原材料数据格式错误'}), 400
-        except json.JSONDecodeError:
-            return jsonify({'success': False, 'message': '原材料数据格式错误'}), 400
-            
-        if not materials:
-            return jsonify({'success': False, 'message': '请至少添加一种原材料'}), 400
-        
-        # 检查原材料库存
+        # 验证原材料数据
         for material in materials:
             if not isinstance(material, dict) or 'raw_material_id' not in material or 'quantity' not in material:
                 return jsonify({'success': False, 'message': '原材料数据格式错误'}), 400
@@ -2469,7 +2449,7 @@ def update_task_status(id):
             if not raw_material:
                 return jsonify({'success': False, 'message': f'原材料不存在'}), 400
             if raw_material.quantity < quantity:
-                return jsonify({'success': False, 'message': f'原材料 {raw_material.name} 库存不足'}), 400
+                return jsonify({'success': False, 'message': f'原材料 {raw_material.material_name} 库存不足'}), 400
         
         # 更新任务状态
         task.completed_quantity = completed_quantity
@@ -2483,16 +2463,16 @@ def update_task_status(id):
                 process_id=task.process_id,
                 quantity=task.quantity,
                 global_sn=task.global_sn,
-                date=datetime.now().date()  # 使用 date 字段记录生产日期
+                date=datetime.now().date()
             )
             db.session.add(production_record)
-            db.session.flush()  # 获取生产记录ID
+            db.session.flush()
             
             # 检查工序是否需要检验，如果需要则自动创建质检任务
             process = ProcessPrice.query.get(task.process_id)
             if process and process.needs_inspection:
                 try:
-                    # 查找默认的质检员（可以是管理员或质检员角色）
+                    # 查找默认的质检员
                     default_inspector = User.query.filter(
                         db.or_(
                             User.role == 'inspector',
@@ -5852,12 +5832,9 @@ def add_production_batch(order_id):
         
         # 生成产品编码
         if batch.generate_product_codes():
-            # 更新订单完成数量
-            order.completed_quantity += batch_quantity
-            if order.completed_quantity >= order.planned_quantity:
-                order.status = 'completed'
-                order.actual_end_date = datetime.now().date()
-            elif order.status == 'pending':
+            # 创建批次时不更新订单的完成数量，只有当批次实际完成时才更新
+            # 如果订单状态还是待开始，且有了第一个批次，可以考虑更新为进行中
+            if order.status == 'pending':
                 order.status = 'in_progress'
                 order.actual_start_date = datetime.now().date()
             
@@ -5923,6 +5900,10 @@ def update_batch_item(item_id):
             item.notes = data['notes']
         
         db.session.commit()
+        
+        # 更新生产状态层次结构
+        update_production_status_hierarchy()
+        
         return jsonify({'success': True, 'message': '批次项目更新成功'})
         
     except Exception as e:
@@ -6066,29 +6047,30 @@ def update_batch_status(batch_id):
         # 更新批次状态
         batch.status = new_status
         
-        # 根据状态更新时间戳
+        # 根据状态更新时间戳和批次项目状态
         if new_status == 'in_progress':
-            batch.start_date = datetime.now()
-            # 同时更新订单状态
-            if batch.production_order.status == 'pending':
-                batch.production_order.status = 'in_progress'
-                batch.production_order.actual_start_date = datetime.now().date()
+            if not batch.start_date:
+                batch.start_date = datetime.now().date()
+            # 将所有待生产的批次项目状态更新为进行中
+            ProductionBatchItem.query.filter_by(
+                batch_id=batch_id, 
+                status='pending'
+            ).update({
+                'status': 'in_progress'
+            })
         elif new_status == 'completed':
-            batch.end_date = datetime.now()
+            if not batch.end_date:
+                batch.end_date = datetime.now().date()
             # 更新所有批次项目为完成状态
             ProductionBatchItem.query.filter_by(batch_id=batch_id).update({
                 'status': 'completed',
                 'completed_at': datetime.now()
             })
-            
-            # 检查订单是否全部完成
-            order = batch.production_order
-            total_completed = sum(b.batch_quantity for b in order.batches if b.status == 'completed')
-            if total_completed >= order.planned_quantity:
-                order.status = 'completed'
-                order.actual_end_date = datetime.now().date()
         
         db.session.commit()
+        
+        # 更新生产状态层次结构
+        update_production_status_hierarchy()
         
         status_text = {
             'in_progress': '已开始生产',
@@ -6513,3 +6495,92 @@ def delete_production_order(order_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': f'删除失败: {str(e)}'})
+
+def update_production_status_hierarchy():
+    """更新生产状态层次结构：批次项目 -> 批次 -> 订单"""
+    try:
+        # 第一步：更新所有批次状态
+        batches = ProductionBatch.query.all()
+        
+        for batch in batches:
+            # 检查批次项目状态
+            total_items = batch.batch_items.count()
+            if total_items == 0:
+                continue
+                
+            completed_items = batch.batch_items.filter_by(status='completed').count()
+            in_progress_items = batch.batch_items.filter(
+                ProductionBatchItem.status.in_(['in_progress', 'completed'])
+            ).count()
+            
+            # 更新批次状态
+            if completed_items == total_items:
+                # 所有项目都完成了
+                batch.status = 'completed'
+                if not batch.end_date:
+                    batch.end_date = datetime.now().date()
+            elif in_progress_items > 0:
+                # 有项目在进行中
+                batch.status = 'in_progress'
+                if not batch.start_date:
+                    batch.start_date = datetime.now().date()
+            else:
+                # 所有项目都是待开始状态
+                batch.status = 'pending'
+        
+        # 第二步：更新所有订单状态
+        orders = ProductionOrder.query.all()
+        
+        for order in orders:
+            order_batches = order.batches.all()
+            total_batches = len(order_batches)
+            
+            if total_batches == 0:
+                # 没有批次的订单保持原状态
+                continue
+                
+            completed_batches = len([b for b in order_batches if b.status == 'completed'])
+            in_progress_batches = len([b for b in order_batches if b.status in ['in_progress', 'completed']])
+            
+            # 计算实际完成数量（基于已完成的批次）
+            actual_completed_quantity = sum(b.batch_quantity for b in order_batches if b.status == 'completed')
+            order.completed_quantity = actual_completed_quantity
+            
+            # 更新订单状态
+            if completed_batches == total_batches:
+                # 所有批次都完成了
+                order.status = 'completed'
+                if not order.actual_end_date:
+                    order.actual_end_date = datetime.now().date()
+            elif in_progress_batches > 0:
+                # 有批次在进行中
+                order.status = 'in_progress'
+                if not order.actual_start_date:
+                    order.actual_start_date = datetime.now().date()
+            else:
+                # 所有批次都是待开始状态
+                order.status = 'pending'
+        
+        db.session.commit()
+        return True
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f'更新生产状态层次结构失败: {str(e)}')
+        return False
+
+@bp.route('/api/production/update-status-hierarchy', methods=['POST'])
+@login_required
+def trigger_status_hierarchy_update():
+    """手动触发生产状态层次结构更新"""
+    if current_user.role not in ['admin', 'manager']:
+        return jsonify({'success': False, 'message': '权限不足'}), 403
+    
+    try:
+        success = update_production_status_hierarchy()
+        if success:
+            return jsonify({'success': True, 'message': '生产状态层次结构更新成功'})
+        else:
+            return jsonify({'success': False, 'message': '生产状态层次结构更新失败'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'更新失败: {str(e)}'})
