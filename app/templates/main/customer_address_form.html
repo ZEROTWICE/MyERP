@@ -1,0 +1,219 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} - {{ customer.customer_name }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>{{ title }}</h2>
+        <a href="{{ url_for('main.customer_detail', customer_id=customer.id) }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> 返回客户详情
+        </a>
+    </div>
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">地址信息</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        {{ form.hidden_tag() }}
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    {{ form.address_type.label(class="form-label") }}
+                                    {{ form.address_type(class="form-select") }}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">设置选项</label>
+                                    <div class="form-check">
+                                        {{ form.is_primary(class="form-check-input") }}
+                                        {{ form.is_primary.label(class="form-check-label") }}
+                                    </div>
+                                    <div class="form-check">
+                                        {{ form.is_active(class="form-check-input") }}
+                                        {{ form.is_active.label(class="form-check-label") }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    {{ form.contact_person.label(class="form-label") }}
+                                    {{ form.contact_person(class="form-control" + (" is-invalid" if form.contact_person.errors else "")) }}
+                                    {% if form.contact_person.errors %}
+                                        <div class="invalid-feedback">
+                                            {% for error in form.contact_person.errors %}{{ error }}{% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    {{ form.contact_phone.label(class="form-label") }}
+                                    {{ form.contact_phone(class="form-control" + (" is-invalid" if form.contact_phone.errors else "")) }}
+                                    {% if form.contact_phone.errors %}
+                                        <div class="invalid-feedback">
+                                            {% for error in form.contact_phone.errors %}{{ error }}{% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    {{ form.province.label(class="form-label") }}
+                                    {{ form.province(class="form-control" + (" is-invalid" if form.province.errors else "")) }}
+                                    {% if form.province.errors %}
+                                        <div class="invalid-feedback">
+                                            {% for error in form.province.errors %}{{ error }}{% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    {{ form.city.label(class="form-label") }}
+                                    {{ form.city(class="form-control" + (" is-invalid" if form.city.errors else "")) }}
+                                    {% if form.city.errors %}
+                                        <div class="invalid-feedback">
+                                            {% for error in form.city.errors %}{{ error }}{% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    {{ form.district.label(class="form-label") }}
+                                    {{ form.district(class="form-control") }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-8">
+                                <div class="mb-3">
+                                    {{ form.detailed_address.label(class="form-label") }}
+                                    {{ form.detailed_address(class="form-control" + (" is-invalid" if form.detailed_address.errors else "")) }}
+                                    {% if form.detailed_address.errors %}
+                                        <div class="invalid-feedback">
+                                            {% for error in form.detailed_address.errors %}{{ error }}{% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    {{ form.postal_code.label(class="form-label") }}
+                                    {{ form.postal_code(class="form-control") }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            {{ form.notes.label(class="form-label") }}
+                            {{ form.notes(class="form-control", rows="3") }}
+                        </div>
+
+                        <div class="d-flex justify-content-end">
+                            <a href="{{ url_for('main.customer_detail', customer_id=customer.id) }}" class="btn btn-secondary me-2">取消</a>
+                            {{ form.submit(class="btn btn-primary") }}
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">客户信息</h6>
+                </div>
+                <div class="card-body">
+                    <div class="text-center mb-3">
+                        <h5>{{ customer.customer_name }}</h5>
+                        <code>{{ customer.customer_code }}</code>
+                    </div>
+                    <div class="small">
+                        <div class="mb-2">
+                            <strong>客户类型:</strong>
+                            {% if customer.customer_type == 'enterprise' %}
+                                <span class="badge bg-primary">企业客户</span>
+                            {% else %}
+                                <span class="badge bg-info">个人客户</span>
+                            {% endif %}
+                        </div>
+                        {% if customer.contact_person %}
+                        <div class="mb-2">
+                            <strong>联系人:</strong> {{ customer.contact_person }}
+                        </div>
+                        {% endif %}
+                        {% if customer.contact_phone %}
+                        <div class="mb-2">
+                            <strong>联系电话:</strong> {{ customer.contact_phone }}
+                        </div>
+                        {% endif %}
+                        <div class="mb-2">
+                            <strong>现有地址:</strong> {{ customer.address_count }}个
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h6 class="mb-0">填写说明</h6>
+                </div>
+                <div class="card-body">
+                    <ul class="list-unstyled small">
+                        <li><i class="fas fa-info-circle text-primary me-2"></i>联系人和电话为必填项</li>
+                        <li><i class="fas fa-info-circle text-primary me-2"></i>省份、城市、详细地址为必填项</li>
+                        <li><i class="fas fa-info-circle text-primary me-2"></i>设为主要地址会取消其他主要地址</li>
+                        <li><i class="fas fa-info-circle text-primary me-2"></i>禁用的地址不会在订单中显示</li>
+                        <li><i class="fas fa-info-circle text-primary me-2"></i>区县和邮政编码为可选项</li>
+                    </ul>
+                </div>
+            </div>
+
+            {% if address %}
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h6 class="mb-0">当前地址</h6>
+                </div>
+                <div class="card-body">
+                    <div class="small">
+                        <div class="mb-2">
+                            <span class="badge {% if address.address_type == 'shipping' %}bg-success{% elif address.address_type == 'billing' %}bg-warning{% else %}bg-info{% endif %}">
+                                {% if address.address_type == 'shipping' %}收货地址
+                                {% elif address.address_type == 'billing' %}账单地址
+                                {% else %}办公地址
+                                {% endif %}
+                            </span>
+                            {% if address.is_primary %}
+                            <span class="badge bg-primary ms-1">主要</span>
+                            {% endif %}
+                        </div>
+                        <div class="mb-2">
+                            <strong>{{ address.contact_person }}</strong><br>
+                            {{ address.contact_phone }}
+                        </div>
+                        <div class="text-muted">
+                            {{ address.full_address }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %} 

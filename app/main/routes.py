@@ -2,7 +2,7 @@ from flask import render_template, redirect, url_for, flash, request, jsonify, c
 from sqlalchemy.exc import SQLAlchemyError
 from flask_login import login_required, current_user
 from app import db, csrf
-from app.models import Employee, ProcessPrice, ProductionRecord, BonusPenalty, AuditLog, ProcessPrice, User, TaskAssignment, SerialNumber, SalaryChange, CoefficientChange, EmployeeSalaryHistory, EmployeeCoefficientHistory, ProcessPriceGroup, FinishedProduct, RawMaterial, CodeRule, CodeGenerationLog, ProductionRecordMaterial, InspectionTemplate, InspectionBaseItem, InspectionItem, InspectionTask, InspectionRecord, Product, ProductBOM, ProductProcess, ProductionOrder, MaterialAllocation, ProductionBatch, ProductionBatchItem
+from app.models import Employee, ProcessPrice, ProductionRecord, BonusPenalty, AuditLog, ProcessPrice, User, TaskAssignment, SerialNumber, SalaryChange, CoefficientChange, EmployeeSalaryHistory, EmployeeCoefficientHistory, ProcessPriceGroup, FinishedProduct, RawMaterial, CodeRule, CodeGenerationLog, ProductionRecordMaterial, InspectionTemplate, InspectionBaseItem, InspectionItem, InspectionTask, InspectionRecord, Product, ProductBOM, ProductProcess, ProductionOrder, MaterialAllocation, ProductionBatch, ProductionBatchItem, Customer, CustomerAddress
 from datetime import datetime, timedelta, date
 from . import bp
 from app.main.forms import (
@@ -10,7 +10,8 @@ from app.main.forms import (
     SalaryCalculationForm, AuditLogSearchForm, ProcessPriceSearchForm,
     ProductionRecordSearchForm, TaskAssignmentForm, TaskSearchForm,
     BonusPenaltySearchForm, ExportEmployeeForm, ExportProcessForm,
-    ExportProductionRecordForm, ExportBonusPenaltyForm, ExportTaskForm
+    ExportProductionRecordForm, ExportBonusPenaltyForm, ExportTaskForm,
+    CustomerForm, CustomerAddressForm
 )
 from sqlalchemy import desc, or_
 from app.utils.excel_generator import ExcelGenerator
@@ -6318,3 +6319,506 @@ def update_production_status_hierarchy():
         db.session.rollback()
         current_app.logger.error(f'更新生产状态层次结构失败: {str(e)}')
         raise e
+
+# ==================== 客户管理 ====================
+
+@bp.route('/customers')
+@login_required
+@handle_pagination_args
+def manage_customers():
+    """客户管理页面"""
+    if current_user.role not in ['admin', 'manager', 'sales']:
+        flash('权限不足', 'danger')
+        return redirect(url_for('main.index'))
+    
+    # 构建基础查询
+    query = Customer.query
+    
+    # 处理搜索
+    search = request.args.get('search', '').strip()
+    if search:
+        search_term = f"%{search}%"
+        query = query.filter(db.or_(
+            Customer.customer_code.like(search_term),
+            Customer.customer_name.like(search_term),
+            Customer.contact_person.like(search_term),
+            Customer.contact_phone.like(search_term),
+            Customer.industry.like(search_term)
+        ))
+    
+    # 状态筛选
+    status_filter = request.args.get('status', '')
+    if status_filter:
+        query = query.filter(Customer.status == status_filter)
+    
+    # 客户类型筛选
+    type_filter = request.args.get('customer_type', '')
+    if type_filter:
+        query = query.filter(Customer.customer_type == type_filter)
+    
+    # 排序
+    query = query.order_by(Customer.created_at.desc())
+    
+    # 分页
+    page = request.validated_page
+    pagination = query.paginate(page=page, per_page=request.validated_per_page)
+    customers = pagination.items
+    
+    return render_template('main/customers.html',
+                         customers=customers,
+                         pagination=pagination,
+                         search=search,
+                         status_filter=status_filter,
+                         type_filter=type_filter)
+
+@bp.route('/customer/add', methods=['GET', 'POST'])
+@login_required
+def add_customer():
+    """新增客户"""
+    if current_user.role not in ['admin', 'manager', 'sales']:
+        flash('权限不足', 'danger')
+        return redirect(url_for('main.manage_customers'))
+    
+    form = CustomerForm()
+    if form.validate_on_submit():
+        try:
+            # 检查客户编码是否已存在
+            if Customer.query.filter_by(customer_code=form.customer_code.data).first():
+                flash('客户编码已存在', 'danger')
+                return render_template('main/customer_form.html', form=form, title='新增客户')
+            
+            customer = Customer(
+                customer_code=form.customer_code.data,
+                customer_name=form.customer_name.data,
+                customer_type=form.customer_type.data,
+                contact_person=form.contact_person.data,
+                contact_phone=form.contact_phone.data,
+                contact_email=form.contact_email.data,
+                tax_number=form.tax_number.data,
+                credit_limit=form.credit_limit.data or 0,
+                payment_terms=form.payment_terms.data,
+                industry=form.industry.data,
+                company_size=form.company_size.data,
+                website=form.website.data,
+                status=form.status.data,
+                notes=form.notes.data,
+                created_by=current_user.id
+            )
+            
+            db.session.add(customer)
+            db.session.commit()
+            
+            # 记录审计日志
+            log = AuditLog(
+                user_id=current_user.id,
+                action='新增客户',
+                details=f'新增客户：{customer.customer_name}（编码：{customer.customer_code}）'
+            )
+            db.session.add(log)
+            db.session.commit()
+            
+            flash('客户新增成功', 'success')
+            return redirect(url_for('main.customer_detail', customer_id=customer.id))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'新增客户失败：{str(e)}', 'danger')
+    
+    return render_template('main/customer_form.html', form=form, title='新增客户')
+
+@bp.route('/customer/<int:customer_id>')
+@login_required
+def customer_detail(customer_id):
+    """客户详情页面"""
+    customer = Customer.query.get_or_404(customer_id)
+    
+    # 获取客户地址
+    addresses = CustomerAddress.query.filter_by(customer_id=customer_id).order_by(
+        CustomerAddress.is_primary.desc(),
+        CustomerAddress.created_at.desc()
+    ).all()
+    
+    return render_template('main/customer_detail.html',
+                         customer=customer,
+                         addresses=addresses)
+
+@bp.route('/customer/<int:customer_id>/edit', methods=['GET', 'POST'])
+@login_required
+def edit_customer(customer_id):
+    """编辑客户"""
+    if current_user.role not in ['admin', 'manager', 'sales']:
+        flash('权限不足', 'danger')
+        return redirect(url_for('main.customer_detail', customer_id=customer_id))
+    
+    customer = Customer.query.get_or_404(customer_id)
+    form = CustomerForm(obj=customer)
+    
+    if form.validate_on_submit():
+        try:
+            # 检查客户编码是否与其他客户冲突
+            existing_customer = Customer.query.filter(
+                Customer.customer_code == form.customer_code.data,
+                Customer.id != customer_id
+            ).first()
+            
+            if existing_customer:
+                flash('客户编码已存在', 'danger')
+                return render_template('main/customer_form.html', form=form, title='编辑客户', customer=customer)
+            
+            # 保存旧数据用于审计
+            old_data = {
+                'customer_code': customer.customer_code,
+                'customer_name': customer.customer_name,
+                'customer_type': customer.customer_type,
+                'contact_person': customer.contact_person,
+                'contact_phone': customer.contact_phone,
+                'status': customer.status
+            }
+            
+            # 更新客户信息
+            form.populate_obj(customer)
+            customer.updated_at = datetime.utcnow()
+            
+            db.session.commit()
+            
+            # 记录审计日志
+            log = AuditLog(
+                user_id=current_user.id,
+                action='编辑客户',
+                details=f'编辑客户：{customer.customer_name}（编码：{customer.customer_code}）',
+                old_data=old_data
+            )
+            db.session.add(log)
+            db.session.commit()
+            
+            flash('客户信息更新成功', 'success')
+            return redirect(url_for('main.customer_detail', customer_id=customer.id))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'更新客户失败：{str(e)}', 'danger')
+    
+    return render_template('main/customer_form.html', form=form, title='编辑客户', customer=customer)
+
+@bp.route('/customer/<int:customer_id>/delete', methods=['DELETE'])
+@login_required
+def delete_customer(customer_id):
+    """删除客户"""
+    if current_user.role not in ['admin', 'manager']:
+        return jsonify({'success': False, 'message': '权限不足'}), 403
+    
+    try:
+        customer = Customer.query.get_or_404(customer_id)
+        
+        # 检查是否有关联的订单或其他业务数据
+        # TODO: 添加订单关联检查
+        
+        # 保存旧数据用于回滚
+        old_data = {
+            'customer_code': customer.customer_code,
+            'customer_name': customer.customer_name,
+            'customer_type': customer.customer_type,
+            'contact_person': customer.contact_person,
+            'contact_phone': customer.contact_phone,
+            'status': customer.status
+        }
+        
+        # 记录可回滚的审计日志
+        log = AuditLog(
+            user_id=current_user.id,
+            action='删除客户',
+            details=f'删除客户：{customer.customer_name}（编码：{customer.customer_code}）',
+            can_rollback=True,
+            rollback_type='delete',
+            target_model='Customer',
+            target_id=customer.id,
+            old_data=old_data
+        )
+        db.session.add(log)
+        
+        db.session.delete(customer)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': '客户删除成功'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'删除失败：{str(e)}'})
+
+@bp.route('/customer/<int:customer_id>/address/add', methods=['GET', 'POST'])
+@login_required
+def add_customer_address(customer_id):
+    """新增客户地址"""
+    if current_user.role not in ['admin', 'manager', 'sales']:
+        flash('权限不足', 'danger')
+        return redirect(url_for('main.customer_detail', customer_id=customer_id))
+    
+    customer = Customer.query.get_or_404(customer_id)
+    form = CustomerAddressForm()
+    
+    if form.validate_on_submit():
+        try:
+            # 如果设置为主要地址，先取消其他主要地址
+            if form.is_primary.data:
+                CustomerAddress.query.filter_by(
+                    customer_id=customer_id,
+                    is_primary=True
+                ).update({'is_primary': False})
+            
+            address = CustomerAddress(
+                customer_id=customer_id,
+                address_type=form.address_type.data,
+                contact_person=form.contact_person.data,
+                contact_phone=form.contact_phone.data,
+                province=form.province.data,
+                city=form.city.data,
+                district=form.district.data,
+                detailed_address=form.detailed_address.data,
+                postal_code=form.postal_code.data,
+                is_primary=form.is_primary.data,
+                is_active=form.is_active.data,
+                notes=form.notes.data
+            )
+            
+            db.session.add(address)
+            db.session.commit()
+            
+            # 记录审计日志
+            log = AuditLog(
+                user_id=current_user.id,
+                action='新增客户地址',
+                details=f'为客户 {customer.customer_name} 新增地址：{address.full_address}'
+            )
+            db.session.add(log)
+            db.session.commit()
+            
+            flash('地址新增成功', 'success')
+            return redirect(url_for('main.customer_detail', customer_id=customer_id))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'新增地址失败：{str(e)}', 'danger')
+    
+    return render_template('main/customer_address_form.html', 
+                         form=form, 
+                         customer=customer, 
+                         title='新增地址')
+
+@bp.route('/customer/<int:customer_id>/address/<int:address_id>/edit', methods=['GET', 'POST'])
+@login_required
+def edit_customer_address(customer_id, address_id):
+    """编辑客户地址"""
+    if current_user.role not in ['admin', 'manager', 'sales']:
+        flash('权限不足', 'danger')
+        return redirect(url_for('main.customer_detail', customer_id=customer_id))
+    
+    customer = Customer.query.get_or_404(customer_id)
+    address = CustomerAddress.query.filter_by(
+        id=address_id, 
+        customer_id=customer_id
+    ).first_or_404()
+    
+    form = CustomerAddressForm(obj=address)
+    
+    if form.validate_on_submit():
+        try:
+            # 如果设置为主要地址，先取消其他主要地址
+            if form.is_primary.data and not address.is_primary:
+                CustomerAddress.query.filter(
+                    CustomerAddress.customer_id == customer_id,
+                    CustomerAddress.id != address_id,
+                    CustomerAddress.is_primary == True
+                ).update({'is_primary': False})
+            
+            # 保存旧数据用于审计
+            old_data = {
+                'contact_person': address.contact_person,
+                'contact_phone': address.contact_phone,
+                'full_address': address.full_address,
+                'is_primary': address.is_primary,
+                'is_active': address.is_active
+            }
+            
+            # 更新地址信息
+            form.populate_obj(address)
+            
+            db.session.commit()
+            
+            # 记录审计日志
+            log = AuditLog(
+                user_id=current_user.id,
+                action='编辑客户地址',
+                details=f'编辑客户 {customer.customer_name} 的地址：{address.full_address}',
+                old_data=old_data
+            )
+            db.session.add(log)
+            db.session.commit()
+            
+            flash('地址更新成功', 'success')
+            return redirect(url_for('main.customer_detail', customer_id=customer_id))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'更新地址失败：{str(e)}', 'danger')
+    
+    return render_template('main/customer_address_form.html', 
+                         form=form, 
+                         customer=customer, 
+                         address=address,
+                         title='编辑地址')
+
+@bp.route('/customer/<int:customer_id>/address/<int:address_id>/delete', methods=['DELETE'])
+@login_required
+def delete_customer_address(customer_id, address_id):
+    """删除客户地址"""
+    if current_user.role not in ['admin', 'manager', 'sales']:
+        return jsonify({'success': False, 'message': '权限不足'}), 403
+    
+    try:
+        customer = Customer.query.get_or_404(customer_id)
+        address = CustomerAddress.query.filter_by(
+            id=address_id, 
+            customer_id=customer_id
+        ).first_or_404()
+        
+        # 保存旧数据用于回滚
+        old_data = {
+            'customer_id': address.customer_id,
+            'address_type': address.address_type,
+            'contact_person': address.contact_person,
+            'contact_phone': address.contact_phone,
+            'full_address': address.full_address,
+            'is_primary': address.is_primary,
+            'is_active': address.is_active
+        }
+        
+        # 记录可回滚的审计日志
+        log = AuditLog(
+            user_id=current_user.id,
+            action='删除客户地址',
+            details=f'删除客户 {customer.customer_name} 的地址：{address.full_address}',
+            can_rollback=True,
+            rollback_type='delete',
+            target_model='CustomerAddress',
+            target_id=address.id,
+            old_data=old_data
+        )
+        db.session.add(log)
+        
+        db.session.delete(address)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': '地址删除成功'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'删除失败：{str(e)}'})
+
+@bp.route('/customer/<int:customer_id>/address/<int:address_id>/set_primary', methods=['POST'])
+@login_required
+def set_primary_address(customer_id, address_id):
+    """设置主要地址"""
+    if current_user.role not in ['admin', 'manager', 'sales']:
+        return jsonify({'success': False, 'message': '权限不足'}), 403
+    
+    try:
+        customer = Customer.query.get_or_404(customer_id)
+        address = CustomerAddress.query.filter_by(
+            id=address_id, 
+            customer_id=customer_id
+        ).first_or_404()
+        
+        # 取消其他主要地址
+        CustomerAddress.query.filter(
+            CustomerAddress.customer_id == customer_id,
+            CustomerAddress.id != address_id
+        ).update({'is_primary': False})
+        
+        # 设置当前地址为主要地址
+        address.is_primary = True
+        
+        db.session.commit()
+        
+        # 记录审计日志
+        log = AuditLog(
+            user_id=current_user.id,
+            action='设置主要地址',
+            details=f'将客户 {customer.customer_name} 的地址设为主要地址：{address.full_address}'
+        )
+        db.session.add(log)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': '主要地址设置成功'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'设置失败：{str(e)}'})
+
+# ==================== 客户管理 API ====================
+
+@bp.route('/api/customers/search')
+@login_required
+def api_search_customers():
+    """客户搜索API"""
+    try:
+        search = request.args.get('search', '').strip()
+        only_active = request.args.get('only_active', 'false').lower() == 'true'
+        
+        query = Customer.query
+        
+        if only_active:
+            query = query.filter(Customer.status == 'active')
+        
+        if search:
+            search_term = f"%{search}%"
+            query = query.filter(db.or_(
+                Customer.customer_code.like(search_term),
+                Customer.customer_name.like(search_term),
+                Customer.contact_person.like(search_term)
+            ))
+        
+        customers = query.order_by(Customer.customer_name).limit(50).all()
+        
+        return jsonify({
+            'success': True,
+            'data': [{
+                'id': customer.id,
+                'customer_code': customer.customer_code,
+                'customer_name': customer.customer_name,
+                'contact_person': customer.contact_person,
+                'contact_phone': customer.contact_phone,
+                'status': customer.status
+            } for customer in customers]
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'搜索失败：{str(e)}'})
+
+@bp.route('/api/customers/<int:customer_id>/addresses')
+@login_required
+def api_customer_addresses(customer_id):
+    """获取客户地址列表API"""
+    try:
+        customer = Customer.query.get_or_404(customer_id)
+        addresses = CustomerAddress.query.filter_by(
+            customer_id=customer_id,
+            is_active=True
+        ).order_by(
+            CustomerAddress.is_primary.desc(),
+            CustomerAddress.created_at.desc()
+        ).all()
+        
+        return jsonify({
+            'success': True,
+            'data': [{
+                'id': addr.id,
+                'address_type': addr.address_type,
+                'contact_person': addr.contact_person,
+                'contact_phone': addr.contact_phone,
+                'full_address': addr.full_address,
+                'is_primary': addr.is_primary
+            } for addr in addresses]
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'获取地址失败：{str(e)}'})

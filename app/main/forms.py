@@ -1,6 +1,6 @@
 from flask_wtf import FlaskForm
 from wtforms import StringField, FloatField, IntegerField, SelectField, TextAreaField, DateField, SubmitField, BooleanField, PasswordField, DecimalField, SelectMultipleField, HiddenField, MultipleFileField
-from wtforms.validators import DataRequired, NumberRange, Optional, Length, ValidationError, Email
+from wtforms.validators import DataRequired, NumberRange, Optional, Length, ValidationError, Email, URL
 
 class EmployeeForm(FlaskForm):
     employee_id = StringField('工号', validators=[DataRequired()])
@@ -188,3 +188,52 @@ class ExportTaskForm(FlaskForm):
     start_date = DateField('分配日期从', validators=[Optional()])
     end_date = DateField('分配日期至', validators=[Optional()])
     submit = SubmitField('导出')
+
+class CustomerForm(FlaskForm):
+    """客户表单"""
+    customer_code = StringField('客户编码', validators=[DataRequired(), Length(1, 50)])
+    customer_name = StringField('客户名称', validators=[DataRequired(), Length(1, 100)])
+    customer_type = SelectField('客户类型', choices=[
+        ('enterprise', '企业客户'),
+        ('individual', '个人客户')
+    ], default='enterprise')
+    contact_person = StringField('联系人', validators=[Length(0, 50)])
+    contact_phone = StringField('联系电话', validators=[Length(0, 20)])
+    contact_email = StringField('联系邮箱', validators=[Optional(), Email(), Length(0, 100)])
+    tax_number = StringField('税号', validators=[Length(0, 50)])
+    credit_limit = FloatField('信用额度', validators=[Optional(), NumberRange(min=0)], default=0)
+    payment_terms = StringField('付款条件', validators=[Length(0, 50)])
+    industry = StringField('所属行业', validators=[Length(0, 50)])
+    company_size = SelectField('公司规模', choices=[
+        ('', '请选择'),
+        ('small', '小型企业'),
+        ('medium', '中型企业'),
+        ('large', '大型企业')
+    ])
+    website = StringField('公司网站', validators=[Optional(), URL(), Length(0, 200)])
+    status = SelectField('状态', choices=[
+        ('active', '活跃'),
+        ('inactive', '非活跃'),
+        ('blacklist', '黑名单')
+    ], default='active')
+    notes = TextAreaField('备注')
+    submit = SubmitField('保存')
+
+class CustomerAddressForm(FlaskForm):
+    """客户地址表单"""
+    address_type = SelectField('地址类型', choices=[
+        ('shipping', '收货地址'),
+        ('billing', '账单地址'),
+        ('office', '办公地址')
+    ], default='shipping')
+    contact_person = StringField('联系人', validators=[DataRequired(), Length(1, 50)])
+    contact_phone = StringField('联系电话', validators=[DataRequired(), Length(1, 20)])
+    province = StringField('省份', validators=[DataRequired(), Length(1, 50)])
+    city = StringField('城市', validators=[DataRequired(), Length(1, 50)])
+    district = StringField('区县', validators=[Length(0, 50)])
+    detailed_address = StringField('详细地址', validators=[DataRequired(), Length(1, 200)])
+    postal_code = StringField('邮政编码', validators=[Length(0, 10)])
+    is_primary = BooleanField('设为主要地址')
+    is_active = BooleanField('启用地址', default=True)
+    notes = TextAreaField('备注')
+    submit = SubmitField('保存')

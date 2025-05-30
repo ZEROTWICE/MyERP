@@ -1,0 +1,221 @@
+{% extends "base.html" %}
+
+{% block title %}客户管理{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>客户管理</h2>
+        {% if current_user.role in ['admin', 'manager', 'sales'] %}
+        <a href="{{ url_for('main.add_customer') }}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> 新增客户
+        </a>
+        {% endif %}
+    </div>
+
+    <!-- 搜索和筛选 -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="GET" class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">搜索</label>
+                    <input type="text" class="form-control" name="search" value="{{ search }}" 
+                           placeholder="客户编码、名称、联系人、电话、行业">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">状态</label>
+                    <select class="form-select" name="status">
+                        <option value="">全部状态</option>
+                        <option value="active" {% if status_filter == 'active' %}selected{% endif %}>活跃</option>
+                        <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>非活跃</option>
+                        <option value="blacklist" {% if status_filter == 'blacklist' %}selected{% endif %}>黑名单</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">客户类型</label>
+                    <select class="form-select" name="customer_type">
+                        <option value="">全部类型</option>
+                        <option value="enterprise" {% if type_filter == 'enterprise' %}selected{% endif %}>企业客户</option>
+                        <option value="individual" {% if type_filter == 'individual' %}selected{% endif %}>个人客户</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">&nbsp;</label>
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-outline-primary">
+                            <i class="fas fa-search"></i> 搜索
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 客户列表 -->
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">客户列表 ({{ pagination.total }}个)</h5>
+        </div>
+        <div class="card-body">
+            {% if customers %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>客户编码</th>
+                            <th>客户名称</th>
+                            <th>类型</th>
+                            <th>联系人</th>
+                            <th>联系电话</th>
+                            <th>行业</th>
+                            <th>地址数量</th>
+                            <th>状态</th>
+                            <th>创建时间</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for customer in customers %}
+                        <tr>
+                            <td>
+                                <code>{{ customer.customer_code }}</code>
+                            </td>
+                            <td>
+                                <strong>{{ customer.customer_name }}</strong>
+                                {% if customer.company_size %}
+                                <br><small class="text-muted">
+                                    {% if customer.company_size == 'small' %}小型企业
+                                    {% elif customer.company_size == 'medium' %}中型企业
+                                    {% elif customer.company_size == 'large' %}大型企业
+                                    {% endif %}
+                                </small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if customer.customer_type == 'enterprise' %}
+                                    <span class="badge bg-primary">企业</span>
+                                {% else %}
+                                    <span class="badge bg-info">个人</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ customer.contact_person or '-' }}</td>
+                            <td>{{ customer.contact_phone or '-' }}</td>
+                            <td>{{ customer.industry or '-' }}</td>
+                            <td>
+                                <span class="badge bg-secondary">{{ customer.address_count }}</span>
+                            </td>
+                            <td>
+                                {% if customer.status == 'active' %}
+                                    <span class="badge bg-success">活跃</span>
+                                {% elif customer.status == 'inactive' %}
+                                    <span class="badge bg-warning">非活跃</span>
+                                {% elif customer.status == 'blacklist' %}
+                                    <span class="badge bg-danger">黑名单</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ customer.created_at.strftime('%Y-%m-%d') }}</td>
+                            <td>
+                                <div class="btn-group">
+                                    <a href="{{ url_for('main.customer_detail', customer_id=customer.id) }}" 
+                                       class="btn btn-sm btn-outline-primary">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    {% if current_user.role in ['admin', 'manager', 'sales'] %}
+                                    <a href="{{ url_for('main.edit_customer', customer_id=customer.id) }}" 
+                                       class="btn btn-sm btn-outline-secondary">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    {% endif %}
+                                    {% if current_user.role in ['admin', 'manager'] %}
+                                    <button class="btn btn-sm btn-outline-danger" 
+                                            onclick="deleteCustomer({{ customer.id }}, '{{ customer.customer_name }}')">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- 分页 -->
+            {% if pagination.pages > 1 %}
+            <nav aria-label="客户分页">
+                <ul class="pagination justify-content-center">
+                    {% if pagination.has_prev %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('main.manage_customers', page=pagination.prev_num, search=search, status=status_filter, customer_type=type_filter) }}">上一页</a>
+                    </li>
+                    {% endif %}
+                    
+                    {% for page_num in pagination.iter_pages() %}
+                        {% if page_num %}
+                            {% if page_num != pagination.page %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('main.manage_customers', page=page_num, search=search, status=status_filter, customer_type=type_filter) }}">{{ page_num }}</a>
+                            </li>
+                            {% else %}
+                            <li class="page-item active">
+                                <span class="page-link">{{ page_num }}</span>
+                            </li>
+                            {% endif %}
+                        {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link">…</span>
+                        </li>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% if pagination.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('main.manage_customers', page=pagination.next_num, search=search, status=status_filter, customer_type=type_filter) }}">下一页</a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+            {% else %}
+            <div class="text-center py-4">
+                <i class="fas fa-users fa-3x text-muted mb-3"></i>
+                <p class="text-muted">暂无客户数据</p>
+                {% if current_user.role in ['admin', 'manager', 'sales'] %}
+                <a href="{{ url_for('main.add_customer') }}" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> 新增客户
+                </a>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+function deleteCustomer(customerId, customerName) {
+    if (!confirm(`确定要删除客户 "${customerName}" 吗？此操作不可恢复。`)) {
+        return;
+    }
+    
+    fetch(`/customer/${customerId}/delete`, {
+        method: 'DELETE',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token() }}'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            location.reload();
+        } else {
+            alert('删除失败：' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('删除失败，请重试');
+    });
+}
+</script>
+{% endblock %} 

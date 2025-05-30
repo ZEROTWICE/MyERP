@@ -1128,3 +1128,98 @@ class MaterialAllocation(db.Model):
     
     def __repr__(self):
         return f'<MaterialAllocation {self.material_name}: {self.required_quantity}{self.unit}>'
+
+class Customer(db.Model):
+    """客户管理"""
+    __tablename__ = 'customers'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    global_sn = db.Column(db.String(8), unique=True, nullable=False)  # 全局流水号
+    customer_code = db.Column(db.String(50), unique=True, nullable=False, index=True)  # 客户编码
+    customer_name = db.Column(db.String(100), nullable=False)  # 客户名称
+    customer_type = db.Column(db.String(20), default='enterprise')  # 客户类型: enterprise(企业), individual(个人)
+    contact_person = db.Column(db.String(50))  # 联系人
+    contact_phone = db.Column(db.String(20))  # 联系电话
+    contact_email = db.Column(db.String(100))  # 联系邮箱
+    tax_number = db.Column(db.String(50))  # 税号
+    credit_limit = db.Column(db.Float, default=0)  # 信用额度
+    payment_terms = db.Column(db.String(50))  # 付款条件
+    industry = db.Column(db.String(50))  # 所属行业
+    company_size = db.Column(db.String(20))  # 公司规模: small, medium, large
+    website = db.Column(db.String(200))  # 公司网站
+    status = db.Column(db.String(20), default='active')  # 状态: active(活跃), inactive(非活跃), blacklist(黑名单)
+    notes = db.Column(db.Text)  # 备注
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_by = db.Column(db.Integer, db.ForeignKey('user.id'))
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    __table_args__ = (
+        db.UniqueConstraint('global_sn', name='uq_customer_global_sn'),
+        db.UniqueConstraint('customer_code', name='uq_customer_code'),
+    )
+    
+    # 关系
+    creator = db.relationship('User', backref=db.backref('created_customers', lazy='dynamic'))
+    addresses = db.relationship('CustomerAddress', backref='customer', lazy='dynamic', cascade='all, delete-orphan')
+    
+    def __init__(self, **kwargs):
+        super(Customer, self).__init__(**kwargs)
+        if not self.global_sn:
+            self.global_sn = SerialNumber.get_next_number()
+        if not self.customer_code:
+            # 自动生成客户编码
+            self.customer_code = f"C{SerialNumber.get_next_number()}"
+    
+    @property
+    def primary_address(self):
+        """获取主要地址"""
+        return self.addresses.filter_by(is_primary=True).first()
+    
+    @property
+    def address_count(self):
+        """地址数量"""
+        return self.addresses.count()
+    
+    def __repr__(self):
+        return f'<Customer {self.customer_code}: {self.customer_name}>'
+
+class CustomerAddress(db.Model):
+    """客户地址"""
+    __tablename__ = 'customer_addresses'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    global_sn = db.Column(db.String(8), unique=True, nullable=False)  # 全局流水号
+    customer_id = db.Column(db.Integer, db.ForeignKey('customers.id', ondelete='CASCADE'), nullable=False)
+    address_type = db.Column(db.String(20), default='shipping')  # 地址类型: shipping(收货), billing(账单), office(办公)
+    contact_person = db.Column(db.String(50), nullable=False)  # 联系人
+    contact_phone = db.Column(db.String(20), nullable=False)  # 联系电话
+    province = db.Column(db.String(50), nullable=False)  # 省份
+    city = db.Column(db.String(50), nullable=False)  # 城市
+    district = db.Column(db.String(50))  # 区县
+    detailed_address = db.Column(db.String(200), nullable=False)  # 详细地址
+    postal_code = db.Column(db.String(10))  # 邮政编码
+    is_primary = db.Column(db.Boolean, default=False)  # 是否为主要地址
+    is_active = db.Column(db.Boolean, default=True)  # 是否启用
+    notes = db.Column(db.Text)  # 备注
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    __table_args__ = (
+        db.UniqueConstraint('global_sn', name='uq_customer_address_global_sn'),
+    )
+    
+    def __init__(self, **kwargs):
+        super(CustomerAddress, self).__init__(**kwargs)
+        if not self.global_sn:
+            self.global_sn = SerialNumber.get_next_number()
+    
+    @property
+    def full_address(self):
+        """完整地址"""
+        parts = [self.province, self.city]
+        if self.district:
+            parts.append(self.district)
+        parts.append(self.detailed_address)
+        return ''.join(parts)
+    
+    def __repr__(self):
+        return f'<CustomerAddress {self.id}: {self.contact_person} - {self.full_address}>'

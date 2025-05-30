@@ -1,0 +1,366 @@
+{% extends "base.html" %}
+
+{% block title %}客户详情 - {{ customer.customer_name }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>客户详情</h2>
+        <div>
+            {% if current_user.role in ['admin', 'manager', 'sales'] %}
+            <a href="{{ url_for('main.edit_customer', customer_id=customer.id) }}" class="btn btn-primary">
+                <i class="fas fa-edit"></i> 编辑客户
+            </a>
+            {% endif %}
+            <a href="{{ url_for('main.manage_customers') }}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> 返回列表
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- 客户基本信息 -->
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">基本信息</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <table class="table table-borderless">
+                                <tr>
+                                    <td><strong>客户编码:</strong></td>
+                                    <td><code>{{ customer.customer_code }}</code></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>客户名称:</strong></td>
+                                    <td>{{ customer.customer_name }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>客户类型:</strong></td>
+                                    <td>
+                                        {% if customer.customer_type == 'enterprise' %}
+                                            <span class="badge bg-primary">企业客户</span>
+                                        {% else %}
+                                            <span class="badge bg-info">个人客户</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><strong>联系人:</strong></td>
+                                    <td>{{ customer.contact_person or '-' }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>联系电话:</strong></td>
+                                    <td>{{ customer.contact_phone or '-' }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>联系邮箱:</strong></td>
+                                    <td>
+                                        {% if customer.contact_email %}
+                                            <a href="mailto:{{ customer.contact_email }}">{{ customer.contact_email }}</a>
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <table class="table table-borderless">
+                                <tr>
+                                    <td><strong>税号:</strong></td>
+                                    <td>{{ customer.tax_number or '-' }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>所属行业:</strong></td>
+                                    <td>{{ customer.industry or '-' }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>公司规模:</strong></td>
+                                    <td>
+                                        {% if customer.company_size == 'small' %}小型企业
+                                        {% elif customer.company_size == 'medium' %}中型企业
+                                        {% elif customer.company_size == 'large' %}大型企业
+                                        {% else %}-
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><strong>信用额度:</strong></td>
+                                    <td>
+                                        {% if customer.credit_limit > 0 %}
+                                            ¥{{ "%.2f"|format(customer.credit_limit) }}
+                                        {% else %}
+                                            <span class="text-muted">无限制</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><strong>付款条件:</strong></td>
+                                    <td>{{ customer.payment_terms or '-' }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>公司网站:</strong></td>
+                                    <td>
+                                        {% if customer.website %}
+                                            <a href="{{ customer.website }}" target="_blank">{{ customer.website }}</a>
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    {% if customer.notes %}
+                    <div class="row">
+                        <div class="col-12">
+                            <hr>
+                            <strong>备注:</strong>
+                            <p class="text-muted mt-2">{{ customer.notes }}</p>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- 收货地址管理 -->
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">收货地址 ({{ addresses|length }}个)</h5>
+                    {% if current_user.role in ['admin', 'manager', 'sales'] %}
+                    <a href="{{ url_for('main.add_customer_address', customer_id=customer.id) }}" class="btn btn-sm btn-primary">
+                        <i class="fas fa-plus"></i> 新增地址
+                    </a>
+                    {% endif %}
+                </div>
+                <div class="card-body">
+                    {% if addresses %}
+                    <div class="row">
+                        {% for address in addresses %}
+                        <div class="col-md-6 mb-3">
+                            <div class="card h-100 {% if address.is_primary %}border-primary{% endif %}">
+                                <div class="card-header d-flex justify-content-between align-items-center py-2">
+                                    <div>
+                                        <span class="badge {% if address.address_type == 'shipping' %}bg-success{% elif address.address_type == 'billing' %}bg-warning{% else %}bg-info{% endif %}">
+                                            {% if address.address_type == 'shipping' %}收货地址
+                                            {% elif address.address_type == 'billing' %}账单地址
+                                            {% else %}办公地址
+                                            {% endif %}
+                                        </span>
+                                        {% if address.is_primary %}
+                                        <span class="badge bg-primary ms-1">主要</span>
+                                        {% endif %}
+                                        {% if not address.is_active %}
+                                        <span class="badge bg-secondary ms-1">已禁用</span>
+                                        {% endif %}
+                                    </div>
+                                    {% if current_user.role in ['admin', 'manager', 'sales'] %}
+                                    <div class="dropdown">
+                                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                            <i class="fas fa-cog"></i>
+                                        </button>
+                                        <ul class="dropdown-menu">
+                                            <li>
+                                                <a class="dropdown-item" href="{{ url_for('main.edit_customer_address', customer_id=customer.id, address_id=address.id) }}">
+                                                    <i class="fas fa-edit"></i> 编辑
+                                                </a>
+                                            </li>
+                                            {% if not address.is_primary %}
+                                            <li>
+                                                <a class="dropdown-item" href="#" onclick="setPrimaryAddress({{ address.id }})">
+                                                    <i class="fas fa-star"></i> 设为主要
+                                                </a>
+                                            </li>
+                                            {% endif %}
+                                            <li><hr class="dropdown-divider"></li>
+                                            <li>
+                                                <a class="dropdown-item text-danger" href="#" onclick="deleteAddress({{ address.id }}, '{{ address.contact_person }}')">
+                                                    <i class="fas fa-trash"></i> 删除
+                                                </a>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                <div class="card-body py-2">
+                                    <div class="mb-2">
+                                        <strong>{{ address.contact_person }}</strong>
+                                        <span class="text-muted ms-2">{{ address.contact_phone }}</span>
+                                    </div>
+                                    <div class="text-muted small">
+                                        {{ address.full_address }}
+                                        {% if address.postal_code %}
+                                        <br>邮编：{{ address.postal_code }}
+                                        {% endif %}
+                                    </div>
+                                    {% if address.notes %}
+                                    <div class="text-muted small mt-2">
+                                        <i class="fas fa-comment"></i> {{ address.notes }}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-map-marker-alt fa-3x text-muted mb-3"></i>
+                        <p class="text-muted">暂无收货地址</p>
+                        {% if current_user.role in ['admin', 'manager', 'sales'] %}
+                        <a href="{{ url_for('main.add_customer_address', customer_id=customer.id) }}" class="btn btn-primary">
+                            <i class="fas fa-plus"></i> 新增地址
+                        </a>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- 侧边栏 -->
+        <div class="col-md-4">
+            <!-- 客户状态 -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h6 class="mb-0">客户状态</h6>
+                </div>
+                <div class="card-body text-center">
+                    {% if customer.status == 'active' %}
+                        <i class="fas fa-check-circle fa-3x text-success mb-2"></i>
+                        <h5 class="text-success">活跃客户</h5>
+                        <p class="text-muted small">可正常进行业务往来</p>
+                    {% elif customer.status == 'inactive' %}
+                        <i class="fas fa-pause-circle fa-3x text-warning mb-2"></i>
+                        <h5 class="text-warning">非活跃客户</h5>
+                        <p class="text-muted small">暂停业务往来</p>
+                    {% elif customer.status == 'blacklist' %}
+                        <i class="fas fa-ban fa-3x text-danger mb-2"></i>
+                        <h5 class="text-danger">黑名单客户</h5>
+                        <p class="text-muted small">禁止业务往来</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- 客户统计 -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h6 class="mb-0">客户统计</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <div class="border-end">
+                                <h4 class="text-primary">{{ customer.address_count }}</h4>
+                                <small class="text-muted">收货地址</small>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <h4 class="text-success">0</h4>
+                            <small class="text-muted">历史订单</small>
+                        </div>
+                    </div>
+                    <hr>
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <div class="border-end">
+                                <h4 class="text-info">¥0.00</h4>
+                                <small class="text-muted">累计金额</small>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <h4 class="text-warning">¥0.00</h4>
+                            <small class="text-muted">待收款</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 创建信息 -->
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">创建信息</h6>
+                </div>
+                <div class="card-body">
+                    <div class="small">
+                        <div class="mb-2">
+                            <strong>创建时间:</strong><br>
+                            {{ customer.created_at.strftime('%Y-%m-%d %H:%M') }}
+                        </div>
+                        {% if customer.updated_at %}
+                        <div class="mb-2">
+                            <strong>更新时间:</strong><br>
+                            {{ customer.updated_at.strftime('%Y-%m-%d %H:%M') }}
+                        </div>
+                        {% endif %}
+                        {% if customer.creator %}
+                        <div>
+                            <strong>创建人:</strong><br>
+                            {{ customer.creator.username }}
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function setPrimaryAddress(addressId) {
+    if (!confirm('确定要设置为主要地址吗？')) {
+        return;
+    }
+    
+    fetch(`/customer/{{ customer.id }}/address/${addressId}/set_primary`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token() }}'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            location.reload();
+        } else {
+            alert('设置失败：' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('设置失败，请重试');
+    });
+}
+
+function deleteAddress(addressId, contactPerson) {
+    if (!confirm(`确定要删除联系人 "${contactPerson}" 的地址吗？此操作不可恢复。`)) {
+        return;
+    }
+    
+    fetch(`/customer/{{ customer.id }}/address/${addressId}/delete`, {
+        method: 'DELETE',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token() }}'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            location.reload();
+        } else {
+            alert('删除失败：' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('删除失败，请重试');
+    });
+}
+</script>
+{% endblock %} 
