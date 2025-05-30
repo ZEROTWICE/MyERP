@@ -124,8 +124,24 @@ $(document).ready(function() {
                 };
             },
             processResults: function(data) {
+                console.log('API返回数据:', data); // 调试信息
+                
+                // 检查API响应格式
+                if (!data || !data.success) {
+                    console.error('API响应错误:', data);
+                    return { results: [] };
+                }
+                
+                if (!data.data || !Array.isArray(data.data)) {
+                    console.error('API数据格式错误:', data);
+                    return { results: [] };
+                }
+                
                 // 过滤掉已经选择的原材料
                 const filteredData = data.data.filter(item => !selectedMaterials.has(item.id.toString()));
+                
+                console.log('过滤后的数据:', filteredData); // 调试信息
+                
                 return {
                     results: filteredData.map(function(item) {
                         return {
@@ -138,14 +154,32 @@ $(document).ready(function() {
                     })
                 };
             },
-            cache: false
+            cache: false,
+            transport: function(params, success, failure) {
+                console.log('发送AJAX请求:', params); // 调试信息
+                
+                var $request = $.ajax(params);
+                
+                $request.then(function(data) {
+                    console.log('AJAX成功响应:', data); // 调试信息
+                    success(data);
+                });
+                
+                $request.fail(function(jqXHR, textStatus, errorThrown) {
+                    console.error('AJAX请求失败:', textStatus, errorThrown); // 调试信息
+                    console.error('响应内容:', jqXHR.responseText);
+                    failure();
+                });
+                
+                return $request;
+            }
         },
-        minimumInputLength: 1,
+        minimumInputLength: 0, // 改为0，允许不输入就显示所有选项
         templateResult: formatMaterial,
         templateSelection: formatMaterialSelection,
         language: {
             inputTooShort: function() {
-                return '请输入至少1个字符以开始搜索...';
+                return '请输入关键字搜索，或直接选择...';
             },
             noResults: function() {
                 return '未找到匹配的原材料';
@@ -154,10 +188,11 @@ $(document).ready(function() {
                 return '搜索中...';
             },
             errorLoading: function() {
-                return '加载数据时出错';
+                return '加载数据时出错，请重试';
             }
         }
     }).on('select2:select', function(e) {
+        console.log('选择了原材料:', e.params.data); // 调试信息
         addSelectedMaterial(e.params.data);
         $(this).val(null).trigger('change');
     });

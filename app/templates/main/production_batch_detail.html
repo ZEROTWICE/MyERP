@@ -408,9 +408,66 @@ function updateItemStatus(itemId, status) {
 
 // 更新任务进度
 function updateTaskProgress(taskId) {
-    // 这里可以打开一个模态框来更新任务进度
-    // 暂时跳转到任务管理页面
-    window.open(`/tasks/${taskId}/get`, '_blank');
+    // 获取任务详情
+    fetch(`/tasks/${taskId}/get`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const task = data.data;
+                document.getElementById('taskId').value = taskId;
+                document.getElementById('completedQuantity').value = task.completed_quantity || 0;
+                document.getElementById('completedQuantity').max = task.quantity;
+                
+                // 显示模态框
+                const modal = new bootstrap.Modal(document.getElementById('quantityModal'));
+                modal.show();
+            } else {
+                alert('获取任务信息失败：' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('获取任务信息失败，请重试');
+        });
+}
+
+// 保存完成数量
+function saveQuantity() {
+    const taskId = document.getElementById('taskId').value;
+    const completedQuantity = document.getElementById('completedQuantity').value;
+    
+    if (!completedQuantity || completedQuantity < 0) {
+        alert('请输入有效的完成数量');
+        return;
+    }
+    
+    fetch(`/tasks/${taskId}/update_status`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify({
+            completed_quantity: parseInt(completedQuantity),
+            status: 'in_progress'
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('进度更新成功');
+            const modal = bootstrap.Modal.getInstance(document.getElementById('quantityModal'));
+            modal.hide();
+            location.reload();
+        } else {
+            alert('更新失败：' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('更新失败，请重试');
+    });
 }
 
 // 复制编码
@@ -429,5 +486,29 @@ function copyCode(code) {
     });
 }
 </script>
+
+<!-- 更新进度的模态框 -->
+<div class="modal fade" id="quantityModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">更新任务进度</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">完成数量</label>
+                    <input type="number" class="form-control" id="completedQuantity" min="0">
+                    <div class="form-text">请输入已完成的数量</div>
+                </div>
+                <input type="hidden" id="taskId">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="saveQuantity()">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
 
 {% endblock %} 

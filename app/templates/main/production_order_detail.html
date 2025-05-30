@@ -109,9 +109,6 @@
     <div class="card mb-4">
         <div class="card-header d-flex justify-content-between align-items-center">
             <h5 class="mb-0">物料分配</h5>
-            <a href="{{ url_for('main.production_order_materials', order_id=order.id) }}" class="btn btn-sm btn-info">
-                <i class="fas fa-list"></i> 详细分配
-            </a>
         </div>
         <div class="card-body">
             {% if material_allocations %}

@@ -2423,10 +2423,21 @@ def update_task_status(id):
     """更新任务状态"""
     try:
         task = TaskAssignment.query.get_or_404(id)
-        data = request.get_json()
         
-        completed_quantity = int(data.get('completed_quantity', 0))
-        materials = data.get('materials', [])
+        # 兼容JSON和表单数据
+        if request.is_json:
+            data = request.get_json()
+            completed_quantity = int(data.get('completed_quantity', 0))
+            materials_data = data.get('materials', [])
+        else:
+            # 处理表单数据
+            completed_quantity = int(request.form.get('completed_quantity', 0))
+            materials_json = request.form.get('materials', '[]')
+            try:
+                import json
+                materials_data = json.loads(materials_json)
+            except (json.JSONDecodeError, TypeError):
+                materials_data = []
         
         # 验证完成数量
         if completed_quantity < 0:
@@ -2435,7 +2446,7 @@ def update_task_status(id):
             return jsonify({'success': False, 'message': '完成数量不能超过任务数量'}), 400
         
         # 验证原材料数据
-        for material in materials:
+        for material in materials_data:
             if not isinstance(material, dict) or 'raw_material_id' not in material or 'quantity' not in material:
                 return jsonify({'success': False, 'message': '原材料数据格式错误'}), 400
                 
@@ -2524,7 +2535,7 @@ def update_task_status(id):
                     # 不影响主流程，继续执行
             
             # 添加原材料使用记录
-            for material in materials:
+            for material in materials_data:
                 material_usage = ProductionRecordMaterial(
                     production_record_id=production_record.id,
                     raw_material_id=int(material['raw_material_id']),
@@ -5835,7 +5846,7 @@ def add_production_order():
         db.session.rollback()
         return jsonify({'success': False, 'message': f'创建失败: {str(e)}'})
 
-@bp.route('/production_orders/<int:order_id>')
+@bp.route('/production_orders/<int:order_id>', methods=['GET'])
 @login_required
 def production_order_detail(order_id):
     """生产订单详情页面"""
@@ -5851,6 +5862,129 @@ def production_order_detail(order_id):
                          order=order,
                          material_allocations=material_allocations,
                          batches=batches)
+
+@bp.route('/production_orders/<int:order_id>', methods=['DELETE'])
+@login_required
+@csrf.exempt
+def delete_production_order(order_id):
+    """删除生产订单"""
+    try:
+        order = ProductionOrder.query.get_or_404(order_id)
+        
+        # 检查权限
+        if current_user.role not in ['admin', 'manager']:
+            return jsonify({'success': False, 'message': '权限不足'})
+        
+        # 检查订单状态，只能删除待开始或已取消的订单
+        if order.status not in ['pending', 'cancelled']:
+            return jsonify({'success': False, 'message': '只能删除待开始或已取消状态的订单'})
+        
+        # 检查是否有关联的生产批次
+        batches = ProductionBatch.query.filter_by(production_order_id=order_id).all()
+        if batches:
+            return jsonify({'success': False, 'message': '该订单已有生产批次，无法删除'})
+        
+        # 记录审计日志
+        log = AuditLog(
+            user_id=current_user.id,
+            action='删除生产订单',
+            details=f'删除生产订单: {order.order_number} (产品: {order.product.product_name})',
+            can_rollback=False,
+            rollback_type='delete',
+            target_model='ProductionOrder',
+            target_id=order.id,
+            old_data={
+                'order_number': order.order_number,
+                'product_id': order.product_id,
+                'planned_quantity': order.planned_quantity,
+                'status': order.status,
+                'priority': order.priority,
+                'planned_start_date': order.planned_start_date.isoformat() if order.planned_start_date else None,
+                'planned_end_date': order.planned_end_date.isoformat() if order.planned_end_date else None,
+                'notes': order.notes
+            }
+        )
+        db.session.add(log)
+        
+        # 删除订单（级联删除会自动删除相关的物料分配）
+        db.session.delete(order)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': f'生产订单 {order.order_number} 删除成功'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'删除失败: {str(e)}'})
+
+def check_and_handle_material_shortage(order, batch_quantity):
+    """检查并处理物料短缺情况"""
+    try:
+        shortage_info = []
+        created_orders = []
+        
+        # 获取该订单的物料分配
+        material_allocations = MaterialAllocation.query.filter_by(production_order_id=order.id).all()
+        
+        for allocation in material_allocations:
+            # 计算此批次需要的物料数量
+            batch_required = (allocation.required_quantity / order.planned_quantity) * batch_quantity
+            
+            # 检查是否有足够的已分配物料
+            available_quantity = allocation.allocated_quantity - allocation.consumed_quantity
+            
+            if available_quantity < batch_required:
+                shortage = batch_required - available_quantity
+                
+                # 检查库存是否足够补充
+                material = allocation.material_info
+                if material:
+                    if allocation.material_type == 'raw':
+                        current_stock = material.current_stock
+                    elif allocation.material_type == 'finished':
+                        current_stock = material.current_stock
+                    elif allocation.material_type == 'product':
+                        # 对于产品类型，需要检查成品库存
+                        current_stock = 0  # 产品通常需要生产，不是库存
+                    else:
+                        current_stock = 0
+                    
+                    shortage_item = {
+                        'material_name': allocation.material_name,
+                        'material_type': allocation.material_type,
+                        'required': batch_required,
+                        'available': available_quantity,
+                        'shortage': shortage,
+                        'current_stock': current_stock,
+                        'can_fulfill': current_stock >= shortage
+                    }
+                    shortage_info.append(shortage_item)
+                    
+                    # 如果是产品类型且有短缺，可以考虑创建子生产订单
+                    if allocation.material_type == 'product' and shortage > 0:
+                        # 这里可以实现自动创建子生产订单的逻辑
+                        # 暂时只记录信息
+                        pass
+        
+        # 如果有短缺但库存足够，自动分配
+        for info in shortage_info:
+            if info['shortage'] > 0 and info['can_fulfill']:
+                # 这里可以实现自动分配逻辑
+                # 暂时只记录信息，不自动分配
+                pass
+        
+        return {
+            'shortage_info': shortage_info,
+            'created_orders': created_orders,
+            'has_shortage': len(shortage_info) > 0
+        }
+        
+    except Exception as e:
+        current_app.logger.error(f"检查物料短缺时出错: {str(e)}")
+        return {
+            'shortage_info': [],
+            'created_orders': [],
+            'has_shortage': False
+        }
 
 @bp.route('/production_orders/<int:order_id>/batches/add', methods=['POST'])
 @login_required
@@ -6107,3 +6241,80 @@ def update_batch_status(batch_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': f'状态更新失败: {str(e)}'})
+
+def update_production_status_hierarchy():
+    """更新生产状态层次结构：批次项目 -> 批次 -> 订单"""
+    try:
+        # 第一步：更新所有批次状态
+        batches = ProductionBatch.query.all()
+        for batch in batches:
+            # 获取批次的所有项目
+            batch_items = ProductionBatchItem.query.filter_by(batch_id=batch.id).all()
+            
+            if not batch_items:
+                continue
+                
+            # 统计各状态的项目数量
+            completed_count = sum(1 for item in batch_items if item.status == 'completed')
+            in_progress_count = sum(1 for item in batch_items if item.status == 'in_progress')
+            total_count = len(batch_items)
+            
+            # 确定批次状态
+            old_status = batch.status
+            if completed_count == total_count:
+                batch.status = 'completed'
+                if not batch.end_date:
+                    batch.end_date = datetime.now().date()
+            elif in_progress_count > 0 or completed_count > 0:
+                batch.status = 'in_progress'
+                if not batch.start_date:
+                    batch.start_date = datetime.now().date()
+            else:
+                batch.status = 'pending'
+            
+            # 记录状态变化
+            if old_status != batch.status:
+                current_app.logger.info(f'批次 {batch.batch_number} 状态自动更新：{old_status} -> {batch.status}')
+        
+        # 第二步：更新所有订单状态和完成数量
+        orders = ProductionOrder.query.all()
+        for order in orders:
+            # 获取订单的所有批次
+            order_batches = ProductionBatch.query.filter_by(production_order_id=order.id).all()
+            
+            if not order_batches:
+                continue
+            
+            # 统计各状态的批次数量
+            completed_batches = [batch for batch in order_batches if batch.status == 'completed']
+            in_progress_batches = [batch for batch in order_batches if batch.status in ['in_progress', 'completed']]
+            total_batches = len(order_batches)
+            
+            # 计算完成数量（基于已完成批次的数量）
+            old_completed_quantity = order.completed_quantity
+            order.completed_quantity = sum(batch.batch_quantity for batch in completed_batches)
+            
+            # 确定订单状态
+            old_status = order.status
+            if len(completed_batches) == total_batches:
+                order.status = 'completed'
+                if not order.actual_end_date:
+                    order.actual_end_date = datetime.now().date()
+            elif len(in_progress_batches) > 0:
+                order.status = 'in_progress'
+                if not order.actual_start_date:
+                    order.actual_start_date = datetime.now().date()
+            else:
+                order.status = 'pending'
+            
+            # 记录状态变化
+            if old_status != order.status or old_completed_quantity != order.completed_quantity:
+                current_app.logger.info(f'订单 {order.order_number} 状态自动更新：{old_status} -> {order.status}，完成数量：{old_completed_quantity} -> {order.completed_quantity}')
+        
+        db.session.commit()
+        current_app.logger.info('生产状态层次结构更新完成')
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f'更新生产状态层次结构失败: {str(e)}')
+        raise e
