@@ -1,0 +1,393 @@
+{% extends "base.html" %}
+
+{% block title %}销售订单详情 - {{ order.order_number }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>销售订单详情</h2>
+        <div>
+            {% if current_user.role in ['admin', 'manager', 'sales'] %}
+            <a href="{{ url_for('main.edit_sales_order', order_id=order.id) }}" class="btn btn-primary">
+                <i class="fas fa-edit"></i> 编辑订单
+            </a>
+            <a href="{{ url_for('main.add_sales_order_item', order_id=order.id) }}" class="btn btn-success">
+                <i class="fas fa-plus"></i> 添加订单行
+            </a>
+            {% endif %}
+            <a href="{{ url_for('main.manage_sales_orders') }}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> 返回列表
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- 订单基本信息 -->
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">订单基本信息</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <table class="table table-borderless">
+                                <tr>
+                                    <td><strong>订单编号:</strong></td>
+                                    <td><code>{{ order.order_number }}</code></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>订单来源:</strong></td>
+                                    <td>{{ order.order_source }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>客户名称:</strong></td>
+                                    <td>{{ order.customer.customer_name }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>客户编码:</strong></td>
+                                    <td><code>{{ order.customer.customer_code }}</code></td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <table class="table table-borderless">
+                                <tr>
+                                    <td><strong>年月:</strong></td>
+                                    <td>{{ order.year_month }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>合计数量:</strong></td>
+                                    <td><span class="badge bg-info fs-6">{{ order.total_quantity }}</span></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>状态:</strong></td>
+                                    <td>
+                                        {% if order.status == 'pending' %}
+                                            <span class="badge bg-warning">待处理</span>
+                                        {% elif order.status == 'confirmed' %}
+                                            <span class="badge bg-primary">已确认</span>
+                                        {% elif order.status == 'in_production' %}
+                                            <span class="badge bg-info">生产中</span>
+                                        {% elif order.status == 'completed' %}
+                                            <span class="badge bg-success">已完成</span>
+                                        {% elif order.status == 'cancelled' %}
+                                            <span class="badge bg-danger">已取消</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><strong>下单时间:</strong></td>
+                                    <td>{{ order.order_date.strftime('%Y-%m-%d %H:%M') }}</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                    {% if order.notes %}
+                    <div class="row">
+                        <div class="col-12">
+                            <hr>
+                            <p><strong>备注:</strong></p>
+                            <p class="text-muted">{{ order.notes }}</p>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- 订单行列表 -->
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">订单行明细 ({{ order_items|length }}项)</h5>
+                    {% if current_user.role in ['admin', 'manager', 'sales'] %}
+                    <a href="{{ url_for('main.add_sales_order_item', order_id=order.id) }}" class="btn btn-sm btn-success">
+                        <i class="fas fa-plus"></i> 添加订单行
+                    </a>
+                    {% endif %}
+                </div>
+                <div class="card-body">
+                    {% if order_items %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>序号</th>
+                                    <th>产品名称</th>
+                                    <th>图号</th>
+                                    <th>数量</th>
+                                    <th>单位</th>
+                                    <th>开向</th>
+                                    <th>规格型号</th>
+                                    <th>使用单位</th>
+                                    <th>下单时间</th>
+                                    <th>分批到货</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in order_items %}
+                                <tr>
+                                    <td>{{ loop.index }}</td>
+                                    <td>
+                                        <strong>{{ item.product_name }}</strong>
+                                        <br><small class="text-muted">{{ item.product.product_code }}</small>
+                                    </td>
+                                    <td>{{ item.drawing_number or '-' }}</td>
+                                    <td><span class="badge bg-primary">{{ item.quantity }}</span></td>
+                                    <td>{{ item.unit }}</td>
+                                    <td>{{ item.direction or '-' }}</td>
+                                    <td>
+                                        <small>{{ item.specifications_text }}</small>
+                                    </td>
+                                    <td>{{ item.usage_unit or '-' }}</td>
+                                    <td>{{ item.order_time.strftime('%Y-%m-%d %H:%M') }}</td>
+                                    <td>
+                                        {% set batches = item.delivery_batches_list %}
+                                        {% if batches %}
+                                            <span class="badge bg-info">{{ batches|length }}批次</span>
+                                            <button class="btn btn-sm btn-outline-info" onclick="viewDeliveryBatches({{ item.id }})">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                        {% else %}
+                                            <button class="btn btn-sm btn-outline-secondary" onclick="manageDeliveryBatches({{ item.id }})">
+                                                <i class="fas fa-plus"></i> 设置
+                                            </button>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group">
+                                            {% if current_user.role in ['admin', 'manager', 'sales'] %}
+                                            <a href="{{ url_for('main.edit_sales_order_item', item_id=item.id) }}" 
+                                               class="btn btn-sm btn-outline-primary">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                            <button class="btn btn-sm btn-outline-danger" 
+                                                    onclick="deleteOrderItem({{ item.id }}, '{{ item.product_name }}')">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% if item.station_notes %}
+                                <tr>
+                                    <td colspan="11">
+                                        <small class="text-muted">
+                                            <strong>到站备注:</strong> {{ item.station_notes }}
+                                        </small>
+                                    </td>
+                                </tr>
+                                {% endif %}
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-list fa-3x text-muted mb-3"></i>
+                        <p class="text-muted">暂无订单行数据</p>
+                        {% if current_user.role in ['admin', 'manager', 'sales'] %}
+                        <a href="{{ url_for('main.add_sales_order_item', order_id=order.id) }}" class="btn btn-primary">
+                            <i class="fas fa-plus"></i> 添加订单行
+                        </a>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- 客户信息 -->
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h6 class="mb-0">客户信息</h6>
+                </div>
+                <div class="card-body">
+                    <div class="text-center mb-3">
+                        <h5>{{ order.customer.customer_name }}</h5>
+                        <code>{{ order.customer.customer_code }}</code>
+                    </div>
+                    <div class="small">
+                        <div class="mb-2">
+                            <strong>客户类型:</strong>
+                            {% if order.customer.customer_type == 'enterprise' %}
+                                <span class="badge bg-primary">企业客户</span>
+                            {% else %}
+                                <span class="badge bg-info">个人客户</span>
+                            {% endif %}
+                        </div>
+                        {% if order.customer.contact_person %}
+                        <div class="mb-2">
+                            <strong>联系人:</strong> {{ order.customer.contact_person }}
+                        </div>
+                        {% endif %}
+                        {% if order.customer.contact_phone %}
+                        <div class="mb-2">
+                            <strong>联系电话:</strong> {{ order.customer.contact_phone }}
+                        </div>
+                        {% endif %}
+                        {% if order.customer.industry %}
+                        <div class="mb-2">
+                            <strong>所属行业:</strong> {{ order.customer.industry }}
+                        </div>
+                        {% endif %}
+                        <div class="mb-2">
+                            <strong>地址数量:</strong> {{ order.customer.address_count }}个
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <a href="{{ url_for('main.customer_detail', customer_id=order.customer.id) }}" 
+                           class="btn btn-sm btn-outline-primary w-100">
+                            <i class="fas fa-user"></i> 查看客户详情
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 订单统计 -->
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">订单统计</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <div class="border-end">
+                                <h4 class="text-primary">{{ order_items|length }}</h4>
+                                <small class="text-muted">订单行数</small>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <h4 class="text-info">{{ order.total_quantity }}</h4>
+                            <small class="text-muted">总数量</small>
+                        </div>
+                    </div>
+                    <hr>
+                    <div class="small">
+                        <div class="mb-2">
+                            <strong>创建时间:</strong> {{ order.created_at.strftime('%Y-%m-%d %H:%M') }}
+                        </div>
+                        <div class="mb-2">
+                            <strong>更新时间:</strong> {{ order.updated_at.strftime('%Y-%m-%d %H:%M') }}
+                        </div>
+                        <div class="mb-2">
+                            <strong>创建人:</strong> {{ order.creator.username if order.creator else '未知' }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 分批到货模态框 -->
+<div class="modal fade" id="deliveryBatchesModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">分批到货管理</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="deliveryBatchesContent">
+                    <!-- 动态加载内容 -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                <button type="button" class="btn btn-primary" id="saveDeliveryBatches" style="display: none;">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function deleteOrderItem(itemId, productName) {
+    if (!confirm(`确定要删除订单行 "${productName}" 吗？此操作不可恢复。`)) {
+        return;
+    }
+    
+    fetch(`/sales_order_item/${itemId}/delete`, {
+        method: 'DELETE',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token() }}'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            location.reload();
+        } else {
+            alert('删除失败：' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('删除失败，请重试');
+    });
+}
+
+function viewDeliveryBatches(itemId) {
+    fetch(`/sales_order_item/${itemId}/delivery_batches`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const orderItem = data.data.order_item;
+                const batches = data.data.batches;
+                
+                let html = `
+                    <div class="mb-3">
+                        <h6>产品：${orderItem.product_name}</h6>
+                        <p class="text-muted">总数量：${orderItem.quantity} ${orderItem.unit}</p>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>批次号</th>
+                                    <th>到货日期</th>
+                                    <th>数量</th>
+                                    <th>备注</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                `;
+                
+                batches.forEach(batch => {
+                    html += `
+                        <tr>
+                            <td>${batch.batch_no}</td>
+                            <td>${batch.delivery_date}</td>
+                            <td>${batch.quantity}</td>
+                            <td>${batch.notes || '-'}</td>
+                        </tr>
+                    `;
+                });
+                
+                html += `
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+                
+                document.getElementById('deliveryBatchesContent').innerHTML = html;
+                document.getElementById('saveDeliveryBatches').style.display = 'none';
+                
+                const modal = new bootstrap.Modal(document.getElementById('deliveryBatchesModal'));
+                modal.show();
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('获取分批信息失败');
+        });
+}
+
+function manageDeliveryBatches(itemId) {
+    // 这里可以实现分批到货的编辑功能
+    alert('分批到货管理功能开发中...');
+}
+</script>
+{% endblock %} 

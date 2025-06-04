@@ -1,6 +1,7 @@
 from flask_wtf import FlaskForm
-from wtforms import StringField, FloatField, IntegerField, SelectField, TextAreaField, DateField, SubmitField, BooleanField, PasswordField, DecimalField, SelectMultipleField, HiddenField, MultipleFileField
+from wtforms import StringField, FloatField, IntegerField, SelectField, TextAreaField, DateField, SubmitField, BooleanField, PasswordField, DecimalField, SelectMultipleField, HiddenField, MultipleFileField, DateTimeField
 from wtforms.validators import DataRequired, NumberRange, Optional, Length, ValidationError, Email, URL
+from datetime import datetime
 
 class EmployeeForm(FlaskForm):
     employee_id = StringField('工号', validators=[DataRequired()])
@@ -236,4 +237,40 @@ class CustomerAddressForm(FlaskForm):
     is_primary = BooleanField('设为主要地址')
     is_active = BooleanField('启用地址', default=True)
     notes = TextAreaField('备注')
+    submit = SubmitField('保存')
+
+class SalesOrderForm(FlaskForm):
+    """销售订单表单"""
+    order_source = StringField('订单来源', validators=[DataRequired(), Length(1, 50)])
+    customer_id = SelectField('客户', coerce=int, validators=[DataRequired()])
+    year_month = StringField('年月', validators=[DataRequired(), Length(7, 7)], 
+                           render_kw={'placeholder': 'YYYY-MM', 'pattern': r'\d{4}-\d{2}'})
+    order_date = DateTimeField('下单时间', default=datetime.utcnow, format='%Y-%m-%d %H:%M')
+    status = SelectField('状态', choices=[
+        ('pending', '待处理'),
+        ('confirmed', '已确认'),
+        ('in_production', '生产中'),
+        ('completed', '已完成'),
+        ('cancelled', '已取消')
+    ], default='pending')
+    notes = TextAreaField('备注')
+    submit = SubmitField('保存')
+
+class SalesOrderItemForm(FlaskForm):
+    """销售订单行表单"""
+    product_id = SelectField('产品', coerce=int, validators=[DataRequired()])
+    quantity = IntegerField('数量', validators=[DataRequired(), NumberRange(min=1)])
+    direction = StringField('开向', validators=[Length(0, 50)])
+    
+    # 规格型号（多选）
+    spec_extended = BooleanField('加长')
+    spec_gasket = BooleanField('垫板')
+    spec_joint = BooleanField('接头')
+    spec_drilling = BooleanField('钻孔')
+    spec_other = BooleanField('其他')
+    spec_other_desc = StringField('其他规格描述', validators=[Length(0, 200)])
+    
+    usage_unit = StringField('使用单位', validators=[Length(0, 100)])
+    order_time = DateTimeField('下单时间', default=datetime.utcnow, format='%Y-%m-%d %H:%M')
+    station_notes = TextAreaField('到站备注')
     submit = SubmitField('保存')

@@ -1223,3 +1223,140 @@ class CustomerAddress(db.Model):
     
     def __repr__(self):
         return f'<CustomerAddress {self.id}: {self.contact_person} - {self.full_address}>'
+
+class SalesOrder(db.Model):
+    """销售订单"""
+    __tablename__ = 'sales_orders'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    global_sn = db.Column(db.String(8), unique=True, nullable=False)  # 全局流水号
+    order_number = db.Column(db.String(50), unique=True, nullable=False, index=True)  # 订单编号
+    order_source = db.Column(db.String(50), nullable=False)  # 订单来源
+    customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'), nullable=False)  # 客户ID
+    year_month = db.Column(db.String(7), nullable=False)  # 年月 (YYYY-MM)
+    total_quantity = db.Column(db.Integer, default=0)  # 合计数量（自动计算）
+    order_date = db.Column(db.DateTime, default=datetime.utcnow)  # 下单时间
+    status = db.Column(db.String(20), default='pending')  # 状态: pending(待处理), confirmed(已确认), in_production(生产中), completed(已完成), cancelled(已取消)
+    notes = db.Column(db.Text)  # 备注
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_by = db.Column(db.Integer, db.ForeignKey('user.id'))
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    __table_args__ = (
+        db.UniqueConstraint('global_sn', name='uq_sales_order_global_sn'),
+        db.UniqueConstraint('order_number', name='uq_sales_order_number'),
+    )
+    
+    # 关系
+    customer = db.relationship('Customer', backref=db.backref('sales_orders', lazy='dynamic'))
+    creator = db.relationship('User', backref=db.backref('created_sales_orders', lazy='dynamic'))
+    order_items = db.relationship('SalesOrderItem', backref='sales_order', lazy='dynamic', cascade='all, delete-orphan')
+    
+    def __init__(self, **kwargs):
+        super(SalesOrder, self).__init__(**kwargs)
+        if not self.global_sn:
+            self.global_sn = SerialNumber.get_next_number()
+    
+    def calculate_total_quantity(self):
+        """计算合计数量"""
+        self.total_quantity = sum(item.quantity for item in self.order_items)
+    
+    def __repr__(self):
+        return f'<SalesOrder {self.order_number}: {self.customer.customer_name if self.customer else "Unknown"}>'
+
+class SalesOrderItem(db.Model):
+    """销售订单行"""
+    __tablename__ = 'sales_order_items'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    global_sn = db.Column(db.String(8), unique=True, nullable=False)  # 全局流水号
+    sales_order_id = db.Column(db.Integer, db.ForeignKey('sales_orders.id', ondelete='CASCADE'), nullable=False)
+    product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False)  # 产品ID（关联产品管理）
+    quantity = db.Column(db.Integer, nullable=False)  # 数量
+    direction = db.Column(db.String(50))  # 开向
+    
+    # 规格型号（五个选项，可同时选择多个）
+    spec_extended = db.Column(db.Boolean, default=False)  # 加长
+    spec_gasket = db.Column(db.Boolean, default=False)  # 垫板
+    spec_joint = db.Column(db.Boolean, default=False)  # 接头
+    spec_drilling = db.Column(db.Boolean, default=False)  # 钻孔
+    spec_other = db.Column(db.Boolean, default=False)  # 其他
+    spec_other_desc = db.Column(db.String(200))  # 其他规格描述
+    
+    usage_unit = db.Column(db.String(100))  # 使用单位
+    order_time = db.Column(db.DateTime, default=datetime.utcnow)  # 下单时间
+    station_notes = db.Column(db.Text)  # 到站备注
+    
+    # 分批到货信息（JSON格式存储）
+    delivery_batches = db.Column(db.Text)  # JSON格式: [{"batch_no": 1, "delivery_date": "2025-01-15", "quantity": 10, "notes": ""}]
+    
+    sequence = db.Column(db.Integer, default=0)  # 排序序号
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    __table_args__ = (
+        db.UniqueConstraint('global_sn', name='uq_sales_order_item_global_sn'),
+    )
+    
+    # 关系
+    product = db.relationship('Product', backref=db.backref('sales_order_items', lazy='dynamic'))
+    
+    def __init__(self, **kwargs):
+        super(SalesOrderItem, self).__init__(**kwargs)
+        if not self.global_sn:
+            self.global_sn = SerialNumber.get_next_number()
+    
+    @property
+    def product_name(self):
+        """获取产品名称"""
+        return self.product.product_name if self.product else '未知产品'
+    
+    @property
+    def drawing_number(self):
+        """获取图号"""
+        return self.product.drawing_number if self.product else ''
+    
+    @property
+    def unit(self):
+        """获取单位"""
+        return self.product.unit if self.product else '件'
+    
+    @property
+    def specifications(self):
+        """获取规格型号列表"""
+        specs = []
+        if self.spec_extended:
+            specs.append('加长')
+        if self.spec_gasket:
+            specs.append('垫板')
+        if self.spec_joint:
+            specs.append('接头')
+        if self.spec_drilling:
+            specs.append('钻孔')
+        if self.spec_other:
+            specs.append(f'其他({self.spec_other_desc})' if self.spec_other_desc else '其他')
+        return specs
+    
+    @property
+    def specifications_text(self):
+        """获取规格型号文本"""
+        specs = self.specifications
+        return ', '.join(specs) if specs else '无'
+    
+    @property
+    def delivery_batches_list(self):
+        """获取分批到货列表"""
+        if self.delivery_batches:
+            try:
+                import json
+                return json.loads(self.delivery_batches)
+            except:
+                return []
+        return []
+    
+    def set_delivery_batches(self, batches):
+        """设置分批到货信息"""
+        import json
+        self.delivery_batches = json.dumps(batches, ensure_ascii=False)
+    
+    def __repr__(self):
+        return f'<SalesOrderItem {self.id}: {self.product_name} x {self.quantity}>'

@@ -2,7 +2,7 @@ from flask import render_template, redirect, url_for, flash, request, jsonify, c
 from sqlalchemy.exc import SQLAlchemyError
 from flask_login import login_required, current_user
 from app import db, csrf
-from app.models import Employee, ProcessPrice, ProductionRecord, BonusPenalty, AuditLog, ProcessPrice, User, TaskAssignment, SerialNumber, SalaryChange, CoefficientChange, EmployeeSalaryHistory, EmployeeCoefficientHistory, ProcessPriceGroup, FinishedProduct, RawMaterial, CodeRule, CodeGenerationLog, ProductionRecordMaterial, InspectionTemplate, InspectionBaseItem, InspectionItem, InspectionTask, InspectionRecord, Product, ProductBOM, ProductProcess, ProductionOrder, MaterialAllocation, ProductionBatch, ProductionBatchItem, Customer, CustomerAddress
+from app.models import Employee, ProcessPrice, ProductionRecord, BonusPenalty, AuditLog, ProcessPrice, User, TaskAssignment, SerialNumber, SalaryChange, CoefficientChange, EmployeeSalaryHistory, EmployeeCoefficientHistory, ProcessPriceGroup, FinishedProduct, RawMaterial, CodeRule, CodeGenerationLog, ProductionRecordMaterial, InspectionTemplate, InspectionBaseItem, InspectionItem, InspectionTask, InspectionRecord, Product, ProductBOM, ProductProcess, ProductionOrder, MaterialAllocation, ProductionBatch, ProductionBatchItem, Customer, CustomerAddress, SalesOrder, SalesOrderItem, SalesOrder, SalesOrderItem
 from datetime import datetime, timedelta, date
 from . import bp
 from app.main.forms import (
@@ -11,7 +11,7 @@ from app.main.forms import (
     ProductionRecordSearchForm, TaskAssignmentForm, TaskSearchForm,
     BonusPenaltySearchForm, ExportEmployeeForm, ExportProcessForm,
     ExportProductionRecordForm, ExportBonusPenaltyForm, ExportTaskForm,
-    CustomerForm, CustomerAddressForm
+    CustomerForm, CustomerAddressForm, SalesOrderForm, SalesOrderItemForm
 )
 from sqlalchemy import desc, or_
 from app.utils.excel_generator import ExcelGenerator
@@ -6822,3 +6822,493 @@ def api_customer_addresses(customer_id):
         
     except Exception as e:
         return jsonify({'success': False, 'message': f'获取地址失败：{str(e)}'})
+
+# ==================== 销售订单管理 ====================
+
+@bp.route('/sales_orders')
+@login_required
+@handle_pagination_args
+def manage_sales_orders():
+    """销售订单管理页面"""
+    if current_user.role not in ['admin', 'manager', 'sales']:
+        flash('权限不足', 'danger')
+        return redirect(url_for('main.index'))
+    
+    # 构建基础查询
+    query = SalesOrder.query
+    
+    # 处理搜索
+    search = request.args.get('search', '').strip()
+    if search:
+        search_term = f"%{search}%"
+        query = query.join(Customer).filter(db.or_(
+            SalesOrder.order_number.like(search_term),
+            SalesOrder.order_source.like(search_term),
+            Customer.customer_name.like(search_term),
+            Customer.customer_code.like(search_term)
+        ))
+    
+    # 状态筛选
+    status_filter = request.args.get('status', '')
+    if status_filter:
+        query = query.filter(SalesOrder.status == status_filter)
+    
+    # 年月筛选
+    year_month_filter = request.args.get('year_month', '')
+    if year_month_filter:
+        query = query.filter(SalesOrder.year_month == year_month_filter)
+    
+    # 客户筛选
+    customer_filter = request.args.get('customer_id', '')
+    if customer_filter:
+        query = query.filter(SalesOrder.customer_id == customer_filter)
+    
+    # 排序
+    query = query.order_by(SalesOrder.created_at.desc())
+    
+    # 分页
+    page = request.validated_page
+    pagination = query.paginate(page=page, per_page=request.validated_per_page)
+    orders = pagination.items
+    
+    # 获取筛选选项
+    customers = Customer.query.filter_by(status='active').order_by(Customer.customer_name).all()
+    year_months = db.session.query(SalesOrder.year_month).distinct().order_by(SalesOrder.year_month.desc()).all()
+    year_months = [ym[0] for ym in year_months if ym[0]]
+    
+    return render_template('main/sales_orders.html',
+                         orders=orders,
+                         pagination=pagination,
+                         search=search,
+                         status_filter=status_filter,
+                         year_month_filter=year_month_filter,
+                         customer_filter=customer_filter,
+                         customers=customers,
+                         year_months=year_months)
+
+@bp.route('/sales_order/add', methods=['GET', 'POST'])
+@login_required
+def add_sales_order():
+    """新增销售订单"""
+    if current_user.role not in ['admin', 'manager', 'sales']:
+        flash('权限不足', 'danger')
+        return redirect(url_for('main.manage_sales_orders'))
+    
+    form = SalesOrderForm()
+    if form.validate_on_submit():
+        try:
+            # 创建销售订单
+            order = SalesOrder(
+                order_source=form.order_source.data,
+                customer_id=form.customer_id.data,
+                year_month=form.year_month.data,
+                notes=form.notes.data,
+                created_by=current_user.id
+            )
+            
+            db.session.add(order)
+            db.session.commit()
+            
+            # 记录审计日志
+            log = AuditLog(
+                user_id=current_user.id,
+                action='新增销售订单',
+                details=f'新增销售订单：{order.order_number}（客户：{order.customer.customer_name}）'
+            )
+            db.session.add(log)
+            db.session.commit()
+            
+            flash('销售订单新增成功', 'success')
+            return redirect(url_for('main.sales_order_detail', order_id=order.id))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'新增失败：{str(e)}', 'danger')
+    
+    return render_template('main/sales_order_form.html', form=form, title='新增销售订单')
+
+@bp.route('/sales_order/<int:order_id>')
+@login_required
+def sales_order_detail(order_id):
+    """销售订单详情页面"""
+    order = SalesOrder.query.get_or_404(order_id)
+    
+    # 获取订单行
+    order_items = SalesOrderItem.query.filter_by(sales_order_id=order_id).order_by(
+        SalesOrderItem.created_at
+    ).all()
+    
+    # 计算总数量
+    order.calculate_total_quantity()
+    db.session.commit()
+    
+    return render_template('main/sales_order_detail.html',
+                         order=order,
+                         order_items=order_items)
+
+@bp.route('/sales_order/<int:order_id>/edit', methods=['GET', 'POST'])
+@login_required
+def edit_sales_order(order_id):
+    """编辑销售订单"""
+    if current_user.role not in ['admin', 'manager', 'sales']:
+        flash('权限不足', 'danger')
+        return redirect(url_for('main.sales_order_detail', order_id=order_id))
+    
+    order = SalesOrder.query.get_or_404(order_id)
+    form = SalesOrderForm(obj=order)
+    
+    if form.validate_on_submit():
+        try:
+            # 保存旧数据用于审计
+            old_data = {
+                'order_source': order.order_source,
+                'customer_id': order.customer_id,
+                'year_month': order.year_month,
+                'status': order.status
+            }
+            
+            # 更新订单信息
+            form.populate_obj(order)
+            order.updated_at = datetime.utcnow()
+            
+            db.session.commit()
+            
+            # 记录审计日志
+            log = AuditLog(
+                user_id=current_user.id,
+                action='编辑销售订单',
+                details=f'编辑销售订单：{order.order_number}',
+                old_data=old_data
+            )
+            db.session.add(log)
+            db.session.commit()
+            
+            flash('销售订单更新成功', 'success')
+            return redirect(url_for('main.sales_order_detail', order_id=order_id))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'更新失败：{str(e)}', 'danger')
+    
+    return render_template('main/sales_order_form.html', form=form, title='编辑销售订单', order=order)
+
+@bp.route('/sales_order/<int:order_id>/delete', methods=['DELETE'])
+@login_required
+def delete_sales_order(order_id):
+    """删除销售订单"""
+    if current_user.role not in ['admin', 'manager']:
+        return jsonify({'success': False, 'message': '权限不足'}), 403
+    
+    try:
+        order = SalesOrder.query.get_or_404(order_id)
+        
+        # 保存旧数据用于回滚
+        old_data = {
+            'order_number': order.order_number,
+            'order_source': order.order_source,
+            'customer_id': order.customer_id,
+            'year_month': order.year_month,
+            'status': order.status
+        }
+        
+        # 记录可回滚的审计日志
+        log = AuditLog(
+            user_id=current_user.id,
+            action='删除销售订单',
+            details=f'删除销售订单：{order.order_number}（客户：{order.customer.customer_name}）',
+            can_rollback=True,
+            rollback_type='delete',
+            target_model='SalesOrder',
+            target_id=order.id,
+            old_data=old_data
+        )
+        db.session.add(log)
+        
+        db.session.delete(order)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': '销售订单删除成功'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'删除失败：{str(e)}'})
+
+@bp.route('/sales_order/<int:order_id>/item/add', methods=['GET', 'POST'])
+@login_required
+def add_sales_order_item(order_id):
+    """新增销售订单行"""
+    if current_user.role not in ['admin', 'manager', 'sales']:
+        flash('权限不足', 'danger')
+        return redirect(url_for('main.sales_order_detail', order_id=order_id))
+    
+    order = SalesOrder.query.get_or_404(order_id)
+    form = SalesOrderItemForm()
+    
+    if form.validate_on_submit():
+        try:
+            # 获取最大序号
+            max_sequence = db.session.query(db.func.max(SalesOrderItem.sequence)).filter_by(sales_order_id=order_id).scalar() or 0
+            
+            order_item = SalesOrderItem(
+                sales_order_id=order_id,
+                product_id=form.product_id.data,
+                quantity=form.quantity.data,
+                direction=form.direction.data,
+                spec_extended=form.spec_extended.data,
+                spec_gasket=form.spec_gasket.data,
+                spec_joint=form.spec_joint.data,
+                spec_drilling=form.spec_drilling.data,
+                spec_other=form.spec_other.data,
+                spec_other_desc=form.spec_other_desc.data,
+                usage_unit=form.usage_unit.data,
+                order_time=form.order_time.data,
+                station_notes=form.station_notes.data,
+                sequence=max_sequence + 1
+            )
+            
+            db.session.add(order_item)
+            
+            # 更新订单合计数量
+            order.calculate_total_quantity()
+            
+            # 记录审计日志
+            log = AuditLog(
+                user_id=current_user.id,
+                action='新增订单行',
+                details=f'为订单 {order.order_number} 新增订单行：{order_item.product_name} x {order_item.quantity}'
+            )
+            db.session.add(log)
+            db.session.commit()
+            
+            flash('订单行新增成功', 'success')
+            return redirect(url_for('main.sales_order_detail', order_id=order_id))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'新增失败：{str(e)}', 'danger')
+    
+    return render_template('main/sales_order_item_form.html', form=form, title='新增订单行', order=order)
+
+@bp.route('/sales_order_item/<int:item_id>/edit', methods=['GET', 'POST'])
+@login_required
+def edit_sales_order_item(item_id):
+    """编辑销售订单行"""
+    if current_user.role not in ['admin', 'manager', 'sales']:
+        flash('权限不足', 'danger')
+        return redirect(url_for('main.manage_sales_orders'))
+    
+    order_item = SalesOrderItem.query.get_or_404(item_id)
+    order = order_item.sales_order
+    form = SalesOrderItemForm(obj=order_item)
+    
+    if form.validate_on_submit():
+        try:
+            # 保存旧数据用于审计
+            old_data = {
+                'product_id': order_item.product_id,
+                'quantity': order_item.quantity,
+                'direction': order_item.direction
+            }
+            
+            # 更新订单行信息
+            form.populate_obj(order_item)
+            
+            # 更新订单合计数量
+            order.calculate_total_quantity()
+            
+            # 记录审计日志
+            log = AuditLog(
+                user_id=current_user.id,
+                action='编辑订单行',
+                details=f'编辑订单 {order.order_number} 的订单行：{order_item.product_name}',
+                old_data=old_data
+            )
+            db.session.add(log)
+            db.session.commit()
+            
+            flash('订单行更新成功', 'success')
+            return redirect(url_for('main.sales_order_detail', order_id=order.id))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'更新失败：{str(e)}', 'danger')
+    
+    return render_template('main/sales_order_item_form.html', form=form, title='编辑订单行', 
+                         order=order, order_item=order_item)
+
+@bp.route('/sales_order_item/<int:item_id>/delete', methods=['DELETE'])
+@login_required
+def delete_sales_order_item(item_id):
+    """删除销售订单行"""
+    if current_user.role not in ['admin', 'manager', 'sales']:
+        return jsonify({'success': False, 'message': '权限不足'}), 403
+    
+    try:
+        order_item = SalesOrderItem.query.get_or_404(item_id)
+        order = order_item.sales_order
+        
+        # 保存旧数据用于回滚
+        old_data = {
+            'sales_order_id': order_item.sales_order_id,
+            'product_id': order_item.product_id,
+            'quantity': order_item.quantity,
+            'direction': order_item.direction
+        }
+        
+        # 记录可回滚的审计日志
+        log = AuditLog(
+            user_id=current_user.id,
+            action='删除订单行',
+            details=f'删除订单 {order.order_number} 的订单行：{order_item.product_name} x {order_item.quantity}',
+            can_rollback=True,
+            rollback_type='delete',
+            target_model='SalesOrderItem',
+            target_id=order_item.id,
+            old_data=old_data
+        )
+        db.session.add(log)
+        
+        db.session.delete(order_item)
+        
+        # 更新订单合计数量
+        order.calculate_total_quantity()
+        
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': '订单行删除成功'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'删除失败：{str(e)}'})
+
+@bp.route('/sales_order_item/<int:item_id>/delivery_batches', methods=['GET', 'POST'])
+@login_required
+def manage_delivery_batches(item_id):
+    """管理分批到货"""
+    if current_user.role not in ['admin', 'manager', 'sales']:
+        return jsonify({'success': False, 'message': '权限不足'}), 403
+    
+    order_item = SalesOrderItem.query.get_or_404(item_id)
+    
+    if request.method == 'POST':
+        try:
+            data = request.get_json()
+            batches = data.get('batches', [])
+            
+            # 验证分批数量总和不超过订单行数量
+            total_batch_quantity = sum(batch.get('quantity', 0) for batch in batches)
+            if total_batch_quantity > order_item.quantity:
+                return jsonify({'success': False, 'message': '分批数量总和不能超过订单数量'})
+            
+            # 保存分批信息
+            order_item.set_delivery_batches(batches)
+            db.session.commit()
+            
+            # 记录审计日志
+            log = AuditLog(
+                user_id=current_user.id,
+                action='设置分批到货',
+                details=f'为订单行 {order_item.product_name} 设置分批到货，共 {len(batches)} 批次'
+            )
+            db.session.add(log)
+            db.session.commit()
+            
+            return jsonify({'success': True, 'message': '分批到货设置成功'})
+            
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'success': False, 'message': f'设置失败：{str(e)}'})
+    
+    # GET请求返回当前分批信息
+    return jsonify({
+        'success': True,
+        'data': {
+            'order_item': {
+                'id': order_item.id,
+                'product_name': order_item.product_name,
+                'quantity': order_item.quantity,
+                'unit': order_item.unit
+            },
+            'batches': order_item.delivery_batches_list
+        }
+    })
+
+# ==================== 销售订单管理 API ====================
+
+@bp.route('/api/sales_orders/search')
+@login_required
+def api_search_sales_orders():
+    """销售订单搜索API"""
+    try:
+        search = request.args.get('search', '').strip()
+        status_filter = request.args.get('status', '')
+        
+        query = SalesOrder.query.join(Customer)
+        
+        if status_filter:
+            query = query.filter(SalesOrder.status == status_filter)
+        
+        if search:
+            search_term = f"%{search}%"
+            query = query.filter(db.or_(
+                SalesOrder.order_number.like(search_term),
+                Customer.customer_name.like(search_term),
+                Customer.customer_code.like(search_term)
+            ))
+        
+        sales_orders = query.order_by(SalesOrder.created_at.desc()).limit(50).all()
+        
+        return jsonify({
+            'success': True,
+            'data': [{
+                'id': order.id,
+                'order_number': order.order_number,
+                'customer_name': order.customer.customer_name,
+                'customer_code': order.customer.customer_code,
+                'year_month': order.year_month,
+                'total_quantity': order.total_quantity,
+                'status': order.status,
+                'order_date': order.order_date.strftime('%Y-%m-%d %H:%M')
+            } for order in sales_orders]
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'搜索失败：{str(e)}'})
+
+@bp.route('/api/products/search')
+@login_required
+def api_search_products_for_sales():
+    """产品搜索API（用于销售订单）"""
+    try:
+        search = request.args.get('search', '').strip()
+        only_active = request.args.get('only_active', 'true').lower() == 'true'
+        
+        query = Product.query
+        
+        if only_active:
+            query = query.filter(Product.status == 'active')
+        
+        if search:
+            search_term = f"%{search}%"
+            query = query.filter(db.or_(
+                Product.product_code.like(search_term),
+                Product.product_name.like(search_term),
+                Product.drawing_number.like(search_term)
+            ))
+        
+        products = query.order_by(Product.product_name).limit(50).all()
+        
+        return jsonify({
+            'success': True,
+            'data': [{
+                'id': product.id,
+                'product_code': product.product_code,
+                'product_name': product.product_name,
+                'drawing_number': product.drawing_number or '',
+                'unit': product.unit,
+                'status': product.status
+            } for product in products]
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'搜索失败：{str(e)}'})

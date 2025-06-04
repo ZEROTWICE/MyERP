@@ -161,6 +161,9 @@
                             <a class="nav-link" href="{{ url_for('main.manage_customers') }}">客户管理</a>
                         </li>
                         <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('main.manage_sales_orders') }}">销售订单</a>
+                        </li>
+                        <li class="nav-item">
                             <a class="nav-link" href="{{ url_for('main.manage_production_orders') }}">生产订单</a>
                         </li>
                         {% if current_user.role in ['admin', 'manager', 'inspector'] %}

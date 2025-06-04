@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>{{ title }}</h2>
+        <a href="{{ url_for('main.manage_sales_orders') }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> 返回列表
+        </a>
+    </div>
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">订单信息</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" id="salesOrderForm">
+                        {{ form.hidden_tag() }}
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    {{ form.order_source.label(class="form-label") }}
+                                    {{ form.order_source(class="form-control" + (" is-invalid" if form.order_source.errors else "")) }}
+                                    {% if form.order_source.errors %}
+                                        <div class="invalid-feedback">
+                                            {% for error in form.order_source.errors %}{{ error }}{% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    {{ form.customer_id.label(class="form-label") }}
+                                    <select class="form-control" id="customer_id" name="customer_id" required>
+                                        <option value="">请选择客户</option>
+                                    </select>
+                                    {% if form.customer_id.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {% for error in form.customer_id.errors %}{{ error }}{% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    {{ form.year_month.label(class="form-label") }}
+                                    {{ form.year_month(class="form-control" + (" is-invalid" if form.year_month.errors else ""), 
+                                        value=order.year_month if order else '', 
+                                        placeholder="YYYY-MM") }}
+                                    {% if form.year_month.errors %}
+                                        <div class="invalid-feedback">
+                                            {% for error in form.year_month.errors %}{{ error }}{% endfor %}
+                                        </div>
+                                    {% endif %}
+                                    <small class="form-text text-muted">格式：YYYY-MM，例如：2025-01</small>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    {{ form.status.label(class="form-label") }}
+                                    {{ form.status(class="form-control" + (" is-invalid" if form.status.errors else "")) }}
+                                    {% if form.status.errors %}
+                                        <div class="invalid-feedback">
+                                            {% for error in form.status.errors %}{{ error }}{% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        {% if order %}
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">订单编号</label>
+                                    <input type="text" class="form-control" value="{{ order.order_number }}" readonly>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">合计数量</label>
+                                    <input type="text" class="form-control" value="{{ order.total_quantity }}" readonly>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        <div class="mb-3">
+                            {{ form.notes.label(class="form-label") }}
+                            {{ form.notes(class="form-control", rows="3") }}
+                        </div>
+                        
+                        <div class="d-flex justify-content-end">
+                            <a href="{{ url_for('main.manage_sales_orders') }}" class="btn btn-secondary me-2">取消</a>
+                            {{ form.submit(class="btn btn-primary") }}
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">操作说明</h6>
+                </div>
+                <div class="card-body">
+                    <div class="small">
+                        <h6>订单来源</h6>
+                        <p>填写订单的来源渠道，如：线上商城、电话订购、展会等。</p>
+                        
+                        <h6>客户选择</h6>
+                        <p>从客户管理中选择已有客户。如果客户不存在，请先在客户管理中添加。</p>
+                        
+                        <h6>年月格式</h6>
+                        <p>请按照 YYYY-MM 格式填写，例如：2025-01 表示2025年1月。</p>
+                        
+                        {% if not order %}
+                        <h6>订单编号</h6>
+                        <p>订单编号将在保存后自动生成，使用编码管理中的规则。</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 初始化客户选择
+    loadCustomers();
+    
+    // 自动填充当前年月
+    if (!document.getElementById('year_month').value) {
+        const now = new Date();
+        const yearMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+        document.getElementById('year_month').value = yearMonth;
+    }
+});
+
+function loadCustomers() {
+    fetch('/api/customers/search?only_active=true')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const select = document.getElementById('customer_id');
+                select.innerHTML = '<option value="">请选择客户</option>';
+                
+                data.data.forEach(customer => {
+                    const option = document.createElement('option');
+                    option.value = customer.id;
+                    option.textContent = `${customer.customer_name} (${customer.customer_code})`;
+                    select.appendChild(option);
+                });
+                
+                // 如果是编辑模式，设置当前客户
+                {% if order %}
+                select.value = {{ order.customer_id }};
+                {% endif %}
+            }
+        })
+        .catch(error => {
+            console.error('Error loading customers:', error);
+        });
+}
+</script>
+{% endblock %} 

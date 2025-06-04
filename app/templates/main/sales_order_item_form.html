@@ -1,0 +1,302 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>{{ title }}</h2>
+        <a href="{{ url_for('main.sales_order_detail', order_id=order.id) }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> 返回订单详情
+        </a>
+    </div>
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">订单行信息</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" id="salesOrderItemForm">
+                        {{ form.hidden_tag() }}
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    {{ form.product_id.label(class="form-label") }}
+                                    <select class="form-control" id="product_id" name="product_id" required>
+                                        <option value="">请选择产品</option>
+                                    </select>
+                                    {% if form.product_id.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {% for error in form.product_id.errors %}{{ error }}{% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    {{ form.quantity.label(class="form-label") }}
+                                    {{ form.quantity(class="form-control" + (" is-invalid" if form.quantity.errors else "")) }}
+                                    {% if form.quantity.errors %}
+                                        <div class="invalid-feedback">
+                                            {% for error in form.quantity.errors %}{{ error }}{% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label class="form-label">单位</label>
+                                    <input type="text" class="form-control" id="unit_display" readonly>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">图号</label>
+                                    <input type="text" class="form-control" id="drawing_number_display" readonly>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    {{ form.direction.label(class="form-label") }}
+                                    {{ form.direction(class="form-control" + (" is-invalid" if form.direction.errors else "")) }}
+                                    {% if form.direction.errors %}
+                                        <div class="invalid-feedback">
+                                            {% for error in form.direction.errors %}{{ error }}{% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 规格型号 -->
+                        <div class="mb-3">
+                            <label class="form-label">规格型号（可多选）</label>
+                            <div class="row">
+                                <div class="col-md-2">
+                                    <div class="form-check">
+                                        {{ form.spec_extended(class="form-check-input") }}
+                                        {{ form.spec_extended.label(class="form-check-label") }}
+                                    </div>
+                                </div>
+                                <div class="col-md-2">
+                                    <div class="form-check">
+                                        {{ form.spec_gasket(class="form-check-input") }}
+                                        {{ form.spec_gasket.label(class="form-check-label") }}
+                                    </div>
+                                </div>
+                                <div class="col-md-2">
+                                    <div class="form-check">
+                                        {{ form.spec_joint(class="form-check-input") }}
+                                        {{ form.spec_joint.label(class="form-check-label") }}
+                                    </div>
+                                </div>
+                                <div class="col-md-2">
+                                    <div class="form-check">
+                                        {{ form.spec_drilling(class="form-check-input") }}
+                                        {{ form.spec_drilling.label(class="form-check-label") }}
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-check">
+                                        {{ form.spec_other(class="form-check-input") }}
+                                        {{ form.spec_other.label(class="form-check-label") }}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row mt-2" id="spec_other_desc_row" style="display: none;">
+                                <div class="col-md-12">
+                                    {{ form.spec_other_desc(class="form-control", placeholder="请描述其他规格") }}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    {{ form.usage_unit.label(class="form-label") }}
+                                    {{ form.usage_unit(class="form-control" + (" is-invalid" if form.usage_unit.errors else "")) }}
+                                    {% if form.usage_unit.errors %}
+                                        <div class="invalid-feedback">
+                                            {% for error in form.usage_unit.errors %}{{ error }}{% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    {{ form.order_time.label(class="form-label") }}
+                                    {{ form.order_time(class="form-control" + (" is-invalid" if form.order_time.errors else "")) }}
+                                    {% if form.order_time.errors %}
+                                        <div class="invalid-feedback">
+                                            {% for error in form.order_time.errors %}{{ error }}{% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            {{ form.station_notes.label(class="form-label") }}
+                            {{ form.station_notes(class="form-control", rows="3") }}
+                        </div>
+                        
+                        <div class="d-flex justify-content-end">
+                            <a href="{{ url_for('main.sales_order_detail', order_id=order.id) }}" class="btn btn-secondary me-2">取消</a>
+                            {{ form.submit(class="btn btn-primary") }}
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <!-- 订单信息 -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h6 class="mb-0">所属订单</h6>
+                </div>
+                <div class="card-body">
+                    <div class="text-center mb-3">
+                        <h6>{{ order.order_number }}</h6>
+                        <small class="text-muted">{{ order.customer.customer_name }}</small>
+                    </div>
+                    <div class="small">
+                        <div class="mb-2">
+                            <strong>订单来源:</strong> {{ order.order_source }}
+                        </div>
+                        <div class="mb-2">
+                            <strong>年月:</strong> {{ order.year_month }}
+                        </div>
+                        <div class="mb-2">
+                            <strong>当前数量:</strong> {{ order.total_quantity }}
+                        </div>
+                        <div class="mb-2">
+                            <strong>状态:</strong>
+                            {% if order.status == 'pending' %}
+                                <span class="badge bg-warning">待处理</span>
+                            {% elif order.status == 'confirmed' %}
+                                <span class="badge bg-primary">已确认</span>
+                            {% elif order.status == 'in_production' %}
+                                <span class="badge bg-info">生产中</span>
+                            {% elif order.status == 'completed' %}
+                                <span class="badge bg-success">已完成</span>
+                            {% elif order.status == 'cancelled' %}
+                                <span class="badge bg-danger">已取消</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 操作说明 -->
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">填写说明</h6>
+                </div>
+                <div class="card-body">
+                    <div class="small">
+                        <h6>产品选择</h6>
+                        <p>从产品管理中选择已有产品。选择后会自动显示图号和单位信息。</p>
+                        
+                        <h6>规格型号</h6>
+                        <p>可以同时选择多个规格型号，如加长、垫板、接头、钻孔等。选择"其他"时需要填写具体描述。</p>
+                        
+                        <h6>分批到货</h6>
+                        <p>保存订单行后，可以在订单详情页面设置分批到货信息。</p>
+                        
+                        <h6>使用单位</h6>
+                        <p>填写产品的最终使用单位或部门。</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 初始化产品选择
+    loadProducts();
+    
+    // 监听产品选择变化
+    document.getElementById('product_id').addEventListener('change', function() {
+        updateProductInfo(this.value);
+    });
+    
+    // 监听"其他"规格选择
+    document.getElementById('spec_other').addEventListener('change', function() {
+        const descRow = document.getElementById('spec_other_desc_row');
+        if (this.checked) {
+            descRow.style.display = 'block';
+        } else {
+            descRow.style.display = 'none';
+            document.getElementById('spec_other_desc').value = '';
+        }
+    });
+    
+    // 初始化时间
+    if (!document.getElementById('order_time').value) {
+        const now = new Date();
+        const timeString = now.getFullYear() + '-' + 
+                          String(now.getMonth() + 1).padStart(2, '0') + '-' + 
+                          String(now.getDate()).padStart(2, '0') + ' ' +
+                          String(now.getHours()).padStart(2, '0') + ':' + 
+                          String(now.getMinutes()).padStart(2, '0');
+        document.getElementById('order_time').value = timeString;
+    }
+    
+    // 如果是编辑模式，初始化其他规格显示
+    {% if order_item and order_item.spec_other %}
+    document.getElementById('spec_other_desc_row').style.display = 'block';
+    {% endif %}
+});
+
+function loadProducts() {
+    fetch('/api/products/search?only_active=true')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const select = document.getElementById('product_id');
+                select.innerHTML = '<option value="">请选择产品</option>';
+                
+                data.data.forEach(product => {
+                    const option = document.createElement('option');
+                    option.value = product.id;
+                    option.textContent = `${product.product_name} (${product.product_code})`;
+                    option.dataset.drawingNumber = product.drawing_number;
+                    option.dataset.unit = product.unit;
+                    select.appendChild(option);
+                });
+                
+                // 如果是编辑模式，设置当前产品
+                {% if order_item %}
+                select.value = {{ order_item.product_id }};
+                updateProductInfo({{ order_item.product_id }});
+                {% endif %}
+            }
+        })
+        .catch(error => {
+            console.error('Error loading products:', error);
+        });
+}
+
+function updateProductInfo(productId) {
+    const select = document.getElementById('product_id');
+    const selectedOption = select.querySelector(`option[value="${productId}"]`);
+    
+    if (selectedOption) {
+        document.getElementById('drawing_number_display').value = selectedOption.dataset.drawingNumber || '';
+        document.getElementById('unit_display').value = selectedOption.dataset.unit || '';
+    } else {
+        document.getElementById('drawing_number_display').value = '';
+        document.getElementById('unit_display').value = '';
+    }
+}
+</script>
+{% endblock %} 

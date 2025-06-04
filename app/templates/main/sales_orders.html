@@ -1,0 +1,222 @@
+{% extends "base.html" %}
+
+{% block title %}销售订单管理{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>销售订单管理</h2>
+        {% if current_user.role in ['admin', 'manager', 'sales'] %}
+        <a href="{{ url_for('main.add_sales_order') }}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> 新增订单
+        </a>
+        {% endif %}
+    </div>
+
+    <!-- 搜索和筛选 -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="GET" class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">搜索</label>
+                    <input type="text" class="form-control" name="search" value="{{ search }}" 
+                           placeholder="订单编号、客户名称、订单来源">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">状态</label>
+                    <select class="form-select" name="status">
+                        <option value="">全部状态</option>
+                        <option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>待处理</option>
+                        <option value="confirmed" {% if status_filter == 'confirmed' %}selected{% endif %}>已确认</option>
+                        <option value="in_production" {% if status_filter == 'in_production' %}selected{% endif %}>生产中</option>
+                        <option value="completed" {% if status_filter == 'completed' %}selected{% endif %}>已完成</option>
+                        <option value="cancelled" {% if status_filter == 'cancelled' %}selected{% endif %}>已取消</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">年月</label>
+                    <select class="form-select" name="year_month">
+                        <option value="">全部年月</option>
+                        {% for ym in year_months %}
+                        <option value="{{ ym }}" {% if year_month_filter == ym %}selected{% endif %}>{{ ym }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">客户</label>
+                    <select class="form-select" name="customer_id">
+                        <option value="">全部客户</option>
+                        {% for customer in customers %}
+                        <option value="{{ customer.id }}" {% if customer_filter == customer.id|string %}selected{% endif %}>
+                            {{ customer.customer_name }} ({{ customer.customer_code }})
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button type="submit" class="btn btn-outline-primary me-2">
+                        <i class="fas fa-search"></i> 搜索
+                    </button>
+                    <a href="{{ url_for('main.manage_sales_orders') }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-undo"></i> 重置
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 订单列表 -->
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">销售订单列表 ({{ pagination.total }}个)</h5>
+        </div>
+        <div class="card-body">
+            {% if orders %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>订单编号</th>
+                            <th>订单来源</th>
+                            <th>客户</th>
+                            <th>年月</th>
+                            <th>合计数量</th>
+                            <th>状态</th>
+                            <th>下单时间</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for order in orders %}
+                        <tr>
+                            <td>
+                                <code>{{ order.order_number }}</code>
+                            </td>
+                            <td>{{ order.order_source }}</td>
+                            <td>
+                                <strong>{{ order.customer.customer_name }}</strong>
+                                <br><small class="text-muted">{{ order.customer.customer_code }}</small>
+                            </td>
+                            <td>{{ order.year_month }}</td>
+                            <td>
+                                <span class="badge bg-info">{{ order.total_quantity }}</span>
+                            </td>
+                            <td>
+                                {% if order.status == 'pending' %}
+                                    <span class="badge bg-warning">待处理</span>
+                                {% elif order.status == 'confirmed' %}
+                                    <span class="badge bg-primary">已确认</span>
+                                {% elif order.status == 'in_production' %}
+                                    <span class="badge bg-info">生产中</span>
+                                {% elif order.status == 'completed' %}
+                                    <span class="badge bg-success">已完成</span>
+                                {% elif order.status == 'cancelled' %}
+                                    <span class="badge bg-danger">已取消</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ order.order_date.strftime('%Y-%m-%d %H:%M') }}</td>
+                            <td>
+                                <div class="btn-group">
+                                    <a href="{{ url_for('main.sales_order_detail', order_id=order.id) }}" 
+                                       class="btn btn-sm btn-outline-primary">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    {% if current_user.role in ['admin', 'manager', 'sales'] %}
+                                    <a href="{{ url_for('main.edit_sales_order', order_id=order.id) }}" 
+                                       class="btn btn-sm btn-outline-secondary">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    {% endif %}
+                                    {% if current_user.role in ['admin', 'manager'] %}
+                                    <button class="btn btn-sm btn-outline-danger" 
+                                            onclick="deleteOrder({{ order.id }}, '{{ order.order_number }}')">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- 分页 -->
+            {% if pagination.pages > 1 %}
+            <nav aria-label="订单分页">
+                <ul class="pagination justify-content-center">
+                    {% if pagination.has_prev %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('main.manage_sales_orders', page=pagination.prev_num, search=search, status=status_filter, year_month=year_month_filter, customer_id=customer_filter) }}">上一页</a>
+                    </li>
+                    {% endif %}
+                    
+                    {% for page_num in pagination.iter_pages() %}
+                        {% if page_num %}
+                            {% if page_num != pagination.page %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('main.manage_sales_orders', page=page_num, search=search, status=status_filter, year_month=year_month_filter, customer_id=customer_filter) }}">{{ page_num }}</a>
+                            </li>
+                            {% else %}
+                            <li class="page-item active">
+                                <span class="page-link">{{ page_num }}</span>
+                            </li>
+                            {% endif %}
+                        {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link">…</span>
+                        </li>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% if pagination.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('main.manage_sales_orders', page=pagination.next_num, search=search, status=status_filter, year_month=year_month_filter, customer_id=customer_filter) }}">下一页</a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+            {% else %}
+            <div class="text-center py-4">
+                <i class="fas fa-file-invoice fa-3x text-muted mb-3"></i>
+                <p class="text-muted">暂无销售订单数据</p>
+                {% if current_user.role in ['admin', 'manager', 'sales'] %}
+                <a href="{{ url_for('main.add_sales_order') }}" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> 新增订单
+                </a>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+function deleteOrder(orderId, orderNumber) {
+    if (!confirm(`确定要删除订单 "${orderNumber}" 吗？此操作不可恢复。`)) {
+        return;
+    }
+    
+    fetch(`/sales_order/${orderId}/delete`, {
+        method: 'DELETE',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token() }}'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            location.reload();
+        } else {
+            alert('删除失败：' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('删除失败，请重试');
+    });
+}
+</script>
+{% endblock %} 
