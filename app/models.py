@@ -912,6 +912,20 @@ class ProductionOrder(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     created_by = db.Column(db.Integer, db.ForeignKey('user.id'))
     
+    # 销售订单关联字段
+    sales_order_id = db.Column(db.Integer, db.ForeignKey('sales_orders.id', ondelete='SET NULL'), nullable=True)  # 关联的销售订单ID
+    sales_order_item_id = db.Column(db.Integer, db.ForeignKey('sales_order_items.id', ondelete='SET NULL'), nullable=True)  # 关联的销售订单行ID
+    source_type = db.Column(db.String(20), default='manual')  # manual: 手动创建, sales_order: 从销售订单创建, sales_item: 从销售订单行创建
+    
+    # 从销售订单继承的规格型号信息
+    spec_extended = db.Column(db.String(100))  # 加长（具体值）
+    spec_gasket = db.Column(db.String(100))  # 垫板（具体值）
+    spec_joint = db.Column(db.String(100))  # 接头（具体值）
+    spec_drilling = db.Column(db.String(100))  # 钻孔（具体值）
+    spec_other = db.Column(db.String(100))  # 其他（具体值）
+    spec_other_desc = db.Column(db.String(200))  # 其他规格描述
+    direction = db.Column(db.String(50))  # 开向
+    
     __table_args__ = (
         db.UniqueConstraint('global_sn', name='uq_production_order_global_sn'),
         db.UniqueConstraint('order_number', name='uq_production_order_number'),
@@ -921,6 +935,8 @@ class ProductionOrder(db.Model):
     creator = db.relationship('User', backref=db.backref('created_production_orders', lazy='dynamic'))
     batches = db.relationship('ProductionBatch', backref='production_order', lazy='dynamic', cascade='all, delete-orphan')
     material_allocations = db.relationship('MaterialAllocation', backref='production_order', lazy='dynamic', cascade='all, delete-orphan')
+    sales_order = db.relationship('SalesOrder', backref=db.backref('production_orders', lazy='dynamic'))
+    sales_order_item = db.relationship('SalesOrderItem', backref=db.backref('production_orders', lazy='dynamic'))
     
     def __init__(self, **kwargs):
         super(ProductionOrder, self).__init__(**kwargs)
@@ -940,6 +956,28 @@ class ProductionOrder(db.Model):
     def remaining_quantity(self):
         """剩余数量"""
         return max(0, self.planned_quantity - self.completed_quantity)
+    
+    @property
+    def specifications(self):
+        """获取规格型号列表"""
+        specs = []
+        if self.spec_extended:
+            specs.append(f'加长({self.spec_extended})')
+        if self.spec_gasket:
+            specs.append(f'垫板({self.spec_gasket})')
+        if self.spec_joint:
+            specs.append(f'接头({self.spec_joint})')
+        if self.spec_drilling:
+            specs.append(f'钻孔({self.spec_drilling})')
+        if self.spec_other:
+            specs.append(f'其他({self.spec_other})')
+        return specs
+    
+    @property
+    def specifications_text(self):
+        """获取规格型号文本"""
+        specs = self.specifications
+        return ', '.join(specs) if specs else '无'
     
     def allocate_materials(self):
         """根据产品BOM分配原材料"""
@@ -1276,14 +1314,14 @@ class SalesOrderItem(db.Model):
     direction = db.Column(db.String(50))  # 开向
     
     # 规格型号（五个选项，可同时选择多个）
-    spec_extended = db.Column(db.Boolean, default=False)  # 加长
-    spec_gasket = db.Column(db.Boolean, default=False)  # 垫板
-    spec_joint = db.Column(db.Boolean, default=False)  # 接头
-    spec_drilling = db.Column(db.Boolean, default=False)  # 钻孔
-    spec_other = db.Column(db.Boolean, default=False)  # 其他
+    spec_extended = db.Column(db.String(100))  # 加长（具体值）
+    spec_gasket = db.Column(db.String(100))  # 垫板（具体值）
+    spec_joint = db.Column(db.String(100))  # 接头（具体值）
+    spec_drilling = db.Column(db.String(100))  # 钻孔（具体值）
+    spec_other = db.Column(db.String(100))  # 其他（具体值）
     spec_other_desc = db.Column(db.String(200))  # 其他规格描述
     
-    usage_unit = db.Column(db.String(100))  # 使用单位
+    customer_address_id = db.Column(db.Integer, db.ForeignKey('customer_addresses.id'), nullable=True)  # 客户地址ID
     order_time = db.Column(db.DateTime, default=datetime.utcnow)  # 下单时间
     station_notes = db.Column(db.Text)  # 到站备注
     
@@ -1299,6 +1337,7 @@ class SalesOrderItem(db.Model):
     
     # 关系
     product = db.relationship('Product', backref=db.backref('sales_order_items', lazy='dynamic'))
+    customer_address = db.relationship('CustomerAddress', backref=db.backref('sales_order_items', lazy='dynamic'))
     
     def __init__(self, **kwargs):
         super(SalesOrderItem, self).__init__(**kwargs)
@@ -1325,15 +1364,15 @@ class SalesOrderItem(db.Model):
         """获取规格型号列表"""
         specs = []
         if self.spec_extended:
-            specs.append('加长')
+            specs.append(f'加长({self.spec_extended})')
         if self.spec_gasket:
-            specs.append('垫板')
+            specs.append(f'垫板({self.spec_gasket})')
         if self.spec_joint:
-            specs.append('接头')
+            specs.append(f'接头({self.spec_joint})')
         if self.spec_drilling:
-            specs.append('钻孔')
+            specs.append(f'钻孔({self.spec_drilling})')
         if self.spec_other:
-            specs.append(f'其他({self.spec_other_desc})' if self.spec_other_desc else '其他')
+            specs.append(f'其他({self.spec_other})')
         return specs
     
     @property

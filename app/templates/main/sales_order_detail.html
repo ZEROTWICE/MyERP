@@ -15,6 +15,11 @@
                 <i class="fas fa-plus"></i> 添加订单行
             </a>
             {% endif %}
+            {% if current_user.role in ['admin', 'manager'] %}
+            <button type="button" class="btn btn-warning" onclick="createProductionOrderFromSales()">
+                <i class="fas fa-industry"></i> 创建生产订单
+            </button>
+            {% endif %}
             <a href="{{ url_for('main.manage_sales_orders') }}" class="btn btn-secondary">
                 <i class="fas fa-arrow-left"></i> 返回列表
             </a>
@@ -118,7 +123,7 @@
                                     <th>单位</th>
                                     <th>开向</th>
                                     <th>规格型号</th>
-                                    <th>使用单位</th>
+                                    <th>收货地址</th>
                                     <th>下单时间</th>
                                     <th>分批到货</th>
                                     <th>操作</th>
@@ -139,7 +144,17 @@
                                     <td>
                                         <small>{{ item.specifications_text }}</small>
                                     </td>
-                                    <td>{{ item.usage_unit or '-' }}</td>
+                                    <td>
+                                        {% if item.customer_address %}
+                                            <div>
+                                                <strong>{{ item.customer_address.contact_person }}</strong>
+                                                <br><small class="text-muted">{{ item.customer_address.contact_phone }}</small>
+                                                <br><small class="text-muted">{{ item.customer_address.full_address }}</small>
+                                            </div>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
                                     <td>{{ item.order_time.strftime('%Y-%m-%d %H:%M') }}</td>
                                     <td>
                                         {% set batches = item.delivery_batches_list %}
@@ -164,6 +179,12 @@
                                             <button class="btn btn-sm btn-outline-danger" 
                                                     onclick="deleteOrderItem({{ item.id }}, '{{ item.product_name }}')">
                                                 <i class="fas fa-trash"></i>
+                                            </button>
+                                            {% endif %}
+                                            {% if current_user.role in ['admin', 'manager'] %}
+                                            <button class="btn btn-sm btn-outline-warning" 
+                                                    onclick="createProductionOrderFromItem({{ item.id }}, '{{ item.product_name }}', {{ item.quantity }})">
+                                                <i class="fas fa-industry"></i>
                                             </button>
                                             {% endif %}
                                         </div>
@@ -302,6 +323,78 @@
     </div>
 </div>
 
+<!-- 创建生产订单模态框 -->
+<div class="modal fade" id="createProductionOrderModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="createProductionOrderModalTitle">创建生产订单</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="createProductionOrderForm">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="plannedStartDate" class="form-label">计划开始日期 *</label>
+                                <input type="date" class="form-control" id="plannedStartDate" name="planned_start_date" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="plannedEndDate" class="form-label">计划完成日期 *</label>
+                                <input type="date" class="form-control" id="plannedEndDate" name="planned_end_date" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="productionPriority" class="form-label">优先级</label>
+                                <select class="form-control" id="productionPriority" name="priority">
+                                    <option value="-1">低优先级</option>
+                                    <option value="0" selected>普通</option>
+                                    <option value="1">高优先级</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6" id="plannedQuantityDiv" style="display: none;">
+                            <div class="mb-3">
+                                <label for="plannedQuantity" class="form-label">计划数量</label>
+                                <input type="number" class="form-control" id="plannedQuantity" name="planned_quantity" min="1">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="productionNotes" class="form-label">备注</label>
+                        <textarea class="form-control" id="productionNotes" name="notes" rows="3"></textarea>
+                    </div>
+                    <div id="orderItemsPreview" class="mb-3" style="display: none;">
+                        <h6>将要创建的生产订单：</h6>
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>产品名称</th>
+                                        <th>数量</th>
+                                        <th>规格型号</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="orderItemsPreviewBody">
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="submitCreateProductionOrder()">创建生产订单</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 function deleteOrderItem(itemId, productName) {
     if (!confirm(`确定要删除订单行 "${productName}" 吗？此操作不可恢复。`)) {
@@ -389,5 +482,513 @@ function manageDeliveryBatches(itemId) {
     // 这里可以实现分批到货的编辑功能
     alert('分批到货管理功能开发中...');
 }
+
+// 创建生产订单相关函数
+let currentCreateMode = 'sales'; // 'sales' 或 'item'
+let currentItemId = null;
+
+function createProductionOrderFromSales() {
+    currentCreateMode = 'sales';
+    currentItemId = null;
+    
+    document.getElementById('createProductionOrderModalTitle').textContent = '从销售订单创建生产订单';
+    document.getElementById('plannedQuantityDiv').style.display = 'none';
+    document.getElementById('orderItemsPreview').style.display = 'block';
+    
+    // 显示订单行预览
+    const orderItems = {{ order_items_json | tojson }};
+    let previewHtml = '';
+    orderItems.forEach(item => {
+        previewHtml += `
+            <tr>
+                <td>${item.product_name}</td>
+                <td>${item.quantity}</td>
+                <td>${item.specifications_text || '无'}</td>
+            </tr>
+        `;
+    });
+    document.getElementById('orderItemsPreviewBody').innerHTML = previewHtml;
+    
+    // 设置默认日期
+    setDefaultDates();
+    
+    const modal = new bootstrap.Modal(document.getElementById('createProductionOrderModal'));
+    modal.show();
+}
+
+function createProductionOrderFromItem(itemId, productName, quantity) {
+    currentCreateMode = 'item';
+    currentItemId = itemId;
+    
+    document.getElementById('createProductionOrderModalTitle').textContent = `为 "${productName}" 创建生产订单`;
+    document.getElementById('plannedQuantityDiv').style.display = 'block';
+    document.getElementById('plannedQuantity').value = quantity;
+    document.getElementById('orderItemsPreview').style.display = 'none';
+    
+    // 设置默认日期
+    setDefaultDates();
+    
+    const modal = new bootstrap.Modal(document.getElementById('createProductionOrderModal'));
+    modal.show();
+}
+
+function setDefaultDates() {
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const nextWeek = new Date(today);
+    nextWeek.setDate(nextWeek.getDate() + 7);
+    
+    document.getElementById('plannedStartDate').value = tomorrow.toISOString().split('T')[0];
+    document.getElementById('plannedEndDate').value = nextWeek.toISOString().split('T')[0];
+}
+
+function submitCreateProductionOrder() {
+    const formData = {
+        planned_start_date: document.getElementById('plannedStartDate').value,
+        planned_end_date: document.getElementById('plannedEndDate').value,
+        priority: document.getElementById('productionPriority').value,
+        notes: document.getElementById('productionNotes').value
+    };
+    
+    // 验证必填字段
+    if (!formData.planned_start_date || !formData.planned_end_date) {
+        alert('请填写计划开始日期和完成日期');
+        return;
+    }
+    
+    // 验证日期逻辑
+    if (new Date(formData.planned_start_date) >= new Date(formData.planned_end_date)) {
+        alert('计划完成日期必须晚于开始日期');
+        return;
+    }
+    
+    let url;
+    if (currentCreateMode === 'sales') {
+        url = `/sales_order/{{ order.id }}/create_production_order`;
+    } else {
+        url = `/sales_order_item/${currentItemId}/create_production_order`;
+        if (document.getElementById('plannedQuantity').value) {
+            formData.planned_quantity = parseInt(document.getElementById('plannedQuantity').value);
+        }
+    }
+    
+    fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
+        },
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            const modal = bootstrap.Modal.getInstance(document.getElementById('createProductionOrderModal'));
+            modal.hide();
+            location.reload();
+        } else {
+            alert('创建失败：' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('创建失败，请重试');
+    });
+}
 </script>
-{% endblock %} 
+    fetch(`/sales_order_item/${itemId}/delete`, {
+        method: 'DELETE',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token() }}'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            location.reload();
+        } else {
+            alert('删除失败：' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('删除失败，请重试');
+    });
+}
+
+function viewDeliveryBatches(itemId) {
+    fetch(`/sales_order_item/${itemId}/delivery_batches`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const orderItem = data.data.order_item;
+                const batches = data.data.batches;
+                
+                let html = `
+                    <div class="mb-3">
+                        <h6>产品：${orderItem.product_name}</h6>
+                        <p class="text-muted">总数量：${orderItem.quantity} ${orderItem.unit}</p>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>批次号</th>
+                                    <th>到货日期</th>
+                                    <th>数量</th>
+                                    <th>备注</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                `;
+                
+                batches.forEach(batch => {
+                    html += `
+                        <tr>
+                            <td>${batch.batch_no}</td>
+                            <td>${batch.delivery_date}</td>
+                            <td>${batch.quantity}</td>
+                            <td>${batch.notes || '-'}</td>
+                        </tr>
+                    `;
+                });
+                
+                html += `
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+                
+                document.getElementById('deliveryBatchesContent').innerHTML = html;
+                document.getElementById('saveDeliveryBatches').style.display = 'none';
+                
+                const modal = new bootstrap.Modal(document.getElementById('deliveryBatchesModal'));
+                modal.show();
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('获取分批信息失败');
+        });
+}
+
+function manageDeliveryBatches(itemId) {
+    // 这里可以实现分批到货的编辑功能
+    alert('分批到货管理功能开发中...');
+}
+
+// 创建生产订单相关函数
+let currentCreateMode = 'sales'; // 'sales' 或 'item'
+let currentItemId = null;
+
+function createProductionOrderFromSales() {
+    currentCreateMode = 'sales';
+    currentItemId = null;
+    
+    document.getElementById('createProductionOrderModalTitle').textContent = '从销售订单创建生产订单';
+    document.getElementById('plannedQuantityDiv').style.display = 'none';
+    document.getElementById('orderItemsPreview').style.display = 'block';
+    
+    // 显示订单行预览
+    const orderItems = {{ order_items_json | tojson }};
+    let previewHtml = '';
+    orderItems.forEach(item => {
+        previewHtml += `
+            <tr>
+                <td>${item.product_name}</td>
+                <td>${item.quantity}</td>
+                <td>${item.specifications_text || '无'}</td>
+            </tr>
+        `;
+    });
+    document.getElementById('orderItemsPreviewBody').innerHTML = previewHtml;
+    
+    // 设置默认日期
+    setDefaultDates();
+    
+    const modal = new bootstrap.Modal(document.getElementById('createProductionOrderModal'));
+    modal.show();
+}
+
+function createProductionOrderFromItem(itemId, productName, quantity) {
+    currentCreateMode = 'item';
+    currentItemId = itemId;
+    
+    document.getElementById('createProductionOrderModalTitle').textContent = `为 "${productName}" 创建生产订单`;
+    document.getElementById('plannedQuantityDiv').style.display = 'block';
+    document.getElementById('plannedQuantity').value = quantity;
+    document.getElementById('orderItemsPreview').style.display = 'none';
+    
+    // 设置默认日期
+    setDefaultDates();
+    
+    const modal = new bootstrap.Modal(document.getElementById('createProductionOrderModal'));
+    modal.show();
+}
+
+function setDefaultDates() {
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const nextWeek = new Date(today);
+    nextWeek.setDate(nextWeek.getDate() + 7);
+    
+    document.getElementById('plannedStartDate').value = tomorrow.toISOString().split('T')[0];
+    document.getElementById('plannedEndDate').value = nextWeek.toISOString().split('T')[0];
+}
+
+function submitCreateProductionOrder() {
+    const formData = {
+        planned_start_date: document.getElementById('plannedStartDate').value,
+        planned_end_date: document.getElementById('plannedEndDate').value,
+        priority: document.getElementById('productionPriority').value,
+        notes: document.getElementById('productionNotes').value
+    };
+    
+    // 验证必填字段
+    if (!formData.planned_start_date || !formData.planned_end_date) {
+        alert('请填写计划开始日期和完成日期');
+        return;
+    }
+    
+    // 验证日期逻辑
+    if (new Date(formData.planned_start_date) >= new Date(formData.planned_end_date)) {
+        alert('计划完成日期必须晚于开始日期');
+        return;
+    }
+    
+    let url;
+    if (currentCreateMode === 'sales') {
+        url = `/sales_order/{{ order.id }}/create_production_order`;
+    } else {
+        url = `/sales_order_item/${currentItemId}/create_production_order`;
+        if (document.getElementById('plannedQuantity').value) {
+            formData.planned_quantity = parseInt(document.getElementById('plannedQuantity').value);
+        }
+    }
+    
+    fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
+        },
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            const modal = bootstrap.Modal.getInstance(document.getElementById('createProductionOrderModal'));
+            modal.hide();
+            location.reload();
+        } else {
+            alert('创建失败：' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('创建失败，请重试');
+    });
+}
+</script>
+    fetch(`/sales_order_item/${itemId}/delete`, {
+        method: 'DELETE',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token() }}'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            location.reload();
+        } else {
+            alert('删除失败：' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('删除失败，请重试');
+    });
+}
+
+function viewDeliveryBatches(itemId) {
+    fetch(`/sales_order_item/${itemId}/delivery_batches`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const orderItem = data.data.order_item;
+                const batches = data.data.batches;
+                
+                let html = `
+                    <div class="mb-3">
+                        <h6>产品：${orderItem.product_name}</h6>
+                        <p class="text-muted">总数量：${orderItem.quantity} ${orderItem.unit}</p>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>批次号</th>
+                                    <th>到货日期</th>
+                                    <th>数量</th>
+                                    <th>备注</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                `;
+                
+                batches.forEach(batch => {
+                    html += `
+                        <tr>
+                            <td>${batch.batch_no}</td>
+                            <td>${batch.delivery_date}</td>
+                            <td>${batch.quantity}</td>
+                            <td>${batch.notes || '-'}</td>
+                        </tr>
+                    `;
+                });
+                
+                html += `
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+                
+                document.getElementById('deliveryBatchesContent').innerHTML = html;
+                document.getElementById('saveDeliveryBatches').style.display = 'none';
+                
+                const modal = new bootstrap.Modal(document.getElementById('deliveryBatchesModal'));
+                modal.show();
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('获取分批信息失败');
+        });
+}
+
+function manageDeliveryBatches(itemId) {
+    // 这里可以实现分批到货的编辑功能
+    alert('分批到货管理功能开发中...');
+}
+
+// 创建生产订单相关函数
+let currentCreateMode = 'sales'; // 'sales' 或 'item'
+let currentItemId = null;
+
+function createProductionOrderFromSales() {
+    currentCreateMode = 'sales';
+    currentItemId = null;
+    
+    document.getElementById('createProductionOrderModalTitle').textContent = '从销售订单创建生产订单';
+    document.getElementById('plannedQuantityDiv').style.display = 'none';
+    document.getElementById('orderItemsPreview').style.display = 'block';
+    
+    // 显示订单行预览
+    const orderItems = {{ order_items_json | tojson }};
+    let previewHtml = '';
+    orderItems.forEach(item => {
+        previewHtml += `
+            <tr>
+                <td>${item.product_name}</td>
+                <td>${item.quantity}</td>
+                <td>${item.specifications_text || '无'}</td>
+            </tr>
+        `;
+    });
+    document.getElementById('orderItemsPreviewBody').innerHTML = previewHtml;
+    
+    // 设置默认日期
+    setDefaultDates();
+    
+    const modal = new bootstrap.Modal(document.getElementById('createProductionOrderModal'));
+    modal.show();
+}
+
+function createProductionOrderFromItem(itemId, productName, quantity) {
+    currentCreateMode = 'item';
+    currentItemId = itemId;
+    
+    document.getElementById('createProductionOrderModalTitle').textContent = `为 "${productName}" 创建生产订单`;
+    document.getElementById('plannedQuantityDiv').style.display = 'block';
+    document.getElementById('plannedQuantity').value = quantity;
+    document.getElementById('orderItemsPreview').style.display = 'none';
+    
+    // 设置默认日期
+    setDefaultDates();
+    
+    const modal = new bootstrap.Modal(document.getElementById('createProductionOrderModal'));
+    modal.show();
+}
+
+function setDefaultDates() {
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const nextWeek = new Date(today);
+    nextWeek.setDate(nextWeek.getDate() + 7);
+    
+    document.getElementById('plannedStartDate').value = tomorrow.toISOString().split('T')[0];
+    document.getElementById('plannedEndDate').value = nextWeek.toISOString().split('T')[0];
+}
+
+function submitCreateProductionOrder() {
+    const formData = {
+        planned_start_date: document.getElementById('plannedStartDate').value,
+        planned_end_date: document.getElementById('plannedEndDate').value,
+        priority: document.getElementById('productionPriority').value,
+        notes: document.getElementById('productionNotes').value
+    };
+    
+    // 验证必填字段
+    if (!formData.planned_start_date || !formData.planned_end_date) {
+        alert('请填写计划开始日期和完成日期');
+        return;
+    }
+    
+    // 验证日期逻辑
+    if (new Date(formData.planned_start_date) >= new Date(formData.planned_end_date)) {
+        alert('计划完成日期必须晚于开始日期');
+        return;
+    }
+    
+    let url;
+    if (currentCreateMode === 'sales') {
+        url = `/sales_order/{{ order.id }}/create_production_order`;
+    } else {
+        url = `/sales_order_item/${currentItemId}/create_production_order`;
+        if (document.getElementById('plannedQuantity').value) {
+            formData.planned_quantity = parseInt(document.getElementById('plannedQuantity').value);
+        }
+    }
+    
+    fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
+        },
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            const modal = bootstrap.Modal.getInstance(document.getElementById('createProductionOrderModal'));
+            modal.hide();
+            location.reload();
+        } else {
+            alert('创建失败：' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('创建失败，请重试');
+    });
+}
+</script>

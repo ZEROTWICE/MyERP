@@ -88,9 +88,9 @@
                         {% endif %}
                     </td>
                     <td>
-                        {% if order.priority == 0 %}
+                        {% if order.priority|int == 0 %}
                             <span class="badge bg-light text-dark">普通</span>
-                        {% elif order.priority > 0 %}
+                        {% elif order.priority|int > 0 %}
                             <span class="badge bg-warning">高优先级</span>
                         {% else %}
                             <span class="badge bg-info">低优先级</span>

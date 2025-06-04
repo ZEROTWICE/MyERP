@@ -258,19 +258,22 @@ class SalesOrderForm(FlaskForm):
 
 class SalesOrderItemForm(FlaskForm):
     """销售订单行表单"""
-    product_id = SelectField('产品', coerce=int, validators=[DataRequired()])
+    product_name = SelectField('产品名称', validators=[DataRequired()])
+    drawing_number = SelectField('图号', validators=[DataRequired()])
+    product_id = HiddenField()  # 隐藏字段，存储最终选择的产品ID
     quantity = IntegerField('数量', validators=[DataRequired(), NumberRange(min=1)])
     direction = StringField('开向', validators=[Length(0, 50)])
     
     # 规格型号（多选）
-    spec_extended = BooleanField('加长')
-    spec_gasket = BooleanField('垫板')
-    spec_joint = BooleanField('接头')
-    spec_drilling = BooleanField('钻孔')
-    spec_other = BooleanField('其他')
+    spec_extended = StringField('加长', validators=[Length(0, 100)])
+    spec_gasket = StringField('垫板', validators=[Length(0, 100)])
+    spec_joint = StringField('接头', validators=[Length(0, 100)])
+    spec_drilling = StringField('钻孔', validators=[Length(0, 100)])
+    spec_other = StringField('其他', validators=[Length(0, 100)])
     spec_other_desc = StringField('其他规格描述', validators=[Length(0, 200)])
     
-    usage_unit = StringField('使用单位', validators=[Length(0, 100)])
+    customer_address_id = SelectField('收货地址', coerce=int, validators=[Optional()])
     order_time = DateTimeField('下单时间', default=datetime.utcnow, format='%Y-%m-%d %H:%M')
     station_notes = TextAreaField('到站备注')
-    submit = SubmitField('保存')
+    station_notes = TextAreaField('到站备注')
+    station_notes = TextAreaField('到站备注')

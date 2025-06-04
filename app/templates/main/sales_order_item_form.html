@@ -24,18 +24,36 @@
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="mb-3">
-                                    {{ form.product_id.label(class="form-label") }}
-                                    <select class="form-control" id="product_id" name="product_id" required>
-                                        <option value="">请选择产品</option>
+                                    {{ form.product_name.label(class="form-label") }}
+                                    <select class="form-control" id="product_name" name="product_name" required>
+                                        <option value="">请选择产品名称</option>
                                     </select>
-                                    {% if form.product_id.errors %}
+                                    {% if form.product_name.errors %}
                                         <div class="invalid-feedback d-block">
-                                            {% for error in form.product_id.errors %}{{ error }}{% endfor %}
+                                            {% for error in form.product_name.errors %}{{ error }}{% endfor %}
                                         </div>
                                     {% endif %}
                                 </div>
                             </div>
-                            <div class="col-md-3">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    {{ form.drawing_number.label(class="form-label") }}
+                                    <select class="form-control" id="drawing_number" name="drawing_number" required disabled>
+                                        <option value="">请先选择产品名称</option>
+                                    </select>
+                                    {% if form.drawing_number.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {% for error in form.drawing_number.errors %}{{ error }}{% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        {{ form.product_id() }}  <!-- 隐藏字段 -->
+                        
+                        <div class="row">
+                            <div class="col-md-6">
                                 <div class="mb-3">
                                     {{ form.quantity.label(class="form-label") }}
                                     {{ form.quantity(class="form-control" + (" is-invalid" if form.quantity.errors else "")) }}
@@ -46,7 +64,7 @@
                                     {% endif %}
                                 </div>
                             </div>
-                            <div class="col-md-3">
+                            <div class="col-md-6">
                                 <div class="mb-3">
                                     <label class="form-label">单位</label>
                                     <input type="text" class="form-control" id="unit_display" readonly>
@@ -57,8 +75,8 @@
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="mb-3">
-                                    <label class="form-label">图号</label>
-                                    <input type="text" class="form-control" id="drawing_number_display" readonly>
+                                    <label class="form-label">产品编码</label>
+                                    <input type="text" class="form-control" id="product_code_display" readonly>
                                 </div>
                             </div>
                             <div class="col-md-6">
@@ -76,42 +94,47 @@
                         
                         <!-- 规格型号 -->
                         <div class="mb-3">
-                            <label class="form-label">规格型号（可多选）</label>
+                            <label class="form-label">规格型号（可填写具体值）</label>
                             <div class="row">
-                                <div class="col-md-2">
-                                    <div class="form-check">
-                                        {{ form.spec_extended(class="form-check-input") }}
-                                        {{ form.spec_extended.label(class="form-check-label") }}
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        {{ form.spec_extended.label(class="form-label") }}
+                                        {{ form.spec_extended(class="form-control", placeholder="如：100mm") }}
                                     </div>
                                 </div>
-                                <div class="col-md-2">
-                                    <div class="form-check">
-                                        {{ form.spec_gasket(class="form-check-input") }}
-                                        {{ form.spec_gasket.label(class="form-check-label") }}
-                                    </div>
-                                </div>
-                                <div class="col-md-2">
-                                    <div class="form-check">
-                                        {{ form.spec_joint(class="form-check-input") }}
-                                        {{ form.spec_joint.label(class="form-check-label") }}
-                                    </div>
-                                </div>
-                                <div class="col-md-2">
-                                    <div class="form-check">
-                                        {{ form.spec_drilling(class="form-check-input") }}
-                                        {{ form.spec_drilling.label(class="form-check-label") }}
-                                    </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="form-check">
-                                        {{ form.spec_other(class="form-check-input") }}
-                                        {{ form.spec_other.label(class="form-check-label") }}
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        {{ form.spec_gasket.label(class="form-label") }}
+                                        {{ form.spec_gasket(class="form-control", placeholder="如：橡胶垫板") }}
                                     </div>
                                 </div>
                             </div>
-                            <div class="row mt-2" id="spec_other_desc_row" style="display: none;">
-                                <div class="col-md-12">
-                                    {{ form.spec_other_desc(class="form-control", placeholder="请描述其他规格") }}
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        {{ form.spec_joint.label(class="form-label") }}
+                                        {{ form.spec_joint(class="form-control", placeholder="如：法兰接头") }}
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        {{ form.spec_drilling.label(class="form-label") }}
+                                        {{ form.spec_drilling(class="form-control", placeholder="如：φ10mm×4孔") }}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        {{ form.spec_other.label(class="form-label") }}
+                                        {{ form.spec_other(class="form-control", placeholder="如：特殊要求") }}
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        {{ form.spec_other_desc.label(class="form-label") }}
+                                        {{ form.spec_other_desc(class="form-control", placeholder="详细描述其他规格") }}
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -119,11 +142,11 @@
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="mb-3">
-                                    {{ form.usage_unit.label(class="form-label") }}
-                                    {{ form.usage_unit(class="form-control" + (" is-invalid" if form.usage_unit.errors else "")) }}
-                                    {% if form.usage_unit.errors %}
+                                    {{ form.customer_address_id.label(class="form-label") }}
+                                    {{ form.customer_address_id(class="form-select", id="customer_address_id") }}
+                                    {% if form.customer_address_id.errors %}
                                         <div class="invalid-feedback">
-                                            {% for error in form.usage_unit.errors %}{{ error }}{% endfor %}
+                                            {% for error in form.customer_address_id.errors %}{{ error }}{% endfor %}
                                         </div>
                                     {% endif %}
                                 </div>
@@ -202,16 +225,16 @@
                 <div class="card-body">
                     <div class="small">
                         <h6>产品选择</h6>
-                        <p>从产品管理中选择已有产品。选择后会自动显示图号和单位信息。</p>
+                        <p>先选择产品名称，然后选择对应的图号。选择后会自动显示产品编码和单位信息。</p>
                         
                         <h6>规格型号</h6>
-                        <p>可以同时选择多个规格型号，如加长、垫板、接头、钻孔等。选择"其他"时需要填写具体描述。</p>
+                        <p>可以填写具体的规格型号值，如加长尺寸、垫板材质、接头类型、钻孔规格等。每个字段都可以输入具体的技术参数。</p>
                         
                         <h6>分批到货</h6>
                         <p>保存订单行后，可以在订单详情页面设置分批到货信息。</p>
                         
-                        <h6>使用单位</h6>
-                        <p>填写产品的最终使用单位或部门。</p>
+                        <h6>收货地址</h6>
+                        <p>选择客户的收货地址，将显示地址详情和联系人信息。</p>
                     </div>
                 </div>
             </div>
@@ -221,23 +244,20 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // 初始化产品选择
-    loadProducts();
+    // 初始化产品名称选择
+    loadProductNames();
     
-    // 监听产品选择变化
-    document.getElementById('product_id').addEventListener('change', function() {
-        updateProductInfo(this.value);
+    // 初始化客户地址选择
+    loadCustomerAddresses();
+    
+    // 监听产品名称选择变化
+    document.getElementById('product_name').addEventListener('change', function() {
+        loadDrawingNumbers(this.value);
     });
     
-    // 监听"其他"规格选择
-    document.getElementById('spec_other').addEventListener('change', function() {
-        const descRow = document.getElementById('spec_other_desc_row');
-        if (this.checked) {
-            descRow.style.display = 'block';
-        } else {
-            descRow.style.display = 'none';
-            document.getElementById('spec_other_desc').value = '';
-        }
+    // 监听图号选择变化
+    document.getElementById('drawing_number').addEventListener('change', function() {
+        updateProductInfo(this.value);
     });
     
     // 初始化时间
@@ -250,53 +270,354 @@ document.addEventListener('DOMContentLoaded', function() {
                           String(now.getMinutes()).padStart(2, '0');
         document.getElementById('order_time').value = timeString;
     }
-    
-    // 如果是编辑模式，初始化其他规格显示
-    {% if order_item and order_item.spec_other %}
-    document.getElementById('spec_other_desc_row').style.display = 'block';
-    {% endif %}
 });
 
-function loadProducts() {
-    fetch('/api/products/search?only_active=true')
+// 存储产品数据
+let productsData = [];
+
+function loadProductNames() {
+    fetch('/api/products/names?only_active=true')
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                const select = document.getElementById('product_id');
-                select.innerHTML = '<option value="">请选择产品</option>';
+                const select = document.getElementById('product_name');
+                select.innerHTML = '<option value="">请选择产品名称</option>';
                 
-                data.data.forEach(product => {
+                data.data.forEach(productName => {
                     const option = document.createElement('option');
-                    option.value = product.id;
-                    option.textContent = `${product.product_name} (${product.product_code})`;
-                    option.dataset.drawingNumber = product.drawing_number;
-                    option.dataset.unit = product.unit;
+                    option.value = productName;
+                    option.textContent = productName;
                     select.appendChild(option);
                 });
                 
-                // 如果是编辑模式，设置当前产品
+                // 如果是编辑模式，设置当前产品名称
                 {% if order_item %}
-                select.value = {{ order_item.product_id }};
-                updateProductInfo({{ order_item.product_id }});
+                select.value = '{{ order_item.product_name }}';
+                loadDrawingNumbers('{{ order_item.product_name }}', '{{ order_item.drawing_number }}');
                 {% endif %}
             }
         })
         .catch(error => {
-            console.error('Error loading products:', error);
+            console.error('Error loading product names:', error);
         });
 }
 
-function updateProductInfo(productId) {
-    const select = document.getElementById('product_id');
-    const selectedOption = select.querySelector(`option[value="${productId}"]`);
+function loadDrawingNumbers(productName, selectedDrawing = null) {
+    const drawingSelect = document.getElementById('drawing_number');
     
-    if (selectedOption) {
-        document.getElementById('drawing_number_display').value = selectedOption.dataset.drawingNumber || '';
-        document.getElementById('unit_display').value = selectedOption.dataset.unit || '';
-    } else {
-        document.getElementById('drawing_number_display').value = '';
-        document.getElementById('unit_display').value = '';
+    if (!productName) {
+        drawingSelect.innerHTML = '<option value="">请先选择产品名称</option>';
+        drawingSelect.disabled = true;
+        clearProductInfo();
+        return;
     }
+    
+    fetch(`/api/products/drawings-by-name?product_name=${encodeURIComponent(productName)}&only_active=true`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                drawingSelect.innerHTML = '<option value="">请选择图号</option>';
+                drawingSelect.disabled = false;
+                
+                // 存储产品数据
+                productsData = data.data;
+                
+                data.data.forEach(product => {
+                    const option = document.createElement('option');
+                    option.value = product.drawing_number;
+                    option.textContent = product.drawing_number || '无图号';
+                    option.dataset.productId = product.id;
+                    option.dataset.productCode = product.product_code;
+                    option.dataset.unit = product.unit;
+                    drawingSelect.appendChild(option);
+                });
+                
+                // 如果指定了选中的图号，设置它
+                if (selectedDrawing) {
+                    drawingSelect.value = selectedDrawing;
+                    updateProductInfo(selectedDrawing);
+                }
+            } else {
+                drawingSelect.innerHTML = '<option value="">无可用图号</option>';
+                drawingSelect.disabled = true;
+                clearProductInfo();
+            }
+        })
+        .catch(error => {
+            console.error('Error loading drawing numbers:', error);
+            drawingSelect.innerHTML = '<option value="">加载失败</option>';
+            drawingSelect.disabled = true;
+            clearProductInfo();
+        });
+}
+
+function updateProductInfo(drawingNumber) {
+    if (!drawingNumber) {
+        clearProductInfo();
+        return;
+    }
+    
+    // 从存储的数据中找到对应的产品
+    const product = productsData.find(p => p.drawing_number === drawingNumber);
+    
+    if (product) {
+        document.getElementById('unit_display').value = product.unit || '';
+        document.getElementById('product_code_display').value = product.product_code || '';
+        document.getElementById('product_id').value = product.id;
+    } else {
+        clearProductInfo();
+    }
+}
+
+function clearProductInfo() {
+    document.getElementById('unit_display').value = '';
+    document.getElementById('product_code_display').value = '';
+    document.getElementById('product_id').value = '';
+}
+
+// 加载客户地址
+function loadCustomerAddresses() {
+    const orderId = {{ order.id }};
+    
+    fetch(`/api/sales_orders/${orderId}/customer_addresses?only_active=true`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const select = document.getElementById('customer_address_id');
+                select.innerHTML = '<option value="">请选择收货地址</option>';
+                
+                data.data.forEach(address => {
+                    const option = document.createElement('option');
+                    option.value = address.id;
+                    option.textContent = `${address.full_address} (${address.contact_person} ${address.contact_phone})`;
+                    if (address.is_primary) {
+                        option.textContent += ' [主要地址]';
+                    }
+                    select.appendChild(option);
+                });
+                
+                // 如果是编辑模式，设置当前地址
+                {% if order_item and order_item.customer_address_id %}
+                select.value = '{{ order_item.customer_address_id }}';
+                {% endif %}
+            }
+        })
+        .catch(error => {
+            console.error('Error loading customer addresses:', error);
+        });
 }
 </script>
 {% endblock %} 
+
+
+    
+    if (!productName) {
+        drawingSelect.innerHTML = '<option value="">请先选择产品名称</option>';
+        drawingSelect.disabled = true;
+        clearProductInfo();
+        return;
+    }
+    
+    fetch(`/api/products/drawings-by-name?product_name=${encodeURIComponent(productName)}&only_active=true`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                drawingSelect.innerHTML = '<option value="">请选择图号</option>';
+                drawingSelect.disabled = false;
+                
+                // 存储产品数据
+                productsData = data.data;
+                
+                data.data.forEach(product => {
+                    const option = document.createElement('option');
+                    option.value = product.drawing_number;
+                    option.textContent = product.drawing_number || '无图号';
+                    option.dataset.productId = product.id;
+                    option.dataset.productCode = product.product_code;
+                    option.dataset.unit = product.unit;
+                    drawingSelect.appendChild(option);
+                });
+                
+                // 如果指定了选中的图号，设置它
+                if (selectedDrawing) {
+                    drawingSelect.value = selectedDrawing;
+                    updateProductInfo(selectedDrawing);
+                }
+            } else {
+                drawingSelect.innerHTML = '<option value="">无可用图号</option>';
+                drawingSelect.disabled = true;
+                clearProductInfo();
+            }
+        })
+        .catch(error => {
+            console.error('Error loading drawing numbers:', error);
+            drawingSelect.innerHTML = '<option value="">加载失败</option>';
+            drawingSelect.disabled = true;
+            clearProductInfo();
+        });
+}
+
+function updateProductInfo(drawingNumber) {
+    if (!drawingNumber) {
+        clearProductInfo();
+        return;
+    }
+    
+    // 从存储的数据中找到对应的产品
+    const product = productsData.find(p => p.drawing_number === drawingNumber);
+    
+    if (product) {
+        document.getElementById('unit_display').value = product.unit || '';
+        document.getElementById('product_code_display').value = product.product_code || '';
+        document.getElementById('product_id').value = product.id;
+    } else {
+        clearProductInfo();
+    }
+}
+
+function clearProductInfo() {
+    document.getElementById('unit_display').value = '';
+    document.getElementById('product_code_display').value = '';
+    document.getElementById('product_id').value = '';
+}
+
+// 加载客户地址
+function loadCustomerAddresses() {
+    const orderId = {{ order.id }};
+    
+    fetch(`/api/sales_orders/${orderId}/customer_addresses?only_active=true`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const select = document.getElementById('customer_address_id');
+                select.innerHTML = '<option value="">请选择收货地址</option>';
+                
+                data.data.forEach(address => {
+                    const option = document.createElement('option');
+                    option.value = address.id;
+                    option.textContent = `${address.full_address} (${address.contact_person} ${address.contact_phone})`;
+                    if (address.is_primary) {
+                        option.textContent += ' [主要地址]';
+                    }
+                    select.appendChild(option);
+                });
+                
+                // 如果是编辑模式，设置当前地址
+                {% if order_item and order_item.customer_address_id %}
+                select.value = '{{ order_item.customer_address_id }}';
+                {% endif %}
+            }
+        })
+        .catch(error => {
+            console.error('Error loading customer addresses:', error);
+        });
+}
+</script>
+{% endblock %} 
+
+
+    
+    if (!productName) {
+        drawingSelect.innerHTML = '<option value="">请先选择产品名称</option>';
+        drawingSelect.disabled = true;
+        clearProductInfo();
+        return;
+    }
+    
+    fetch(`/api/products/drawings-by-name?product_name=${encodeURIComponent(productName)}&only_active=true`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                drawingSelect.innerHTML = '<option value="">请选择图号</option>';
+                drawingSelect.disabled = false;
+                
+                // 存储产品数据
+                productsData = data.data;
+                
+                data.data.forEach(product => {
+                    const option = document.createElement('option');
+                    option.value = product.drawing_number;
+                    option.textContent = product.drawing_number || '无图号';
+                    option.dataset.productId = product.id;
+                    option.dataset.productCode = product.product_code;
+                    option.dataset.unit = product.unit;
+                    drawingSelect.appendChild(option);
+                });
+                
+                // 如果指定了选中的图号，设置它
+                if (selectedDrawing) {
+                    drawingSelect.value = selectedDrawing;
+                    updateProductInfo(selectedDrawing);
+                }
+            } else {
+                drawingSelect.innerHTML = '<option value="">无可用图号</option>';
+                drawingSelect.disabled = true;
+                clearProductInfo();
+            }
+        })
+        .catch(error => {
+            console.error('Error loading drawing numbers:', error);
+            drawingSelect.innerHTML = '<option value="">加载失败</option>';
+            drawingSelect.disabled = true;
+            clearProductInfo();
+        });
+}
+
+function updateProductInfo(drawingNumber) {
+    if (!drawingNumber) {
+        clearProductInfo();
+        return;
+    }
+    
+    // 从存储的数据中找到对应的产品
+    const product = productsData.find(p => p.drawing_number === drawingNumber);
+    
+    if (product) {
+        document.getElementById('unit_display').value = product.unit || '';
+        document.getElementById('product_code_display').value = product.product_code || '';
+        document.getElementById('product_id').value = product.id;
+    } else {
+        clearProductInfo();
+    }
+}
+
+function clearProductInfo() {
+    document.getElementById('unit_display').value = '';
+    document.getElementById('product_code_display').value = '';
+    document.getElementById('product_id').value = '';
+}
+
+// 加载客户地址
+function loadCustomerAddresses() {
+    const orderId = {{ order.id }};
+    
+    fetch(`/api/sales_orders/${orderId}/customer_addresses?only_active=true`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const select = document.getElementById('customer_address_id');
+                select.innerHTML = '<option value="">请选择收货地址</option>';
+                
+                data.data.forEach(address => {
+                    const option = document.createElement('option');
+                    option.value = address.id;
+                    option.textContent = `${address.full_address} (${address.contact_person} ${address.contact_phone})`;
+                    if (address.is_primary) {
+                        option.textContent += ' [主要地址]';
+                    }
+                    select.appendChild(option);
+                });
+                
+                // 如果是编辑模式，设置当前地址
+                {% if order_item and order_item.customer_address_id %}
+                select.value = '{{ order_item.customer_address_id }}';
+                {% endif %}
+            }
+        })
+        .catch(error => {
+            console.error('Error loading customer addresses:', error);
+        });
+}
+</script>
+{% endblock %} 
+
