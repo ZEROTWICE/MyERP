@@ -7135,9 +7135,6 @@ def sales_order_detail(order_id):
     # 将订单行转换为可序列化的字典格式，供JavaScript使用
     order_items_json = []
     for item in order_items:
-        # 获取该订单行关联的生产订单
-        production_orders = ProductionOrder.query.filter_by(sales_order_item_id=item.id).all()
-        
         order_items_json.append({
             'id': item.id,
             'product_id': item.product_id,
@@ -7154,16 +7151,7 @@ def sales_order_detail(order_id):
             'unit': item.unit,
             'order_time': item.order_time.isoformat() if item.order_time else None,
             'station_notes': item.station_notes,
-            'sequence': item.sequence,
-            'production_orders': [{
-                'id': po.id,
-                'order_number': po.order_number,
-                'status': po.status,
-                'planned_quantity': po.planned_quantity,
-                'completed_quantity': po.completed_quantity,
-                'planned_start_date': po.planned_start_date.isoformat() if po.planned_start_date else None,
-                'planned_end_date': po.planned_end_date.isoformat() if po.planned_end_date else None
-            } for po in production_orders]
+            'sequence': item.sequence
         })
     
     return render_template('main/sales_order_detail.html',
@@ -7269,25 +7257,6 @@ def add_sales_order_item(order_id):
     order = SalesOrder.query.get_or_404(order_id)
     form = SalesOrderItemForm()
     
-    # 设置SelectField的选项
-    form.product_name.choices = [('', '请选择产品名称')]
-    form.drawing_number.choices = [('', '请选择图号')]
-    form.customer_address_id.choices = [(0, '请选择收货地址')]
-    
-    # 在验证前，动态添加用户提交的值到choices中，避免"Not a valid choice"错误
-    if request.method == 'POST':
-        if form.product_name.data and form.product_name.data not in [choice[0] for choice in form.product_name.choices]:
-            form.product_name.choices.append((form.product_name.data, form.product_name.data))
-        if form.drawing_number.data and form.drawing_number.data not in [choice[0] for choice in form.drawing_number.choices]:
-            form.drawing_number.choices.append((form.drawing_number.data, form.drawing_number.data))
-        if form.customer_address_id.data and form.customer_address_id.data != 0:
-            # 获取地址信息用于显示
-            from app.models import CustomerAddress
-            address = CustomerAddress.query.get(form.customer_address_id.data)
-            if address:
-                address_text = f"{address.detailed_address} ({address.contact_person})"
-                form.customer_address_id.choices.append((address.id, address_text))
-    
     if form.validate_on_submit():
         try:
             # 获取最大序号
@@ -7350,30 +7319,11 @@ def edit_sales_order_item(item_id):
     order = order_item.sales_order
     form = SalesOrderItemForm(obj=order_item)
     
-    # 设置SelectField的选项
-    form.product_name.choices = [('', '请选择产品名称')]
-    form.drawing_number.choices = [('', '请选择图号')]
-    form.customer_address_id.choices = [(0, '请选择收货地址')]
-    
     # 预填充产品名称和图号字段
     if request.method == 'GET':
         form.product_name.data = order_item.product_name
         form.drawing_number.data = order_item.drawing_number
         form.product_id.data = order_item.product_id
-    
-    # 在验证前，动态添加用户提交的值到choices中，避免"Not a valid choice"错误
-    if request.method == 'POST':
-        if form.product_name.data and form.product_name.data not in [choice[0] for choice in form.product_name.choices]:
-            form.product_name.choices.append((form.product_name.data, form.product_name.data))
-        if form.drawing_number.data and form.drawing_number.data not in [choice[0] for choice in form.drawing_number.choices]:
-            form.drawing_number.choices.append((form.drawing_number.data, form.drawing_number.data))
-        if form.customer_address_id.data and form.customer_address_id.data != 0:
-            # 获取地址信息用于显示
-            from app.models import CustomerAddress
-            address = CustomerAddress.query.get(form.customer_address_id.data)
-            if address:
-                address_text = f"{address.detailed_address} ({address.contact_person})"
-                form.customer_address_id.choices.append((address.id, address_text))
     
     if form.validate_on_submit():
         try:
@@ -7384,19 +7334,8 @@ def edit_sales_order_item(item_id):
                 'direction': order_item.direction
             }
             
-            # 更新订单行信息（不使用populate_obj避免设置只读属性）
-            order_item.product_id = form.product_id.data
-            order_item.quantity = form.quantity.data
-            order_item.direction = form.direction.data
-            order_item.spec_extended = form.spec_extended.data
-            order_item.spec_gasket = form.spec_gasket.data
-            order_item.spec_joint = form.spec_joint.data
-            order_item.spec_drilling = form.spec_drilling.data
-            order_item.spec_other = form.spec_other.data
-            order_item.spec_other_desc = form.spec_other_desc.data
-            order_item.customer_address_id = form.customer_address_id.data if form.customer_address_id.data != 0 else None
-            order_item.order_time = form.order_time.data
-            order_item.station_notes = form.station_notes.data
+            # 更新订单行信息
+            form.populate_obj(order_item)
             
             # 更新订单合计数量
             order.calculate_total_quantity()
@@ -7502,6 +7441,248 @@ def manage_delivery_batches(item_id):
             
         except Exception as e:
             db.session.rollback()
+            return jsonify({'success': False, 'message': f'设置失败：{str(e)}'})
+    
+    # GET请求返回当前分批信息
+    return jsonify({
+        'success': True,
+        'data': {
+            'order_item': {
+                'id': order_item.id,
+                'product_name': order_item.product_name,
+                'quantity': order_item.quantity,
+                'unit': order_item.unit
+            },
+            'batches': order_item.delivery_batches_list
+        }
+    })
+
+# ==================== 销售订单管理 API ====================
+
+@bp.route('/api/sales_orders/search')
+@login_required
+def api_search_sales_orders():
+    """销售订单搜索API"""
+    try:
+        search = request.args.get('search', '').strip()
+        status_filter = request.args.get('status', '')
+        
+        query = SalesOrder.query.join(Customer)
+        
+        if status_filter:
+            query = query.filter(SalesOrder.status == status_filter)
+        
+        if search:
+            search_term = f"%{search}%"
+            query = query.filter(db.or_(
+                SalesOrder.order_number.like(search_term),
+                Customer.customer_name.like(search_term),
+                Customer.customer_code.like(search_term)
+            ))
+        
+        sales_orders = query.order_by(SalesOrder.created_at.desc()).limit(50).all()
+        
+        return jsonify({
+            'success': True,
+            'data': [{
+                'id': order.id,
+                'order_number': order.order_number,
+                'customer_name': order.customer.customer_name,
+                'customer_code': order.customer.customer_code,
+                'year_month': order.year_month,
+                'total_quantity': order.total_quantity,
+                'status': order.status,
+                'order_date': order.order_date.strftime('%Y-%m-%d %H:%M')
+            } for order in sales_orders]
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'搜索失败：{str(e)}'})
+
+@bp.route('/api/products/search')
+@login_required
+def api_search_products_for_sales():
+    """产品搜索API（用于销售订单）"""
+    try:
+        search = request.args.get('search', '').strip()
+        only_active = request.args.get('only_active', 'true').lower() == 'true'
+        
+        query = Product.query
+        
+        if only_active:
+            query = query.filter(Product.status == 'active')
+        
+        if search:
+            search_term = f"%{search}%"
+            query = query.filter(db.or_(
+                Product.product_code.like(search_term),
+                Product.product_name.like(search_term),
+                Product.drawing_number.like(search_term)
+            ))
+        
+        products = query.order_by(Product.product_name).limit(50).all()
+        
+        return jsonify({
+            'success': True,
+            'data': [{
+                'id': product.id,
+                'product_code': product.product_code,
+                'product_name': product.product_name,
+                'drawing_number': product.drawing_number or '',
+                'unit': product.unit,
+                'status': product.status
+            } for product in products]
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'搜索失败：{str(e)}'})
+
+# ==================== 产品名称和图号选择 API ====================
+
+@bp.route('/api/products/names')
+@login_required
+def api_get_product_names():
+    """获取产品名称列表（去重）"""
+    try:
+        only_active = request.args.get('only_active', 'true').lower() == 'true'
+        
+        # 获取去重的产品名称
+        query = db.session.query(Product.product_name).distinct()
+        if only_active:
+            query = query.filter(Product.status == 'active')
+        
+        product_names = query.order_by(Product.product_name).all()
+        
+        return jsonify({
+            'success': True,
+            'data': [name[0] for name in product_names if name[0]]  # 过滤空值
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'获取产品名称失败：{str(e)}'})
+
+@bp.route('/api/products/drawings-by-name')
+@login_required
+def api_get_drawings_by_product_name():
+    """根据产品名称获取图号列表"""
+    try:
+        product_name = request.args.get('product_name', '').strip()
+        only_active = request.args.get('only_active', 'true').lower() == 'true'
+        
+        if not product_name:
+            return jsonify({'success': False, 'message': '产品名称不能为空'})
+        
+        query = Product.query.filter(Product.product_name == product_name)
+        if only_active:
+            query = query.filter(Product.status == 'active')
+        
+        products = query.order_by(Product.drawing_number).all()
+        
+        return jsonify({
+            'success': True,
+            'data': [{
+                'id': product.id,
+                'product_code': product.product_code,
+                'product_name': product.product_name,
+                'drawing_number': product.drawing_number or '',
+                'unit': product.unit,
+                'status': product.status
+            } for product in products]
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'获取图号列表失败：{str(e)}'})
+
+# ==================== 客户地址选择 API ====================
+
+@bp.route('/api/customers/<int:customer_id>/addresses')
+@login_required
+def api_get_customer_addresses(customer_id):
+    """获取指定客户的地址列表"""
+    try:
+        only_active = request.args.get('only_active', 'true').lower() == 'true'
+        
+        query = CustomerAddress.query.filter(CustomerAddress.customer_id == customer_id)
+        if only_active:
+            query = query.filter(CustomerAddress.is_active == True)
+        
+        addresses = query.order_by(CustomerAddress.is_primary.desc(), CustomerAddress.created_at.desc()).all()
+        
+        return jsonify({
+            'success': True,
+            'data': [{
+                'id': addr.id,
+                'contact_person': addr.contact_person,
+                'contact_phone': addr.contact_phone,
+                'full_address': addr.full_address,
+                'address_type': addr.address_type,
+                'is_primary': addr.is_primary,
+                'is_active': addr.is_active
+            } for addr in addresses]
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'获取客户地址失败：{str(e)}'})
+
+@bp.route('/api/sales_orders/<int:order_id>/customer_addresses')
+@login_required
+def api_get_sales_order_customer_addresses(order_id):
+    """获取销售订单对应客户的地址列表"""
+    try:
+        order = SalesOrder.query.get_or_404(order_id)
+        only_active = request.args.get('only_active', 'true').lower() == 'true'
+        
+        query = CustomerAddress.query.filter(CustomerAddress.customer_id == order.customer_id)
+        if only_active:
+            query = query.filter(CustomerAddress.is_active == True)
+        
+        addresses = query.order_by(CustomerAddress.is_primary.desc(), CustomerAddress.created_at.desc()).all()
+        
+        return jsonify({
+            'success': True,
+            'data': [{
+                'id': addr.id,
+                'contact_person': addr.contact_person,
+                'contact_phone': addr.contact_phone,
+                'full_address': addr.full_address,
+                'address_type': addr.address_type,
+                'is_primary': addr.is_primary,
+                'is_active': addr.is_active
+            } for addr in addresses]
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'获取客户地址失败：{str(e)}'})
+
+@bp.route('/api/sales_orders/<int:order_id>/customer_addresses')
+@login_required
+def api_get_sales_order_customer_addresses(order_id):
+    """获取销售订单对应客户的地址列表"""
+    try:
+        order = SalesOrder.query.get_or_404(order_id)
+        only_active = request.args.get('only_active', 'true').lower() == 'true'
+        
+        query = CustomerAddress.query.filter(CustomerAddress.customer_id == order.customer_id)
+        if only_active:
+            query = query.filter(CustomerAddress.is_active == True)
+        
+        addresses = query.order_by(CustomerAddress.is_primary.desc(), CustomerAddress.created_at.desc()).all()
+        
+        return jsonify({
+            'success': True,
+            'data': [{
+                'id': addr.id,
+                'contact_person': addr.contact_person,
+                'contact_phone': addr.contact_phone,
+                'full_address': addr.full_address,
+                'address_type': addr.address_type,
+                'is_primary': addr.is_primary,
+                'is_active': addr.is_active
+            } for addr in addresses]
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'获取客户地址失败：{str(e)}'})
             return jsonify({'success': False, 'message': f'设置失败：{str(e)}'})
     
     # GET请求返回当前分批信息

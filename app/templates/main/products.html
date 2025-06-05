@@ -415,17 +415,17 @@ function submitProduct() {
 // 编辑产品
 function editProduct(id) {
     // 先加载编码规则列表
-    fetch('/api/production/code-rules')
+    fetch('/code_rules/available/product')
         .then(response => response.json())
         .then(codeRulesData => {
             const editCodeRuleSelect = document.getElementById('editCodeRule');
             editCodeRuleSelect.innerHTML = '<option value="">请选择编码规则（可选）</option>';
             
             if (codeRulesData.success) {
-                codeRulesData.data.forEach(rule => {
+                codeRulesData.rules.forEach(rule => {
                     const option = document.createElement('option');
                     option.value = rule.id;
-                    option.textContent = `${rule.name} (${rule.format_pattern})`;
+                    option.textContent = rule.name;
                     editCodeRuleSelect.appendChild(option);
                 });
             }
@@ -578,17 +578,17 @@ function deleteProduct(id) {
 
 // 加载编码规则列表
 function loadCodeRules() {
-    fetch('/api/production/code-rules')
+    fetch('/code_rules/available/product')
         .then(response => response.json())
         .then(data => {
             if (data.success) {
                 const addCodeRuleSelect = document.getElementById('codeRule');
                 addCodeRuleSelect.innerHTML = '<option value="">请选择编码规则（可选）</option>';
                 
-                data.data.forEach(rule => {
+                data.rules.forEach(rule => {
                     const option = document.createElement('option');
                     option.value = rule.id;
-                    option.textContent = `${rule.name} (${rule.format_pattern})`;
+                    option.textContent = rule.name;
                     addCodeRuleSelect.appendChild(option);
                 });
             }

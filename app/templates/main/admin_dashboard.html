@@ -8,152 +8,99 @@
         </div>
     </div>
 
-    <!-- 快速访问卡片 -->
+    <!-- 问候语和时间显示 -->
     <div class="row mb-4">
-        <div class="col-md-3">
-            <div class="card h-100">
-                <div class="card-body text-center">
-                    <i class="fas fa-users fa-3x mb-3 text-primary"></i>
-                    <h5 class="card-title">员工管理</h5>
-                    <p class="card-text">管理员工信息、工资系数等</p>
-                    <a href="{{ url_for('main.manage_employees') }}" class="btn btn-primary">进入管理</a>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card h-100">
-                <div class="card-body text-center">
-                    <i class="fas fa-cogs fa-3x mb-3 text-success"></i>
-                    <h5 class="card-title">工序管理</h5>
-                    <p class="card-text">管理工序价格、生效日期等</p>
-                    <a href="{{ url_for('main.process_prices') }}" class="btn btn-success">进入管理</a>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card h-100">
-                <div class="card-body text-center">
-                    <i class="fas fa-tasks fa-3x mb-3 text-info"></i>
-                    <h5 class="card-title">任务管理</h5>
-                    <p class="card-text">分配和跟踪生产任务</p>
-                    <a href="{{ url_for('main.manage_tasks') }}" class="btn btn-info">进入管理</a>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card h-100">
-                <div class="card-body text-center">
-                    <i class="fas fa-calculator fa-3x mb-3 text-warning"></i>
-                    <h5 class="card-title">工资计算</h5>
-                    <p class="card-text">计算和查看工资明细</p>
-                    <a href="{{ url_for('main.salary_calculation') }}" class="btn btn-warning">进入计算</a>
+        <div class="col-md-12">
+            <div class="welcome-section text-center p-4 bg-light rounded">
+                <h4 class="text-primary mb-3" id="greeting">欢迎您，管理员！</h4>
+                <div class="datetime-display">
+                    <p class="mb-1">
+                        <i class="fas fa-calendar-alt text-info me-2"></i>
+                        <strong>今天是：</strong>
+                        <span id="current-date" class="text-success">加载中...</span>
+                    </p>
+                    <p class="mb-0">
+                        <i class="fas fa-clock text-warning me-2"></i>
+                        <strong>当前时间：</strong>
+                        <span id="current-time" class="text-primary">加载中...</span>
+                    </p>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="row mb-4">
-        <div class="col-md-3">
-            <div class="card h-100">
-                <div class="card-body text-center">
-                    <i class="fas fa-clipboard-list fa-3x mb-3 text-secondary"></i>
-                    <h5 class="card-title">生产记录</h5>
-                    <p class="card-text">管理员工生产记录</p>
-                    <a href="{{ url_for('main.manage_production_records') }}" class="btn btn-secondary">查看记录</a>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card h-100">
-                <div class="card-body text-center">
-                    <i class="fas fa-trophy fa-3x mb-3 text-danger"></i>
-                    <h5 class="card-title">奖惩管理</h5>
-                    <p class="card-text">管理奖金和处罚记录</p>
-                    <a href="{{ url_for('main.manage_bonus_penalties') }}" class="btn btn-danger">进入管理</a>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card h-100">
-                <div class="card-body text-center">
-                    <i class="fas fa-history fa-3x mb-3 text-primary"></i>
-                    <h5 class="card-title">审计日志</h5>
-                    <p class="card-text">查看系统操作记录</p>
-                    <a href="{{ url_for('main.view_audit_logs') }}" class="btn btn-primary">查看日志</a>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card h-100">
-                <div class="card-body text-center">
-                    <i class="fas fa-boxes fa-3x mb-3 text-success"></i>
-                    <h5 class="card-title">库存管理</h5>
-                    <p class="card-text">管理产品和原材料库存</p>
-                    <a href="{{ url_for('main.manage_inventory') }}" class="btn btn-success">进入管理</a>
-                </div>
-            </div>
-        </div>
-    </div>
 
-    <div class="row mb-4">
-        <div class="col-md-3">
-            <div class="card h-100">
-                <div class="card-body text-center">
-                    <i class="fas fa-clipboard-check fa-3x mb-3 text-info"></i>
-                    <h5 class="card-title">质量管理</h5>
-                    <p class="card-text">管理质检任务和记录</p>
-                    <a href="{{ url_for('main.quality_management') }}" class="btn btn-info">进入管理</a>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card h-100">
-                <div class="card-body text-center">
-                    <i class="fas fa-barcode fa-3x mb-3 text-warning"></i>
-                    <h5 class="card-title">编码管理</h5>
-                    <p class="card-text">管理系统编码规则</p>
-                    <a href="{{ url_for('main.manage_code_rules') }}" class="btn btn-warning">进入管理</a>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card h-100">
-                <div class="card-body text-center">
-                    <i class="fas fa-cube fa-3x mb-3 text-primary"></i>
-                    <h5 class="card-title">产品管理</h5>
-                    <p class="card-text">管理产品信息和MBOM</p>
-                    <a href="{{ url_for('main.manage_products') }}" class="btn btn-primary">进入管理</a>
-                </div>
-            </div>
-        </div>
-    </div>
 </div>
 
 <!-- 引入Font Awesome图标库 -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 
 <style>
-.card {
-    transition: transform 0.2s;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+.welcome-section {
+    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+    border: 1px solid #dee2e6;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
 }
 
-.card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+.datetime-display {
+    font-size: 1.1em;
 }
 
-.card-body {
-    padding: 2rem 1rem;
-}
-
-.btn {
-    width: 100%;
-    margin-top: 1rem;
-}
-
-.fas {
-    margin-bottom: 1rem;
+.datetime-display i {
+    font-size: 1.2em;
 }
 </style>
+
+<script>
+function updateDateTime() {
+    const now = new Date();
+    
+    // 格式化日期
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const weekdays = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
+    const weekday = weekdays[now.getDay()];
+    
+    const dateString = `${year}年${month}月${day}日 ${weekday}`;
+    
+    // 格式化时间
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const seconds = String(now.getSeconds()).padStart(2, '0');
+    
+    const timeString = `${hours}:${minutes}:${seconds}`;
+    
+    // 更新页面显示
+    document.getElementById('current-date').textContent = dateString;
+    document.getElementById('current-time').textContent = timeString;
+    
+    // 根据时间显示不同的问候语
+    updateGreeting(now.getHours());
+}
+
+function updateGreeting(hour) {
+    let greeting;
+    
+    if (hour >= 6 && hour < 12) {
+        greeting = "早上好，管理员！";
+    } else if (hour >= 12 && hour < 18) {
+        greeting = "下午好，管理员！";
+    } else if (hour >= 18 && hour < 22) {
+        greeting = "晚上好，管理员！";
+    } else {
+        greeting = "夜深了，管理员辛苦了！";
+    }
+    
+    document.getElementById('greeting').textContent = greeting;
+}
+
+// 页面加载完成后立即更新一次
+document.addEventListener('DOMContentLoaded', function() {
+    updateDateTime();
+    // 每秒更新一次时间
+    setInterval(updateDateTime, 1000);
+});
+</script>
+
 {% endblock %} 

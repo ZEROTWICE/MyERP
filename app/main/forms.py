@@ -275,5 +275,4 @@ class SalesOrderItemForm(FlaskForm):
     customer_address_id = SelectField('收货地址', coerce=int, validators=[Optional()])
     order_time = DateTimeField('下单时间', default=datetime.utcnow, format='%Y-%m-%d %H:%M')
     station_notes = TextAreaField('到站备注')
-    station_notes = TextAreaField('到站备注')
-    station_notes = TextAreaField('到站备注')
+    submit = SubmitField('保存')

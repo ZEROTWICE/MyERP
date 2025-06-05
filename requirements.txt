@@ -1,47 +1,45 @@
-# Core Flask framework and extensions
-Flask==2.2.5
-Flask-SQLAlchemy==3.0.5
-Flask-Login==0.6.2
-Flask-Migrate==4.0.5
-Flask-WTF==1.1.1
-flask-paginate==2024.4.12
-Bootstrap-Flask==2.4.2
+# Core Flask框架
+Flask>=2.3.0
+Flask-SQLAlchemy>=3.0.0
+Flask-Login>=0.6.0
+Flask-Migrate>=4.0.0
+Flask-WTF>=1.1.0
+Flask-Bootstrap5>=2.0.0
 
-# Database and ORM
-SQLAlchemy==1.4.46
-alembic==1.11.1
+# 数据库
+SQLAlchemy>=2.0.0
 
-# Template engine and utilities
-Jinja2==3.1.6
-MarkupSafe==3.0.2
-Werkzeug==2.3.8
-itsdangerous==2.2.0
-blinker==1.9.0
+# 表单和验证
+WTForms>=3.0.0
 
-# Forms and validation
-WTForms==3.0.1
-email_validator==2.2.0
+# 密码加密
+Werkzeug>=2.3.0
 
-# Configuration and environment
-python-dotenv==0.19.2
+# Excel文件处理
+openpyxl>=3.1.0
 
-# Data processing and analysis
-pandas==2.2.3
-numpy==2.0.1
-openpyxl==3.1.5
+# 数据处理
+pandas>=2.0.0
+numpy>=1.24.0
 
-# Web scraping and parsing
-beautifulsoup4==4.13.4
+# 分页
+Flask-Paginate>=2023.10.24
 
-# HTTP requests
-requests==2.32.3
+# 命令行工具
+click>=8.1.0
 
-# DNS resolution
-dnspython==2.7.0
+# Web请求（用于诊断工具）
+requests>=2.31.0
+beautifulsoup4>=4.12.0
 
-# Development and testing tools
-pytest==8.3.5
-black==25.1.0
+# WSGI服务器（生产环境）
+gunicorn>=21.0.0
 
-# Server deployment
-uvicorn==0.24.0
+# 文件类型检测
+python-magic>=0.4.27
+
+# 日期时间处理
+python-dateutil>=2.8.0
+
+# 类型提示支持
+typing-extensions>=4.5.0 

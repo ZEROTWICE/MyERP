@@ -133,23 +133,26 @@
                 <ul class="navbar-nav me-auto">
                     {% if current_user.is_authenticated %}
                         {% if current_user.role in ['admin'] %}
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('main.manage_employees') }}">员工管理</a>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="employeeDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                员工管理
+                            </a>
+                            <ul class="dropdown-menu" aria-labelledby="employeeDropdown">
+                                <li><a class="dropdown-item" href="{{ url_for('main.manage_employees') }}">员工管理</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('main.manage_bonus_penalties') }}">奖惩管理</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('main.salary_calculation') }}">工资管理</a></li>
+                            </ul>
                         </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('main.process_prices') }}">工序管理</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('main.manage_production_records') }}">生产记录</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('main.manage_bonus_penalties') }}">奖惩管理</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('main.manage_tasks') }}">任务管理</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('main.salary_calculation') }}">工资计算</a>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="productionDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                生产管理
+                            </a>
+                            <ul class="dropdown-menu" aria-labelledby="productionDropdown">
+                                <li><a class="dropdown-item" href="{{ url_for('main.process_prices') }}">工序管理</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('main.manage_production_records') }}">生产记录</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('main.manage_tasks') }}">任务管理</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('main.manage_production_orders') }}">生产订单</a></li>
+                            </ul>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link" href="{{ url_for('main.manage_inventory') }}">库存管理</a>
@@ -157,14 +160,14 @@
                         <li class="nav-item">
                             <a class="nav-link" href="{{ url_for('main.manage_products') }}">产品管理</a>
                         </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('main.manage_customers') }}">客户管理</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('main.manage_sales_orders') }}">销售订单</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('main.manage_production_orders') }}">生产订单</a>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="salesDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                销售管理
+                            </a>
+                            <ul class="dropdown-menu" aria-labelledby="salesDropdown">
+                                <li><a class="dropdown-item" href="{{ url_for('main.manage_customers') }}">客户管理</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('main.manage_sales_orders') }}">销售订单</a></li>
+                            </ul>
                         </li>
                         {% if current_user.role in ['admin', 'manager', 'inspector'] %}
                         <li class="nav-item">
