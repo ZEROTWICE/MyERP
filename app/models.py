@@ -275,6 +275,15 @@ class TaskAssignment(db.Model):
     batch_item_id = db.Column(db.Integer, db.ForeignKey('production_batch_items.id', ondelete='SET NULL'), nullable=True)
     task_type = db.Column(db.String(20), default='manual')  # manual: 手动创建, auto: 自动创建
     
+    # 从生产订单继承的规格型号信息
+    spec_extended = db.Column(db.String(100))  # 加长（具体值）
+    spec_gasket = db.Column(db.String(100))  # 垫板（具体值）
+    spec_joint = db.Column(db.String(100))  # 接头（具体值）
+    spec_drilling = db.Column(db.String(100))  # 钻孔（具体值）
+    spec_other = db.Column(db.String(100))  # 其他（具体值）
+    spec_other_desc = db.Column(db.String(200))  # 其他规格描述
+    direction = db.Column(db.String(50))  # 开向
+    
     __table_args__ = (
         db.UniqueConstraint('global_sn', name='uq_task_assignment_global_sn'),
     )
@@ -299,6 +308,28 @@ class TaskAssignment(db.Model):
     def is_overdue(self):
         """是否逾期"""
         return self.target_date < datetime.now().date() and self.status != 'completed'
+    
+    @property
+    def specifications(self):
+        """获取规格型号列表"""
+        specs = []
+        if self.spec_extended:
+            specs.append(f'加长({self.spec_extended})')
+        if self.spec_gasket:
+            specs.append(f'垫板({self.spec_gasket})')
+        if self.spec_joint:
+            specs.append(f'接头({self.spec_joint})')
+        if self.spec_drilling:
+            specs.append(f'钻孔({self.spec_drilling})')
+        if self.spec_other:
+            specs.append(f'其他({self.spec_other})')
+        return specs
+    
+    @property
+    def specifications_text(self):
+        """获取规格型号文本"""
+        specs = self.specifications
+        return ', '.join(specs) if specs else '无'
 
     def __init__(self, **kwargs):
         super(TaskAssignment, self).__init__(**kwargs)
@@ -1023,6 +1054,15 @@ class ProductionBatch(db.Model):
     notes = db.Column(db.Text)  # 备注
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
+    # 从生产订单继承的规格型号信息
+    spec_extended = db.Column(db.String(100))  # 加长（具体值）
+    spec_gasket = db.Column(db.String(100))  # 垫板（具体值）
+    spec_joint = db.Column(db.String(100))  # 接头（具体值）
+    spec_drilling = db.Column(db.String(100))  # 钻孔（具体值）
+    spec_other = db.Column(db.String(100))  # 其他（具体值）
+    spec_other_desc = db.Column(db.String(200))  # 其他规格描述
+    direction = db.Column(db.String(50))  # 开向
+    
     __table_args__ = (
         db.UniqueConstraint('global_sn', name='uq_production_batch_global_sn'),
         db.UniqueConstraint('batch_number', name='uq_production_batch_number'),
@@ -1074,6 +1114,28 @@ class ProductionBatch(db.Model):
             db.session.rollback()
             return False
     
+    @property
+    def specifications(self):
+        """获取规格型号列表"""
+        specs = []
+        if self.spec_extended:
+            specs.append(f'加长({self.spec_extended})')
+        if self.spec_gasket:
+            specs.append(f'垫板({self.spec_gasket})')
+        if self.spec_joint:
+            specs.append(f'接头({self.spec_joint})')
+        if self.spec_drilling:
+            specs.append(f'钻孔({self.spec_drilling})')
+        if self.spec_other:
+            specs.append(f'其他({self.spec_other})')
+        return specs
+    
+    @property
+    def specifications_text(self):
+        """获取规格型号文本"""
+        specs = self.specifications
+        return ', '.join(specs) if specs else '无'
+
     def __repr__(self):
         return f'<ProductionBatch {self.batch_number}: {self.batch_quantity}件>'
 
@@ -1399,3 +1461,180 @@ class SalesOrderItem(db.Model):
     
     def __repr__(self):
         return f'<SalesOrderItem {self.id}: {self.product_name} x {self.quantity}>'
+
+
+class NotificationRule(db.Model):
+    """通知规则"""
+    __tablename__ = 'notification_rules'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    global_sn = db.Column(db.String(8), unique=True, nullable=False)  # 全局流水号
+    rule_name = db.Column(db.String(100), nullable=False)  # 规则名称
+    trigger_type = db.Column(db.String(50), nullable=False)  # 触发类型
+    trigger_conditions = db.Column(db.JSON)  # 触发条件（JSON格式）
+    receiver_type = db.Column(db.String(20), nullable=False)  # 接收者类型：user, role, department
+    receiver_config = db.Column(db.JSON)  # 接收者配置（JSON格式）
+    notification_methods = db.Column(db.JSON)  # 通知方式：[system, email, sms]
+    template_config = db.Column(db.JSON)  # 模板配置
+    is_active = db.Column(db.Boolean, default=True)  # 是否启用
+    priority = db.Column(db.Integer, default=0)  # 优先级
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_by = db.Column(db.Integer, db.ForeignKey('user.id'))
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    __table_args__ = (
+        db.UniqueConstraint('global_sn', name='uq_notification_rule_global_sn'),
+    )
+    
+    # 关系
+    creator = db.relationship('User', backref=db.backref('created_notification_rules', lazy='dynamic'))
+    
+    def __init__(self, **kwargs):
+        super(NotificationRule, self).__init__(**kwargs)
+        if not self.global_sn:
+            self.global_sn = SerialNumber.get_next_number()
+    
+    def __repr__(self):
+        return f'<NotificationRule {self.rule_name}>'
+
+
+class Notification(db.Model):
+    """通知记录"""
+    __tablename__ = 'notifications'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    global_sn = db.Column(db.String(8), unique=True, nullable=False)  # 全局流水号
+    rule_id = db.Column(db.Integer, db.ForeignKey('notification_rules.id'), nullable=True)  # 关联规则
+    trigger_type = db.Column(db.String(50), nullable=False)  # 触发类型
+    trigger_data = db.Column(db.JSON)  # 触发数据（JSON格式）
+    title = db.Column(db.String(200), nullable=False)  # 通知标题
+    content = db.Column(db.Text, nullable=False)  # 通知内容
+    notification_type = db.Column(db.String(20), default='info')  # 通知类型：info, warning, error, success
+    priority = db.Column(db.String(20), default='normal')  # 优先级：low, normal, high, urgent
+    status = db.Column(db.String(20), default='pending')  # 状态：pending, sent, failed
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    sent_at = db.Column(db.DateTime)  # 发送时间
+    
+    # 关联相关业务对象
+    related_model = db.Column(db.String(50))  # 关联模型名称
+    related_id = db.Column(db.Integer)  # 关联对象ID
+    
+    __table_args__ = (
+        db.UniqueConstraint('global_sn', name='uq_notification_global_sn'),
+        db.Index('ix_notification_status', 'status'),
+        db.Index('ix_notification_type', 'trigger_type'),
+        db.Index('ix_notification_created', 'created_at'),
+    )
+    
+    # 关系
+    rule = db.relationship('NotificationRule', backref=db.backref('notifications', lazy='dynamic'))
+    receivers = db.relationship('NotificationReceiver', back_populates='notification', cascade='all, delete-orphan')
+    
+    def __init__(self, **kwargs):
+        super(Notification, self).__init__(**kwargs)
+        if not self.global_sn:
+            self.global_sn = SerialNumber.get_next_number()
+    
+    @property
+    def unread_count(self):
+        """未读数量"""
+        return NotificationReceiver.query.filter_by(
+            notification_id=self.id, 
+            status='unread'
+        ).count()
+    
+    @property
+    def total_receivers(self):
+        """接收者总数"""
+        return NotificationReceiver.query.filter_by(notification_id=self.id).count()
+    
+    def __repr__(self):
+        return f'<Notification {self.title}>'
+
+
+class NotificationReceiver(db.Model):
+    """通知接收者"""
+    __tablename__ = 'notification_receivers'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    notification_id = db.Column(db.Integer, db.ForeignKey('notifications.id', ondelete='CASCADE'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False)
+    status = db.Column(db.String(20), default='unread')  # 状态：unread, read, archived
+    read_at = db.Column(db.DateTime)  # 阅读时间
+    archived_at = db.Column(db.DateTime)  # 归档时间
+    delivery_method = db.Column(db.String(20), default='system')  # 投递方式：system, email, sms
+    delivery_status = db.Column(db.String(20), default='pending')  # 投递状态：pending, delivered, failed
+    delivery_at = db.Column(db.DateTime)  # 投递时间
+    failure_reason = db.Column(db.Text)  # 失败原因
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    __table_args__ = (
+        db.UniqueConstraint('notification_id', 'user_id', name='uq_notification_receiver'),
+        db.Index('ix_receiver_user_status', 'user_id', 'status'),
+        db.Index('ix_receiver_status', 'status'),
+    )
+    
+    # 关系
+    notification = db.relationship('Notification', back_populates='receivers')
+    user = db.relationship('User', backref=db.backref('received_notifications', lazy='dynamic'))
+    
+    def mark_as_read(self):
+        """标记为已读"""
+        if self.status == 'unread':
+            self.status = 'read'
+            self.read_at = datetime.utcnow()
+            db.session.commit()
+    
+    def archive(self):
+        """归档"""
+        self.status = 'archived'
+        self.archived_at = datetime.utcnow()
+        db.session.commit()
+    
+    def __repr__(self):
+        return f'<NotificationReceiver {self.notification.title} -> {self.user.username}>'
+
+
+class NotificationTemplate(db.Model):
+    """通知模板"""
+    __tablename__ = 'notification_templates'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    global_sn = db.Column(db.String(8), unique=True, nullable=False)  # 全局流水号
+    template_code = db.Column(db.String(50), unique=True, nullable=False)  # 模板编码
+    template_name = db.Column(db.String(100), nullable=False)  # 模板名称
+    trigger_type = db.Column(db.String(50), nullable=False)  # 适用的触发类型
+    title_template = db.Column(db.String(200), nullable=False)  # 标题模板
+    content_template = db.Column(db.Text, nullable=False)  # 内容模板
+    variables = db.Column(db.JSON)  # 可用变量说明
+    notification_type = db.Column(db.String(20), default='info')  # 默认通知类型
+    is_active = db.Column(db.Boolean, default=True)  # 是否启用
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_by = db.Column(db.Integer, db.ForeignKey('user.id'))
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    __table_args__ = (
+        db.UniqueConstraint('global_sn', name='uq_notification_template_global_sn'),
+        db.UniqueConstraint('template_code', name='uq_notification_template_code'),
+    )
+    
+    # 关系
+    creator = db.relationship('User', backref=db.backref('created_notification_templates', lazy='dynamic'))
+    
+    def __init__(self, **kwargs):
+        super(NotificationTemplate, self).__init__(**kwargs)
+        if not self.global_sn:
+            self.global_sn = SerialNumber.get_next_number()
+    
+    def render(self, variables):
+        """渲染模板"""
+        try:
+            from jinja2 import Template
+            title = Template(self.title_template).render(**variables)
+            content = Template(self.content_template).render(**variables)
+            return title, content
+        except Exception as e:
+            return f"模板渲染错误: {str(e)}", f"模板渲染错误: {str(e)}"
+    
+    def __repr__(self):
+        return f'<NotificationTemplate {self.template_code}>'

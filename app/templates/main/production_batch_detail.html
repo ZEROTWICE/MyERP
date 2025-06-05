@@ -45,6 +45,35 @@
                             <td><strong>批次数量:</strong></td>
                             <td>{{ batch.batch_quantity }}件</td>
                         </tr>
+                        <tr>
+                            <td><strong>规格型号:</strong></td>
+                            <td>
+                                {% if batch.specifications %}
+                                    <ul class="list-unstyled mb-0">
+                                        {% for spec in batch.specifications %}
+                                            <li class="mb-1">
+                                                <i class="fas fa-cog text-primary me-2"></i>
+                                                <span class="text-primary">{{ spec }}</span>
+                                            </li>
+                                        {% endfor %}
+                                    </ul>
+                                {% else %}
+                                    <span class="text-muted">
+                                        <i class="fas fa-minus-circle me-2"></i>无特殊规格
+                                    </span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><strong>开向:</strong></td>
+                            <td>
+                                {% if batch.direction %}
+                                    <span class="text-info">{{ batch.direction }}</span>
+                                {% else %}
+                                    <span class="text-muted">未指定</span>
+                                {% endif %}
+                            </td>
+                        </tr>
                     </table>
                 </div>
                 <div class="col-md-6">

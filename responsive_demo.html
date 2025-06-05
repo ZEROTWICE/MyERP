@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>工资管理系统 - 响应式设计演示</title>
+    
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- FontAwesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    
+    <!-- 响应式CSS -->
+    <link rel="stylesheet" href="app/static/css/responsive.css">
+    <link rel="stylesheet" href="app/static/css/mobile-components.css">
+    
+    <style>
+        /* 演示专用样式 */
+        .demo-section {
+            margin-bottom: 3rem;
+            padding: 2rem;
+            border: 2px dashed #dee2e6;
+            border-radius: 8px;
+        }
+        
+        .demo-title {
+            color: #007bff;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+        }
+        
+        .demo-title i {
+            margin-right: 0.5rem;
+        }
+        
+        .demo-description {
+            color: #6c757d;
+            margin-bottom: 1.5rem;
+            font-style: italic;
+        }
+        
+        @media (max-width: 768px) {
+            .demo-section {
+                margin-bottom: 2rem;
+                padding: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="#"><i class="fas fa-calculator"></i> 工资管理系统</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="#"><i class="fas fa-home"></i> 首页</a>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
+                            <i class="fas fa-cogs"></i> 系统管理
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="#">编码管理</a></li>
+                            <li><a class="dropdown-item" href="#">审计日志</a></li>
+                            <li><a class="dropdown-item" href="#">通知规则</a></li>
+                        </ul>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link position-relative" href="#">
+                            <i class="fas fa-bell"></i>
+                            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+                                3
+                            </span>
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <h1 class="text-center mb-5">📱 响应式设计演示</h1>
+        
+        <!-- 统计卡片演示 -->
+        <div class="demo-section">
+            <h3 class="demo-title"><i class="fas fa-chart-bar"></i> 统计卡片响应式</h3>
+            <p class="demo-description">在桌面端显示为水平排列，移动端自动适应为垂直堆叠</p>
+            
+            <div class="mobile-stats-grid">
+                <div class="mobile-stats-card primary">
+                    <div class="mobile-stats-number">156</div>
+                    <div class="mobile-stats-label">总员工数</div>
+                </div>
+                <div class="mobile-stats-card success">
+                    <div class="mobile-stats-number">89%</div>
+                    <div class="mobile-stats-label">出勤率</div>
+                </div>
+                <div class="mobile-stats-card warning">
+                    <div class="mobile-stats-number">¥125K</div>
+                    <div class="mobile-stats-label">月薪总额</div>
+                </div>
+                <div class="mobile-stats-card danger">
+                    <div class="mobile-stats-number">12</div>
+                    <div class="mobile-stats-label">待处理任务</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 表格响应式演示 -->
+        <div class="demo-section">
+            <h3 class="demo-title"><i class="fas fa-table"></i> 数据表格响应式</h3>
+            <p class="demo-description">桌面端显示完整表格，移动端自动切换为卡片视图</p>
+            
+            <!-- 桌面端表格 -->
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>员工编码</th>
+                            <th>姓名</th>
+                            <th>部门</th>
+                            <th>职位</th>
+                            <th>基本工资</th>
+                            <th>状态</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>EMP001</code></td>
+                            <td>张三</td>
+                            <td>技术部</td>
+                            <td>高级工程师</td>
+                            <td>¥15,000</td>
+                            <td><span class="badge bg-success">在职</span></td>
+                            <td>
+                                <div class="btn-group">
+                                    <button class="btn btn-sm btn-outline-primary"><i class="fas fa-eye"></i></button>
+                                    <button class="btn btn-sm btn-outline-secondary"><i class="fas fa-edit"></i></button>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><code>EMP002</code></td>
+                            <td>李四</td>
+                            <td>销售部</td>
+                            <td>销售经理</td>
+                            <td>¥12,000</td>
+                            <td><span class="badge bg-success">在职</span></td>
+                            <td>
+                                <div class="btn-group">
+                                    <button class="btn btn-sm btn-outline-primary"><i class="fas fa-eye"></i></button>
+                                    <button class="btn btn-sm btn-outline-secondary"><i class="fas fa-edit"></i></button>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- 移动端卡片视图 -->
+            <div class="mobile-table">
+                <div class="mobile-table-item">
+                    <div class="mobile-table-header">
+                        <div><strong>张三</strong> <span class="mobile-status-badge bg-primary">技术部</span></div>
+                        <span class="mobile-status-badge bg-success">在职</span>
+                    </div>
+                    <div class="mobile-table-body">
+                        <div class="mobile-table-row">
+                            <span class="mobile-table-label">员工编码</span>
+                            <span class="mobile-table-value"><code>EMP001</code></span>
+                        </div>
+                        <div class="mobile-table-row">
+                            <span class="mobile-table-label">职位</span>
+                            <span class="mobile-table-value">高级工程师</span>
+                        </div>
+                        <div class="mobile-table-row">
+                            <span class="mobile-table-label">基本工资</span>
+                            <span class="mobile-table-value">¥15,000</span>
+                        </div>
+                    </div>
+                    <div class="mobile-table-actions">
+                        <button class="btn btn-sm btn-outline-primary"><i class="fas fa-eye"></i> 查看</button>
+                        <button class="btn btn-sm btn-outline-secondary"><i class="fas fa-edit"></i> 编辑</button>
+                    </div>
+                </div>
+
+                <div class="mobile-table-item">
+                    <div class="mobile-table-header">
+                        <div><strong>李四</strong> <span class="mobile-status-badge bg-warning">销售部</span></div>
+                        <span class="mobile-status-badge bg-success">在职</span>
+                    </div>
+                    <div class="mobile-table-body">
+                        <div class="mobile-table-row">
+                            <span class="mobile-table-label">员工编码</span>
+                            <span class="mobile-table-value"><code>EMP002</code></span>
+                        </div>
+                        <div class="mobile-table-row">
+                            <span class="mobile-table-label">职位</span>
+                            <span class="mobile-table-value">销售经理</span>
+                        </div>
+                        <div class="mobile-table-row">
+                            <span class="mobile-table-label">基本工资</span>
+                            <span class="mobile-table-value">¥12,000</span>
+                        </div>
+                    </div>
+                    <div class="mobile-table-actions">
+                        <button class="btn btn-sm btn-outline-primary"><i class="fas fa-eye"></i> 查看</button>
+                        <button class="btn btn-sm btn-outline-secondary"><i class="fas fa-edit"></i> 编辑</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 搜索筛选响应式 -->
+        <div class="demo-section">
+            <h3 class="demo-title"><i class="fas fa-search"></i> 搜索筛选响应式</h3>
+            <p class="demo-description">移动端具有可折叠的筛选器，节省屏幕空间</p>
+            
+            <div class="mobile-filters">
+                <form class="row g-3">
+                    <div class="col-md-4 col-12">
+                        <label class="form-label">搜索关键词</label>
+                        <input type="text" class="form-control" placeholder="输入搜索关键词...">
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <label class="form-label">部门</label>
+                        <select class="form-select">
+                            <option>全部部门</option>
+                            <option>技术部</option>
+                            <option>销售部</option>
+                            <option>财务部</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <label class="form-label">状态</label>
+                        <select class="form-select">
+                            <option>全部状态</option>
+                            <option>在职</option>
+                            <option>离职</option>
+                            <option>休假</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2 col-12">
+                        <label class="form-label d-none d-md-block">&nbsp;</label>
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="fas fa-search"></i> 搜索
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- 通知卡片演示 -->
+        <div class="demo-section">
+            <h3 class="demo-title"><i class="fas fa-bell"></i> 通知卡片响应式</h3>
+            <p class="demo-description">移动端优化的通知显示方式</p>
+            
+            <div class="mobile-notification-card">
+                <div class="mobile-notification-header">
+                    <div class="mobile-notification-title">
+                        <i class="fas fa-exclamation-triangle text-warning me-2"></i>
+                        工资计算提醒
+                    </div>
+                </div>
+                <div class="mobile-notification-content">
+                    <div class="mobile-notification-text">
+                        2024年3月份工资计算即将开始，请及时提交考勤数据和绩效评估。
+                    </div>
+                    <div class="mobile-notification-meta">
+                        <span><i class="fas fa-clock"></i> 2小时前</span>
+                        <span class="badge bg-warning">高优先级</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mobile-notification-card">
+                <div class="mobile-notification-header">
+                    <div class="mobile-notification-title">
+                        <i class="fas fa-check-circle text-success me-2"></i>
+                        系统维护完成
+                    </div>
+                </div>
+                <div class="mobile-notification-content">
+                    <div class="mobile-notification-text">
+                        系统维护已完成，所有功能恢复正常使用。感谢您的耐心等待。
+                    </div>
+                    <div class="mobile-notification-meta">
+                        <span><i class="fas fa-clock"></i> 1天前</span>
+                        <span class="badge bg-info">系统通知</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 表单响应式演示 -->
+        <div class="demo-section">
+            <h3 class="demo-title"><i class="fas fa-wpforms"></i> 表单响应式</h3>
+            <p class="demo-description">移动端优化的表单布局和输入体验</p>
+            
+            <div class="mobile-form-section">
+                <div class="mobile-form-header">
+                    <i class="fas fa-user me-2"></i>员工信息
+                </div>
+                <div class="mobile-form-body">
+                    <div class="row">
+                        <div class="col-md-6 col-12">
+                            <label class="form-label">姓名</label>
+                            <input type="text" class="form-control" placeholder="请输入姓名">
+                        </div>
+                        <div class="col-md-6 col-12">
+                            <label class="form-label">工号</label>
+                            <input type="text" class="form-control" placeholder="请输入工号">
+                        </div>
+                        <div class="col-md-4 col-12">
+                            <label class="form-label">部门</label>
+                            <select class="form-select">
+                                <option>请选择部门</option>
+                                <option>技术部</option>
+                                <option>销售部</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 col-12">
+                            <label class="form-label">职位</label>
+                            <input type="text" class="form-control" placeholder="请输入职位">
+                        </div>
+                        <div class="col-md-4 col-12">
+                            <label class="form-label">基本工资</label>
+                            <input type="number" class="form-control" placeholder="请输入基本工资">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 移动端底部导航 -->
+    <div class="mobile-nav-menu">
+        <div class="mobile-nav-items">
+            <a href="#" class="mobile-nav-item active">
+                <i class="fas fa-home"></i>
+                <span>首页</span>
+            </a>
+            <a href="#" class="mobile-nav-item">
+                <i class="fas fa-users"></i>
+                <span>员工</span>
+            </a>
+            <a href="#" class="mobile-nav-item">
+                <i class="fas fa-calculator"></i>
+                <span>工资</span>
+            </a>
+            <a href="#" class="mobile-nav-item">
+                <i class="fas fa-chart-bar"></i>
+                <span>报表</span>
+            </a>
+            <a href="#" class="mobile-nav-item">
+                <i class="fas fa-bell"></i>
+                <span>通知</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="app/static/js/mobile-optimization.js"></script>
+
+    <script>
+        // 演示页面特定脚本
+        document.addEventListener('DOMContentLoaded', function() {
+            // 显示屏幕尺寸
+            function showScreenSize() {
+                const width = window.innerWidth;
+                const height = window.innerHeight;
+                const deviceType = width <= 768 ? '📱 移动设备' : width <= 992 ? '📱 平板设备' : '🖥️ 桌面设备';
+                
+                document.title = `${deviceType} (${width}x${height}) - 响应式演示`;
+            }
+            
+            showScreenSize();
+            window.addEventListener('resize', showScreenSize);
+            
+            // 添加测试按钮
+            const testButton = document.createElement('button');
+            testButton.className = 'mobile-action-btn';
+            testButton.innerHTML = '<i class="fas fa-mobile-alt"></i>';
+            testButton.style.bottom = '6rem';
+            testButton.style.right = '1rem';
+            testButton.title = '切换视图模式';
+            
+            testButton.addEventListener('click', function() {
+                if (window.MobileOptimization) {
+                    window.MobileOptimization.showToast('响应式设计演示正在运行! 🎉', 'success');
+                }
+            });
+            
+            document.body.appendChild(testButton);
+        });
+    </script>
+</body>
+</html> 

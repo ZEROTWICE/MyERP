@@ -1,0 +1,498 @@
+/* ==================== 移动端组件优化 ==================== */
+
+/* 移动端数据表格 */
+.mobile-table {
+    display: none;
+}
+
+@media (max-width: 768px) {
+    .table-responsive {
+        display: none;
+    }
+    
+    .mobile-table {
+        display: block;
+    }
+    
+    .mobile-table-item {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        margin-bottom: 1rem;
+        padding: 1rem;
+        border-left: 4px solid #007bff;
+    }
+    
+    .mobile-table-header {
+        font-weight: 600;
+        color: #2c3e50;
+        margin-bottom: 0.5rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .mobile-table-body {
+        color: #6c757d;
+        font-size: 0.9rem;
+        line-height: 1.4;
+    }
+    
+    .mobile-table-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 0.25rem;
+        padding: 0.25rem 0;
+        border-bottom: 1px solid #f8f9fa;
+    }
+    
+    .mobile-table-row:last-child {
+        border-bottom: none;
+        margin-bottom: 0;
+    }
+    
+    .mobile-table-label {
+        font-weight: 500;
+        color: #495057;
+    }
+    
+    .mobile-table-value {
+        text-align: right;
+        flex-shrink: 0;
+        margin-left: 1rem;
+    }
+    
+    .mobile-table-actions {
+        margin-top: 1rem;
+        padding-top: 1rem;
+        border-top: 1px solid #f8f9fa;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+    
+    .mobile-table-actions .btn {
+        flex: 1;
+        min-width: calc(50% - 0.25rem);
+        font-size: 0.875rem;
+        padding: 0.5rem 0.75rem;
+    }
+}
+
+/* 移动端搜索栏 */
+.mobile-search {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: white;
+    padding: 1rem;
+    margin: -1rem -1rem 1rem -1rem;
+    border-bottom: 1px solid #dee2e6;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+@media (max-width: 768px) {
+    .mobile-search .input-group {
+        width: 100%;
+    }
+    
+    .mobile-search .form-control {
+        font-size: 16px; /* 防止iOS缩放 */
+    }
+    
+    .mobile-search .btn {
+        white-space: nowrap;
+    }
+}
+
+/* 移动端筛选器 */
+.mobile-filters {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+@media (max-width: 768px) {
+    .mobile-filters .row > div {
+        margin-bottom: 0.75rem;
+    }
+    
+    .mobile-filters .form-control,
+    .mobile-filters .form-select {
+        font-size: 16px;
+    }
+    
+    .mobile-filters .btn {
+        width: 100%;
+        margin-top: 0.5rem;
+    }
+}
+
+/* 移动端状态标签 */
+.mobile-status-badge {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 12px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* 移动端操作按钮 */
+.mobile-action-btn {
+    position: fixed;
+    bottom: 1rem;
+    right: 1rem;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: #007bff;
+    border: none;
+    color: white;
+    font-size: 1.5rem;
+    box-shadow: 0 4px 12px rgba(0,123,255,0.3);
+    z-index: 1000;
+    transition: all 0.3s ease;
+}
+
+.mobile-action-btn:hover {
+    background: #0056b3;
+    transform: scale(1.1);
+}
+
+@media (min-width: 769px) {
+    .mobile-action-btn {
+        display: none;
+    }
+}
+
+/* 移动端导航菜单 */
+.mobile-nav-menu {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: white;
+    border-top: 1px solid #dee2e6;
+    box-shadow: 0 -2px 8px rgba(0,0,0,0.1);
+    z-index: 1000;
+    padding: 0.5rem;
+}
+
+.mobile-nav-items {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+}
+
+.mobile-nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-decoration: none;
+    color: #6c757d;
+    font-size: 0.75rem;
+    padding: 0.5rem;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+    min-width: 60px;
+}
+
+.mobile-nav-item:hover,
+.mobile-nav-item.active {
+    color: #007bff;
+    background: #e3f2fd;
+    text-decoration: none;
+}
+
+.mobile-nav-item i {
+    font-size: 1.2rem;
+    margin-bottom: 0.25rem;
+}
+
+@media (min-width: 769px) {
+    .mobile-nav-menu {
+        display: none;
+    }
+}
+
+/* 移动端通知卡片 */
+.mobile-notification-card {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    margin-bottom: 1rem;
+    overflow: hidden;
+    transition: all 0.2s ease;
+}
+
+.mobile-notification-card:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.mobile-notification-header {
+    padding: 1rem 1rem 0.5rem 1rem;
+    border-bottom: 1px solid #f8f9fa;
+}
+
+.mobile-notification-content {
+    padding: 0.5rem 1rem 1rem 1rem;
+}
+
+.mobile-notification-title {
+    font-weight: 600;
+    color: #2c3e50;
+    margin-bottom: 0.5rem;
+    font-size: 1rem;
+}
+
+.mobile-notification-text {
+    color: #6c757d;
+    font-size: 0.9rem;
+    line-height: 1.4;
+    margin-bottom: 0.75rem;
+}
+
+.mobile-notification-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.8rem;
+    color: #8b8b8b;
+}
+
+/* 移动端统计卡片 */
+.mobile-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.mobile-stats-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 12px;
+    padding: 1.5rem 1rem;
+    text-align: center;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.mobile-stats-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+}
+
+.mobile-stats-number {
+    font-size: 2rem;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: 0.5rem;
+}
+
+.mobile-stats-label {
+    font-size: 0.85rem;
+    opacity: 0.9;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.mobile-stats-card.primary {
+    background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+}
+
+.mobile-stats-card.success {
+    background: linear-gradient(135deg, #28a745 0%, #1e7e34 100%);
+}
+
+.mobile-stats-card.warning {
+    background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%);
+    color: #212529;
+}
+
+.mobile-stats-card.danger {
+    background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+}
+
+.mobile-stats-card.info {
+    background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+}
+
+/* 移动端表单优化 */
+.mobile-form-section {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    margin-bottom: 1rem;
+    overflow: hidden;
+}
+
+.mobile-form-header {
+    background: #f8f9fa;
+    padding: 1rem;
+    border-bottom: 1px solid #dee2e6;
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+.mobile-form-body {
+    padding: 1rem;
+}
+
+@media (max-width: 768px) {
+    .mobile-form-body .row > div {
+        margin-bottom: 1rem;
+    }
+    
+    .mobile-form-body .form-control,
+    .mobile-form-body .form-select {
+        font-size: 16px;
+        padding: 0.75rem;
+    }
+    
+    .mobile-form-body .form-label {
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+        color: #495057;
+    }
+}
+
+/* 移动端工具栏 */
+.mobile-toolbar {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    padding: 1rem;
+    margin-bottom: 1rem;
+    position: sticky;
+    top: 1rem;
+    z-index: 10;
+}
+
+@media (max-width: 768px) {
+    .mobile-toolbar {
+        margin: -1rem -1rem 1rem -1rem;
+        border-radius: 0;
+        top: 0;
+    }
+    
+    .mobile-toolbar .btn {
+        width: 100%;
+        margin-bottom: 0.5rem;
+    }
+    
+    .mobile-toolbar .btn:last-child {
+        margin-bottom: 0;
+    }
+}
+
+/* 移动端加载状态 */
+.mobile-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem 1rem;
+    text-align: center;
+}
+
+.mobile-loading-spinner {
+    width: 3rem;
+    height: 3rem;
+    border: 3px solid #f3f3f3;
+    border-top: 3px solid #007bff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 1rem;
+}
+
+.mobile-loading-text {
+    color: #6c757d;
+    font-size: 0.9rem;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* 移动端空状态 */
+.mobile-empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: #6c757d;
+}
+
+.mobile-empty-icon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+}
+
+.mobile-empty-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: #495057;
+}
+
+.mobile-empty-text {
+    font-size: 0.9rem;
+    margin-bottom: 1.5rem;
+}
+
+/* 移动端底部安全区域 */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+    .mobile-safe-area {
+        padding-bottom: env(safe-area-inset-bottom);
+    }
+}
+
+/* 移动端触摸优化 */
+@media (max-width: 768px) {
+    .btn,
+    .nav-link,
+    .dropdown-item {
+        min-height: 44px; /* iOS推荐的最小触摸目标 */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .table td {
+        min-height: 44px;
+        display: table-cell;
+        vertical-align: middle;
+    }
+}
+
+/* 移动端滚动优化 */
+@media (max-width: 768px) {
+    .table-responsive {
+        -webkit-overflow-scrolling: touch; /* iOS滑动优化 */
+    }
+    
+    .modal-body {
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    .overflow-auto {
+        -webkit-overflow-scrolling: touch;
+    }
+}
+
+/* 移动端图片优化 */
+@media (max-width: 768px) {
+    img {
+        max-width: 100%;
+        height: auto;
+    }
+    
+    .img-fluid {
+        width: 100%;
+        height: auto;
+    }
+} 

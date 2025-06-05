@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>首页通知框测试</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .header-section {
+            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+            border: 1px solid #dee2e6;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            border-radius: 12px;
+        }
+
+        .header-section h3 {
+            font-weight: 700;
+            color: #2c3e50;
+            font-size: 1.5rem;
+        }
+
+        /* 通知面板样式 */
+        .notification-panel {
+            border: 1px solid #e3f2fd;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            transition: all 0.3s ease;
+        }
+
+        .notification-panel:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+        }
+
+        .notification-panel .card-header {
+            background: linear-gradient(135deg, #fff3e0, #ffe0b2);
+            border-bottom: 1px solid #ffcc02;
+            border-radius: 12px 12px 0 0;
+        }
+
+        .notification-item {
+            border-bottom: 1px solid #f8f9fa;
+            padding: 1rem 1.25rem;
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+
+        .notification-item:last-child {
+            border-bottom: none;
+        }
+
+        .notification-item:hover {
+            background-color: #f8f9fa;
+        }
+
+        .notification-item.unread {
+            background-color: #e3f2fd;
+            border-left: 4px solid #2196f3;
+        }
+
+        .notification-item.unread:hover {
+            background-color: #bbdefb;
+        }
+
+        .notification-priority-high {
+            border-left-color: #f44336 !important;
+        }
+
+        .notification-priority-medium {
+            border-left-color: #ff9800 !important;
+        }
+
+        .notification-priority-low {
+            border-left-color: #4caf50 !important;
+        }
+
+        .notification-title {
+            font-weight: 600;
+            color: #212529;
+            margin-bottom: 0.25rem;
+        }
+
+        .notification-content {
+            color: #495057;
+            font-size: 0.9rem;
+            line-height: 1.4;
+        }
+
+        .notification-time {
+            font-size: 0.8rem;
+            color: #8b8b8b;
+        }
+
+        .priority-badge {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 12px;
+            font-weight: 500;
+        }
+
+        .priority-high {
+            background-color: #ffebee;
+            color: #c62828;
+        }
+
+        .priority-medium {
+            background-color: #fff3e0;
+            color: #ef6c00;
+        }
+
+        .priority-low {
+            background-color: #e8f5e8;
+            color: #2e7d32;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-4">
+        <!-- 标题区域 -->
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="header-section p-4">
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <h3 class="mb-2">综合管理系统 - 管理控制台</h3>
+                            <p class="mb-0 text-muted">欢迎您，管理员！</p>
+                        </div>
+                        <div class="col-md-4 text-end">
+                            <div class="d-flex align-items-center justify-content-end">
+                                <i class="fas fa-calendar-alt text-info me-2"></i>
+                                <span class="text-success fw-bold">2024年12月19日 星期四</span>
+                            </div>
+                            <div class="d-flex align-items-center justify-content-end mt-2">
+                                <i class="fas fa-clock text-warning me-2"></i>
+                                <span class="text-primary fw-bold">14:30:25</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 通知信息框 -->
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="card notification-panel">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0">
+                            <i class="fas fa-bell text-warning me-2"></i>
+                            系统通知
+                        </h6>
+                        <div class="d-flex align-items-center">
+                            <small class="text-muted me-3">最后更新: 2024-12-19 14:30:00</small>
+                            <a href="#" class="btn btn-sm btn-outline-primary">
+                                <i class="fas fa-eye me-1"></i>查看全部
+                            </a>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        <div id="notification-content">
+                            <!-- 示例通知内容 -->
+                            <div class="notification-item unread notification-priority-high">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div class="flex-grow-1">
+                                        <div class="notification-title">生产订单规格变更通知</div>
+                                        <div class="notification-content">订单 PO-20241219-001 的产品规格已从 A型 更改为 B型，请相关部门及时调整生产计划。</div>
+                                        <div class="notification-meta d-flex align-items-center mt-2">
+                                            <span class="priority-badge priority-high me-2">优先级: 高</span>
+                                            <small class="notification-time">
+                                                <i class="fas fa-clock me-1"></i>
+                                                5分钟前
+                                            </small>
+                                        </div>
+                                    </div>
+                                    <div class="ms-3">
+                                        <i class="fas fa-circle text-primary" style="font-size: 0.6rem;" title="未读"></i>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="notification-item unread notification-priority-medium">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div class="flex-grow-1">
+                                        <div class="notification-title">新任务分配</div>
+                                        <div class="notification-content">任务 TSK-20241219-015 已分配给张三，预计完成时间：2024-12-20 18:00。</div>
+                                        <div class="notification-meta d-flex align-items-center mt-2">
+                                            <span class="priority-badge priority-medium me-2">优先级: 中</span>
+                                            <small class="notification-time">
+                                                <i class="fas fa-clock me-1"></i>
+                                                15分钟前
+                                            </small>
+                                        </div>
+                                    </div>
+                                    <div class="ms-3">
+                                        <i class="fas fa-circle text-primary" style="font-size: 0.6rem;" title="未读"></i>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="notification-item notification-priority-low">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div class="flex-grow-1">
+                                        <div class="notification-title">库存补充提醒</div>
+                                        <div class="notification-content">原材料 RM-001 (钢板) 库存已降至安全库存线以下，当前库存：25件，建议及时补充。</div>
+                                        <div class="notification-meta d-flex align-items-center mt-2">
+                                            <span class="priority-badge priority-low me-2">优先级: 低</span>
+                                            <small class="notification-time">
+                                                <i class="fas fa-clock me-1"></i>
+                                                1小时前
+                                            </small>
+                                        </div>
+                                    </div>
+                                    <div class="ms-3">
+                                        <!-- 已读状态，无圆点 -->
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="notification-item notification-priority-medium">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div class="flex-grow-1">
+                                        <div class="notification-title">质量检验异常</div>
+                                        <div class="notification-content">批次 BT-20241219-003 在质量检验中发现问题，不合格率：8%，需要返工处理。</div>
+                                        <div class="notification-meta d-flex align-items-center mt-2">
+                                            <span class="priority-badge priority-medium me-2">优先级: 中</span>
+                                            <small class="notification-time">
+                                                <i class="fas fa-clock me-1"></i>
+                                                2小时前
+                                            </small>
+                                        </div>
+                                    </div>
+                                    <div class="ms-3">
+                                        <!-- 已读状态，无圆点 -->
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="notification-item notification-priority-low">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div class="flex-grow-1">
+                                        <div class="notification-title">员工考勤提醒</div>
+                                        <div class="notification-content">李四今日未按时打卡，请人事部门跟进处理。</div>
+                                        <div class="notification-meta d-flex align-items-center mt-2">
+                                            <span class="priority-badge priority-low me-2">优先级: 低</span>
+                                            <small class="notification-time">
+                                                <i class="fas fa-clock me-1"></i>
+                                                3小时前
+                                            </small>
+                                        </div>
+                                    </div>
+                                    <div class="ms-3">
+                                        <!-- 已读状态，无圆点 -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 模拟图表区域 -->
+        <div class="row">
+            <div class="col-md-6 mb-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="mb-0">
+                            <i class="fas fa-chart-line text-primary me-2"></i>
+                            员工工资统计
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="text-center py-5">
+                            <i class="fas fa-chart-line fa-3x text-muted mb-3"></i>
+                            <p class="text-muted">图表内容区域</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6 mb-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="mb-0">
+                            <i class="fas fa-chart-bar text-success me-2"></i>
+                            生产记录趋势
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="text-center py-5">
+                            <i class="fas fa-chart-bar fa-3x text-muted mb-3"></i>
+                            <p class="text-muted">图表内容区域</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 功能说明 -->
+        <div class="row mt-4">
+            <div class="col-md-12">
+                <div class="alert alert-success" role="alert">
+                    <i class="fas fa-check-circle me-2"></i>
+                    <strong>通知信息框已成功添加到首页！</strong> 
+                    位于标题和图表之间，实时显示系统重要通知信息。
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-info-circle me-2"></i>通知框功能特性
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6>📢 实时通知显示</h6>
+                                <ul>
+                                    <li>显示最新5条重要通知</li>
+                                    <li>按优先级和时间排序</li>
+                                    <li>未读通知突出显示</li>
+                                </ul>
+                                
+                                <h6>🎨 优雅的界面设计</h6>
+                                <ul>
+                                    <li>渐变色彩搭配</li>
+                                    <li>悬停效果和动画</li>
+                                    <li>响应式布局设计</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-6">
+                                <h6>⚡ 智能优先级标识</h6>
+                                <ul>
+                                    <li><span class="priority-badge priority-high">高优先级</span> - 红色边框，紧急通知</li>
+                                    <li><span class="priority-badge priority-medium">中优先级</span> - 橙色边框，重要通知</li>
+                                    <li><span class="priority-badge priority-low">低优先级</span> - 绿色边框，一般通知</li>
+                                </ul>
+                                
+                                <h6>🔄 自动刷新机制</h6>
+                                <ul>
+                                    <li>每2分钟自动刷新通知</li>
+                                    <li>点击可标记为已读</li>
+                                    <li>一键查看全部通知</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // 模拟点击通知项的交互效果
+        document.querySelectorAll('.notification-item').forEach(item => {
+            item.addEventListener('click', function() {
+                if (this.classList.contains('unread')) {
+                    this.classList.remove('unread');
+                    // 移除未读圆点
+                    const unreadDot = this.querySelector('.fa-circle');
+                    if (unreadDot) {
+                        unreadDot.remove();
+                    }
+                    
+                    // 显示反馈
+                    const title = this.querySelector('.notification-title').textContent;
+                    alert(`通知 "${title}" 已标记为已读`);
+                }
+            });
+        });
+    </script>
+</body>
+</html> 

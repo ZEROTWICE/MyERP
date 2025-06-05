@@ -14,41 +14,39 @@
     </div>
 
     <!-- 搜索和筛选 -->
-    <div class="card mb-4">
-        <div class="card-body">
-            <form method="GET" class="row g-3">
-                <div class="col-md-4">
-                    <label class="form-label">搜索</label>
-                    <input type="text" class="form-control" name="search" value="{{ search }}" 
-                           placeholder="客户编码、名称、联系人、电话、行业">
+    <div class="mobile-filters mb-4">
+        <form method="GET" class="row g-3">
+            <div class="col-md-4 col-12">
+                <label class="form-label">搜索</label>
+                <input type="text" class="form-control" name="search" value="{{ search }}" 
+                       placeholder="客户编码、名称、联系人、电话、行业">
+            </div>
+            <div class="col-md-3 col-6">
+                <label class="form-label">状态</label>
+                <select class="form-select" name="status">
+                    <option value="">全部状态</option>
+                    <option value="active" {% if status_filter == 'active' %}selected{% endif %}>活跃</option>
+                    <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>非活跃</option>
+                    <option value="blacklist" {% if status_filter == 'blacklist' %}selected{% endif %}>黑名单</option>
+                </select>
+            </div>
+            <div class="col-md-3 col-6">
+                <label class="form-label">客户类型</label>
+                <select class="form-select" name="customer_type">
+                    <option value="">全部类型</option>
+                    <option value="enterprise" {% if type_filter == 'enterprise' %}selected{% endif %}>企业客户</option>
+                    <option value="individual" {% if type_filter == 'individual' %}selected{% endif %}>个人客户</option>
+                </select>
+            </div>
+            <div class="col-md-2 col-12">
+                <label class="form-label d-none d-md-block">&nbsp;</label>
+                <div class="d-grid">
+                    <button type="submit" class="btn btn-outline-primary">
+                        <i class="fas fa-search"></i> 搜索
+                    </button>
                 </div>
-                <div class="col-md-3">
-                    <label class="form-label">状态</label>
-                    <select class="form-select" name="status">
-                        <option value="">全部状态</option>
-                        <option value="active" {% if status_filter == 'active' %}selected{% endif %}>活跃</option>
-                        <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>非活跃</option>
-                        <option value="blacklist" {% if status_filter == 'blacklist' %}selected{% endif %}>黑名单</option>
-                    </select>
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label">客户类型</label>
-                    <select class="form-select" name="customer_type">
-                        <option value="">全部类型</option>
-                        <option value="enterprise" {% if type_filter == 'enterprise' %}selected{% endif %}>企业客户</option>
-                        <option value="individual" {% if type_filter == 'individual' %}selected{% endif %}>个人客户</option>
-                    </select>
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label">&nbsp;</label>
-                    <div class="d-grid">
-                        <button type="submit" class="btn btn-outline-primary">
-                            <i class="fas fa-search"></i> 搜索
-                        </button>
-                    </div>
-                </div>
-            </form>
-        </div>
+            </div>
+        </form>
     </div>
 
     <!-- 客户列表 -->
@@ -58,6 +56,7 @@
         </div>
         <div class="card-body">
             {% if customers %}
+            <!-- 桌面端表格 -->
             <div class="table-responsive">
                 <table class="table table-hover">
                     <thead>
@@ -138,6 +137,83 @@
                         {% endfor %}
                     </tbody>
                 </table>
+            </div>
+
+            <!-- 移动端卡片视图 -->
+            <div class="mobile-table">
+                {% for customer in customers %}
+                <div class="mobile-table-item">
+                    <div class="mobile-table-header">
+                        <div>
+                            <strong>{{ customer.customer_name }}</strong>
+                            {% if customer.customer_type == 'enterprise' %}
+                                <span class="mobile-status-badge bg-primary ms-2">企业</span>
+                            {% else %}
+                                <span class="mobile-status-badge bg-info ms-2">个人</span>
+                            {% endif %}
+                        </div>
+                        {% if customer.status == 'active' %}
+                            <span class="mobile-status-badge bg-success">活跃</span>
+                        {% elif customer.status == 'inactive' %}
+                            <span class="mobile-status-badge bg-warning">非活跃</span>
+                        {% elif customer.status == 'blacklist' %}
+                            <span class="mobile-status-badge bg-danger">黑名单</span>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="mobile-table-body">
+                        <div class="mobile-table-row">
+                            <span class="mobile-table-label">客户编码</span>
+                            <span class="mobile-table-value"><code>{{ customer.customer_code }}</code></span>
+                        </div>
+                        {% if customer.contact_person %}
+                        <div class="mobile-table-row">
+                            <span class="mobile-table-label">联系人</span>
+                            <span class="mobile-table-value">{{ customer.contact_person }}</span>
+                        </div>
+                        {% endif %}
+                        {% if customer.contact_phone %}
+                        <div class="mobile-table-row">
+                            <span class="mobile-table-label">联系电话</span>
+                            <span class="mobile-table-value">{{ customer.contact_phone }}</span>
+                        </div>
+                        {% endif %}
+                        {% if customer.industry %}
+                        <div class="mobile-table-row">
+                            <span class="mobile-table-label">行业</span>
+                            <span class="mobile-table-value">{{ customer.industry }}</span>
+                        </div>
+                        {% endif %}
+                        <div class="mobile-table-row">
+                            <span class="mobile-table-label">地址数量</span>
+                            <span class="mobile-table-value"><span class="badge bg-secondary">{{ customer.address_count }}</span></span>
+                        </div>
+                        <div class="mobile-table-row">
+                            <span class="mobile-table-label">创建时间</span>
+                            <span class="mobile-table-value">{{ customer.created_at.strftime('%Y-%m-%d') }}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="mobile-table-actions">
+                        <a href="{{ url_for('main.customer_detail', customer_id=customer.id) }}" 
+                           class="btn btn-sm btn-outline-primary">
+                            <i class="fas fa-eye"></i> 查看
+                        </a>
+                        {% if current_user.role in ['admin', 'manager', 'sales'] %}
+                        <a href="{{ url_for('main.edit_customer', customer_id=customer.id) }}" 
+                           class="btn btn-sm btn-outline-secondary">
+                            <i class="fas fa-edit"></i> 编辑
+                        </a>
+                        {% endif %}
+                        {% if current_user.role in ['admin', 'manager'] %}
+                        <button class="btn btn-sm btn-outline-danger" 
+                                onclick="deleteCustomer({{ customer.id }}, '{{ customer.customer_name }}')">
+                            <i class="fas fa-trash"></i> 删除
+                        </button>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
             </div>
 
             <!-- 分页 -->

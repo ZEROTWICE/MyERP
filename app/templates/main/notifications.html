@@ -1,0 +1,235 @@
+{% extends "base.html" %}
+
+{% block title %}通知中心{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>通知中心</h2>
+        <div>
+            {% if current_user.role in ['admin', 'manager'] %}
+            <a href="{{ url_for('main.manage_notification_rules') }}" class="btn btn-secondary">
+                <i class="fas fa-cog"></i> 通知规则
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- 通知统计 -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card text-white bg-primary">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <div class="small">未读通知</div>
+                            <div class="h4">{{ stats.unread }}</div>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-bell fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-info">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <div class="small">总通知数</div>
+                            <div class="h4">{{ stats.total }}</div>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-inbox fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 过滤器 -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-4">
+                    <select class="form-select" id="statusFilter" onchange="filterNotifications()">
+                        <option value="">所有状态</option>
+                        <option value="unread">未读</option>
+                        <option value="read">已读</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <select class="form-select" id="typeFilter" onchange="filterNotifications()">
+                        <option value="">所有类型</option>
+                        <option value="info">信息</option>
+                        <option value="warning">警告</option>
+                        <option value="error">错误</option>
+                        <option value="success">成功</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 通知列表 -->
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">通知列表</h5>
+        </div>
+        <div class="card-body p-0">
+            {% if notifications %}
+            <div class="list-group list-group-flush">
+                {% for notification in notifications %}
+                <div class="list-group-item notification-item {% if notification.status == 'unread' %}list-group-item-light{% endif %}" 
+                     data-notification-id="{{ notification.id }}"
+                     data-status="{{ notification.status }}"
+                     data-type="{{ notification.notification_type }}">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div class="flex-grow-1">
+                            <div class="d-flex align-items-center mb-2">
+                                <!-- 通知类型图标 -->
+                                {% if notification.notification_type == 'warning' %}
+                                <i class="fas fa-exclamation-triangle text-warning me-2"></i>
+                                {% elif notification.notification_type == 'error' %}
+                                <i class="fas fa-exclamation-circle text-danger me-2"></i>
+                                {% elif notification.notification_type == 'success' %}
+                                <i class="fas fa-check-circle text-success me-2"></i>
+                                {% else %}
+                                <i class="fas fa-info-circle text-info me-2"></i>
+                                {% endif %}
+                                
+                                <!-- 标题 -->
+                                <h6 class="mb-0 {% if notification.status == 'unread' %}fw-bold{% endif %}">
+                                    {{ notification.title }}
+                                </h6>
+                                
+                                <!-- 未读标识 -->
+                                {% if notification.status == 'unread' %}
+                                <span class="badge bg-primary ms-2">新</span>
+                                {% endif %}
+                            </div>
+                            
+                            <!-- 内容 -->
+                            <p class="mb-2 text-muted">{{ notification.content }}</p>
+                            
+                            <!-- 时间 -->
+                            <small class="text-muted">
+                                <i class="fas fa-clock"></i>
+                                {{ notification.created_at.strftime('%Y-%m-%d %H:%M') }}
+                                {% if notification.read_at %}
+                                <span class="ms-2">
+                                    <i class="fas fa-eye"></i>
+                                    已读于 {{ notification.read_at.strftime('%Y-%m-%d %H:%M') }}
+                                </span>
+                                {% endif %}
+                            </small>
+                        </div>
+                        
+                        <!-- 操作按钮 -->
+                        <div class="ms-3">
+                            {% if notification.status == 'unread' %}
+                            <button class="btn btn-sm btn-outline-primary" 
+                                    onclick="markAsRead({{ notification.id }})">
+                                <i class="fas fa-eye"></i> 标记已读
+                            </button>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="text-center py-5">
+                <i class="fas fa-bell-slash fa-3x text-muted mb-3"></i>
+                <p class="text-muted">暂无通知</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+// 标记通知为已读
+function markAsRead(notificationId) {
+    fetch(`/notifications/${notificationId}/read`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCsrfToken()
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // 更新界面
+            const item = document.querySelector(`[data-notification-id="${notificationId}"]`);
+            item.classList.remove('list-group-item-light');
+            item.dataset.status = 'read';
+            
+            // 移除未读标识和标记已读按钮
+            const badge = item.querySelector('.badge');
+            if (badge) badge.remove();
+            
+            const button = item.querySelector('button');
+            if (button) button.remove();
+            
+            // 更新标题样式
+            const title = item.querySelector('h6');
+            title.classList.remove('fw-bold');
+            
+            // 更新统计数据
+            updateStats();
+        } else {
+            alert('操作失败：' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('操作失败');
+    });
+}
+
+// 过滤通知
+function filterNotifications() {
+    const statusFilter = document.getElementById('statusFilter').value;
+    const typeFilter = document.getElementById('typeFilter').value;
+    
+    const items = document.querySelectorAll('.notification-item');
+    
+    items.forEach(item => {
+        let show = true;
+        
+        if (statusFilter && item.dataset.status !== statusFilter) {
+            show = false;
+        }
+        
+        if (typeFilter && item.dataset.type !== typeFilter) {
+            show = false;
+        }
+        
+        item.style.display = show ? 'block' : 'none';
+    });
+}
+
+// 更新统计数据
+function updateStats() {
+    fetch('/api/notifications/stats')
+    .then(response => response.json())
+    .then(data => {
+        // 更新未读数量
+        const unreadElement = document.querySelector('.bg-primary .h4');
+        if (unreadElement) {
+            unreadElement.textContent = data.unread;
+        }
+    })
+    .catch(error => console.error('Error updating stats:', error));
+}
+
+// 获取CSRF令牌
+function getCsrfToken() {
+    return document.querySelector('meta[name=csrf-token]').getAttribute('content');
+}
+</script>
+{% endblock %} 

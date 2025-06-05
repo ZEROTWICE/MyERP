@@ -1,56 +1,444 @@
 {% extends "base.html" %}
 
+{% block head %}
+{{ super() }}
+<!-- 引入Font Awesome图标库 -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+{% endblock %}
+
 {% block content %}
 <div class="container mt-4">
+    <!-- 标题和状态信息整合区域 -->
     <div class="row mb-4">
         <div class="col-md-12">
-            <h2 class="mb-4">综合管理系统 - 管理控制台</h2>
-        </div>
-    </div>
-
-    <!-- 问候语和时间显示 -->
-    <div class="row mb-4">
-        <div class="col-md-12">
-            <div class="welcome-section text-center p-4 bg-light rounded">
-                <h4 class="text-primary mb-3" id="greeting">欢迎您，管理员！</h4>
-                <div class="datetime-display">
-                    <p class="mb-1">
-                        <i class="fas fa-calendar-alt text-info me-2"></i>
-                        <strong>今天是：</strong>
-                        <span id="current-date" class="text-success">加载中...</span>
-                    </p>
-                    <p class="mb-0">
-                        <i class="fas fa-clock text-warning me-2"></i>
-                        <strong>当前时间：</strong>
-                        <span id="current-time" class="text-primary">加载中...</span>
-                    </p>
+            <div class="header-section bg-light rounded p-4">
+                <div class="row align-items-center">
+                    <div class="col-md-8 d-flex flex-column justify-content-center">
+                        <h3 class="mb-2 text-dark fw-bold">综合管理系统 - 管理控制台</h3>
+                        <p class="mb-0 text-muted fs-6" id="greeting">欢迎您，管理员！</p>
+                    </div>
+                    <div class="col-md-4 d-flex flex-column justify-content-center text-end">
+                        <div class="datetime-info">
+                            <div class="mb-2 d-flex align-items-center justify-content-end">
+                                <i class="fas fa-calendar-alt text-info me-2"></i>
+                                <span class="text-success fw-bold fs-6" id="current-date">加载中...</span>
+                            </div>
+                            <div class="d-flex align-items-center justify-content-end">
+                                <i class="fas fa-clock text-warning me-2"></i>
+                                <span class="text-primary fw-bold fs-6" id="current-time">加载中...</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
+    <!-- 通知信息框 -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card notification-panel">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0">
+                        <i class="fas fa-bell text-warning me-2"></i>
+                        系统通知
+                    </h6>
+                    <div class="d-flex align-items-center">
+                        <small class="text-muted me-3" id="notification-update-time">最后更新: 加载中...</small>
+                        <a href="{{ url_for('main.manage_notifications') }}" class="btn btn-sm btn-outline-primary">
+                            <i class="fas fa-eye me-1"></i>查看全部
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div id="notification-content">
+                        <!-- 通知内容将通过JavaScript动态加载 -->
+                        <div class="text-center py-4">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">加载通知中...</span>
+                            </div>
+                            <p class="mt-2 text-muted">正在加载最新通知...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
+    <!-- 图表展示区域 -->
+    <div class="row">
+        <!-- 左上角图表 -->
+        <div class="col-md-6 mb-4">
+            <div class="card shadow-sm">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0">
+                        <i class="fas fa-chart-line text-primary me-2"></i>
+                        <span id="chart1-title">员工工资统计</span>
+                    </h6>
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="chart1Dropdown" data-bs-toggle="dropdown">
+                            选择图表
+                        </button>
+                        <ul class="dropdown-menu" aria-labelledby="chart1Dropdown">
+                            <li><a class="dropdown-item chart-option" href="#" data-chart="1" data-type="salary">员工工资统计</a></li>
+                            <li><a class="dropdown-item chart-option" href="#" data-chart="1" data-type="production">生产记录趋势</a></li>
+                            <li><a class="dropdown-item chart-option" href="#" data-chart="1" data-type="department">部门生产力对比</a></li>
+                            <li><a class="dropdown-item chart-option" href="#" data-chart="1" data-type="bonus">奖惩统计</a></li>
+                            <li><a class="dropdown-item chart-option" href="#" data-chart="1" data-type="task">任务完成率</a></li>
+                            <li><a class="dropdown-item chart-option" href="#" data-chart="1" data-type="inventory">库存状态</a></li>
+                            <li><a class="dropdown-item chart-option" href="#" data-chart="1" data-type="quality">质量检验统计</a></li>
+                            <li><a class="dropdown-item chart-option" href="#" data-chart="1" data-type="process">工序价格分布</a></li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <canvas id="chart1" width="400" height="300"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右上角图表 -->
+        <div class="col-md-6 mb-4">
+            <div class="card shadow-sm">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0">
+                        <i class="fas fa-chart-bar text-success me-2"></i>
+                        <span id="chart2-title">生产记录趋势</span>
+                    </h6>
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="chart2Dropdown" data-bs-toggle="dropdown">
+                            选择图表
+                        </button>
+                        <ul class="dropdown-menu" aria-labelledby="chart2Dropdown">
+                            <li><a class="dropdown-item chart-option" href="#" data-chart="2" data-type="salary">员工工资统计</a></li>
+                            <li><a class="dropdown-item chart-option" href="#" data-chart="2" data-type="production">生产记录趋势</a></li>
+                            <li><a class="dropdown-item chart-option" href="#" data-chart="2" data-type="department">部门生产力对比</a></li>
+                            <li><a class="dropdown-item chart-option" href="#" data-chart="2" data-type="bonus">奖惩统计</a></li>
+                            <li><a class="dropdown-item chart-option" href="#" data-chart="2" data-type="task">任务完成率</a></li>
+                            <li><a class="dropdown-item chart-option" href="#" data-chart="2" data-type="inventory">库存状态</a></li>
+                            <li><a class="dropdown-item chart-option" href="#" data-chart="2" data-type="quality">质量检验统计</a></li>
+                            <li><a class="dropdown-item chart-option" href="#" data-chart="2" data-type="process">工序价格分布</a></li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <canvas id="chart2" width="400" height="300"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- 左下角图表 -->
+        <div class="col-md-6 mb-4">
+            <div class="card shadow-sm">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0">
+                        <i class="fas fa-chart-pie text-info me-2"></i>
+                        <span id="chart3-title">部门生产力对比</span>
+                    </h6>
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="chart3Dropdown" data-bs-toggle="dropdown">
+                            选择图表
+                        </button>
+                        <ul class="dropdown-menu" aria-labelledby="chart3Dropdown">
+                            <li><a class="dropdown-item chart-option" href="#" data-chart="3" data-type="salary">员工工资统计</a></li>
+                            <li><a class="dropdown-item chart-option" href="#" data-chart="3" data-type="production">生产记录趋势</a></li>
+                            <li><a class="dropdown-item chart-option" href="#" data-chart="3" data-type="department">部门生产力对比</a></li>
+                            <li><a class="dropdown-item chart-option" href="#" data-chart="3" data-type="bonus">奖惩统计</a></li>
+                            <li><a class="dropdown-item chart-option" href="#" data-chart="3" data-type="task">任务完成率</a></li>
+                            <li><a class="dropdown-item chart-option" href="#" data-chart="3" data-type="inventory">库存状态</a></li>
+                            <li><a class="dropdown-item chart-option" href="#" data-chart="3" data-type="quality">质量检验统计</a></li>
+                            <li><a class="dropdown-item chart-option" href="#" data-chart="3" data-type="process">工序价格分布</a></li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <canvas id="chart3" width="400" height="300"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右下角图表 -->
+        <div class="col-md-6 mb-4">
+            <div class="card shadow-sm">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0">
+                        <i class="fas fa-chart-area text-warning me-2"></i>
+                        <span id="chart4-title">任务完成率</span>
+                    </h6>
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="chart4Dropdown" data-bs-toggle="dropdown">
+                            选择图表
+                        </button>
+                        <ul class="dropdown-menu" aria-labelledby="chart4Dropdown">
+                            <li><a class="dropdown-item chart-option" href="#" data-chart="4" data-type="salary">员工工资统计</a></li>
+                            <li><a class="dropdown-item chart-option" href="#" data-chart="4" data-type="production">生产记录趋势</a></li>
+                            <li><a class="dropdown-item chart-option" href="#" data-chart="4" data-type="department">部门生产力对比</a></li>
+                            <li><a class="dropdown-item chart-option" href="#" data-chart="4" data-type="bonus">奖惩统计</a></li>
+                            <li><a class="dropdown-item chart-option" href="#" data-chart="4" data-type="task">任务完成率</a></li>
+                            <li><a class="dropdown-item chart-option" href="#" data-chart="4" data-type="inventory">库存状态</a></li>
+                            <li><a class="dropdown-item chart-option" href="#" data-chart="4" data-type="quality">质量检验统计</a></li>
+                            <li><a class="dropdown-item chart-option" href="#" data-chart="4" data-type="process">工序价格分布</a></li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <canvas id="chart4" width="400" height="300"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
-<!-- 引入Font Awesome图标库 -->
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
-
 <style>
-.welcome-section {
+.header-section {
     background: linear-gradient(135deg, #f8f9fa, #e9ecef);
     border: 1px solid #dee2e6;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
 }
 
-.datetime-display {
-    font-size: 1.1em;
+.header-section h3 {
+    font-weight: 700;
+    color: #2c3e50;
+    font-size: 1.5rem;
+    line-height: 1.4;
 }
 
-.datetime-display i {
-    font-size: 1.2em;
+.header-section #greeting {
+    font-size: 1rem;
+    font-style: italic;
+    color: #6c757d;
+    line-height: 1.4;
+}
+
+.datetime-info {
+    text-align: right;
+    line-height: 1.5;
+}
+
+.datetime-info span {
+    font-size: 1rem;
+    display: inline-block;
+    min-width: 120px;
+}
+
+.datetime-info i {
+    width: 18px;
+    height: 18px;
+    text-align: center;
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+.datetime-info .d-flex {
+    align-items: center;
+    height: 1.5rem;
+}
+
+@media (max-width: 768px) {
+    .header-section .col-md-4 {
+        text-align: center !important;
+        margin-top: 1rem;
+    }
+    
+    .datetime-info {
+        text-align: center;
+    }
+}
+
+/* 图表区域样式 */
+.card {
+    border: none;
+    border-radius: 12px;
+    transition: all 0.3s ease;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1) !important;
+}
+
+.card-header {
+    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+    border-bottom: 1px solid #dee2e6;
+    border-radius: 12px 12px 0 0 !important;
+    padding: 1rem 1.25rem;
+}
+
+.card-header h6 {
+    font-weight: 600;
+    margin: 0;
+}
+
+.card-body {
+    padding: 1.5rem;
+    height: 320px;
+    position: relative;
+}
+
+.dropdown-toggle {
+    font-size: 0.875rem;
+    padding: 0.375rem 0.75rem;
+    border-radius: 6px;
+}
+
+.dropdown-menu {
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+    border: 1px solid #e9ecef;
+}
+
+.dropdown-item {
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    transition: all 0.2s ease;
+}
+
+.dropdown-item:hover {
+    background-color: #f8f9fa;
+    color: #495057;
+}
+
+.dropdown-item:active {
+    background-color: #007bff;
+    color: white;
+}
+
+/* 图表画布样式 */
+canvas {
+    max-height: 280px !important;
+}
+
+/* 通知面板样式 */
+.notification-panel {
+    border: 1px solid #e3f2fd;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    transition: all 0.3s ease;
+}
+
+.notification-panel:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+}
+
+.notification-panel .card-header {
+    background: linear-gradient(135deg, #fff3e0, #ffe0b2);
+    border-bottom: 1px solid #ffcc02;
+    border-radius: 12px 12px 0 0;
+}
+
+.notification-item {
+    border-bottom: 1px solid #f8f9fa;
+    padding: 1rem 1.25rem;
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.notification-item:last-child {
+    border-bottom: none;
+}
+
+.notification-item:hover {
+    background-color: #f8f9fa;
+}
+
+.notification-item.unread {
+    background-color: #e3f2fd;
+    border-left: 4px solid #2196f3;
+}
+
+.notification-item.unread:hover {
+    background-color: #bbdefb;
+}
+
+.notification-priority-high {
+    border-left-color: #f44336 !important;
+}
+
+.notification-priority-medium {
+    border-left-color: #ff9800 !important;
+}
+
+.notification-priority-low {
+    border-left-color: #4caf50 !important;
+}
+
+.notification-meta {
+    font-size: 0.875rem;
+    color: #6c757d;
+}
+
+.notification-title {
+    font-weight: 600;
+    color: #212529;
+    margin-bottom: 0.25rem;
+}
+
+.notification-content {
+    color: #495057;
+    font-size: 0.9rem;
+    line-height: 1.4;
+}
+
+.notification-time {
+    font-size: 0.8rem;
+    color: #8b8b8b;
+}
+
+.priority-badge {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 12px;
+    font-weight: 500;
+}
+
+.priority-high {
+    background-color: #ffebee;
+    color: #c62828;
+}
+
+.priority-medium {
+    background-color: #fff3e0;
+    color: #ef6c00;
+}
+
+.priority-low {
+    background-color: #e8f5e8;
+    color: #2e7d32;
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+    .card-body {
+        height: 280px;
+        padding: 1rem;
+    }
+    
+    canvas {
+        max-height: 240px !important;
+    }
+    
+    .notification-item {
+        padding: 0.75rem 1rem;
+    }
+    
+    .notification-panel .card-header .d-flex {
+        flex-direction: column;
+        align-items: flex-start !important;
+    }
+    
+    .notification-panel .card-header .btn {
+        margin-top: 0.5rem;
+    }
 }
 </style>
+{% endblock %}
 
+{% block scripts %}
+<!-- 引入Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 function updateDateTime() {
     const now = new Date();
@@ -95,12 +483,411 @@ function updateGreeting(hour) {
     document.getElementById('greeting').textContent = greeting;
 }
 
+// 图表实例存储
+const chartInstances = {};
+
+// 图表配置
+const chartConfigs = {
+    salary: {
+        title: '员工工资统计',
+        type: 'bar',
+        icon: 'fa-chart-line',
+        color: 'primary',
+        data: {
+            labels: ['张三', '李四', '王五', '赵六', '钱七'],
+            datasets: [{
+                label: '工资(元)',
+                data: [5200, 4800, 5600, 4900, 5100],
+                backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 1
+            }]
+        }
+    },
+    production: {
+        title: '生产记录趋势',
+        type: 'line',
+        icon: 'fa-chart-bar',
+        color: 'success',
+        data: {
+            labels: ['1月', '2月', '3月', '4月', '5月', '6月'],
+            datasets: [{
+                label: '产量(件)',
+                data: [120, 150, 180, 160, 200, 220],
+                borderColor: 'rgb(75, 192, 192)',
+                backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                tension: 0.1
+            }]
+        }
+    },
+    department: {
+        title: '部门生产力对比',
+        type: 'pie',
+        icon: 'fa-chart-pie',
+        color: 'info',
+        data: {
+            labels: ['生产部', '质检部', '包装部', '仓储部'],
+            datasets: [{
+                data: [45, 25, 20, 10],
+                backgroundColor: [
+                    'rgba(255, 99, 132, 0.8)',
+                    'rgba(54, 162, 235, 0.8)',
+                    'rgba(255, 205, 86, 0.8)',
+                    'rgba(75, 192, 192, 0.8)'
+                ]
+            }]
+        }
+    },
+    bonus: {
+        title: '奖惩统计',
+        type: 'doughnut',
+        icon: 'fa-award',
+        color: 'warning',
+        data: {
+            labels: ['奖励', '无奖惩', '轻微惩罚', '严重惩罚'],
+            datasets: [{
+                data: [30, 60, 8, 2],
+                backgroundColor: [
+                    'rgba(40, 167, 69, 0.8)',
+                    'rgba(108, 117, 125, 0.8)',
+                    'rgba(255, 193, 7, 0.8)',
+                    'rgba(220, 53, 69, 0.8)'
+                ]
+            }]
+        }
+    },
+    task: {
+        title: '任务完成率',
+        type: 'bar',
+        icon: 'fa-chart-area',
+        color: 'warning',
+        data: {
+            labels: ['已完成', '进行中', '待开始', '已取消'],
+            datasets: [{
+                label: '任务数量',
+                data: [85, 12, 8, 3],
+                backgroundColor: ['#28a745', '#ffc107', '#6c757d', '#dc3545']
+            }]
+        }
+    },
+    inventory: {
+        title: '库存状态',
+        type: 'bar',
+        icon: 'fa-boxes',
+        color: 'success',
+        data: {
+            labels: ['成品', '原材料', '半成品'],
+            datasets: [{
+                label: '库存数量',
+                data: [150, 320, 80],
+                backgroundColor: ['#007bff', '#28a745', '#ffc107']
+            }]
+        }
+    },
+    quality: {
+        title: '质量检验统计',
+        type: 'line',
+        icon: 'fa-clipboard-check',
+        color: 'info',
+        data: {
+            labels: ['合格', '返工', '报废'],
+            datasets: [{
+                label: '检验结果',
+                data: [92, 6, 2],
+                borderColor: '#17a2b8',
+                backgroundColor: 'rgba(23, 162, 184, 0.1)',
+                fill: true
+            }]
+        }
+    },
+    process: {
+        title: '工序价格分布',
+        type: 'radar',
+        icon: 'fa-cogs',
+        color: 'primary',
+        data: {
+            labels: ['切割', '焊接', '打磨', '喷涂', '组装', '检验'],
+            datasets: [{
+                label: '价格(元)',
+                data: [65, 80, 45, 70, 90, 35],
+                borderColor: '#007bff',
+                backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                pointBackgroundColor: '#007bff'
+            }]
+        }
+    }
+};
+
+function initializeCharts() {
+    // 初始化四个图表
+    createChart('chart1', 'salary');
+    createChart('chart2', 'production');
+    createChart('chart3', 'department');
+    createChart('chart4', 'task');
+    
+    // 绑定图表选择事件
+    document.querySelectorAll('.chart-option').forEach(option => {
+        option.addEventListener('click', function(e) {
+            e.preventDefault();
+            const chartId = this.dataset.chart;
+            const chartType = this.dataset.type;
+            const titleElement = document.getElementById(`chart${chartId}-title`);
+            
+            // 更新标题
+            titleElement.textContent = chartConfigs[chartType].title;
+            
+            // 重新创建图表
+            createChart(`chart${chartId}`, chartType);
+        });
+    });
+}
+
+function createChart(canvasId, configKey) {
+    const canvas = document.getElementById(canvasId);
+    const config = chartConfigs[configKey];
+    
+    // 销毁现有图表实例
+    if (chartInstances[canvasId]) {
+        chartInstances[canvasId].destroy();
+    }
+    
+    // 显示加载状态
+    const cardBody = canvas.parentElement;
+    cardBody.innerHTML = '<div class="d-flex justify-content-center align-items-center h-100"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">加载中...</span></div></div>';
+    
+    // 从后端获取数据
+    fetch(`/api/chart-data/${configKey}`)
+        .then(response => response.json())
+        .then(data => {
+            // 恢复canvas元素
+            cardBody.innerHTML = `<canvas id="${canvasId}" width="400" height="300"></canvas>`;
+            const newCanvas = document.getElementById(canvasId);
+            
+            // 创建新图表
+            chartInstances[canvasId] = new Chart(newCanvas, {
+                type: config.type,
+                data: data.success ? data.data : config.data,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                font: {
+                                    size: 12
+                                }
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0,0,0,0.8)',
+                            titleColor: 'white',
+                            bodyColor: 'white',
+                            borderColor: '#007bff',
+                            borderWidth: 1
+                        }
+                    },
+                    scales: config.type === 'radar' || config.type === 'pie' || config.type === 'doughnut' ? {} : {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                font: {
+                                    size: 11
+                                }
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                font: {
+                                    size: 11
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        })
+        .catch(error => {
+            console.error('获取图表数据失败:', error);
+            // 恢复canvas元素并使用模拟数据
+            cardBody.innerHTML = `<canvas id="${canvasId}" width="400" height="300"></canvas>`;
+            const newCanvas = document.getElementById(canvasId);
+            
+            chartInstances[canvasId] = new Chart(newCanvas, {
+                type: config.type,
+                data: config.data,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                font: {
+                                    size: 12
+                                }
+                            }
+                        }
+                    },
+                    scales: config.type === 'radar' || config.type === 'pie' || config.type === 'doughnut' ? {} : {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                font: {
+                                    size: 11
+                                }
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                font: {
+                                    size: 11
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        });
+}
+
+// 加载通知数据
+function loadNotifications() {
+    fetch('/api/notifications/recent')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                displayNotifications(data.notifications);
+                updateNotificationTime();
+            } else {
+                showNotificationError('获取通知失败');
+            }
+        })
+        .catch(error => {
+            console.error('加载通知失败:', error);
+            showNotificationError('网络连接失败');
+        });
+}
+
+function displayNotifications(notifications) {
+    const container = document.getElementById('notification-content');
+    
+    if (!notifications || notifications.length === 0) {
+        container.innerHTML = `
+            <div class="text-center py-4">
+                <i class="fas fa-bell-slash fa-3x text-muted mb-3"></i>
+                <p class="text-muted">暂无新通知</p>
+            </div>
+        `;
+        return;
+    }
+    
+    let html = '';
+    notifications.slice(0, 5).forEach(notification => { // 只显示最新5条
+        const priorityClass = `priority-${notification.priority > 5 ? 'high' : notification.priority > 0 ? 'medium' : 'low'}`;
+        const priorityText = notification.priority > 5 ? '高' : notification.priority > 0 ? '中' : '低';
+        const unreadClass = notification.is_read ? '' : 'unread';
+        const priorityBorderClass = `notification-priority-${notification.priority > 5 ? 'high' : notification.priority > 0 ? 'medium' : 'low'}`;
+        
+        html += `
+            <div class="notification-item ${unreadClass} ${priorityBorderClass}" onclick="markAsRead(${notification.id})">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div class="flex-grow-1">
+                        <div class="notification-title">${notification.title}</div>
+                        <div class="notification-content">${notification.content}</div>
+                        <div class="notification-meta d-flex align-items-center mt-2">
+                            <span class="priority-badge ${priorityClass} me-2">优先级: ${priorityText}</span>
+                            <small class="notification-time">
+                                <i class="fas fa-clock me-1"></i>
+                                ${formatTime(notification.created_at)}
+                            </small>
+                        </div>
+                    </div>
+                    <div class="ms-3">
+                        ${notification.is_read ? '' : '<i class="fas fa-circle text-primary" style="font-size: 0.6rem;" title="未读"></i>'}
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    container.innerHTML = html;
+}
+
+function showNotificationError(message) {
+    const container = document.getElementById('notification-content');
+    container.innerHTML = `
+        <div class="text-center py-4">
+            <i class="fas fa-exclamation-triangle fa-3x text-warning mb-3"></i>
+            <p class="text-muted">${message}</p>
+            <button class="btn btn-sm btn-outline-primary" onclick="loadNotifications()">
+                <i class="fas fa-sync-alt me-1"></i>重新加载
+            </button>
+        </div>
+    `;
+}
+
+function markAsRead(notificationId) {
+    fetch(`/notifications/${notificationId}/read`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // 刷新通知显示
+            loadNotifications();
+            // 更新导航栏通知计数
+            if (window.loadNotificationCount) {
+                window.loadNotificationCount();
+            }
+        }
+    })
+    .catch(error => {
+        console.error('标记为已读失败:', error);
+    });
+}
+
+function formatTime(timeString) {
+    const now = new Date();
+    const time = new Date(timeString);
+    const diffInSeconds = Math.floor((now - time) / 1000);
+    
+    if (diffInSeconds < 60) {
+        return '刚刚';
+    } else if (diffInSeconds < 3600) {
+        return `${Math.floor(diffInSeconds / 60)}分钟前`;
+    } else if (diffInSeconds < 86400) {
+        return `${Math.floor(diffInSeconds / 3600)}小时前`;
+    } else if (diffInSeconds < 604800) {
+        return `${Math.floor(diffInSeconds / 86400)}天前`;
+    } else {
+        return time.toLocaleDateString('zh-CN');
+    }
+}
+
+function updateNotificationTime() {
+    const now = new Date();
+    const timeString = now.toLocaleString('zh-CN');
+    document.getElementById('notification-update-time').textContent = `最后更新: ${timeString}`;
+}
+
 // 页面加载完成后立即更新一次
 document.addEventListener('DOMContentLoaded', function() {
     updateDateTime();
     // 每秒更新一次时间
     setInterval(updateDateTime, 1000);
+    
+    // 初始化图表
+    initializeCharts();
+    
+    // 加载通知
+    loadNotifications();
+    // 每2分钟刷新一次通知
+    setInterval(loadNotifications, 120000);
 });
 </script>
-
 {% endblock %} 

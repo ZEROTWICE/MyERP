@@ -105,6 +105,11 @@
                             <a href="{{ url_for('main.production_order_detail', order_id=order.id) }}" class="btn btn-sm btn-info">
                                 <i class="fas fa-eye"></i> 详情
                             </a>
+                            {% if current_user.role in ['admin', 'manager'] %}
+                            <a href="{{ url_for('main.edit_production_order', order_id=order.id) }}" class="btn btn-sm btn-warning">
+                                <i class="fas fa-edit"></i> 编辑
+                            </a>
+                            {% endif %}
                             {% if current_user.role in ['admin', 'manager'] and order.status != 'completed' %}
                             <button class="btn btn-sm btn-success" onclick="addBatch({{ order.id }})">
                                 <i class="fas fa-plus"></i> 批次

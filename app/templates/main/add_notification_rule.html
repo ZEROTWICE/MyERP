@@ -1,0 +1,297 @@
+{% extends "base.html" %}
+
+{% block title %}添加通知规则{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>
+            <i class="fas fa-plus me-2"></i>添加通知规则
+        </h2>
+        <div>
+            <a href="{{ url_for('main.manage_notification_rules') }}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> 返回列表
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">规则配置</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        {{ form.hidden_tag() }}
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                {{ form.rule_name.label(class="form-label") }}
+                                {{ form.rule_name(class="form-control") }}
+                                {% if form.rule_name.errors %}
+                                    <div class="text-danger">
+                                        {% for error in form.rule_name.errors %}
+                                            <small>{{ error }}</small>
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                {{ form.priority.label(class="form-label") }}
+                                {{ form.priority(class="form-control") }}
+                                <small class="form-text text-muted">数值越大优先级越高</small>
+                                {% if form.priority.errors %}
+                                    <div class="text-danger">
+                                        {% for error in form.priority.errors %}
+                                            <small>{{ error }}</small>
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                {{ form.trigger_type.label(class="form-label") }}
+                                {{ form.trigger_type(class="form-select") }}
+                                {% if form.trigger_type.errors %}
+                                    <div class="text-danger">
+                                        {% for error in form.trigger_type.errors %}
+                                            <small>{{ error }}</small>
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                {{ form.receiver_type.label(class="form-label") }}
+                                {{ form.receiver_type(class="form-select", id="receiverType") }}
+                                {% if form.receiver_type.errors %}
+                                    <div class="text-danger">
+                                        {% for error in form.receiver_type.errors %}
+                                            <small>{{ error }}</small>
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- 接收者配置区域 -->
+                        <div class="mb-3" id="receiverConfigArea">
+                            <label class="form-label">接收者配置</label>
+                            
+                            <!-- 指定用户 -->
+                            <div id="userConfig" class="receiver-config" style="display: none;">
+                                <div class="card border-info">
+                                    <div class="card-body">
+                                        <h6 class="card-title">选择用户</h6>
+                                        <div class="row">
+                                            <div class="col-md-12">
+                                                <select class="form-select" multiple id="userSelect" size="6">
+                                                    <!-- 用户选项将通过JavaScript动态加载 -->
+                                                </select>
+                                                <small class="form-text text-muted">按住Ctrl键可选择多个用户</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 指定角色 -->
+                            <div id="roleConfig" class="receiver-config" style="display: none;">
+                                <div class="card border-success">
+                                    <div class="card-body">
+                                        <h6 class="card-title">选择角色</h6>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" value="admin" id="role_admin">
+                                            <label class="form-check-label" for="role_admin">管理员 (admin)</label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" value="manager" id="role_manager">
+                                            <label class="form-check-label" for="role_manager">经理 (manager)</label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" value="user" id="role_user">
+                                            <label class="form-check-label" for="role_user">普通用户 (user)</label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 指定部门 -->
+                            <div id="departmentConfig" class="receiver-config" style="display: none;">
+                                <div class="card border-warning">
+                                    <div class="card-body">
+                                        <h6 class="card-title">选择部门</h6>
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" value="生产部" id="dept_production">
+                                                    <label class="form-check-label" for="dept_production">生产部</label>
+                                                </div>
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" value="技术部" id="dept_technical">
+                                                    <label class="form-check-label" for="dept_technical">技术部</label>
+                                                </div>
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" value="质检部" id="dept_quality">
+                                                    <label class="form-check-label" for="dept_quality">质检部</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" value="销售部" id="dept_sales">
+                                                    <label class="form-check-label" for="dept_sales">销售部</label>
+                                                </div>
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" value="财务部" id="dept_finance">
+                                                    <label class="form-check-label" for="dept_finance">财务部</label>
+                                                </div>
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" value="行政部" id="dept_admin">
+                                                    <label class="form-check-label" for="dept_admin">行政部</label>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 隐藏字段存储接收者配置 -->
+                        {{ form.receiver_config() }}
+
+                        <div class="mb-3">
+                            <div class="form-check">
+                                {{ form.is_active(class="form-check-input") }}
+                                {{ form.is_active.label(class="form-check-label") }}
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-end">
+                            <a href="{{ url_for('main.manage_notification_rules') }}" class="btn btn-secondary me-2">取消</a>
+                            {{ form.submit(class="btn btn-primary") }}
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-info-circle me-2"></i>规则说明
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <h6>触发类型说明：</h6>
+                    <ul class="list-unstyled">
+                        <li><i class="fas fa-cog text-info me-2"></i><strong>规格变更</strong>：生产订单规格型号修改时触发</li>
+                        <li><i class="fas fa-wrench text-warning me-2"></i><strong>工艺变更</strong>：工艺价格或流程修改时触发</li>
+                        <li><i class="fas fa-tasks text-primary me-2"></i><strong>任务分配</strong>：新任务分配给员工时触发</li>
+                        <li><i class="fas fa-exclamation-triangle text-danger me-2"></i><strong>库存预警</strong>：库存低于安全库存时触发</li>
+                        <li><i class="fas fa-list-alt text-secondary me-2"></i><strong>订单状态变更</strong>：生产订单状态改变时触发</li>
+                    </ul>
+
+                    <hr>
+
+                    <h6>接收者类型说明：</h6>
+                    <ul class="list-unstyled">
+                        <li><i class="fas fa-user text-info me-2"></i><strong>指定用户</strong>：选择具体的用户接收通知</li>
+                        <li><i class="fas fa-users text-success me-2"></i><strong>指定角色</strong>：按用户角色发送通知</li>
+                        <li><i class="fas fa-building text-warning me-2"></i><strong>指定部门</strong>：按部门发送通知</li>
+                    </ul>
+
+                    <hr>
+
+                    <h6>优先级设置：</h6>
+                    <ul class="list-unstyled">
+                        <li><i class="fas fa-circle text-danger me-2"></i><strong>高优先级 (>5)</strong>：紧急通知</li>
+                        <li><i class="fas fa-circle text-warning me-2"></i><strong>中优先级 (1-5)</strong>：重要通知</li>
+                        <li><i class="fas fa-circle text-muted me-2"></i><strong>低优先级 (0)</strong>：一般通知</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const receiverTypeSelect = document.getElementById('receiverType');
+    const receiverConfigArea = document.getElementById('receiverConfigArea');
+    const receiverConfigInput = document.getElementById('receiver_config');
+    
+    // 监听接收者类型变化
+    receiverTypeSelect.addEventListener('change', function() {
+        updateReceiverConfig();
+    });
+    
+    // 初始化显示
+    updateReceiverConfig();
+    
+    // 监听所有配置选项的变化
+    document.addEventListener('change', function(e) {
+        if (e.target.closest('.receiver-config')) {
+            updateReceiverConfigValue();
+        }
+    });
+    
+    function updateReceiverConfig() {
+        const receiverType = receiverTypeSelect.value;
+        
+        // 隐藏所有配置区域
+        document.querySelectorAll('.receiver-config').forEach(el => {
+            el.style.display = 'none';
+        });
+        
+        // 显示对应的配置区域
+        if (receiverType === 'user') {
+            document.getElementById('userConfig').style.display = 'block';
+            loadUsers();
+        } else if (receiverType === 'role') {
+            document.getElementById('roleConfig').style.display = 'block';
+        } else if (receiverType === 'department') {
+            document.getElementById('departmentConfig').style.display = 'block';
+        }
+        
+        updateReceiverConfigValue();
+    }
+    
+    function updateReceiverConfigValue() {
+        const receiverType = receiverTypeSelect.value;
+        let config = {};
+        
+        if (receiverType === 'user') {
+            const selectedUsers = Array.from(document.getElementById('userSelect').selectedOptions)
+                .map(option => parseInt(option.value));
+            config = { user_ids: selectedUsers };
+        } else if (receiverType === 'role') {
+            const selectedRoles = Array.from(document.querySelectorAll('#roleConfig input:checked'))
+                .map(input => input.value);
+            config = { roles: selectedRoles };
+        } else if (receiverType === 'department') {
+            const selectedDepartments = Array.from(document.querySelectorAll('#departmentConfig input:checked'))
+                .map(input => input.value);
+            config = { departments: selectedDepartments };
+        }
+        
+        receiverConfigInput.value = JSON.stringify(config);
+    }
+    
+    function loadUsers() {
+        // 这里应该通过AJAX加载用户列表
+        // 暂时添加一些示例用户
+        const userSelect = document.getElementById('userSelect');
+        userSelect.innerHTML = `
+            <option value="1">管理员 (admin)</option>
+            <option value="2">张三 (生产部)</option>
+            <option value="3">李四 (技术部)</option>
+            <option value="4">王五 (质检部)</option>
+            <option value="5">赵六 (销售部)</option>
+        `;
+    }
+});
+</script>
+{% endblock %} 

@@ -11,7 +11,8 @@ from app.main.forms import (
     ProductionRecordSearchForm, TaskAssignmentForm, TaskSearchForm,
     BonusPenaltySearchForm, ExportEmployeeForm, ExportProcessForm,
     ExportProductionRecordForm, ExportBonusPenaltyForm, ExportTaskForm,
-    CustomerForm, CustomerAddressForm, SalesOrderForm, SalesOrderItemForm
+    CustomerForm, CustomerAddressForm, SalesOrderForm, SalesOrderItemForm,
+    ProductionOrderForm, NotificationRuleForm, NotificationTemplateForm
 )
 from sqlalchemy import desc, or_
 from app.utils.excel_generator import ExcelGenerator
@@ -2364,7 +2365,15 @@ def manage_tasks():
                 target_date=form.target_date.data,
                 notes=form.notes.data,
                 status='pending',  # 设置初始状态为待处理
-                assigned_date=datetime.now().date()  # 设置分配日期
+                assigned_date=datetime.now().date(),  # 设置分配日期
+                # 规格型号信息
+                spec_extended=form.spec_extended.data,
+                spec_gasket=form.spec_gasket.data,
+                spec_joint=form.spec_joint.data,
+                spec_drilling=form.spec_drilling.data,
+                spec_other=form.spec_other.data,
+                spec_other_desc=form.spec_other_desc.data,
+                direction=form.direction.data
             )
             db.session.add(task)
             db.session.flush()  # 获取task.id
@@ -3348,7 +3357,15 @@ def add_task():
             target_date=datetime.strptime(data.get('target_date'), '%Y-%m-%d').date() if data.get('target_date') else None,
             notes=data.get('notes'),
             status='pending',  # 设置初始状态为待处理
-            assigned_date=datetime.now().date()  # 设置分配日期
+            assigned_date=datetime.now().date(),  # 设置分配日期
+            # 规格型号信息
+            spec_extended=data.get('spec_extended'),
+            spec_gasket=data.get('spec_gasket'),
+            spec_joint=data.get('spec_joint'),
+            spec_drilling=data.get('spec_drilling'),
+            spec_other=data.get('spec_other'),
+            spec_other_desc=data.get('spec_other_desc'),
+            direction=data.get('direction')
         )
         db.session.add(task)
         db.session.flush()  # 获取task.id
@@ -5917,6 +5934,148 @@ def delete_production_order(order_id):
         db.session.rollback()
         return jsonify({'success': False, 'message': f'删除失败: {str(e)}'})
 
+@bp.route('/production_orders/<int:order_id>/edit', methods=['GET', 'POST'])
+@login_required
+def edit_production_order(order_id):
+    """编辑生产订单"""
+    order = ProductionOrder.query.get_or_404(order_id)
+    
+    # 检查权限
+    if current_user.role not in ['admin', 'manager']:
+        flash('权限不足', 'error')
+        return redirect(url_for('main.production_order_detail', order_id=order_id))
+    
+    form = ProductionOrderForm()
+    
+    # 设置产品选择项
+    form.product_id.choices = [(p.id, f'{p.product_name} ({p.product_code})') 
+                               for p in Product.query.filter_by(status='active').all()]
+    
+    if form.validate_on_submit():
+        try:
+            # 记录修改前的数据用于审计
+            old_data = {
+                'product_id': order.product_id,
+                'planned_quantity': order.planned_quantity,
+                'status': order.status,
+                'priority': order.priority,
+                'planned_start_date': order.planned_start_date.isoformat() if order.planned_start_date else None,
+                'planned_end_date': order.planned_end_date.isoformat() if order.planned_end_date else None,
+                'actual_start_date': order.actual_start_date.isoformat() if order.actual_start_date else None,
+                'actual_end_date': order.actual_end_date.isoformat() if order.actual_end_date else None,
+                'spec_extended': order.spec_extended,
+                'spec_gasket': order.spec_gasket,
+                'spec_joint': order.spec_joint,
+                'spec_drilling': order.spec_drilling,
+                'spec_other': order.spec_other,
+                'spec_other_desc': order.spec_other_desc,
+                'direction': order.direction,
+                'notes': order.notes
+            }
+            
+            # 更新生产订单信息
+            order.product_id = form.product_id.data
+            order.planned_quantity = form.planned_quantity.data
+            order.status = form.status.data
+            order.priority = form.priority.data
+            order.planned_start_date = form.planned_start_date.data
+            order.planned_end_date = form.planned_end_date.data
+            order.actual_start_date = form.actual_start_date.data
+            order.actual_end_date = form.actual_end_date.data
+            order.spec_extended = form.spec_extended.data
+            order.spec_gasket = form.spec_gasket.data
+            order.spec_joint = form.spec_joint.data
+            order.spec_drilling = form.spec_drilling.data
+            order.spec_other = form.spec_other.data
+            order.spec_other_desc = form.spec_other_desc.data
+            order.direction = form.direction.data
+            order.notes = form.notes.data
+            
+            # 记录审计日志
+            new_data = {
+                'product_id': order.product_id,
+                'planned_quantity': order.planned_quantity,
+                'status': order.status,
+                'priority': order.priority,
+                'planned_start_date': order.planned_start_date.isoformat() if order.planned_start_date else None,
+                'planned_end_date': order.planned_end_date.isoformat() if order.planned_end_date else None,
+                'actual_start_date': order.actual_start_date.isoformat() if order.actual_start_date else None,
+                'actual_end_date': order.actual_end_date.isoformat() if order.actual_end_date else None,
+                'spec_extended': order.spec_extended,
+                'spec_gasket': order.spec_gasket,
+                'spec_joint': order.spec_joint,
+                'spec_drilling': order.spec_drilling,
+                'spec_other': order.spec_other,
+                'spec_other_desc': order.spec_other_desc,
+                'direction': order.direction,
+                'notes': order.notes
+            }
+            
+            # 级联更新相关的生产批次
+            batches = ProductionBatch.query.filter_by(production_order_id=order.id).all()
+            for batch in batches:
+                batch.spec_extended = order.spec_extended
+                batch.spec_gasket = order.spec_gasket
+                batch.spec_joint = order.spec_joint
+                batch.spec_drilling = order.spec_drilling
+                batch.spec_other = order.spec_other
+                batch.spec_other_desc = order.spec_other_desc
+                batch.direction = order.direction
+            
+            # 级联更新相关的生产任务
+            tasks = TaskAssignment.query.filter_by(production_batch_id=ProductionBatch.id)\
+                                       .join(ProductionBatch)\
+                                       .filter(ProductionBatch.production_order_id == order.id)\
+                                       .all()
+            for task in tasks:
+                task.spec_extended = order.spec_extended
+                task.spec_gasket = order.spec_gasket
+                task.spec_joint = order.spec_joint
+                task.spec_drilling = order.spec_drilling
+                task.spec_other = order.spec_other
+                task.spec_other_desc = order.spec_other_desc
+                task.direction = order.direction
+            
+            log = AuditLog(
+                user_id=current_user.id,
+                action='修改生产订单',
+                details=f'修改生产订单: {order.order_number}，同时更新了 {len(batches)} 个生产批次和 {len(tasks)} 个任务',
+                target_model='ProductionOrder',
+                target_id=order.id,
+                old_data=old_data,
+                new_data=new_data
+            )
+            db.session.add(log)
+            
+            db.session.commit()
+            flash(f'生产订单修改成功，同时更新了 {len(batches)} 个批次和 {len(tasks)} 个任务的规格型号信息', 'success')
+            return redirect(url_for('main.production_order_detail', order_id=order_id))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'修改失败: {str(e)}', 'error')
+    
+    elif request.method == 'GET':
+        # 填充表单数据
+        form.product_id.data = order.product_id
+        form.planned_quantity.data = order.planned_quantity
+        form.status.data = order.status
+        form.priority.data = order.priority
+        form.planned_start_date.data = order.planned_start_date
+        form.planned_end_date.data = order.planned_end_date
+        form.actual_start_date.data = order.actual_start_date
+        form.actual_end_date.data = order.actual_end_date
+        form.spec_extended.data = order.spec_extended
+        form.spec_gasket.data = order.spec_gasket
+        form.spec_joint.data = order.spec_joint
+        form.spec_drilling.data = order.spec_drilling
+        form.spec_other.data = order.spec_other
+        form.spec_other_desc.data = order.spec_other_desc
+        form.direction.data = order.direction
+        form.notes.data = order.notes
+    
+    return render_template('main/edit_production_order.html', form=form, order=order)
+
 @bp.route('/sales_order/<int:order_id>/create_production_order', methods=['POST'])
 @login_required
 def create_production_order_from_sales(order_id):
@@ -6194,11 +6353,19 @@ def add_production_batch(order_id):
         # 检查物料需求并处理不足情况
         material_shortage_info = check_and_handle_material_shortage(order, batch_quantity)
         
-        # 创建生产批次
+        # 创建生产批次，继承生产订单的规格型号信息
         batch = ProductionBatch(
             production_order_id=order_id,
             batch_quantity=batch_quantity,
-            notes=data.get('notes', '')
+            notes=data.get('notes', ''),
+            # 继承生产订单的规格型号信息
+            spec_extended=order.spec_extended,
+            spec_gasket=order.spec_gasket,
+            spec_joint=order.spec_joint,
+            spec_drilling=order.spec_drilling,
+            spec_other=order.spec_other,
+            spec_other_desc=order.spec_other_desc,
+            direction=order.direction
         )
         
         db.session.add(batch)
@@ -6270,7 +6437,7 @@ def create_tasks_for_production_batch(batch):
             days_offset = process_item.sequence * 2  # 每个工序间隔2天
             target_date = batch.production_order.planned_end_date + timedelta(days=days_offset)
             
-            # 创建任务
+            # 创建任务，并继承生产批次的规格型号信息
             task = TaskAssignment(
                 employee_id=employee.id,
                 process_id=process_item.process_id,
@@ -6278,7 +6445,15 @@ def create_tasks_for_production_batch(batch):
                 target_date=target_date,
                 production_batch_id=batch.id,
                 task_type='auto',
-                notes=f'自动创建 - 生产批次: {batch.batch_number}, 工序序号: {process_item.sequence}'
+                notes=f'自动创建 - 生产批次: {batch.batch_number}, 工序序号: {process_item.sequence}',
+                # 继承生产批次的规格型号信息
+                spec_extended=batch.spec_extended,
+                spec_gasket=batch.spec_gasket,
+                spec_joint=batch.spec_joint,
+                spec_drilling=batch.spec_drilling,
+                spec_other=batch.spec_other,
+                spec_other_desc=batch.spec_other_desc,
+                direction=batch.direction
             )
             
             db.session.add(task)
@@ -7713,4 +7888,271 @@ def api_get_sales_order_customer_addresses(order_id):
         })
         
     except Exception as e:
-        return jsonify({'success': False, 'message': f'获取客户地址失败：{str(e)}'})
+        return jsonify({'success': False, 'message': f'获取客户地址失败：{str(e)}'}) 
+
+
+# ================== 通知系统路由 ==================
+
+@bp.route('/notifications')
+@login_required
+def manage_notifications():
+    """通知管理页面"""
+    from app.services.notification_service import NotificationService
+    
+    # 获取用户通知
+    notifications_data = NotificationService.get_user_notifications(
+        user_id=current_user.id,
+        status=request.args.get('status'),
+        limit=int(request.args.get('limit', 50))
+    )
+    
+    return render_template('main/notifications.html',
+                         notifications=notifications_data['notifications'],
+                         stats=notifications_data['stats'])
+
+
+@bp.route('/notifications/<int:notification_id>/read', methods=['POST'])
+@login_required  
+def mark_notification_read(notification_id):
+    """标记通知为已读"""
+    from app.services.notification_service import NotificationService
+    
+    success = NotificationService.mark_as_read(notification_id, current_user.id)
+    
+    return jsonify({
+        'success': success,
+        'message': '标记成功' if success else '标记失败'
+    })
+
+
+@bp.route('/notification_rules')
+@login_required
+def manage_notification_rules():
+    """通知规则管理"""
+    if current_user.role not in ['admin', 'manager']:
+        flash('权限不足', 'danger')
+        return redirect(url_for('main.index'))
+    
+    from app.models import NotificationRule
+    rules = NotificationRule.query.order_by(NotificationRule.priority.desc()).all()
+    
+    return render_template('main/notification_rules.html', rules=rules)
+
+
+@bp.route('/notification_rules/add', methods=['GET', 'POST'])  
+@login_required
+def add_notification_rule():
+    """添加通知规则"""
+    if current_user.role not in ['admin', 'manager']:
+        flash('权限不足', 'danger')
+        return redirect(url_for('main.index'))
+    
+    form = NotificationRuleForm()
+    
+    if form.validate_on_submit():
+        try:
+            import json
+            from app.models import NotificationRule
+            
+            rule = NotificationRule(
+                rule_name=form.rule_name.data,
+                trigger_type=form.trigger_type.data,
+                receiver_type=form.receiver_type.data,
+                receiver_config=json.loads(form.receiver_config.data) if form.receiver_config.data else {},
+                priority=form.priority.data,
+                is_active=form.is_active.data,
+                created_by=current_user.id
+            )
+            
+            db.session.add(rule)
+            db.session.commit()
+            
+            flash('通知规则创建成功', 'success')
+            return redirect(url_for('main.manage_notification_rules'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'创建失败: {str(e)}', 'danger')
+    
+    return render_template('main/add_notification_rule.html', form=form)
+
+
+@bp.route('/api/notifications/stats')
+@login_required
+def api_notification_stats():
+    """获取用户通知统计"""
+    from app.services.notification_service import NotificationService
+    
+    stats = NotificationService.get_user_notification_stats(current_user.id)
+    return jsonify(stats)
+
+@bp.route('/api/notifications/recent')
+@login_required
+def api_recent_notifications():
+    """获取最近的通知列表"""
+    try:
+        from app.models import Notification, NotificationReceiver
+        
+        # 获取当前用户最近的通知（最多10条）
+        notifications_query = db.session.query(Notification, NotificationReceiver)\
+            .join(NotificationReceiver, Notification.id == NotificationReceiver.notification_id)\
+            .filter(NotificationReceiver.user_id == current_user.id)\
+            .order_by(Notification.created_at.desc())\
+            .limit(10)
+        
+        notifications_data = []
+        for notification, receiver in notifications_query:
+            notifications_data.append({
+                'id': notification.id,
+                'title': notification.title,
+                'content': notification.content,
+                'priority': notification.priority,
+                'is_read': receiver.is_read,
+                'created_at': notification.created_at.isoformat(),
+                'trigger_type': notification.trigger_type
+            })
+        
+        return jsonify({
+            'success': True,
+            'notifications': notifications_data
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f'获取最近通知失败: {str(e)}')
+        return jsonify({'success': False, 'message': '获取通知失败'}), 500
+
+
+# ==================== 图表数据API路由 ====================
+
+@bp.route('/api/chart-data/salary')
+@login_required
+def api_chart_data_salary():
+    """获取工资统计图表数据"""
+    try:
+        # 获取最近12个月的工资数据
+        from datetime import datetime, timedelta
+        end_date = datetime.now().date()
+        start_date = end_date - timedelta(days=365)
+        
+        # 这里需要根据实际的工资计算表结构来查询
+        # 暂时返回示例数据
+        data = {
+            'labels': ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'],
+            'datasets': [{
+                'label': '平均工资',
+                'data': [8500, 8600, 8700, 8800, 8900, 9000, 9100, 9200, 9300, 9400, 9500, 9600],
+                'borderColor': '#007bff',
+                'backgroundColor': 'rgba(0, 123, 255, 0.1)'
+            }]
+        }
+        
+        return jsonify({'success': True, 'data': data})
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'获取工资统计数据失败: {str(e)}'})
+
+@bp.route('/api/chart-data/production')
+@login_required
+def api_chart_data_production():
+    """获取生产统计图表数据"""
+    try:
+        # 获取最近30天的生产数据
+        from datetime import datetime, timedelta
+        end_date = datetime.now().date()
+        start_date = end_date - timedelta(days=30)
+        
+        # 查询生产记录
+        production_records = ProductionRecord.query.filter(
+            ProductionRecord.production_date.between(start_date, end_date)
+        ).all()
+        
+        # 按日期汇总生产数量
+        daily_production = {}
+        for record in production_records:
+            date_str = record.production_date.strftime('%m-%d')
+            if date_str not in daily_production:
+                daily_production[date_str] = 0
+            daily_production[date_str] += record.quantity
+        
+        # 生成最近30天的标签和数据
+        labels = []
+        data = []
+        current_date = start_date
+        while current_date <= end_date:
+            date_str = current_date.strftime('%m-%d')
+            labels.append(date_str)
+            data.append(daily_production.get(date_str, 0))
+            current_date += timedelta(days=1)
+        
+        chart_data = {
+            'labels': labels,
+            'datasets': [{
+                'label': '日产量',
+                'data': data,
+                'borderColor': '#28a745',
+                'backgroundColor': 'rgba(40, 167, 69, 0.1)'
+            }]
+        }
+        
+        return jsonify({'success': True, 'data': chart_data})
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'获取生产统计数据失败: {str(e)}'})
+
+@bp.route('/api/chart-data/department')
+@login_required
+def api_chart_data_department():
+    """获取部门统计图表数据"""
+    try:
+        # 按部门统计员工数量
+        from sqlalchemy import func
+        department_stats = db.session.query(
+            Employee.department,
+            func.count(Employee.id).label('count')
+        ).filter(Employee.status == 'active').group_by(Employee.department).all()
+        
+        data = {
+            'labels': [stat[0] or '未分配' for stat in department_stats],
+            'datasets': [{
+                'label': '员工数量',
+                'data': [stat[1] for stat in department_stats],
+                'backgroundColor': [
+                    '#007bff', '#28a745', '#ffc107', '#dc3545', 
+                    '#6c757d', '#17a2b8', '#6f42c1', '#e83e8c'
+                ]
+            }]
+        }
+        
+        return jsonify({'success': True, 'data': data})
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'获取部门统计数据失败: {str(e)}'})
+
+@bp.route('/api/chart-data/task')
+@login_required
+def api_chart_data_task():
+    """获取任务统计图表数据"""
+    try:
+        # 按状态统计任务数量
+        from sqlalchemy import func
+        task_stats = db.session.query(
+            Task.status,
+            func.count(Task.id).label('count')
+        ).group_by(Task.status).all()
+        
+        status_labels = {
+            'pending': '待处理',
+            'in_progress': '进行中',
+            'completed': '已完成',
+            'cancelled': '已取消'
+        }
+        
+        data = {
+            'labels': [status_labels.get(stat[0], stat[0]) for stat in task_stats],
+            'datasets': [{
+                'label': '任务数量',
+                'data': [stat[1] for stat in task_stats],
+                'backgroundColor': ['#ffc107', '#007bff', '#28a745', '#dc3545']
+            }]
+        }
+        
+        return jsonify({'success': True, 'data': data})
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'获取任务统计数据失败: {str(e)}'})

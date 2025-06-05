@@ -288,7 +288,7 @@ function editFinishedProduct(id) {
         .then(data => {
             if (data.success) {
                 // 填充表单数据
-                document.getElementById('editProductId').value = data.data.id;
+                document.getElementById('editFinishedProductId').value = data.data.id;
                 document.getElementById('editProductNumber').value = data.data.product_number;
                 document.getElementById('editDrawingNumber').value = data.data.drawing_number;
                 document.getElementById('editModel').value = data.data.model;

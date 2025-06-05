@@ -6,9 +6,16 @@
 <div class="container mt-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2>生产订单详情</h2>
-        <a href="{{ url_for('main.manage_production_orders') }}" class="btn btn-secondary">
-            <i class="fas fa-arrow-left"></i> 返回列表
-        </a>
+        <div>
+            {% if current_user.role in ['admin', 'manager'] %}
+            <a href="{{ url_for('main.edit_production_order', order_id=order.id) }}" class="btn btn-primary">
+                <i class="fas fa-edit"></i> 编辑订单
+            </a>
+            {% endif %}
+            <a href="{{ url_for('main.manage_production_orders') }}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> 返回列表
+            </a>
+        </div>
     </div>
 
     <!-- 订单基本信息 -->
@@ -39,6 +46,35 @@
                         <tr>
                             <td><strong>完成数量:</strong></td>
                             <td>{{ order.completed_quantity }}件</td>
+                        </tr>
+                        <tr>
+                            <td><strong>规格型号:</strong></td>
+                            <td>
+                                {% if order.specifications %}
+                                    <ul class="list-unstyled mb-0">
+                                        {% for spec in order.specifications %}
+                                            <li class="mb-1">
+                                                <i class="fas fa-cog text-primary me-2"></i>
+                                                <span class="text-primary">{{ spec }}</span>
+                                            </li>
+                                        {% endfor %}
+                                    </ul>
+                                {% else %}
+                                    <span class="text-muted">
+                                        <i class="fas fa-minus-circle me-2"></i>无特殊规格
+                                    </span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><strong>开向:</strong></td>
+                            <td>
+                                {% if order.direction %}
+                                    <span class="text-info">{{ order.direction }}</span>
+                                {% else %}
+                                    <span class="text-muted">未指定</span>
+                                {% endif %}
+                            </td>
                         </tr>
                     </table>
                 </div>

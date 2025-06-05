@@ -74,6 +74,8 @@
                             <th>{{ sort_link('quantity', '数量') }}</th>
                             <th>已完成</th>
                             <th>完成率</th>
+                            <th>规格型号</th>
+                            <th>开向</th>
                             <th>生产批次</th>
                             <th>任务类型</th>
                             <th>{{ sort_link('status', '状态') }}</th>
@@ -91,6 +93,14 @@
                             <td>{{ task.quantity }}</td>
                             <td>{{ task.completed_quantity }}</td>
                             <td>{{ "%.1f"|format(task.completion_rate) }}%</td>
+                            <td>
+                                <span class="small text-muted" data-bs-toggle="tooltip" title="{{ task.specifications_text }}">
+                                    {{ task.specifications_text|truncate(20) }}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="small text-muted">{{ task.direction or '-' }}</span>
+                            </td>
                             <td>
                                 {% if task.production_batch %}
                                     <a href="{{ url_for('main.production_batch_detail', batch_id=task.production_batch.id) }}" class="text-decoration-none">
@@ -205,6 +215,54 @@
                             {{ form.notes.label(class="form-label") }}
                             {{ form.notes(class="form-control", rows="3") }}
                         </div>
+                        
+                        <!-- 规格型号 -->
+                        <div class="mb-3">
+                            <label class="form-label">规格型号</label>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-2">
+                                        {{ form.spec_extended.label(class="form-label small") }}
+                                        {{ form.spec_extended(class="form-control form-control-sm", placeholder="如：100mm") }}
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-2">
+                                        {{ form.spec_gasket.label(class="form-label small") }}
+                                        {{ form.spec_gasket(class="form-control form-control-sm", placeholder="如：橡胶垫板") }}
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-2">
+                                        {{ form.spec_joint.label(class="form-label small") }}
+                                        {{ form.spec_joint(class="form-control form-control-sm", placeholder="如：法兰接头") }}
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-2">
+                                        {{ form.spec_drilling.label(class="form-label small") }}
+                                        {{ form.spec_drilling(class="form-control form-control-sm", placeholder="如：φ10mm×4孔") }}
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-2">
+                                        {{ form.spec_other.label(class="form-label small") }}
+                                        {{ form.spec_other(class="form-control form-control-sm", placeholder="其他规格") }}
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-2">
+                                        {{ form.direction.label(class="form-label small") }}
+                                        {{ form.direction(class="form-control form-control-sm", placeholder="如：左开") }}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mt-2">
+                                {{ form.spec_other_desc.label(class="form-label small") }}
+                                {{ form.spec_other_desc(class="form-control form-control-sm", placeholder="其他规格说明", rows="2") }}
+                            </div>
+                        </div>
+                        
                         <div class="modal-footer">
                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
                             {{ form.submit(class="btn btn-primary") }}

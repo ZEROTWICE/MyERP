@@ -130,6 +130,16 @@ class TaskAssignmentForm(FlaskForm):
     quantity = IntegerField('数量', validators=[DataRequired(), NumberRange(min=1)])
     target_date = DateField('目标完成日期', validators=[DataRequired()])
     notes = TextAreaField('备注')
+    
+    # 规格型号字段
+    spec_extended = StringField('加长', validators=[Length(0, 100)])
+    spec_gasket = StringField('垫板', validators=[Length(0, 100)])
+    spec_joint = StringField('接头', validators=[Length(0, 100)])
+    spec_drilling = StringField('钻孔', validators=[Length(0, 100)])
+    spec_other = StringField('其他', validators=[Length(0, 100)])
+    spec_other_desc = StringField('其他规格描述', validators=[Length(0, 200)])
+    direction = StringField('开向', validators=[Length(0, 50)])
+    
     submit = SubmitField('分配任务')
 
 class TaskSearchForm(FlaskForm):
@@ -275,4 +285,98 @@ class SalesOrderItemForm(FlaskForm):
     customer_address_id = SelectField('收货地址', coerce=int, validators=[Optional()])
     order_time = DateTimeField('下单时间', default=datetime.utcnow, format='%Y-%m-%d %H:%M')
     station_notes = TextAreaField('到站备注')
+    submit = SubmitField('保存')
+
+class ProductionOrderForm(FlaskForm):
+    """生产订单表单"""
+    product_id = SelectField('产品', coerce=int, validators=[DataRequired()])
+    planned_quantity = IntegerField('计划数量', validators=[DataRequired(), NumberRange(min=1)])
+    planned_start_date = DateField('计划开始日期', validators=[DataRequired()])
+    planned_end_date = DateField('计划完成日期', validators=[DataRequired()])
+    actual_start_date = DateField('实际开始日期')
+    actual_end_date = DateField('实际完成日期')
+    status = SelectField('状态', 
+                        choices=[('pending', '待开始'), ('in_progress', '进行中'), 
+                                ('completed', '已完成'), ('cancelled', '已取消')],
+                        default='pending')
+    priority = SelectField('优先级',
+                          choices=[('low', '低优先级'), ('normal', '普通'), ('high', '高优先级')],
+                          default='normal')
+    
+    # 规格型号（多选）
+    spec_extended = StringField('加长', validators=[Length(0, 100)])
+    spec_gasket = StringField('垫板', validators=[Length(0, 100)])
+    spec_joint = StringField('接头', validators=[Length(0, 100)])
+    spec_drilling = StringField('钻孔', validators=[Length(0, 100)])
+    spec_other = StringField('其他', validators=[Length(0, 100)])
+    spec_other_desc = StringField('其他规格描述', validators=[Length(0, 200)])
+    direction = StringField('开向', validators=[Length(0, 50)])
+    
+    notes = TextAreaField('备注', validators=[Length(0, 500)])
+    
+    def validate_planned_end_date(self, field):
+        if field.data and self.planned_start_date.data:
+            if field.data <= self.planned_start_date.data:
+                raise ValidationError('计划完成日期必须晚于计划开始日期')
+    
+    def validate_actual_end_date(self, field):
+        if field.data and self.actual_start_date.data:
+            if field.data <= self.actual_start_date.data:
+                raise ValidationError('实际完成日期必须晚于实际开始日期')
+
+class NotificationRuleForm(FlaskForm):
+    """通知规则表单"""
+    rule_name = StringField('规则名称', validators=[DataRequired(), Length(1, 100)])
+    trigger_type = SelectField('触发类型', validators=[DataRequired()], 
+                              choices=[
+                                  ('process_change', '工艺变更'),
+                                  ('spec_change', '规格变更'),
+                                  ('inventory_warning', '库存预警'),
+                                  ('production_order_status', '生产订单状态变更'),
+                                  ('task_assignment', '任务分配'),
+                                  ('task_overdue', '任务逾期'),
+                                  ('quality_issue', '质量问题'),
+                                  ('system_maintenance', '系统维护'),
+                              ])
+    receiver_type = SelectField('接收者类型', validators=[DataRequired()],
+                               choices=[
+                                   ('user', '指定用户'),
+                                   ('role', '指定角色'),
+                                   ('department', '指定部门')
+                               ])
+    priority = IntegerField('优先级', validators=[DataRequired()], default=0)
+    is_active = BooleanField('启用', default=True)
+    
+    # 接收者配置 - 通过JavaScript动态填充
+    receiver_config = HiddenField('接收者配置')
+    
+    submit = SubmitField('保存')
+
+class NotificationTemplateForm(FlaskForm):
+    """通知模板表单"""
+    template_code = StringField('模板编码', validators=[DataRequired(), Length(1, 50)])
+    template_name = StringField('模板名称', validators=[DataRequired(), Length(1, 100)])
+    trigger_type = SelectField('适用触发类型', validators=[DataRequired()],
+                              choices=[
+                                  ('process_change', '工艺变更'),
+                                  ('spec_change', '规格变更'),
+                                  ('inventory_warning', '库存预警'),
+                                  ('production_order_status', '生产订单状态变更'),
+                                  ('task_assignment', '任务分配'),
+                                  ('task_overdue', '任务逾期'),
+                                  ('quality_issue', '质量问题'),
+                                  ('system_maintenance', '系统维护'),
+                              ])
+    title_template = StringField('标题模板', validators=[DataRequired(), Length(1, 200)])
+    content_template = TextAreaField('内容模板', validators=[DataRequired()])
+    notification_type = SelectField('通知类型', validators=[DataRequired()],
+                                   choices=[
+                                       ('info', '信息'),
+                                       ('warning', '警告'),
+                                       ('error', '错误'),
+                                       ('success', '成功')
+                                   ], default='info')
+    variables = TextAreaField('可用变量（JSON格式）')
+    is_active = BooleanField('启用', default=True)
+    
     submit = SubmitField('保存')

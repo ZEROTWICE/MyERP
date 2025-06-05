@@ -1,0 +1,242 @@
+{% extends "base.html" %}
+
+{% block title %}编辑生产订单 - {{ order.order_number }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>编辑生产订单 - {{ order.order_number }}</h2>
+        <div>
+            <a href="{{ url_for('main.production_order_detail', order_id=order.id) }}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> 返回详情
+            </a>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">订单信息</h5>
+        </div>
+        <div class="card-body">
+            <form method="POST">
+                {{ form.hidden_tag() }}
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            {{ form.product_id.label(class="form-label") }}
+                            {{ form.product_id(class="form-select" + (" is-invalid" if form.product_id.errors else "")) }}
+                            {% if form.product_id.errors %}
+                                <div class="invalid-feedback">
+                                    {% for error in form.product_id.errors %}{{ error }}{% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            {{ form.planned_quantity.label(class="form-label") }}
+                            {{ form.planned_quantity(class="form-control" + (" is-invalid" if form.planned_quantity.errors else "")) }}
+                            {% if form.planned_quantity.errors %}
+                                <div class="invalid-feedback">
+                                    {% for error in form.planned_quantity.errors %}{{ error }}{% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            {{ form.planned_start_date.label(class="form-label") }}
+                            {{ form.planned_start_date(class="form-control" + (" is-invalid" if form.planned_start_date.errors else "")) }}
+                            {% if form.planned_start_date.errors %}
+                                <div class="invalid-feedback">
+                                    {% for error in form.planned_start_date.errors %}{{ error }}{% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            {{ form.planned_end_date.label(class="form-label") }}
+                            {{ form.planned_end_date(class="form-control" + (" is-invalid" if form.planned_end_date.errors else "")) }}
+                            {% if form.planned_end_date.errors %}
+                                <div class="invalid-feedback">
+                                    {% for error in form.planned_end_date.errors %}{{ error }}{% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            {{ form.actual_start_date.label(class="form-label") }}
+                            {{ form.actual_start_date(class="form-control" + (" is-invalid" if form.actual_start_date.errors else "")) }}
+                            {% if form.actual_start_date.errors %}
+                                <div class="invalid-feedback">
+                                    {% for error in form.actual_start_date.errors %}{{ error }}{% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            {{ form.actual_end_date.label(class="form-label") }}
+                            {{ form.actual_end_date(class="form-control" + (" is-invalid" if form.actual_end_date.errors else "")) }}
+                            {% if form.actual_end_date.errors %}
+                                <div class="invalid-feedback">
+                                    {% for error in form.actual_end_date.errors %}{{ error }}{% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            {{ form.status.label(class="form-label") }}
+                            {{ form.status(class="form-select" + (" is-invalid" if form.status.errors else "")) }}
+                            {% if form.status.errors %}
+                                <div class="invalid-feedback">
+                                    {% for error in form.status.errors %}{{ error }}{% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            {{ form.priority.label(class="form-label") }}
+                            {{ form.priority(class="form-select" + (" is-invalid" if form.priority.errors else "")) }}
+                            {% if form.priority.errors %}
+                                <div class="invalid-feedback">
+                                    {% for error in form.priority.errors %}{{ error }}{% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 规格型号信息 -->
+                <div class="card mt-4">
+                    <div class="card-header">
+                        <h6 class="mb-0"><i class="fas fa-cogs"></i> 规格型号信息</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    {{ form.spec_extended.label(class="form-label") }}
+                                    {{ form.spec_extended(class="form-control" + (" is-invalid" if form.spec_extended.errors else "")) }}
+                                    {% if form.spec_extended.errors %}
+                                        <div class="invalid-feedback">
+                                            {% for error in form.spec_extended.errors %}{{ error }}{% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    {{ form.spec_gasket.label(class="form-label") }}
+                                    {{ form.spec_gasket(class="form-control" + (" is-invalid" if form.spec_gasket.errors else "")) }}
+                                    {% if form.spec_gasket.errors %}
+                                        <div class="invalid-feedback">
+                                            {% for error in form.spec_gasket.errors %}{{ error }}{% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    {{ form.spec_joint.label(class="form-label") }}
+                                    {{ form.spec_joint(class="form-control" + (" is-invalid" if form.spec_joint.errors else "")) }}
+                                    {% if form.spec_joint.errors %}
+                                        <div class="invalid-feedback">
+                                            {% for error in form.spec_joint.errors %}{{ error }}{% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    {{ form.spec_drilling.label(class="form-label") }}
+                                    {{ form.spec_drilling(class="form-control" + (" is-invalid" if form.spec_drilling.errors else "")) }}
+                                    {% if form.spec_drilling.errors %}
+                                        <div class="invalid-feedback">
+                                            {% for error in form.spec_drilling.errors %}{{ error }}{% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    {{ form.spec_other.label(class="form-label") }}
+                                    {{ form.spec_other(class="form-control" + (" is-invalid" if form.spec_other.errors else "")) }}
+                                    {% if form.spec_other.errors %}
+                                        <div class="invalid-feedback">
+                                            {% for error in form.spec_other.errors %}{{ error }}{% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    {{ form.direction.label(class="form-label") }}
+                                    {{ form.direction(class="form-control" + (" is-invalid" if form.direction.errors else "")) }}
+                                    {% if form.direction.errors %}
+                                        <div class="invalid-feedback">
+                                            {% for error in form.direction.errors %}{{ error }}{% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            {{ form.spec_other_desc.label(class="form-label") }}
+                            {{ form.spec_other_desc(class="form-control" + (" is-invalid" if form.spec_other_desc.errors else "")) }}
+                            {% if form.spec_other_desc.errors %}
+                                <div class="invalid-feedback">
+                                    {% for error in form.spec_other_desc.errors %}{{ error }}{% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mb-3 mt-4">
+                    {{ form.notes.label(class="form-label") }}
+                    {{ form.notes(class="form-control", rows="4") }}
+                    {% if form.notes.errors %}
+                        <div class="invalid-feedback">
+                            {% for error in form.notes.errors %}{{ error }}{% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+                
+                <div class="d-flex justify-content-end gap-2">
+                    <a href="{{ url_for('main.production_order_detail', order_id=order.id) }}" class="btn btn-secondary">取消</a>
+                    {{ form.submit(class="btn btn-primary") }}
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %} 

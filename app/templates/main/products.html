@@ -7,44 +7,42 @@
     <h2>产品管理</h2>
 
     <!-- 搜索和操作按钮 -->
-    <div class="card mb-4">
-        <div class="card-body">
-            <form method="get" class="row g-3 align-items-center">
-                <div class="col-md-3">
-                    <div class="input-group">
-                        <input type="text" class="form-control" name="search" 
-                               value="{{ request.args.get('search', '') }}" 
-                               placeholder="搜索产品编码、名称、图号...">
-                        <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-search"></i> 搜索
-                        </button>
-                    </div>
-                </div>
-                <div class="col-md-2">
-                    <select class="form-control" name="status" onchange="this.form.submit()">
-                        <option value="">所有状态</option>
-                        <option value="active" {% if request.args.get('status') == 'active' %}selected{% endif %}>启用</option>
-                        <option value="inactive" {% if request.args.get('status') == 'inactive' %}selected{% endif %}>停用</option>
-                        <option value="obsolete" {% if request.args.get('status') == 'obsolete' %}selected{% endif %}>淘汰</option>
-                    </select>
-                </div>
-                <div class="col-md-2">
-                    <select class="form-control" name="category" onchange="this.form.submit()">
-                        <option value="">所有类别</option>
-                        {% for category in categories %}
-                        <option value="{{ category }}" {% if request.args.get('category') == category %}selected{% endif %}>{{ category }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="col-md-5 text-end">
-                    {% if current_user.role in ['admin', 'manager'] %}
-                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addProductModal">
-                        <i class="fas fa-plus"></i> 添加产品
+    <div class="mobile-filters mb-4">
+        <form method="get" class="row g-3">
+            <div class="col-md-3 col-12">
+                <div class="input-group">
+                    <input type="text" class="form-control" name="search" 
+                           value="{{ request.args.get('search', '') }}" 
+                           placeholder="搜索产品编码、名称、图号...">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-search"></i> 搜索
                     </button>
-                    {% endif %}
                 </div>
-            </form>
-        </div>
+            </div>
+            <div class="col-md-2 col-6">
+                <select class="form-control" name="status" onchange="this.form.submit()">
+                    <option value="">所有状态</option>
+                    <option value="active" {% if request.args.get('status') == 'active' %}selected{% endif %}>启用</option>
+                    <option value="inactive" {% if request.args.get('status') == 'inactive' %}selected{% endif %}>停用</option>
+                    <option value="obsolete" {% if request.args.get('status') == 'obsolete' %}selected{% endif %}>淘汰</option>
+                </select>
+            </div>
+            <div class="col-md-2 col-6">
+                <select class="form-control" name="category" onchange="this.form.submit()">
+                    <option value="">所有类别</option>
+                    {% for category in categories %}
+                    <option value="{{ category }}" {% if request.args.get('category') == category %}selected{% endif %}>{{ category }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-5 col-12 text-end">
+                {% if current_user.role in ['admin', 'manager'] %}
+                <button type="button" class="btn btn-primary w-100" data-bs-toggle="modal" data-bs-target="#addProductModal">
+                    <i class="fas fa-plus"></i> 添加产品
+                </button>
+                {% endif %}
+            </div>
+        </form>
     </div>
 
     <!-- 产品列表 -->
