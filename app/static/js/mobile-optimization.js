@@ -67,47 +67,394 @@ function optimizeTables() {
     });
 }
 
-// 移动端导航
+// 移动端侧边栏导航
 function addMobileNavigation() {
     const body = document.body;
     
     // 检查是否已存在移动导航
-    if (document.querySelector('.mobile-nav-menu')) {
+    if (document.querySelector('.mobile-sidebar') || document.querySelector('.mobile-menu-toggle')) {
         return;
     }
     
-    // 创建移动端底部导航
-    const mobileNav = document.createElement('div');
-    mobileNav.className = 'mobile-nav-menu';
+    // 创建汉堡菜单按钮
+    const menuToggle = document.createElement('button');
+    menuToggle.className = 'mobile-menu-toggle';
+    menuToggle.innerHTML = '<i class="fas fa-bars"></i>';
+    menuToggle.setAttribute('aria-label', '打开菜单');
     
-    const navItems = [
-        { href: '/', icon: 'fas fa-home', text: '首页' },
-        { href: '/customers', icon: 'fas fa-users', text: '客户' },
-        { href: '/products', icon: 'fas fa-box', text: '产品' },
-        { href: '/production', icon: 'fas fa-industry', text: '生产' },
-        { href: '/notifications', icon: 'fas fa-bell', text: '通知' }
-    ];
+    // 创建遮罩层
+    const overlay = document.createElement('div');
+    overlay.className = 'mobile-sidebar-overlay';
     
-    const navItemsHtml = navItems.map(item => `
-        <a href="${item.href}" class="mobile-nav-item ${window.location.pathname === item.href ? 'active' : ''}">
-            <i class="${item.icon}"></i>
-            <span>${item.text}</span>
-        </a>
-    `).join('');
+    // 创建侧边栏
+    const sidebar = document.createElement('div');
+    sidebar.className = 'mobile-sidebar';
     
-    mobileNav.innerHTML = `
-        <div class="mobile-nav-items">
-            ${navItemsHtml}
+    // 动态生成导航内容
+    const navContent = generateSidebarNavigation();
+    
+    sidebar.innerHTML = `
+        <div class="mobile-sidebar-header">
+            <h3 class="mobile-sidebar-title">综合管理系统</h3>
+            <button class="mobile-sidebar-close" aria-label="关闭菜单">
+                <i class="fas fa-times"></i>
+            </button>
         </div>
+        <nav class="mobile-sidebar-nav">
+            ${navContent}
+        </nav>
+        ${generateUserSection()}
     `;
     
-    body.appendChild(mobileNav);
+    // 添加到页面
+    body.appendChild(menuToggle);
+    body.appendChild(overlay);
+    body.appendChild(sidebar);
     
-    // 为主内容添加底部padding，避免被导航栏遮挡
+    // 绑定事件
+    setupSidebarEvents(menuToggle, sidebar, overlay);
+    
+    // 调试：输出生成的侧边栏内容
+    console.log('Generated sidebar HTML:', sidebar.innerHTML);
+    
+    // 为主内容添加底部padding，避免被菜单按钮遮挡
     const mainContent = document.querySelector('.container, .container-fluid');
     if (mainContent) {
         mainContent.style.paddingBottom = '80px';
+        // 移除可能存在的顶部padding
+        mainContent.style.paddingTop = '';
     }
+}
+
+// 获取用户信息和角色
+function getUserInfo() {
+    // 从页面中获取用户信息
+    const userElement = document.querySelector('.navbar-text');
+    const isAuthenticated = !!userElement;
+    const username = isAuthenticated ? userElement.textContent.replace('欢迎，', '') : '';
+    
+    // 检查用户角色（通过检查页面中的导航元素来判断）
+    const hasEmployeeDropdown = !!document.querySelector('#employeeDropdown');
+    const hasProductionDropdown = !!document.querySelector('#productionDropdown');
+    const hasSystemDropdown = !!document.querySelector('#systemDropdown');
+    const hasMyTasksOnly = !!document.querySelector('a[href*="my_tasks"]') && !hasEmployeeDropdown;
+    
+    let role = 'guest';
+    if (isAuthenticated) {
+        if (hasEmployeeDropdown || hasProductionDropdown || hasSystemDropdown) {
+            role = 'admin';
+        } else if (hasMyTasksOnly) {
+            role = 'user';
+        } else {
+            // 如果无法确定角色，默认为admin（因为大多数功能需要管理员权限）
+            role = 'admin';
+        }
+    }
+    
+    console.log('User Info:', { 
+        isAuthenticated, 
+        username, 
+        role,
+        hasEmployeeDropdown,
+        hasProductionDropdown,
+        hasSystemDropdown 
+    }); // 调试信息
+    return { isAuthenticated, username, role };
+}
+
+// 生成侧边栏导航内容
+function generateSidebarNavigation() {
+    const userInfo = getUserInfo();
+    const currentPath = window.location.pathname;
+    
+    if (!userInfo.isAuthenticated) {
+        return `
+            <a href="/" class="mobile-sidebar-item ${currentPath === '/' ? 'active' : ''}">
+                <i class="fas fa-home"></i>
+                <span>首页</span>
+            </a>
+            <a href="/auth/login" class="mobile-sidebar-item">
+                <i class="fas fa-sign-in-alt"></i>
+                <span>登录</span>
+            </a>
+            <a href="/auth/register" class="mobile-sidebar-item">
+                <i class="fas fa-user-plus"></i>
+                <span>注册</span>
+            </a>
+        `;
+    }
+    
+    let navHtml = `
+        <a href="/" class="mobile-sidebar-item ${currentPath === '/' ? 'active' : ''}">
+            <i class="fas fa-home"></i>
+            <span>首页</span>
+        </a>
+    `;
+    
+    // 管理员菜单
+    if (userInfo.role === 'admin') {
+        console.log('Generating admin menu'); // 调试信息
+        navHtml += `
+            <!-- 员工管理 -->
+            <div class="mobile-sidebar-expandable" data-toggle="employee">
+                <div class="mobile-sidebar-item">
+                    <i class="fas fa-users"></i>
+                    <span>员工管理</span>
+                    <i class="fas fa-chevron-right toggle-icon"></i>
+                </div>
+                <div class="mobile-sidebar-submenu" data-submenu="employee">
+                    <a href="/employees" class="mobile-sidebar-subitem ${currentPath === '/employees' ? 'active' : ''}">
+                        <i class="fas fa-user"></i>
+                        <span>员工管理</span>
+                    </a>
+                    <a href="/bonus_penalties" class="mobile-sidebar-subitem ${currentPath === '/bonus_penalties' ? 'active' : ''}">
+                        <i class="fas fa-award"></i>
+                        <span>奖惩管理</span>
+                    </a>
+                    <a href="/salary_calculation" class="mobile-sidebar-subitem ${currentPath === '/salary_calculation' ? 'active' : ''}">
+                        <i class="fas fa-calculator"></i>
+                        <span>工资管理</span>
+                    </a>
+                </div>
+            </div>
+            
+            <!-- 生产管理 -->
+            <div class="mobile-sidebar-expandable" data-toggle="production">
+                <div class="mobile-sidebar-item">
+                    <i class="fas fa-industry"></i>
+                    <span>生产管理</span>
+                    <i class="fas fa-chevron-right toggle-icon"></i>
+                </div>
+                <div class="mobile-sidebar-submenu" data-submenu="production">
+                    <a href="/process_prices" class="mobile-sidebar-subitem ${currentPath === '/process_prices' ? 'active' : ''}">
+                        <i class="fas fa-cogs"></i>
+                        <span>工序管理</span>
+                    </a>
+                    <a href="/production_records" class="mobile-sidebar-subitem ${currentPath === '/production_records' ? 'active' : ''}">
+                        <i class="fas fa-clipboard-list"></i>
+                        <span>生产记录</span>
+                    </a>
+                    <a href="/tasks" class="mobile-sidebar-subitem ${currentPath === '/tasks' ? 'active' : ''}">
+                        <i class="fas fa-tasks"></i>
+                        <span>任务管理</span>
+                    </a>
+                    <a href="/production_orders" class="mobile-sidebar-subitem ${currentPath === '/production_orders' ? 'active' : ''}">
+                        <i class="fas fa-file-alt"></i>
+                        <span>生产订单</span>
+                    </a>
+                </div>
+            </div>
+            
+            <!-- 库存管理 -->
+            <a href="/inventory" class="mobile-sidebar-item ${currentPath === '/inventory' ? 'active' : ''}">
+                <i class="fas fa-warehouse"></i>
+                <span>库存管理</span>
+            </a>
+            
+            <!-- 产品管理 -->
+            <a href="/products" class="mobile-sidebar-item ${currentPath === '/products' ? 'active' : ''}">
+                <i class="fas fa-box"></i>
+                <span>产品管理</span>
+            </a>
+            
+            <!-- 销售管理 -->
+            <div class="mobile-sidebar-expandable" data-toggle="sales">
+                <div class="mobile-sidebar-item">
+                    <i class="fas fa-shopping-cart"></i>
+                    <span>销售管理</span>
+                    <i class="fas fa-chevron-right toggle-icon"></i>
+                </div>
+                <div class="mobile-sidebar-submenu" data-submenu="sales">
+                    <a href="/customers" class="mobile-sidebar-subitem ${currentPath === '/customers' ? 'active' : ''}">
+                        <i class="fas fa-user-tie"></i>
+                        <span>客户管理</span>
+                    </a>
+                    <a href="/sales_orders" class="mobile-sidebar-subitem ${currentPath === '/sales_orders' ? 'active' : ''}">
+                        <i class="fas fa-file-invoice"></i>
+                        <span>销售订单</span>
+                    </a>
+                </div>
+            </div>
+            
+            <!-- 质量管理 -->
+            <a href="/quality" class="mobile-sidebar-item ${currentPath.includes('/quality') ? 'active' : ''}">
+                <i class="fas fa-medal"></i>
+                <span>质量管理</span>
+            </a>
+            
+            <!-- 系统管理 -->
+            <div class="mobile-sidebar-expandable" data-toggle="system">
+                <div class="mobile-sidebar-item">
+                    <i class="fas fa-cog"></i>
+                    <span>系统管理</span>
+                    <i class="fas fa-chevron-right toggle-icon"></i>
+                </div>
+                <div class="mobile-sidebar-submenu" data-submenu="system">
+                    <a href="/code_rules" class="mobile-sidebar-subitem ${currentPath === '/code_rules' ? 'active' : ''}">
+                        <i class="fas fa-code"></i>
+                        <span>编码管理</span>
+                    </a>
+                    <a href="/audit_logs" class="mobile-sidebar-subitem ${currentPath === '/audit_logs' ? 'active' : ''}">
+                        <i class="fas fa-history"></i>
+                        <span>审计日志</span>
+                    </a>
+                    <a href="/notification_rules" class="mobile-sidebar-subitem ${currentPath === '/notification_rules' ? 'active' : ''}">
+                        <i class="fas fa-bell-slash"></i>
+                        <span>通知规则</span>
+                    </a>
+                </div>
+            </div>
+        `;
+    } else if (userInfo.role === 'user') {
+        // 普通用户菜单
+        navHtml += `
+            <a href="/my_tasks" class="mobile-sidebar-item ${currentPath === '/my_tasks' ? 'active' : ''}">
+                <i class="fas fa-tasks"></i>
+                <span>我的任务</span>
+            </a>
+        `;
+    }
+    
+    // 通知中心（所有登录用户都可访问）
+    navHtml += `
+        <a href="/notifications" class="mobile-sidebar-item ${currentPath === '/notifications' ? 'active' : ''}">
+            <i class="fas fa-bell"></i>
+            <span>通知中心</span>
+        </a>
+    `;
+    
+    console.log('Generated nav HTML length:', navHtml.length); // 调试信息
+    return navHtml;
+}
+
+// 生成用户信息区域
+function generateUserSection() {
+    const userInfo = getUserInfo();
+    
+    if (!userInfo.isAuthenticated) {
+        return '';
+    }
+    
+    return `
+        <div class="mobile-sidebar-user">
+            <div class="mobile-sidebar-user-info">
+                <div class="mobile-sidebar-user-name">欢迎，${userInfo.username}</div>
+            </div>
+            <a href="/auth/logout" class="mobile-sidebar-logout">
+                <i class="fas fa-sign-out-alt"></i>
+                <span>退出登录</span>
+            </a>
+        </div>
+    `;
+}
+
+// 设置侧边栏事件
+function setupSidebarEvents(toggle, sidebar, overlay) {
+    // 打开侧边栏
+    function openSidebar() {
+        sidebar.classList.add('open');
+        overlay.classList.add('show');
+        toggle.classList.add('active');
+        toggle.innerHTML = '<i class="fas fa-times"></i>';
+        toggle.setAttribute('aria-label', '关闭菜单');
+        document.body.style.overflow = 'hidden';
+    }
+    
+    // 关闭侧边栏
+    function closeSidebar() {
+        sidebar.classList.remove('open');
+        overlay.classList.remove('show');
+        toggle.classList.remove('active');
+        toggle.innerHTML = '<i class="fas fa-bars"></i>';
+        toggle.setAttribute('aria-label', '打开菜单');
+        document.body.style.overflow = '';
+    }
+    
+    // 菜单按钮点击事件
+    toggle.addEventListener('click', function() {
+        if (sidebar.classList.contains('open')) {
+            closeSidebar();
+        } else {
+            openSidebar();
+        }
+    });
+    
+    // 遮罩层点击关闭
+    overlay.addEventListener('click', closeSidebar);
+    
+    // 关闭按钮点击事件
+    const closeBtn = sidebar.querySelector('.mobile-sidebar-close');
+    closeBtn.addEventListener('click', closeSidebar);
+    
+    // 直接导航项点击后关闭侧边栏（不包括可展开项的容器）
+    const directNavItems = sidebar.querySelectorAll('a.mobile-sidebar-item');
+    directNavItems.forEach(item => {
+        item.addEventListener('click', function(e) {
+            // 允许链接正常跳转
+            closeSidebar();
+        });
+    });
+    
+    // 子菜单项点击后关闭侧边栏
+    const subNavItems = sidebar.querySelectorAll('.mobile-sidebar-subitem');
+    console.log('Found subNavItems:', subNavItems.length); // 调试信息
+    subNavItems.forEach((item, index) => {
+        console.log(`Binding click event to subitem ${index}:`, item.href); // 调试信息
+        item.addEventListener('click', function(e) {
+            // 确保链接能正常工作
+            console.log('Clicking subitem:', item.href); // 调试信息
+            // 允许链接正常跳转
+            setTimeout(() => {
+                closeSidebar();
+            }, 100); // 延迟关闭，确保链接跳转
+        });
+    });
+    
+    // 可展开菜单的点击事件（只绑定到 .mobile-sidebar-item div，不是链接）
+    const expandableItems = sidebar.querySelectorAll('.mobile-sidebar-expandable');
+    expandableItems.forEach(item => {
+        const toggleDiv = item.querySelector('.mobile-sidebar-item');
+        if (toggleDiv) {
+            toggleDiv.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                const toggleName = item.getAttribute('data-toggle');
+                const submenu = sidebar.querySelector(`[data-submenu="${toggleName}"]`);
+                const isExpanded = item.classList.contains('expanded');
+                
+                console.log('Toggling menu:', toggleName, 'expanded:', isExpanded); // 调试信息
+                
+                // 关闭其他展开的菜单
+                expandableItems.forEach(otherItem => {
+                    if (otherItem !== item) {
+                        otherItem.classList.remove('expanded');
+                        const otherToggleName = otherItem.getAttribute('data-toggle');
+                        const otherSubmenu = sidebar.querySelector(`[data-submenu="${otherToggleName}"]`);
+                        if (otherSubmenu) {
+                            otherSubmenu.classList.remove('show');
+                        }
+                    }
+                });
+                
+                // 切换当前菜单
+                if (isExpanded) {
+                    item.classList.remove('expanded');
+                    if (submenu) submenu.classList.remove('show');
+                } else {
+                    item.classList.add('expanded');
+                    if (submenu) submenu.classList.add('show');
+                }
+            });
+        }
+    });
+    
+    // ESC键关闭侧边栏
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && sidebar.classList.contains('open')) {
+            closeSidebar();
+        }
+    });
 }
 
 // 表单优化
@@ -193,7 +540,9 @@ function addBackToTop() {
     backToTopBtn.className = 'mobile-action-btn back-to-top';
     backToTopBtn.innerHTML = '<i class="fas fa-arrow-up"></i>';
     backToTopBtn.style.display = 'none';
-    backToTopBtn.style.bottom = '5rem'; // 避免与底部导航重叠
+    backToTopBtn.style.bottom = '1rem'; // 移动端底部位置
+    backToTopBtn.style.alignItems = 'center';
+    backToTopBtn.style.justifyContent = 'center';
     
     document.body.appendChild(backToTopBtn);
     

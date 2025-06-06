@@ -15,38 +15,38 @@
 
     <!-- 搜索和筛选 -->
     <div class="mobile-filters mb-4">
-        <form method="GET" class="row g-3">
+            <form method="GET" class="row g-3">
             <div class="col-md-4 col-12">
-                <label class="form-label">搜索</label>
-                <input type="text" class="form-control" name="search" value="{{ search }}" 
-                       placeholder="客户编码、名称、联系人、电话、行业">
-            </div>
+                    <label class="form-label">搜索</label>
+                    <input type="text" class="form-control" name="search" value="{{ search }}" 
+                           placeholder="客户编码、名称、联系人、电话、行业">
+                </div>
             <div class="col-md-3 col-6">
-                <label class="form-label">状态</label>
-                <select class="form-select" name="status">
-                    <option value="">全部状态</option>
-                    <option value="active" {% if status_filter == 'active' %}selected{% endif %}>活跃</option>
-                    <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>非活跃</option>
-                    <option value="blacklist" {% if status_filter == 'blacklist' %}selected{% endif %}>黑名单</option>
-                </select>
-            </div>
+                    <label class="form-label">状态</label>
+                    <select class="form-select" name="status">
+                        <option value="">全部状态</option>
+                        <option value="active" {% if status_filter == 'active' %}selected{% endif %}>活跃</option>
+                        <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>非活跃</option>
+                        <option value="blacklist" {% if status_filter == 'blacklist' %}selected{% endif %}>黑名单</option>
+                    </select>
+                </div>
             <div class="col-md-3 col-6">
-                <label class="form-label">客户类型</label>
-                <select class="form-select" name="customer_type">
-                    <option value="">全部类型</option>
-                    <option value="enterprise" {% if type_filter == 'enterprise' %}selected{% endif %}>企业客户</option>
-                    <option value="individual" {% if type_filter == 'individual' %}selected{% endif %}>个人客户</option>
-                </select>
-            </div>
+                    <label class="form-label">客户类型</label>
+                    <select class="form-select" name="customer_type">
+                        <option value="">全部类型</option>
+                        <option value="enterprise" {% if type_filter == 'enterprise' %}selected{% endif %}>企业客户</option>
+                        <option value="individual" {% if type_filter == 'individual' %}selected{% endif %}>个人客户</option>
+                    </select>
+                </div>
             <div class="col-md-2 col-12">
                 <label class="form-label d-none d-md-block">&nbsp;</label>
-                <div class="d-grid">
-                    <button type="submit" class="btn btn-outline-primary">
-                        <i class="fas fa-search"></i> 搜索
-                    </button>
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-outline-primary">
+                            <i class="fas fa-search"></i> 搜索
+                        </button>
+                    </div>
                 </div>
-            </div>
-        </form>
+            </form>
     </div>
 
     <!-- 客户列表 -->

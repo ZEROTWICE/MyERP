@@ -1135,7 +1135,7 @@ class ProductionBatch(db.Model):
         """获取规格型号文本"""
         specs = self.specifications
         return ', '.join(specs) if specs else '无'
-
+    
     def __repr__(self):
         return f'<ProductionBatch {self.batch_number}: {self.batch_quantity}件>'
 

@@ -30,12 +30,17 @@
     <div class="card mb-4">
         <div class="card-body">
             <form method="get" action="{{ url_for('main.manage_tasks') }}" class="row g-3" id="searchForm">
-                <div class="col-md-10">
+                <div class="col-md-6">
                     {{ search_form.search.label(class="form-label") }}
                     {{ search_form.search(class="form-control", value=request.args.get('search', '')) }}
                 </div>
+                <div class="col-md-4">
+                    {{ search_form.status.label(class="form-label") }}
+                    {{ search_form.status(class="form-control", value=request.args.get('status', 'pending')) }}
+                </div>
                 <div class="col-md-2 d-flex align-items-end">
                     {{ search_form.submit(class="btn btn-primary") }}
+                    <button type="button" class="btn btn-secondary ms-2" onclick="resetFilters()">重置</button>
                 </div>
             </form>
         </div>
@@ -51,16 +56,16 @@
                             {% macro sort_link(column, text) %}
                                 {% if current_sort == column %}
                                     {% if current_direction == 'asc' %}
-                                        <a href="{{ url_for('main.manage_tasks', sort=column, direction='desc', search=search_form.search.data, per_page=request.args.get('per_page', 20)) }}" class="text-dark text-decoration-none">
+                                        <a href="{{ url_for('main.manage_tasks', sort=column, direction='desc', search=search_form.search.data, status=request.args.get('status', ''), per_page=request.args.get('per_page', 20)) }}" class="text-dark text-decoration-none">
                                             {{ text }} <i class="bi bi-arrow-up"></i>
                                         </a>
                                     {% else %}
-                                        <a href="{{ url_for('main.manage_tasks', sort=column, direction='asc', search=search_form.search.data, per_page=request.args.get('per_page', 20)) }}" class="text-dark text-decoration-none">
+                                        <a href="{{ url_for('main.manage_tasks', sort=column, direction='asc', search=search_form.search.data, status=request.args.get('status', ''), per_page=request.args.get('per_page', 20)) }}" class="text-dark text-decoration-none">
                                             {{ text }} <i class="bi bi-arrow-down"></i>
                                         </a>
                                     {% endif %}
                                 {% else %}
-                                    <a href="{{ url_for('main.manage_tasks', sort=column, direction='asc', search=search_form.search.data, per_page=request.args.get('per_page', 20)) }}" class="text-dark text-decoration-none">
+                                    <a href="{{ url_for('main.manage_tasks', sort=column, direction='asc', search=search_form.search.data, status=request.args.get('status', ''), per_page=request.args.get('per_page', 20)) }}" class="text-dark text-decoration-none">
                                         {{ text }}
                                     </a>
                                 {% endif %}
@@ -159,14 +164,14 @@
                     <ul class="pagination mb-0">
                         {% if pagination.has_prev %}
                         <li class="page-item">
-                            <a class="page-link" href="{{ url_for('main.manage_tasks', page=pagination.prev_num, sort=current_sort, direction=current_direction, search=search_form.search.data, per_page=request.args.get('per_page', 20)) }}">上一页</a>
+                            <a class="page-link" href="{{ url_for('main.manage_tasks', page=pagination.prev_num, sort=current_sort, direction=current_direction, search=search_form.search.data, status=request.args.get('status', ''), per_page=request.args.get('per_page', 20)) }}">上一页</a>
                         </li>
                         {% endif %}
                         
                         {% for page in pagination.iter_pages() %}
                             {% if page %}
                                 <li class="page-item {% if page == pagination.page %}active{% endif %}">
-                                    <a class="page-link" href="{{ url_for('main.manage_tasks', page=page, sort=current_sort, direction=current_direction, search=search_form.search.data, per_page=request.args.get('per_page', 20)) }}">{{ page }}</a>
+                                    <a class="page-link" href="{{ url_for('main.manage_tasks', page=page, sort=current_sort, direction=current_direction, search=search_form.search.data, status=request.args.get('status', ''), per_page=request.args.get('per_page', 20)) }}">{{ page }}</a>
                                 </li>
                             {% else %}
                                 <li class="page-item disabled"><span class="page-link">...</span></li>
@@ -175,7 +180,7 @@
                         
                         {% if pagination.has_next %}
                         <li class="page-item">
-                            <a class="page-link" href="{{ url_for('main.manage_tasks', page=pagination.next_num, sort=current_sort, direction=current_direction, search=search_form.search.data, per_page=request.args.get('per_page', 20)) }}">下一页</a>
+                            <a class="page-link" href="{{ url_for('main.manage_tasks', page=pagination.next_num, sort=current_sort, direction=current_direction, search=search_form.search.data, status=request.args.get('status', ''), per_page=request.args.get('per_page', 20)) }}">下一页</a>
                         </li>
                         {% endif %}
                     </ul>
@@ -643,6 +648,14 @@ $(document).ready(function() {
         });
     });
 });
+
+// 重置过滤器函数
+function resetFilters() {
+    const form = document.getElementById('searchForm');
+    form.querySelector('input[name="search"]').value = '';
+    form.querySelector('select[name="status"]').value = 'pending'; // 重置为默认的未完成状态
+    form.submit();
+}
 
 // 初始化 Select2 的函数
 function initializeSelect2() {

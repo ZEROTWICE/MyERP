@@ -147,11 +147,11 @@ class TaskSearchForm(FlaskForm):
     search = StringField('搜索')
     status = SelectField('状态', choices=[
         ('', '全部'),
-        ('pending', '待开始'),
+        ('pending', '未完成'),
         ('in_progress', '进行中'),
         ('completed', '已完成'),
         ('cancelled', '已取消')
-    ], default='')
+    ], default='pending')
     start_date = DateField('开始日期')
     end_date = DateField('结束日期')
     submit = SubmitField('搜索')

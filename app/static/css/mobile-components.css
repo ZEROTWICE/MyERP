@@ -5,9 +5,49 @@
     display: none;
 }
 
+/* 确保所有表格在移动端都可见 */
 @media (max-width: 768px) {
+    .table, 
+    .table-responsive table,
+    .dataTable {
+        display: table !important;
+        visibility: visible !important;
+    }
+}
+
+@media (max-width: 768px) {
+    /* 优化原表格在移动端的显示 */
     .table-responsive {
-        display: none;
+        display: block !important;
+        overflow-x: auto;
+        font-size: 0.8rem;
+        -webkit-overflow-scrolling: touch;
+        border-radius: 0.375rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .table-responsive .table {
+        font-size: 0.8rem;
+        margin-bottom: 0;
+        min-width: 600px; /* 确保表格有最小宽度 */
+    }
+    
+    .table-responsive .table th,
+    .table-responsive .table td {
+        padding: 0.5rem 0.4rem;
+        white-space: nowrap;
+        vertical-align: middle;
+    }
+    
+    .table-responsive .table th {
+        background-color: #f8f9fa;
+        border-bottom: 2px solid #dee2e6;
+        font-weight: 600;
+        color: #495057;
+    }
+    
+    .table-responsive .table-striped tbody tr:nth-of-type(odd) {
+        background-color: rgba(0,0,0,0.02);
     }
     
     .mobile-table {
@@ -147,17 +187,20 @@
     width: 56px;
     height: 56px;
     border-radius: 50%;
-    background: #007bff;
+    background: #28a745;
     border: none;
     color: white;
     font-size: 1.5rem;
-    box-shadow: 0 4px 12px rgba(0,123,255,0.3);
-    z-index: 1000;
+    box-shadow: 0 4px 12px rgba(40,167,69,0.3);
+    z-index: 1100;
     transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .mobile-action-btn:hover {
-    background: #0056b3;
+    background: #1e7e34;
     transform: scale(1.1);
 }
 
@@ -167,8 +210,8 @@
     }
 }
 
-/* 移动端导航菜单 */
-.mobile-nav-menu {
+/* 移动端导航菜单 - 原底部导航（保留备用） */
+.mobile-nav-menu.bottom {
     position: fixed;
     bottom: 0;
     left: 0;
@@ -180,6 +223,256 @@
     padding: 0.5rem;
 }
 
+/* 移动端侧边栏导航 */
+.mobile-sidebar {
+    position: fixed;
+    top: 0;
+    left: -280px;
+    width: 280px;
+    height: 100vh;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    z-index: 1150;
+    transition: left 0.3s ease;
+    overflow-y: auto;
+    box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+    display: flex;
+    flex-direction: column;
+}
+
+.mobile-sidebar.open {
+    left: 0;
+}
+
+.mobile-sidebar-header {
+    padding: 1.5rem 1rem;
+    background: rgba(255,255,255,0.1);
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    color: white;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.mobile-sidebar-title {
+    font-size: 1.2rem;
+    font-weight: 600;
+    margin: 0;
+}
+
+.mobile-sidebar-close {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 0.5rem;
+    border-radius: 50%;
+    transition: background 0.2s ease;
+}
+
+.mobile-sidebar-close:hover {
+    background: rgba(255,255,255,0.1);
+}
+
+.mobile-sidebar-nav {
+    padding: 1rem 0;
+    flex: 1;
+    overflow-y: auto;
+}
+
+.mobile-sidebar-item {
+    display: flex;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    color: rgba(255,255,255,0.9);
+    text-decoration: none;
+    transition: all 0.2s ease;
+    border-left: 3px solid transparent;
+}
+
+.mobile-sidebar-item:hover,
+.mobile-sidebar-item.active {
+    background: rgba(255,255,255,0.1);
+    color: white;
+    text-decoration: none;
+    border-left-color: white;
+}
+
+.mobile-sidebar-item i {
+    font-size: 1.1rem;
+    margin-right: 1rem;
+    width: 20px;
+    text-align: center;
+}
+
+.mobile-sidebar-item span {
+    font-size: 0.95rem;
+    font-weight: 500;
+}
+
+/* 侧边栏分组 */
+.mobile-sidebar-group {
+    margin-bottom: 0.5rem;
+}
+
+.mobile-sidebar-group-title {
+    padding: 0.75rem 1.5rem;
+    color: rgba(255,255,255,0.6);
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    margin-bottom: 0.5rem;
+}
+
+/* 侧边栏可展开项 */
+.mobile-sidebar-expandable {
+    border-left: 3px solid transparent;
+}
+
+.mobile-sidebar-expandable.expanded {
+    background: rgba(255,255,255,0.05);
+}
+
+.mobile-sidebar-expandable .toggle-icon {
+    margin-left: auto;
+    transition: transform 0.2s ease;
+}
+
+.mobile-sidebar-expandable.expanded .toggle-icon {
+    transform: rotate(90deg);
+}
+
+.mobile-sidebar-submenu {
+    background: rgba(0,0,0,0.1);
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+    pointer-events: none;
+}
+
+.mobile-sidebar-submenu.show {
+    max-height: 500px;
+    pointer-events: auto;
+}
+
+.mobile-sidebar-subitem {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem 1.5rem 0.75rem 3rem;
+    color: rgba(255,255,255,0.8);
+    text-decoration: none;
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
+    border-left: 3px solid transparent;
+    pointer-events: auto;
+    position: relative;
+    z-index: 1;
+}
+
+.mobile-sidebar-subitem:hover,
+.mobile-sidebar-subitem.active {
+    background: rgba(255,255,255,0.1);
+    color: white;
+    text-decoration: none;
+    border-left-color: rgba(255,255,255,0.5);
+}
+
+.mobile-sidebar-subitem i {
+    font-size: 0.9rem;
+    margin-right: 0.75rem;
+    width: 16px;
+    text-align: center;
+}
+
+/* 用户信息区域 */
+.mobile-sidebar-user {
+    padding: 1rem 1.5rem;
+    background: rgba(0,0,0,0.1);
+    border-top: 1px solid rgba(255,255,255,0.1);
+    margin-top: auto;
+}
+
+.mobile-sidebar-user-info {
+    color: rgba(255,255,255,0.9);
+    font-size: 0.9rem;
+    margin-bottom: 0.5rem;
+}
+
+.mobile-sidebar-user-name {
+    font-weight: 600;
+    color: white;
+}
+
+.mobile-sidebar-logout {
+    display: flex;
+    align-items: center;
+    color: rgba(255,255,255,0.8);
+    text-decoration: none;
+    font-size: 0.9rem;
+    transition: color 0.2s ease;
+}
+
+.mobile-sidebar-logout:hover {
+    color: white;
+    text-decoration: none;
+}
+
+.mobile-sidebar-logout i {
+    margin-right: 0.5rem;
+}
+
+/* 汉堡菜单按钮 */
+.mobile-menu-toggle {
+    position: fixed;
+    bottom: 1rem;
+    left: 1rem;
+    width: 50px;
+    height: 50px;
+    background: #007bff;
+    border: none;
+    border-radius: 10px;
+    color: white;
+    font-size: 1.2rem;
+    z-index: 1100;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(0,123,255,0.3);
+}
+
+.mobile-menu-toggle:hover {
+    background: #0056b3;
+    transform: scale(1.05);
+}
+
+.mobile-menu-toggle.active {
+    background: #dc3545;
+    transform: rotate(90deg);
+}
+
+/* 遮罩层 */
+.mobile-sidebar-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    z-index: 1140;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+}
+
+.mobile-sidebar-overlay.show {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* 移动端导航项底部版本 */
 .mobile-nav-items {
     display: flex;
     justify-content: space-around;
@@ -211,9 +504,57 @@
     margin-bottom: 0.25rem;
 }
 
+/* 移动端顶部导航栏优化 */
+@media (max-width: 768px) {
+    /* 隐藏顶部导航栏的菜单按钮和菜单项 */
+    .navbar-toggler,
+    .navbar-collapse,
+    .navbar-nav {
+        display: none !important;
+    }
+    
+    /* 缩小顶部导航栏高度 */
+    .navbar {
+        padding: 0.5rem 0 !important;
+        min-height: 50px !important;
+    }
+    
+    /* 调整导航栏品牌标题 */
+    .navbar-brand {
+        font-size: 1.1rem !important;
+        padding: 0.5rem 0 !important;
+        margin: 0 !important;
+    }
+    
+    /* 确保容器内边距适配 */
+    .navbar .container {
+        padding: 0 1rem !important;
+    }
+    
+    /* 调整主内容区域顶部间距 */
+    .container.mt-4 {
+        margin-top: 1rem !important;
+    }
+    
+    /* 优化消息提示区域 */
+    .alert {
+        margin-bottom: 1rem !important;
+        font-size: 0.9rem !important;
+    }
+    
+    /* 确保页面不会被顶部导航栏遮挡 */
+    body {
+        padding-top: 0 !important;
+    }
+}
+
+/* 响应式规则 */
 @media (min-width: 769px) {
+    .mobile-sidebar,
+    .mobile-menu-toggle,
+    .mobile-sidebar-overlay,
     .mobile-nav-menu {
-        display: none;
+        display: none !important;
     }
 }
 
@@ -453,19 +794,57 @@
 
 /* 移动端触摸优化 */
 @media (max-width: 768px) {
-    .btn,
+    .btn {
+        font-size: 0.8rem;
+        padding: 0.4rem 0.6rem;
+        min-height: 36px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0.1rem;
+        line-height: 1.2;
+    }
+    
+    .btn-sm {
+        font-size: 0.75rem;
+        padding: 0.25rem 0.5rem;
+        min-height: 32px;
+    }
+    
+    .btn-group .btn {
+        margin: 0;
+        border-radius: 0.25rem;
+    }
+    
     .nav-link,
     .dropdown-item {
-        min-height: 44px; /* iOS推荐的最小触摸目标 */
+        min-height: 44px;
         display: flex;
         align-items: center;
         justify-content: center;
     }
     
     .table td {
-        min-height: 44px;
+        min-height: 36px;
         display: table-cell;
         vertical-align: middle;
+    }
+    
+    /* 优化分页 */
+    .pagination .page-link {
+        padding: 0.4rem 0.6rem;
+        font-size: 0.8rem;
+        min-height: 36px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    /* 优化表格中的操作按钮 */
+    .table .btn-group {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 2px;
     }
 }
 

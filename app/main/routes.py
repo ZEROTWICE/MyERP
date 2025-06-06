@@ -2298,8 +2298,10 @@ def manage_tasks():
             TaskAssignment.notes.like(search_term)
         ))
     
-    if request.args.get('status'):
-        query = query.filter(TaskAssignment.status == request.args.get('status'))
+    # 状态筛选，默认为pending（未完成）
+    status_filter = request.args.get('status', 'pending')
+    if status_filter and status_filter != '':
+        query = query.filter(TaskAssignment.status == status_filter)
     
     if request.args.get('start_date'):
         try:
@@ -2407,7 +2409,7 @@ def manage_tasks():
     
     # 从请求参数填充搜索表单
     search_form.search.data = request.args.get('search', '')
-    search_form.status.data = request.args.get('status', '')
+    search_form.status.data = request.args.get('status', 'pending')
     if request.args.get('start_date'):
         try:
             search_form.start_date.data = datetime.strptime(request.args.get('start_date'), '%Y-%m-%d')
