@@ -160,14 +160,34 @@
                                     <td>
                                         {% set batches = item.delivery_batches_list %}
                                         {% if batches %}
-                                            <span class="badge bg-info">{{ batches|length }}批次</span>
-                                            <button class="btn btn-sm btn-outline-info" onclick="viewDeliveryBatches({{ item.id }})">
-                                                <i class="fas fa-eye"></i>
-                                            </button>
+                                            <div class="mb-1">
+                                                <span class="badge bg-info">{{ batches|length }}批次</span>
+                                                {% set status = item.delivery_status %}
+                                                {% if status == 'completed' %}
+                                                    <span class="badge bg-success">已完成</span>
+                                                {% elif status == 'partial' %}
+                                                    <span class="badge bg-warning">部分完成</span>
+                                                {% elif status == 'overdue' %}
+                                                    <span class="badge bg-danger">有逾期</span>
+                                                {% else %}
+                                                    <span class="badge bg-secondary">待交付</span>
+                                                {% endif %}
+                                            </div>
+                                            <div class="progress mb-1" style="height: 8px;">
+                                                <div class="progress-bar" role="progressbar" 
+                                                     style="width: {{ item.delivery_progress }}%"
+                                                     aria-valuenow="{{ item.delivery_progress }}" 
+                                                     aria-valuemin="0" aria-valuemax="100"></div>
+                                            </div>
+                                            <a href="{{ url_for('main.manage_delivery_batches_page', item_id=item.id) }}" 
+                                               class="btn btn-sm btn-outline-info">
+                                                <i class="fas fa-edit"></i> 管理
+                                            </a>
                                         {% else %}
-                                            <button class="btn btn-sm btn-outline-secondary" onclick="manageDeliveryBatches({{ item.id }})">
+                                            <a href="{{ url_for('main.manage_delivery_batches_page', item_id=item.id) }}" 
+                                               class="btn btn-sm btn-outline-secondary">
                                                 <i class="fas fa-plus"></i> 设置
-                                            </button>
+                                            </a>
                                         {% endif %}
                                     </td>
                                     <td>
@@ -508,9 +528,238 @@ function viewDeliveryBatches(itemId) {
 }
 
 function manageDeliveryBatches(itemId) {
-    // 这里可以实现分批到货的编辑功能
-    alert('分批到货管理功能开发中...');
+    // 获取订单行信息和现有分批数据
+    fetch(`/sales_order_item/${itemId}/delivery_batches`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const orderItem = data.data.order_item;
+                const batches = data.data.batches || [];
+                
+                let html = `
+                    <div class="mb-3">
+                        <h6>产品：${orderItem.product_name}</h6>
+                        <p class="text-muted">总数量：${orderItem.quantity} ${orderItem.unit}</p>
+                    </div>
+                    
+                    <div id="batchesContainer">
+                        <div class="table-responsive">
+                            <table class="table table-sm" id="batchesTable">
+                                <thead>
+                                    <tr>
+                                        <th>批次号</th>
+                                        <th>到货日期</th>
+                                        <th>数量</th>
+                                        <th>备注</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="batchesTableBody">
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <div class="row mt-3">
+                            <div class="col-md-12">
+                                <button type="button" class="btn btn-sm btn-success me-2" onclick="addBatchRow()">
+                                    <i class="fas fa-plus"></i> 添加批次
+                                </button>
+                                <div class="float-end">
+                                    <span class="badge bg-info me-2">已分配：<span id="totalAllocated">0</span></span>
+                                    <span class="badge bg-warning">剩余：<span id="remaining">${orderItem.quantity}</span></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                document.getElementById('deliveryBatchesContent').innerHTML = html;
+                
+                // 设置全局变量
+                                 window.currentItemId = itemId;
+                 window.currentOrderItem = orderItem;
+                 window.deliveryBatches = batches.slice();
+                
+                // 渲染现有批次
+                renderBatches();
+                
+                // 显示保存按钮
+                document.getElementById('saveDeliveryBatches').style.display = 'inline-block';
+                
+                const modal = new bootstrap.Modal(document.getElementById('deliveryBatchesModal'));
+                modal.show();
+            } else {
+                alert('获取分批信息失败：' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('获取分批信息失败');
+        });
 }
+
+function renderBatches() {
+    const tbody = document.getElementById('batchesTableBody');
+    tbody.innerHTML = '';
+    
+    let totalAllocated = 0;
+    
+    window.deliveryBatches.forEach((batch, index) => {
+        totalAllocated += parseInt(batch.quantity) || 0;
+        
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>
+                <input type="number" class="form-control form-control-sm" 
+                       value="${batch.batch_no || index + 1}" 
+                       onchange="updateBatch(${index}, 'batch_no', this.value)" min="1">
+            </td>
+            <td>
+                <input type="date" class="form-control form-control-sm" 
+                       value="${batch.delivery_date || ''}" 
+                       onchange="updateBatch(${index}, 'delivery_date', this.value)" required>
+            </td>
+            <td>
+                <input type="number" class="form-control form-control-sm" 
+                       value="${batch.quantity || ''}" 
+                       onchange="updateBatch(${index}, 'quantity', this.value)" 
+                       min="1" max="${window.currentOrderItem.quantity}" required>
+            </td>
+            <td>
+                <input type="text" class="form-control form-control-sm" 
+                       value="${batch.notes || ''}" 
+                       onchange="updateBatch(${index}, 'notes', this.value)" 
+                       placeholder="备注">
+            </td>
+            <td>
+                <button type="button" class="btn btn-sm btn-outline-danger" 
+                        onclick="removeBatch(${index})">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+    
+    // 更新统计信息
+    document.getElementById('totalAllocated').textContent = totalAllocated;
+    document.getElementById('remaining').textContent = window.currentOrderItem.quantity - totalAllocated;
+    
+    // 如果没有批次，添加一个空行
+    if (window.deliveryBatches.length === 0) {
+        addBatchRow();
+    }
+}
+
+function addBatchRow() {
+    const newBatch = {
+        batch_no: window.deliveryBatches.length + 1,
+        delivery_date: '',
+        quantity: '',
+        notes: ''
+    };
+    
+    window.deliveryBatches.push(newBatch);
+    renderBatches();
+}
+
+function removeBatch(index) {
+    if (window.deliveryBatches.length <= 1) {
+        alert('至少需要保留一个批次');
+        return;
+    }
+    
+    window.deliveryBatches.splice(index, 1);
+    
+    // 重新编号
+    window.deliveryBatches.forEach((batch, idx) => {
+        batch.batch_no = idx + 1;
+    });
+    
+    renderBatches();
+}
+
+function updateBatch(index, field, value) {
+    if (field === 'quantity') {
+        value = parseInt(value) || 0;
+        
+        // 检查总数量不超过订单数量
+        const totalAllocated = window.deliveryBatches.reduce((sum, batch, idx) => {
+            return sum + (idx === index ? value : (parseInt(batch.quantity) || 0));
+        }, 0);
+        
+        if (totalAllocated > window.currentOrderItem.quantity) {
+            alert(`分批数量总和不能超过订单数量 ${window.currentOrderItem.quantity}`);
+            renderBatches(); // 重新渲染以恢复原值
+            return;
+        }
+    }
+    
+    window.deliveryBatches[index][field] = value;
+    
+    // 更新统计信息
+    if (field === 'quantity') {
+        const totalAllocated = window.deliveryBatches.reduce((sum, batch) => {
+            return sum + (parseInt(batch.quantity) || 0);
+        }, 0);
+        
+        document.getElementById('totalAllocated').textContent = totalAllocated;
+        document.getElementById('remaining').textContent = window.currentOrderItem.quantity - totalAllocated;
+    }
+}
+
+// 保存分批到货设置
+document.getElementById('saveDeliveryBatches').addEventListener('click', function() {
+    // 验证数据
+    const validBatches = window.deliveryBatches.filter(batch => {
+        return batch.delivery_date && batch.quantity && parseInt(batch.quantity) > 0;
+    });
+    
+    if (validBatches.length === 0) {
+        alert('请至少添加一个有效的分批记录');
+        return;
+    }
+    
+    // 检查总数量
+    const totalQuantity = validBatches.reduce((sum, batch) => {
+        return sum + parseInt(batch.quantity);
+    }, 0);
+    
+    if (totalQuantity > window.currentOrderItem.quantity) {
+        alert(`分批数量总和 ${totalQuantity} 超过了订单数量 ${window.currentOrderItem.quantity}`);
+        return;
+    }
+    
+    // 发送保存请求
+    fetch(`/sales_order_item/${window.currentItemId}/delivery_batches`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            batches: validBatches
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('分批到货设置保存成功');
+            
+            // 关闭模态框
+            const modal = bootstrap.Modal.getInstance(document.getElementById('deliveryBatchesModal'));
+            modal.hide();
+            
+            // 刷新页面以显示更新后的信息
+            location.reload();
+        } else {
+            alert('保存失败：' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('保存失败，请重试');
+    });
+});
 
 // 创建生产订单相关函数
 let currentCreateMode = 'sales'; // 'sales' 或 'item'

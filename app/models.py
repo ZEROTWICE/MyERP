@@ -1459,6 +1459,69 @@ class SalesOrderItem(db.Model):
         import json
         self.delivery_batches = json.dumps(batches, ensure_ascii=False)
     
+    @property
+    def delivery_status(self):
+        """获取分批到货状态"""
+        batches = self.delivery_batches_list
+        if not batches:
+            return 'not_set'  # 未设置
+        
+        from datetime import datetime, date
+        today = date.today()
+        
+        total_delivered = 0
+        overdue_count = 0
+        
+        for batch in batches:
+            delivery_date = batch.get('delivery_date')
+            if delivery_date:
+                try:
+                    if isinstance(delivery_date, str):
+                        delivery_date = datetime.strptime(delivery_date, '%Y-%m-%d').date()
+                    
+                    # 检查是否逾期（这里假设到货日期就是交付日期）
+                    if delivery_date < today:
+                        total_delivered += batch.get('quantity', 0)
+                    elif delivery_date < today:
+                        overdue_count += 1
+                except:
+                    pass
+        
+        if total_delivered >= self.quantity:
+            return 'completed'  # 已完成
+        elif total_delivered > 0:
+            return 'partial'    # 部分完成
+        elif overdue_count > 0:
+            return 'overdue'    # 有逾期
+        else:
+            return 'pending'    # 待交付
+    
+    @property
+    def delivery_progress(self):
+        """获取分批到货进度"""
+        batches = self.delivery_batches_list
+        if not batches:
+            return 0
+        
+        from datetime import datetime, date
+        today = date.today()
+        
+        delivered_quantity = 0
+        for batch in batches:
+            delivery_date = batch.get('delivery_date')
+            if delivery_date:
+                try:
+                    if isinstance(delivery_date, str):
+                        delivery_date = datetime.strptime(delivery_date, '%Y-%m-%d').date()
+                    
+                    # 如果到货日期已过，认为已交付
+                    if delivery_date <= today:
+                        delivered_quantity += batch.get('quantity', 0)
+                except:
+                    pass
+        
+        return min(100, int((delivered_quantity / self.quantity) * 100)) if self.quantity > 0 else 0
+    
     def __repr__(self):
         return f'<SalesOrderItem {self.id}: {self.product_name} x {self.quantity}>'
 

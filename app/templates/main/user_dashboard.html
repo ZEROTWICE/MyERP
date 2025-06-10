@@ -9,16 +9,27 @@
                 <div class="card-body">
                     <h4 class="card-title">欢迎，{{ employee.name }}</h4>
                     <div class="row">
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <p><strong>工号：</strong>{{ employee.employee_id }}</p>
                             <p><strong>部门：</strong>{{ employee.department }}</p>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <p><strong>职位：</strong>{{ employee.position }}</p>
-                            <p><strong>基本工资：</strong>{{ employee.base_salary }}</p>
+                            <p><strong>基本工资：</strong>¥{{ "%.2f"|format(employee.base_salary) }}</p>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <p><strong>系数：</strong>{{ employee.coefficient }}</p>
+                            <p><strong>当日工资：</strong><span class="text-success fw-bold">¥{{ "%.2f"|format(daily_salary) }}</span></p>
+                        </div>
+                        <div class="col-md-3">
+                            <p><strong>当月工资：</strong><span class="text-primary fw-bold">¥{{ "%.2f"|format(monthly_salary) }}</span></p>
+                            {% if is_inspector %}
+                            <p><strong>待处理质检：</strong>
+                                <span class="badge {% if pending_inspections > 0 %}bg-warning{% else %}bg-success{% endif %}">
+                                    {{ pending_inspections }}
+                                </span>
+                            </p>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
@@ -26,37 +37,71 @@
         </div>
     </div>
 
-    <!-- 最近任务 -->
+    {% if is_inspector %}
+    <!-- 质检任务 -->
     <div class="row mb-4">
         <div class="col-md-12">
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">最近任务</h5>
-                    <a href="{{ url_for('main.my_tasks') }}" class="btn btn-sm btn-primary">查看全部</a>
+                    <h5 class="mb-0"><i class="fas fa-clipboard-check me-2"></i>我的质检任务</h5>
+                    <a href="{{ url_for('main.quality_tasks') }}" class="btn btn-sm btn-primary">查看全部</a>
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
                         <table class="table table-hover">
                             <thead>
                                 <tr>
-                                    <th>分配时间</th>
-                                    <th>工序</th>
-                                    <th>数量</th>
-                                    <th>已完成</th>
-                                    <th>完成率</th>
-                                    <th>目标日期</th>
+                                    <th>任务编号</th>
+                                    <th>检验对象</th>
+                                    <th>检验类型</th>
+                                    <th>优先级</th>
+                                    <th>创建时间</th>
+                                    <th>截止时间</th>
                                     <th>状态</th>
+                                    <th>操作</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {% for task in recent_tasks %}
-                                <tr class="{% if task.is_overdue %}table-danger{% endif %}">
-                                    <td>{{ task.assigned_date.strftime('%Y-%m-%d %H:%M') }}</td>
-                                    <td>{{ task.process.process_name }}</td>
-                                    <td>{{ task.quantity }}</td>
-                                    <td>{{ task.completed_quantity }}</td>
-                                    <td>{{ "%.1f"|format(task.completion_rate) }}%</td>
-                                    <td>{{ task.target_date.strftime('%Y-%m-%d') }}</td>
+                                {% for task in inspection_tasks %}
+                                <tr>
+                                    <td>{{ task.global_sn }}</td>
+                                    <td>
+                                        {% if task.target_type == 'production_record' %}
+                                            生产记录
+                                        {% elif task.target_type == 'product' %}
+                                            成品
+                                        {% elif task.target_type == 'material' %}
+                                            原材料
+                                        {% else %}
+                                            {{ task.target_type }}
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if task.target_type == 'production_record' %}
+                                            <span class="badge bg-primary">生产质检</span>
+                                        {% elif task.target_type == 'product' %}
+                                            <span class="badge bg-success">成品质检</span>
+                                        {% elif task.target_type == 'material' %}
+                                            <span class="badge bg-info">材料质检</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if task.priority >= 2 %}
+                                            <span class="badge bg-danger">高</span>
+                                        {% elif task.priority == 1 %}
+                                            <span class="badge bg-warning">中</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">低</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ task.created_at.strftime('%m-%d %H:%M') }}</td>
+                                    <td>
+                                        {% if task.deadline %}
+                                            {{ task.deadline.strftime('%m-%d %H:%M') }}
+                                        {% else %}
+                                            无期限
+                                        {% endif %}
+                                    </td>
                                     <td>
                                         {% if task.status == 'pending' %}
                                             <span class="badge bg-warning">待开始</span>
@@ -68,10 +113,121 @@
                                             <span class="badge bg-secondary">已取消</span>
                                         {% endif %}
                                     </td>
+                                    <td>
+                                        {% if task.status == 'pending' %}
+                                            <button class="btn btn-sm btn-success me-1" 
+                                                    onclick="startInspection({{ task.id }})"
+                                                    title="开始质检">
+                                                <i class="fas fa-play"></i>
+                                            </button>
+                                        {% elif task.status == 'in_progress' %}
+                                            {% if task.record %}
+                                            <a href="{{ url_for('main.quality_inspection', record_id=task.record.id) }}" 
+                                               class="btn btn-sm btn-primary me-1"
+                                               title="继续质检">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                            {% endif %}
+                                        {% endif %}
+                                        <a href="{{ url_for('main.quality_task_detail', task_id=task.id) }}" 
+                                           class="btn btn-sm btn-outline-info"
+                                           title="查看详情">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                    </td>
                                 </tr>
                                 {% else %}
                                 <tr>
-                                    <td colspan="7" class="text-center">暂无任务</td>
+                                    <td colspan="8" class="text-center">暂无质检任务</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- 待完成任务 -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-clock text-warning me-2"></i>待完成任务</h5>
+                    <a href="{{ url_for('main.my_tasks') }}" class="btn btn-sm btn-warning">查看全部</a>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>工序</th>
+                                    <th>数量</th>
+                                    <th>已完成</th>
+                                    <th>目标日期</th>
+                                    <th>状态</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for task in pending_tasks %}
+                                <tr class="{% if task.is_overdue %}table-danger{% endif %}">
+                                    <td>{{ task.process.process_name }}</td>
+                                    <td>{{ task.quantity }}</td>
+                                    <td>{{ task.completed_quantity }}</td>
+                                    <td>{{ task.target_date.strftime('%m-%d') }}</td>
+                                    <td>
+                                        {% if task.status == 'pending' %}
+                                            <span class="badge bg-warning">待开始</span>
+                                        {% elif task.status == 'in_progress' %}
+                                            <span class="badge bg-primary">进行中</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="5" class="text-center text-muted">暂无待完成任务</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 已完成任务 -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-check-circle text-success me-2"></i>已完成任务</h5>
+                    <a href="{{ url_for('main.my_tasks') }}" class="btn btn-sm btn-success">查看全部</a>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>工序</th>
+                                    <th>数量</th>
+                                    <th>完成日期</th>
+                                    <th>状态</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for task in completed_tasks %}
+                                <tr>
+                                    <td>{{ task.process.process_name }}</td>
+                                    <td>{{ task.quantity }}</td>
+                                    <td>{{ task.assigned_date.strftime('%m-%d') }}</td>
+                                    <td>
+                                        <span class="badge bg-success">已完成</span>
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="4" class="text-center text-muted">暂无已完成任务</td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
@@ -170,4 +326,57 @@
         </div>
     </div>
 </div>
+
+{% if is_inspector %}
+<script>
+function startInspection(taskId) {
+    if (confirm('确定要开始这个质检任务吗？')) {
+        fetch(`/api/quality/tasks/${taskId}/start-inspection`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token() }}'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast('success', '质检任务已开始');
+                // 重定向到质检页面
+                if (data.record_id) {
+                    window.location.href = `/quality/inspection/${data.record_id}`;
+                } else {
+                    location.reload();
+                }
+            } else {
+                showToast('error', data.message || '开始质检任务失败');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showToast('error', '操作失败，请重试');
+        });
+    }
+}
+
+function showToast(type, message) {
+    // 简单的提示函数
+    const alert = document.createElement('div');
+    alert.className = `alert alert-${type === 'success' ? 'success' : 'danger'} alert-dismissible fade show position-fixed`;
+    alert.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+    alert.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    document.body.appendChild(alert);
+    
+    // 3秒后自动移除
+    setTimeout(() => {
+        if (alert.parentNode) {
+            alert.parentNode.removeChild(alert);
+        }
+    }, 3000);
+}
+</script>
+{% endif %}
 {% endblock %} 

@@ -1097,3 +1097,362 @@ def update_task(task_id):
         db.session.rollback()
         current_app.logger.error(f'更新质检任务失败: {str(e)}')
         return jsonify({'success': False, 'message': f'更新失败：{str(e)}'}), 500
+
+@bp.route('/api/quality/records', methods=['GET'])
+@login_required
+def get_inspection_records():
+    """获取质检记录列表API"""
+    try:
+        # 获取查询参数
+        search = request.args.get('search', '').strip()
+        type_filter = request.args.get('type', '').strip()
+        result_filter = request.args.get('result', '').strip()
+        inspector_id = request.args.get('inspector', '').strip()
+        start_date = request.args.get('start_date', '').strip()
+        end_date = request.args.get('end_date', '').strip()
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 20, type=int)
+        
+        # 构建查询
+        query = InspectionRecord.query
+        
+        # 搜索条件
+        if search:
+            query = query.filter(
+                db.or_(
+                    InspectionRecord.global_sn.like(f'%{search}%'),
+                    InspectionRecord.notes.like(f'%{search}%')
+                )
+            )
+        
+        # 类型筛选
+        if type_filter:
+            query = query.join(InspectionTask).filter(InspectionTask.target_type == type_filter)
+        
+        # 结果筛选
+        if result_filter:
+            query = query.filter(InspectionRecord.result == result_filter)
+        
+        # 检验员筛选
+        if inspector_id:
+            query = query.filter(InspectionRecord.inspector_id == int(inspector_id))
+        
+        # 日期范围筛选
+        if start_date:
+            try:
+                start_dt = datetime.strptime(start_date, '%Y-%m-%d')
+                query = query.filter(InspectionRecord.created_at >= start_dt)
+            except ValueError:
+                pass
+        
+        if end_date:
+            try:
+                end_dt = datetime.strptime(end_date, '%Y-%m-%d')
+                end_dt = end_dt.replace(hour=23, minute=59, second=59)
+                query = query.filter(InspectionRecord.created_at <= end_dt)
+            except ValueError:
+                pass
+        
+        # 权限控制
+        if current_user.role == 'inspector':
+            query = query.filter(InspectionRecord.inspector_id == current_user.id)
+        
+        # 排序
+        query = query.order_by(InspectionRecord.created_at.desc())
+        
+        # 分页
+        pagination = query.paginate(
+            page=page, 
+            per_page=per_page, 
+            error_out=False
+        )
+        
+        # 构造返回数据
+        records = []
+        for record in pagination.items:
+            # 获取检验对象名称
+            target_name = '未知'
+            if record.task:
+                target_name = get_inspection_target_name(record.task)
+            
+            # 获取检验员名称
+            inspector_name = record.inspector.employee.name if record.inspector and record.inspector.employee else (record.inspector.username if record.inspector else '未知')
+            
+            records.append({
+                'id': record.id,
+                'record_code': record.global_sn,
+                'type': record.task.target_type if record.task else 'unknown',
+                'inspection_target': target_name,
+                'inspector_name': inspector_name,
+                'inspection_time': record.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+                'result': record.result or 'pending',
+                'notes': record.notes or ''
+            })
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'items': records,
+                'page': page,
+                'pages': pagination.pages,
+                'per_page': per_page,
+                'total': pagination.total
+            }
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f'获取质检记录列表失败: {str(e)}')
+        return jsonify({'success': False, 'message': f'获取记录列表失败：{str(e)}'}), 500
+
+
+@bp.route('/api/quality/records/<int:record_id>', methods=['GET'])
+@login_required
+def get_inspection_record_detail(record_id):
+    """获取质检记录详情API"""
+    try:
+        record = InspectionRecord.query.get_or_404(record_id)
+        
+        # 权限控制
+        if current_user.role == 'inspector' and record.inspector_id != current_user.id:
+            return jsonify({'success': False, 'message': '权限不足'}), 403
+        
+        # 获取检验对象名称
+        target_name = '未知'
+        if record.task:
+            target_name = get_inspection_target_name(record.task)
+        
+        # 获取检验员名称
+        inspector_name = record.inspector.employee.name if record.inspector and record.inspector.employee else (record.inspector.username if record.inspector else '未知')
+        
+        # 获取检验项目记录
+        items = []
+        for item_record in record.item_records:
+            item = item_record.item
+            items.append({
+                'id': item.id,
+                'item_name': item.item_name,
+                'unit': item.unit or '',
+                'standard_value': item.standard_value or '',
+                'tolerance': item.tolerance or '',
+                'measured_value': item_record.measured_value,
+                'is_qualified': item_record.is_qualified,
+                'notes': item_record.notes or ''
+            })
+        
+        # 获取基本信息项目记录
+        base_items = []
+        for base_record in record.base_item_records:
+            base_item = base_record.base_item
+            base_items.append({
+                'id': base_item.id,
+                'item_name': base_item.item_name,
+                'value': base_record.value
+            })
+        
+        record_data = {
+            'id': record.id,
+            'record_code': record.global_sn,
+            'type': record.task.target_type if record.task else 'unknown',
+            'inspection_target': target_name,
+            'inspector_name': inspector_name,
+            'inspection_time': record.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+            'result': record.result or 'pending',
+            'notes': record.notes or '',
+            'items': items,
+            'base_items': base_items
+        }
+        
+        return jsonify({
+            'success': True,
+            'data': record_data
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f'获取质检记录详情失败: {str(e)}')
+        return jsonify({'success': False, 'message': f'获取记录详情失败：{str(e)}'}), 500
+
+@bp.route('/api/quality/records/<int:record_id>/print', methods=['GET'])
+@login_required
+def print_inspection_record(record_id):
+    """打印质检记录"""
+    try:
+        record = InspectionRecord.query.get_or_404(record_id)
+        
+        # 权限控制
+        if current_user.role not in ['admin', 'manager', 'inspector']:
+            return jsonify({'success': False, 'message': '权限不足'}), 403
+        
+        if current_user.role == 'inspector' and record.inspector_id != current_user.id:
+            return jsonify({'success': False, 'message': '权限不足'}), 403
+        
+        # 获取检验对象名称
+        target_name = '未知'
+        if record.task:
+            target_name = get_inspection_target_name(record.task)
+        
+        # 获取检验员名称
+        inspector_name = record.inspector.employee.name if record.inspector and record.inspector.employee else (record.inspector.username if record.inspector else '未知')
+        
+        # 获取检验项目记录
+        items = []
+        for item_record in record.item_records:
+            item = item_record.item
+            items.append({
+                'item_name': item.item_name,
+                'unit': item.unit or '',
+                'standard_value': item.standard_value or '',
+                'tolerance': item.tolerance or '',
+                'measured_value': item_record.measured_value,
+                'is_qualified': '合格' if item_record.is_qualified else '不合格',
+                'notes': item_record.notes or ''
+            })
+        
+        # 获取基本信息项目记录
+        base_items = []
+        for base_record in record.base_item_records:
+            base_item = base_record.base_item
+            base_items.append({
+                'item_name': base_item.item_name,
+                'value': base_record.value
+            })
+        
+        print_data = {
+            'record_code': record.global_sn,
+            'type': record.task.target_type if record.task else 'unknown',
+            'inspection_target': target_name,
+            'inspector_name': inspector_name,
+            'inspection_time': record.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+            'result': '合格' if record.result == 'pass' else '不合格',
+            'notes': record.notes or '',
+            'items': items,
+            'base_items': base_items
+        }
+        
+        return render_template('main/quality/print_record.html', record=print_data)
+        
+    except Exception as e:
+        current_app.logger.error(f'打印质检记录失败: {str(e)}')
+        return f'打印失败：{str(e)}', 500
+
+
+@bp.route('/api/quality/records/export', methods=['GET'])
+@login_required
+def export_inspection_records():
+    """导出质检记录"""
+    try:
+        # 检查权限
+        if current_user.role not in ['admin', 'manager']:
+            return jsonify({'success': False, 'message': '权限不足'}), 403
+        
+        # 获取查询参数（与列表查询相同的参数）
+        search = request.args.get('search', '').strip()
+        type_filter = request.args.get('type', '').strip()
+        result_filter = request.args.get('result', '').strip()
+        inspector_id = request.args.get('inspector', '').strip()
+        start_date = request.args.get('start_date', '').strip()
+        end_date = request.args.get('end_date', '').strip()
+        
+        # 构建查询（不分页，获取所有记录）
+        query = InspectionRecord.query
+        
+        # 搜索条件
+        if search:
+            query = query.filter(
+                db.or_(
+                    InspectionRecord.global_sn.like(f'%{search}%'),
+                    InspectionRecord.notes.like(f'%{search}%')
+                )
+            )
+        
+        # 类型筛选
+        if type_filter:
+            query = query.join(InspectionTask).filter(InspectionTask.target_type == type_filter)
+        
+        # 结果筛选
+        if result_filter:
+            query = query.filter(InspectionRecord.result == result_filter)
+        
+        # 检验员筛选
+        if inspector_id:
+            query = query.filter(InspectionRecord.inspector_id == int(inspector_id))
+        
+        # 日期范围筛选
+        if start_date:
+            try:
+                start_dt = datetime.strptime(start_date, '%Y-%m-%d')
+                query = query.filter(InspectionRecord.created_at >= start_dt)
+            except ValueError:
+                pass
+        
+        if end_date:
+            try:
+                end_dt = datetime.strptime(end_date, '%Y-%m-%d')
+                end_dt = end_dt.replace(hour=23, minute=59, second=59)
+                query = query.filter(InspectionRecord.created_at <= end_dt)
+            except ValueError:
+                pass
+        
+        # 排序
+        query = query.order_by(InspectionRecord.created_at.desc())
+        
+        # 获取所有记录
+        records = query.all()
+        
+        # 准备Excel数据
+        import pandas as pd
+        from io import BytesIO
+        
+        data = []
+        for record in records:
+            # 获取检验对象名称
+            target_name = '未知'
+            if record.task:
+                target_name = get_inspection_target_name(record.task)
+            
+            # 获取检验员名称
+            inspector_name = record.inspector.employee.name if record.inspector and record.inspector.employee else (record.inspector.username if record.inspector else '未知')
+            
+            # 获取类型名称
+            type_names = {
+                'production_record': '生产记录质检',
+                'product': '成品质检',
+                'material': '原材料质检'
+            }
+            type_name = type_names.get(record.task.target_type if record.task else 'unknown', '未知')
+            
+            data.append({
+                '记录编号': record.global_sn,
+                '检验类型': type_name,
+                '检验对象': target_name,
+                '检验员': inspector_name,
+                '检验时间': record.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+                '检验结果': '合格' if record.result == 'pass' else '不合格',
+                '备注': record.notes or ''
+            })
+        
+        # 创建DataFrame
+        df = pd.DataFrame(data)
+        
+        # 创建Excel文件
+        output = BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df.to_excel(writer, sheet_name='质检记录', index=False)
+        
+        output.seek(0)
+        
+        # 生成文件名
+        from datetime import datetime
+        filename = f'质检记录_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
+        
+        # 返回文件
+        from flask import send_file
+        return send_file(
+            output,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name=filename
+        )
+        
+    except Exception as e:
+        current_app.logger.error(f'导出质检记录失败: {str(e)}')
+        return jsonify({'success': False, 'message': f'导出失败：{str(e)}'}), 500
