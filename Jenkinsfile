@@ -8,7 +8,7 @@ pipeline {
         
         // 部署路径 - 根据实际情况修改
         DEPLOY_PATH = 'C:\\Deployed\\wage_management_system'
-        BACKUP_PATH = 'C:\\Apps\\backups\\wage_management_system'
+        BACKUP_PATH = 'C:\\Deployed\\backups\\wage_management_system'
         
         // Anaconda环境配置
         CONDA_ENV_NAME = 'OperaEnv_01'
@@ -415,4 +415,4 @@ pipeline {
             echo '⚠️ 部署完成但存在警告'
         }
     }
-} Deployed
+} 
