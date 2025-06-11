@@ -11,7 +11,8 @@ from app.main.forms import (
     BonusPenaltySearchForm, ExportEmployeeForm, ExportProcessForm,
     ExportProductionRecordForm, ExportBonusPenaltyForm, ExportTaskForm,
     CustomerForm, CustomerAddressForm, SalesOrderForm, SalesOrderItemForm,
-    ProductionOrderForm, NotificationRuleForm, NotificationTemplateForm
+    ProductionOrderForm, NotificationRuleForm, NotificationTemplateForm,
+    GlobalSearchForm, AdvancedSearchForm
 )
 from sqlalchemy import desc, or_
 from app.utils.excel_generator import ExcelGenerator
@@ -37,6 +38,8 @@ from openpyxl import load_workbook
 
 # 导入质量管理路由
 from .quality import *
+
+from app.services.search_service import SearchService
 
 def handle_pagination_args(f):
     @wraps(f)
@@ -2309,6 +2312,232 @@ def export_bonus_penalties():
                     pass
     
     return render_template('main/export_form.html', form=form, title='导出奖惩记录')
+
+@bp.route('/search', methods=['GET', 'POST'])
+@login_required
+def global_search():
+    """全局搜索页面"""
+    form = GlobalSearchForm()
+    search_results = None
+    
+    # 处理URL参数传递的搜索（快速搜索）
+    url_query = request.args.get('query')
+    if url_query and request.method == 'GET':
+        form.query.data = url_query
+        form.search_type.data = request.args.get('search_type', 'all')
+        
+        page = request.args.get('page', 1, type=int)
+        per_page = 20
+        
+        search_results = SearchService.global_search(
+            query=url_query,
+            search_type=form.search_type.data,
+            page=page,
+            per_page=per_page
+        )
+    elif form.validate_on_submit():
+        query = form.query.data
+        search_type = form.search_type.data
+        page = request.args.get('page', 1, type=int)
+        per_page = 20
+        
+        search_results = SearchService.global_search(
+            query=query,
+            search_type=search_type,
+            page=page,
+            per_page=per_page
+        )
+    
+    return render_template('main/search/global_search.html', 
+                         form=form, 
+                         search_results=search_results)
+
+@bp.route('/search/advanced', methods=['GET', 'POST'])
+@login_required
+def advanced_search():
+    """高级搜索页面"""
+    form = AdvancedSearchForm()
+    search_results = None
+    
+    if form.validate_on_submit():
+        # 构建搜索参数字典
+        search_params = {}
+        
+        # 员工搜索参数
+        if form.employee_name.data:
+            search_params['employee_name'] = form.employee_name.data
+        if form.employee_id.data:
+            search_params['employee_id'] = form.employee_id.data
+        if form.department.data:
+            search_params['department'] = form.department.data
+        if form.position.data:
+            search_params['position'] = form.position.data
+        if form.is_active.data:
+            search_params['is_active'] = form.is_active.data
+        
+        # 工序价格搜索参数
+        if form.process_code.data:
+            search_params['process_code'] = form.process_code.data
+        if form.process_name.data:
+            search_params['process_name'] = form.process_name.data
+        if form.component.data:
+            search_params['component'] = form.component.data
+        if form.drawing_no.data:
+            search_params['drawing_no'] = form.drawing_no.data
+        if form.model_no.data:
+            search_params['model_no'] = form.model_no.data
+        
+        # 生产记录搜索参数
+        if form.production_date_start.data:
+            search_params['production_date_start'] = form.production_date_start.data
+        if form.production_date_end.data:
+            search_params['production_date_end'] = form.production_date_end.data
+        
+        # 产品搜索参数
+        if form.product_code.data:
+            search_params['product_code'] = form.product_code.data
+        if form.product_name.data:
+            search_params['product_name'] = form.product_name.data
+        if form.drawing_number.data:
+            search_params['drawing_number'] = form.drawing_number.data
+        if form.model.data:
+            search_params['model'] = form.model.data
+        
+        # 库存搜索参数
+        if form.inventory_type.data:
+            search_params['inventory_type'] = form.inventory_type.data
+        if form.supplier.data:
+            search_params['supplier'] = form.supplier.data
+        if form.material_name.data:
+            search_params['material_name'] = form.material_name.data
+        if form.storage_date_start.data:
+            search_params['storage_date_start'] = form.storage_date_start.data
+        if form.storage_date_end.data:
+            search_params['storage_date_end'] = form.storage_date_end.data
+        
+        # 客户搜索参数
+        if form.customer_code.data:
+            search_params['customer_code'] = form.customer_code.data
+        if form.customer_name.data:
+            search_params['customer_name'] = form.customer_name.data
+        if form.contact_person.data:
+            search_params['contact_person'] = form.contact_person.data
+        if form.customer_type.data:
+            search_params['customer_type'] = form.customer_type.data
+        
+        # 销售订单搜索参数
+        if form.sales_order_number.data:
+            search_params['sales_order_number'] = form.sales_order_number.data
+        if form.order_source.data:
+            search_params['order_source'] = form.order_source.data
+        if form.year_month.data:
+            search_params['year_month'] = form.year_month.data
+        if form.order_status.data:
+            search_params['order_status'] = form.order_status.data
+        
+        # 生产订单搜索参数
+        if form.production_order_number.data:
+            search_params['production_order_number'] = form.production_order_number.data
+        if form.production_status.data:
+            search_params['production_status'] = form.production_status.data
+        if form.planned_start_date.data:
+            search_params['planned_start_date'] = form.planned_start_date.data
+        if form.planned_end_date.data:
+            search_params['planned_end_date'] = form.planned_end_date.data
+        
+        page = request.args.get('page', 1, type=int)
+        per_page = 20
+        
+        search_results = SearchService.advanced_search(
+            search_params=search_params,
+            page=page,
+            per_page=per_page
+        )
+    
+    return render_template('main/search/advanced_search.html', 
+                         form=form, 
+                         search_results=search_results)
+
+@bp.route('/api/search/suggestions')
+@login_required
+def search_suggestions():
+    """搜索建议API"""
+    query = request.args.get('q', '')
+    limit = request.args.get('limit', 10, type=int)
+    
+    if not query or len(query) < 2:
+        return jsonify({'suggestions': {}})
+    
+    suggestions = SearchService.get_search_suggestions(query, limit)
+    return jsonify({'suggestions': suggestions})
+
+@bp.route('/search/quick', methods=['POST'])
+@login_required
+def quick_search():
+    """快速搜索API"""
+    data = request.get_json()
+    query = data.get('query', '')
+    search_type = data.get('search_type', 'all')
+    
+    if not query:
+        return jsonify({'error': '请输入搜索关键词'}), 400
+    
+    # 只返回前5个结果用于快速预览
+    search_results = SearchService.global_search(
+        query=query,
+        search_type=search_type,
+        page=1,
+        per_page=5
+    )
+    
+    # 简化结果格式
+    simplified_results = {}
+    for category, results in search_results['results'].items():
+        simplified_results[category] = {
+            'total': results['total'],
+            'items': []
+        }
+        
+        for item in results['items']:
+            if category == 'employees':
+                simplified_results[category]['items'].append({
+                    'id': item.id,
+                    'name': item.name,
+                    'employee_id': item.employee_id,
+                    'department': item.department,
+                    'url': url_for('main.manage_employees') + f'?search={item.employee_id}'
+                })
+            elif category == 'process_prices':
+                simplified_results[category]['items'].append({
+                    'id': item.id,
+                    'process_name': item.process_name,
+                    'process_code': item.process_code,
+                    'price': item.price,
+                    'url': url_for('main.process_prices') + f'?search={item.process_code}'
+                })
+            elif category == 'products':
+                simplified_results[category]['items'].append({
+                    'id': item.id,
+                    'product_name': item.product_name,
+                    'product_code': item.product_code,
+                    'model': item.model,
+                    'url': url_for('main.manage_products') + f'?search={item.product_code}'
+                })
+            elif category == 'customers':
+                simplified_results[category]['items'].append({
+                    'id': item.id,
+                    'customer_name': item.customer_name,
+                    'customer_code': item.customer_code,
+                    'contact_person': item.contact_person,
+                    'url': url_for('main.customer_detail', customer_id=item.id)
+                })
+            # 可以继续添加其他类别的简化格式
+    
+    return jsonify({
+        'results': simplified_results,
+        'total_count': search_results['total_count'],
+        'query': query
+    })
 
 @bp.route('/tasks', methods=['GET', 'POST'])
 @login_required
@@ -5282,6 +5511,672 @@ def auto_archive_inventory():
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': f'自动存档失败: {str(e)}'})
+
+
+@bp.route('/inventory/inbound', methods=['GET', 'POST'])
+@login_required
+def inventory_inbound():
+    """批量入库管理"""
+    from app.main.forms import InventoryInboundForm
+    from app.models import RawMaterial, FinishedProduct, SerialNumber, AuditLog
+    
+    form = InventoryInboundForm()
+    
+    if request.method == 'POST':
+        try:
+            # 获取所有表单数据
+            form_data = request.form.to_dict()
+            
+            # 解析批量数据
+            rows_data = {}
+            for key, value in form_data.items():
+                if '_' in key and key != 'csrf_token':
+                    field_name, row_index = key.rsplit('_', 1)
+                    if row_index.isdigit():
+                        row_index = int(row_index)
+                        if row_index not in rows_data:
+                            rows_data[row_index] = {}
+                        rows_data[row_index][field_name] = value
+            
+            success_count = 0
+            error_messages = []
+            
+            # 处理每一行数据
+            for row_index, row_data in rows_data.items():
+                try:
+                    inventory_type = row_data.get('inventory_type', '').strip()
+                    if not inventory_type:
+                        continue
+                    
+                    quantity = float(row_data.get('quantity', 0))
+                    if quantity <= 0:
+                        error_messages.append(f'第 {row_index + 1} 行：数量无效')
+                        continue
+                    
+                    storage_date_str = row_data.get('storage_date', '')
+                    if not storage_date_str:
+                        error_messages.append(f'第 {row_index + 1} 行：入库日期不能为空')
+                        continue
+                    
+                    try:
+                        from datetime import datetime
+                        storage_date = datetime.strptime(storage_date_str, '%Y-%m-%d').date()
+                    except ValueError:
+                        error_messages.append(f'第 {row_index + 1} 行：日期格式错误')
+                        continue
+                    
+                    field1 = row_data.get('field1', '').strip()
+                    field2 = row_data.get('field2', '').strip()
+                    field3 = row_data.get('field3', '').strip()
+                    field4 = row_data.get('field4', '').strip()
+                    field5 = row_data.get('field5', '').strip()
+                    notes = row_data.get('notes', '').strip()
+                    has_sample = f'has_sample_{row_index}' in form_data
+                    
+                    if not field1 or not field2:
+                        error_messages.append(f'第 {row_index + 1} 行：必填字段不能为空')
+                        continue
+                    
+                    if inventory_type == 'raw':
+                        # 原材料入库
+                        if not field4:  # 供应商编号
+                            error_messages.append(f'第 {row_index + 1} 行：供应商编号不能为空')
+                            continue
+                        
+                        # 自动生成内部编号
+                        internal_number = field5 if field5 else SerialNumber.get_next_number()
+                        
+                        raw_material = RawMaterial(
+                            supplier=field1,           # 供应商
+                            material_name=field2,      # 品名
+                            quantity=quantity,
+                            storage_date=storage_date,
+                            melt_number=field3 if field3 else '',        # 冶炼炉号
+                            supplier_number=field4,    # 供应商编号
+                            internal_number=internal_number,
+                            has_sample=has_sample,
+                            notes=notes,
+                            status='in_stock'
+                        )
+                        
+                        db.session.add(raw_material)
+                        db.session.flush()  # 获取ID
+                        
+                        # 记录审计日志
+                        audit_log = AuditLog(
+                            user_id=current_user.id,
+                            action='原材料入库',
+                            details=f'入库原材料：{raw_material.material_name}，数量：{raw_material.quantity}',
+                            can_rollback=True,
+                            rollback_type='delete',
+                            target_model='RawMaterial',
+                            target_id=raw_material.id,
+                            new_data={
+                                'supplier': raw_material.supplier,
+                                'material_name': raw_material.material_name,
+                                'quantity': float(raw_material.quantity),
+                                'storage_date': raw_material.storage_date.isoformat()
+                            }
+                        )
+                        db.session.add(audit_log)
+                        success_count += 1
+                        
+                    elif inventory_type == 'finished':
+                        # 成品入库
+                        if not field3 or not field4 or not field5:
+                            error_messages.append(f'第 {row_index + 1} 行：成品信息不完整')
+                            continue
+                        
+                        try:
+                            production_date = datetime.strptime(field5, '%Y-%m-%d').date()
+                        except ValueError:
+                            error_messages.append(f'第 {row_index + 1} 行：生产日期格式错误')
+                            continue
+                        
+                        finished_product = FinishedProduct(
+                            product_number=field1,     # 产品编号
+                            drawing_number=field2,     # 图号
+                            model=field3,              # 型号
+                            quantity=int(quantity),
+                            storage_date=storage_date,
+                            inspector=field4,          # 检验员
+                            production_date=production_date,
+                            notes=notes,
+                            status='in_stock'
+                        )
+                        
+                        db.session.add(finished_product)
+                        db.session.flush()  # 获取ID
+                        
+                        # 记录审计日志
+                        audit_log = AuditLog(
+                            user_id=current_user.id,
+                            action='成品入库',
+                            details=f'入库成品：{finished_product.product_number}，数量：{finished_product.quantity}',
+                            can_rollback=True,
+                            rollback_type='delete',
+                            target_model='FinishedProduct',
+                            target_id=finished_product.id,
+                            new_data={
+                                'product_number': finished_product.product_number,
+                                'drawing_number': finished_product.drawing_number,
+                                'model': finished_product.model,
+                                'quantity': finished_product.quantity,
+                                'production_date': finished_product.production_date.isoformat()
+                            }
+                        )
+                        db.session.add(audit_log)
+                        success_count += 1
+                
+                except Exception as e:
+                    error_messages.append(f'第 {row_index + 1} 行处理失败: {str(e)}')
+            
+            # 提交数据库事务
+            if success_count > 0:
+                db.session.commit()
+                flash(f'批量入库成功！共处理 {success_count} 条记录', 'success')
+            
+            if error_messages:
+                flash(f'部分记录处理失败：\n' + '\n'.join(error_messages), 'warning')
+            
+            if success_count == 0 and not error_messages:
+                flash('没有有效的入库数据', 'warning')
+            
+            return redirect(url_for('main.inventory_inbound'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'批量入库失败: {str(e)}', 'danger')
+    
+    return render_template('main/inventory_inbound.html', form=form)
+
+
+@bp.route('/inventory/raw-material/inbound', methods=['GET', 'POST'])
+@login_required
+def raw_material_inbound():
+    """原材料批量入库管理"""
+    from app.main.forms import RawMaterialInboundForm
+    from app.models import RawMaterial, SerialNumber, AuditLog
+    
+    form = RawMaterialInboundForm()
+    
+    if request.method == 'POST':
+        try:
+            # 获取所有表单数据
+            form_data = request.form.to_dict()
+            
+            # 解析批量数据
+            rows_data = {}
+            for key, value in form_data.items():
+                if '_' in key and key != 'csrf_token':
+                    field_name, row_index = key.rsplit('_', 1)
+                    if row_index.isdigit():
+                        row_index = int(row_index)
+                        if row_index not in rows_data:
+                            rows_data[row_index] = {}
+                        rows_data[row_index][field_name] = value
+            
+            success_count = 0
+            error_messages = []
+            
+            # 处理每一行数据
+            for row_index, row_data in rows_data.items():
+                try:
+                    supplier = row_data.get('supplier', '').strip()
+                    material_name = row_data.get('material_name', '').strip()
+                    supplier_number = row_data.get('supplier_number', '').strip()
+                    
+                    if not supplier or not material_name or not supplier_number:
+                        error_messages.append(f'第 {row_index + 1} 行：供应商、品名、供应商编号不能为空')
+                        continue
+                    
+                    quantity = float(row_data.get('quantity', 0))
+                    if quantity <= 0:
+                        error_messages.append(f'第 {row_index + 1} 行：数量无效')
+                        continue
+                    
+                    storage_date_str = row_data.get('storage_date', '')
+                    if not storage_date_str:
+                        error_messages.append(f'第 {row_index + 1} 行：入库日期不能为空')
+                        continue
+                    
+                    try:
+                        from datetime import datetime
+                        storage_date = datetime.strptime(storage_date_str, '%Y-%m-%d').date()
+                    except ValueError:
+                        error_messages.append(f'第 {row_index + 1} 行：日期格式错误')
+                        continue
+                    
+                    melt_number = row_data.get('melt_number', '').strip()
+                    internal_number = row_data.get('internal_number', '').strip()
+                    notes = row_data.get('notes', '').strip()
+                    has_sample = f'has_sample_{row_index}' in form_data
+                    
+                    # 自动生成内部编号
+                    if not internal_number:
+                        internal_number = SerialNumber.get_next_number()
+                    
+                    # 获取品类ID
+                    category_id = form_data.get(f'category_id_{row_index}')
+                    if category_id and category_id.strip():
+                        try:
+                            category_id = int(category_id)
+                        except ValueError:
+                            category_id = None
+                    else:
+                        category_id = None
+                    
+                    raw_material = RawMaterial(
+                        supplier=supplier,
+                        material_name=material_name,
+                        quantity=quantity,
+                        storage_date=storage_date,
+                        melt_number=melt_number,
+                        supplier_number=supplier_number,
+                        internal_number=internal_number,
+                        has_sample=has_sample,
+                        notes=notes,
+                        status='in_stock',
+                        category_id=category_id
+                    )
+                    
+                    db.session.add(raw_material)
+                    db.session.flush()  # 获取ID
+                    
+                    # 记录审计日志
+                    audit_log = AuditLog(
+                        user_id=current_user.id,
+                        action='原材料入库',
+                        details=f'入库原材料：{raw_material.material_name}，数量：{raw_material.quantity}',
+                        can_rollback=True,
+                        rollback_type='delete',
+                        target_model='RawMaterial',
+                        target_id=raw_material.id,
+                        new_data={
+                            'supplier': raw_material.supplier,
+                            'material_name': raw_material.material_name,
+                            'quantity': float(raw_material.quantity),
+                            'storage_date': raw_material.storage_date.isoformat()
+                        }
+                    )
+                    db.session.add(audit_log)
+                    success_count += 1
+                
+                except Exception as e:
+                    error_messages.append(f'第 {row_index + 1} 行处理失败: {str(e)}')
+            
+            # 提交数据库事务
+            if success_count > 0:
+                db.session.commit()
+                flash(f'原材料批量入库成功！共处理 {success_count} 条记录', 'success')
+            
+            if error_messages:
+                flash(f'部分记录处理失败：\n' + '\n'.join(error_messages), 'warning')
+            
+            if success_count == 0 and not error_messages:
+                flash('没有有效的入库数据', 'warning')
+            
+            return redirect(url_for('main.raw_material_inbound'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'原材料批量入库失败: {str(e)}', 'danger')
+    
+    return render_template('main/raw_material_inbound.html', form=form)
+
+
+@bp.route('/inventory/finished-product/inbound', methods=['GET', 'POST'])
+@login_required
+def finished_product_inbound():
+    """成品批量入库管理"""
+    from app.main.forms import FinishedProductInboundForm
+    from app.models import FinishedProduct, AuditLog
+    
+    form = FinishedProductInboundForm()
+    
+    if request.method == 'POST':
+        try:
+            # 获取所有表单数据
+            form_data = request.form.to_dict()
+            
+            # 解析批量数据
+            rows_data = {}
+            for key, value in form_data.items():
+                if '_' in key and key != 'csrf_token':
+                    field_name, row_index = key.rsplit('_', 1)
+                    if row_index.isdigit():
+                        row_index = int(row_index)
+                        if row_index not in rows_data:
+                            rows_data[row_index] = {}
+                        rows_data[row_index][field_name] = value
+            
+            success_count = 0
+            error_messages = []
+            
+            # 处理每一行数据
+            for row_index, row_data in rows_data.items():
+                try:
+                    product_number = row_data.get('product_number', '').strip()
+                    drawing_number = row_data.get('drawing_number', '').strip()
+                    model = row_data.get('model', '').strip()
+                    inspector = row_data.get('inspector', '').strip()
+                    production_date_str = row_data.get('production_date', '')
+                    
+                    if not product_number or not drawing_number or not model or not inspector or not production_date_str:
+                        error_messages.append(f'第 {row_index + 1} 行：产品编号、图号、型号、检验员、生产日期不能为空')
+                        continue
+                    
+                    quantity = int(row_data.get('quantity', 0))
+                    if quantity <= 0:
+                        error_messages.append(f'第 {row_index + 1} 行：数量无效')
+                        continue
+                    
+                    storage_date_str = row_data.get('storage_date', '')
+                    if not storage_date_str:
+                        error_messages.append(f'第 {row_index + 1} 行：入库日期不能为空')
+                        continue
+                    
+                    try:
+                        from datetime import datetime
+                        storage_date = datetime.strptime(storage_date_str, '%Y-%m-%d').date()
+                        production_date = datetime.strptime(production_date_str, '%Y-%m-%d').date()
+                    except ValueError:
+                        error_messages.append(f'第 {row_index + 1} 行：日期格式错误')
+                        continue
+                    
+                    notes = row_data.get('notes', '').strip()
+                    
+                    finished_product = FinishedProduct(
+                        product_number=product_number,
+                        drawing_number=drawing_number,
+                        model=model,
+                        quantity=quantity,
+                        storage_date=storage_date,
+                        inspector=inspector,
+                        production_date=production_date,
+                        notes=notes,
+                        status='in_stock'
+                    )
+                    
+                    db.session.add(finished_product)
+                    db.session.flush()  # 获取ID
+                    
+                    # 记录审计日志
+                    audit_log = AuditLog(
+                        user_id=current_user.id,
+                        action='成品入库',
+                        details=f'入库成品：{finished_product.product_number}，数量：{finished_product.quantity}',
+                        can_rollback=True,
+                        rollback_type='delete',
+                        target_model='FinishedProduct',
+                        target_id=finished_product.id,
+                        new_data={
+                            'product_number': finished_product.product_number,
+                            'drawing_number': finished_product.drawing_number,
+                            'model': finished_product.model,
+                            'quantity': finished_product.quantity,
+                            'production_date': finished_product.production_date.isoformat()
+                        }
+                    )
+                    db.session.add(audit_log)
+                    success_count += 1
+                
+                except Exception as e:
+                    error_messages.append(f'第 {row_index + 1} 行处理失败: {str(e)}')
+            
+            # 提交数据库事务
+            if success_count > 0:
+                db.session.commit()
+                flash(f'成品批量入库成功！共处理 {success_count} 条记录', 'success')
+            
+            if error_messages:
+                flash(f'部分记录处理失败：\n' + '\n'.join(error_messages), 'warning')
+            
+            if success_count == 0 and not error_messages:
+                flash('没有有效的入库数据', 'warning')
+            
+            return redirect(url_for('main.finished_product_inbound'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'成品批量入库失败: {str(e)}', 'danger')
+    
+    return render_template('main/finished_product_inbound.html', form=form)
+
+
+@bp.route('/inventory/raw-material/categories')
+@login_required
+def raw_material_categories():
+    """原材料品类管理"""
+    from app.models import RawMaterialCategory
+    from app.main.forms import RawMaterialCategoryForm
+    
+    categories = RawMaterialCategory.query.order_by(RawMaterialCategory.created_at.desc()).all()
+    form = RawMaterialCategoryForm()
+    
+    return render_template('main/raw_material_categories.html', categories=categories, form=form)
+
+
+@bp.route('/inventory/raw-material/categories/add', methods=['POST'])
+@login_required
+def add_raw_material_category():
+    """添加原材料品类"""
+    from app.models import RawMaterialCategory, AuditLog
+    from app.main.forms import RawMaterialCategoryForm
+    
+    if current_user.role not in ['admin', 'manager']:
+        return jsonify({'success': False, 'message': '权限不足'})
+    
+    try:
+        data = request.json if request.is_json else request.form.to_dict()
+        
+        # 验证必填字段
+        if not data.get('name') or not data.get('code'):
+            return jsonify({'success': False, 'message': '品类名称和编码不能为空'})
+        
+        # 检查名称和编码是否已存在
+        existing_name = RawMaterialCategory.query.filter_by(name=data['name']).first()
+        if existing_name:
+            return jsonify({'success': False, 'message': '品类名称已存在'})
+        
+        existing_code = RawMaterialCategory.query.filter_by(code=data['code']).first()
+        if existing_code:
+            return jsonify({'success': False, 'message': '品类编码已存在'})
+        
+        # 创建新品类
+        category = RawMaterialCategory(
+            name=data['name'].strip(),
+            code=data['code'].strip(),
+            description=data.get('description', '').strip(),
+            is_active=data.get('is_active', True),
+            created_by=current_user.id
+        )
+        
+        db.session.add(category)
+        db.session.flush()  # 获取ID
+        
+        # 记录审计日志
+        audit_log = AuditLog(
+            user_id=current_user.id,
+            action='添加原材料品类',
+            details=f'添加原材料品类：{category.name} ({category.code})',
+            can_rollback=True,
+            rollback_type='delete',
+            target_model='RawMaterialCategory',
+            target_id=category.id,
+            new_data=category.to_dict()
+        )
+        db.session.add(audit_log)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': '品类添加成功',
+            'data': category.to_dict()
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'添加失败：{str(e)}'})
+
+
+@bp.route('/inventory/raw-material/categories/<int:category_id>', methods=['GET'])
+@login_required
+def get_raw_material_category(category_id):
+    """获取原材料品类详情"""
+    from app.models import RawMaterialCategory
+    
+    try:
+        category = RawMaterialCategory.query.get_or_404(category_id)
+        return jsonify({
+            'success': True,
+            'data': category.to_dict()
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'获取品类详情失败：{str(e)}'})
+
+
+@bp.route('/inventory/raw-material/categories/<int:category_id>', methods=['PUT'])
+@login_required
+def update_raw_material_category(category_id):
+    """更新原材料品类"""
+    from app.models import RawMaterialCategory, AuditLog
+    
+    if current_user.role not in ['admin', 'manager']:
+        return jsonify({'success': False, 'message': '权限不足'})
+    
+    try:
+        category = RawMaterialCategory.query.get_or_404(category_id)
+        data = request.json
+        
+        if not data:
+            return jsonify({'success': False, 'message': '请求数据为空'})
+        
+        # 保存旧数据
+        old_data = category.to_dict()
+        
+        # 检查名称和编码是否已被其他品类使用
+        if data.get('name') and data['name'] != category.name:
+            existing_name = RawMaterialCategory.query.filter(
+                RawMaterialCategory.name == data['name'],
+                RawMaterialCategory.id != category_id
+            ).first()
+            if existing_name:
+                return jsonify({'success': False, 'message': '品类名称已存在'})
+        
+        if data.get('code') and data['code'] != category.code:
+            existing_code = RawMaterialCategory.query.filter(
+                RawMaterialCategory.code == data['code'],
+                RawMaterialCategory.id != category_id
+            ).first()
+            if existing_code:
+                return jsonify({'success': False, 'message': '品类编码已存在'})
+        
+        # 更新数据
+        category.name = data.get('name', category.name).strip()
+        category.code = data.get('code', category.code).strip()
+        category.description = data.get('description', category.description).strip()
+        category.is_active = data.get('is_active', category.is_active)
+        category.updated_at = datetime.utcnow()
+        
+        # 记录审计日志
+        audit_log = AuditLog(
+            user_id=current_user.id,
+            action='更新原材料品类',
+            details=f'更新原材料品类：{category.name} ({category.code})',
+            can_rollback=True,
+            rollback_type='edit',
+            target_model='RawMaterialCategory',
+            target_id=category.id,
+            old_data=old_data,
+            new_data=category.to_dict()
+        )
+        db.session.add(audit_log)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': '品类更新成功',
+            'data': category.to_dict()
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'更新失败：{str(e)}'})
+
+
+@bp.route('/inventory/raw-material/categories/<int:category_id>', methods=['DELETE'])
+@login_required
+def delete_raw_material_category(category_id):
+    """删除原材料品类"""
+    from app.models import RawMaterialCategory, AuditLog
+    
+    if current_user.role not in ['admin', 'manager']:
+        return jsonify({'success': False, 'message': '权限不足'})
+    
+    try:
+        category = RawMaterialCategory.query.get_or_404(category_id)
+        
+        # 检查是否有原材料使用此品类
+        if category.raw_materials.count() > 0:
+            return jsonify({'success': False, 'message': f'无法删除，该品类下还有 {category.raw_materials.count()} 个原材料'})
+        
+        # 保存数据用于审计日志
+        category_data = category.to_dict()
+        
+        # 记录审计日志
+        audit_log = AuditLog(
+            user_id=current_user.id,
+            action='删除原材料品类',
+            details=f'删除原材料品类：{category.name} ({category.code})',
+            can_rollback=True,
+            rollback_type='add',
+            target_model='RawMaterialCategory',
+            target_id=category.id,
+            old_data=category_data
+        )
+        db.session.add(audit_log)
+        
+        # 删除品类
+        db.session.delete(category)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': '品类删除成功'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'删除失败：{str(e)}'})
+
+
+@bp.route('/api/raw-material-categories', methods=['GET'])
+@login_required
+def get_raw_material_categories_api():
+    """获取原材料品类列表API"""
+    from app.models import RawMaterialCategory
+    
+    try:
+        categories = RawMaterialCategory.query.filter_by(is_active=True).order_by(RawMaterialCategory.name).all()
+        
+        result = []
+        for category in categories:
+            result.append({
+                'id': category.id,
+                'name': category.name,
+                'code': category.code,
+                'description': category.description
+            })
+        
+        return jsonify({
+            'success': True,
+            'data': result
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'获取品类列表失败：{str(e)}'})
+
 
 # 产品管理路由
 @bp.route('/products')

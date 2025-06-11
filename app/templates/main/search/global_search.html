@@ -1,0 +1,617 @@
+{% extends "base.html" %}
+
+{% block title %}全局搜索{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">全局搜索</h5>
+                    <a href="{{ url_for('main.advanced_search') }}" class="btn btn-outline-primary btn-sm">高级搜索</a>
+                </div>
+                <div class="card-body">
+                    <!-- 搜索表单 -->
+                    <form method="POST" class="mb-4">
+                        {{ form.hidden_tag() }}
+                        <div class="row align-items-end">
+                            <div class="col-md-6">
+                                {{ form.query.label(class="form-label") }}
+                                <div class="position-relative">
+                                    {{ form.query(class="form-control", placeholder="输入关键词搜索...", id="searchInput") }}
+                                    <div id="searchSuggestions" class="search-suggestions" style="display: none;"></div>
+                                </div>
+                                {% for error in form.query.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                            <div class="col-md-4">
+                                {{ form.search_type.label(class="form-label") }}
+                                {{ form.search_type(class="form-select") }}
+                            </div>
+                            <div class="col-md-2">
+                                <button type="submit" class="btn btn-primary w-100">搜索</button>
+                            </div>
+                        </div>
+                    </form>
+                    
+                    <!-- 搜索结果 -->
+                    {% if search_results %}
+                    <div class="search-results">
+                        <!-- 搜索结果概要 -->
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div>
+                                <h6 class="mb-1">搜索结果</h6>
+                                <p class="text-muted small mb-0">
+                                    关键词: <strong>"{{ search_results.query }}"</strong> | 共 {{ search_results.total_count }} 条结果
+                                </p>
+                            </div>
+                            <div class="btn-group btn-group-sm" role="group">
+                                <button type="button" class="btn btn-outline-secondary active" onclick="showAllResults()">全部</button>
+                                {% for category in search_results.results.keys() %}
+                                {% if search_results.results[category].total > 0 %}
+                                <button type="button" class="btn btn-outline-secondary" onclick="showCategoryResults('{{ category }}')">
+                                    {% if category == 'employees' %}员工
+                                    {% elif category == 'process_prices' %}工序
+                                    {% elif category == 'production_records' %}生产
+                                    {% elif category == 'products' %}产品
+                                    {% elif category == 'inventory' %}库存
+                                    {% elif category == 'customers' %}客户
+                                    {% elif category == 'sales_orders' %}销售
+                                    {% elif category == 'production_orders' %}订单
+                                    {% else %}{{ category }}{% endif %}
+                                    ({{ search_results.results[category].total }})
+                                </button>
+                                {% endif %}
+                                {% endfor %}
+                            </div>
+                        </div>
+                        
+                        <!-- 员工搜索结果 -->
+                        {% if 'employees' in search_results.results %}
+                        <div class="result-category mb-4" id="employees-results">
+                            <h6 class="text-secondary mb-3">员工信息 ({{ search_results.results.employees.total }})</h6>
+                            {% if search_results.results.employees['items'] %}
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>姓名</th>
+                                            <th>工号</th>
+                                            <th>部门</th>
+                                            <th>职位</th>
+                                            <th>状态</th>
+                                            <th>操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for employee in search_results.results.employees['items'] %}
+                                        <tr>
+                                            <td>{{ employee.name }}</td>
+                                            <td>{{ employee.employee_id }}</td>
+                                            <td>{{ employee.department or '-' }}</td>
+                                            <td>{{ employee.position }}</td>
+                                            <td>
+                                                <span class="badge bg-{{ 'success' if employee.is_active else 'secondary' }}">
+                                                    {{ '在职' if employee.is_active else '离职' }}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <a href="{{ url_for('main.manage_employees') }}?search={{ employee.employee_id }}" 
+                                                   class="btn btn-sm btn-outline-primary">查看</a>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% else %}
+                            <p class="text-muted">没有找到相关员工信息</p>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                        
+                        <!-- 工序价格搜索结果 -->
+                        {% if 'process_prices' in search_results.results %}
+                        <div class="result-category mb-4" id="process_prices-results">
+                            <h6 class="text-secondary mb-3">工序价格 ({{ search_results.results.process_prices.total }})</h6>
+                            {% if search_results.results.process_prices['items'] %}
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>工序编号</th>
+                                            <th>工序名称</th>
+                                            <th>部件</th>
+                                            <th>图号</th>
+                                            <th>型号</th>
+                                            <th>价格</th>
+                                            <th>操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for process in search_results.results.process_prices['items'] %}
+                                        <tr>
+                                            <td>{{ process.process_code }}</td>
+                                            <td>{{ process.process_name }}</td>
+                                            <td>{{ process.component or '-' }}</td>
+                                            <td>{{ process.drawing_no or '-' }}</td>
+                                            <td>{{ process.model_no or '-' }}</td>
+                                            <td>¥{{ "%.2f"|format(process.price) }}</td>
+                                            <td>
+                                                <a href="{{ url_for('main.process_prices') }}?search={{ process.process_code }}" 
+                                                   class="btn btn-sm btn-outline-primary">查看</a>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% else %}
+                            <p class="text-muted">没有找到相关工序价格信息</p>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                        
+                        <!-- 产品搜索结果 -->
+                        {% if 'products' in search_results.results %}
+                        <div class="result-category mb-4" id="products-results">
+                            <h6 class="text-secondary mb-3">产品管理 ({{ search_results.results.products.total }})</h6>
+                            {% if search_results.results.products['items'] %}
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>产品名称</th>
+                                            <th>产品编码</th>
+                                            <th>图号</th>
+                                            <th>型号</th>
+                                            <th>类别</th>
+                                            <th>操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for product in search_results.results.products['items'] %}
+                                        <tr>
+                                            <td>{{ product.product_name }}</td>
+                                            <td>{{ product.product_code }}</td>
+                                            <td>{{ product.drawing_number or '-' }}</td>
+                                            <td>{{ product.model or '-' }}</td>
+                                            <td>{{ product.category or '-' }}</td>
+                                            <td>
+                                                <a href="{{ url_for('main.manage_products') }}?search={{ product.product_code }}" 
+                                                   class="btn btn-sm btn-outline-primary">查看</a>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% else %}
+                            <p class="text-muted">没有找到相关产品信息</p>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                        
+                        <!-- 客户搜索结果 -->
+                        {% if 'customers' in search_results.results %}
+                        <div class="result-category mb-4" id="customers-results">
+                            <h6 class="text-secondary mb-3">客户管理 ({{ search_results.results.customers.total }})</h6>
+                            {% if search_results.results.customers['items'] %}
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>客户名称</th>
+                                            <th>客户编码</th>
+                                            <th>联系人</th>
+                                            <th>联系电话</th>
+                                            <th>客户类型</th>
+                                            <th>操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for customer in search_results.results.customers['items'] %}
+                                        <tr>
+                                            <td>{{ customer.customer_name }}</td>
+                                            <td>{{ customer.customer_code }}</td>
+                                            <td>{{ customer.contact_person or '-' }}</td>
+                                            <td>{{ customer.contact_phone or '-' }}</td>
+                                            <td>
+                                                <span class="badge bg-{{ 'primary' if customer.customer_type == 'enterprise' else 'secondary' }}">
+                                                    {{ '企业' if customer.customer_type == 'enterprise' else '个人' }}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <a href="{{ url_for('main.customer_detail', customer_id=customer.id) }}" 
+                                                   class="btn btn-sm btn-outline-primary">查看</a>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% else %}
+                            <p class="text-muted">没有找到相关客户信息</p>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                        
+                        <!-- 生产记录搜索结果 -->
+                        {% if 'production_records' in search_results.results %}
+                        <div class="result-category mb-4" id="production_records-results">
+                            <h6 class="text-secondary mb-3">生产记录 ({{ search_results.results.production_records.total }})</h6>
+                            {% if search_results.results.production_records['items'] %}
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>员工</th>
+                                            <th>工序</th>
+                                            <th>数量</th>
+                                            <th>日期</th>
+                                            <th>操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for record in search_results.results.production_records['items'] %}
+                                        <tr>
+                                            <td>{{ record.employee.name }} ({{ record.employee.employee_id }})</td>
+                                            <td>{{ record.process_price.process_name }}</td>
+                                            <td>{{ record.quantity }}</td>
+                                            <td>{{ record.date.strftime('%Y-%m-%d') }}</td>
+                                            <td>
+                                                <a href="{{ url_for('main.manage_production_records') }}" 
+                                                   class="btn btn-sm btn-outline-primary">查看</a>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% else %}
+                            <p class="text-muted">没有找到相关生产记录</p>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                        
+                        <!-- 库存搜索结果 -->
+                        {% if 'inventory' in search_results.results %}
+                        <div class="result-category mb-4" id="inventory-results">
+                            <h6 class="text-secondary mb-3">库存管理 ({{ search_results.results.inventory.total }})</h6>
+                            {% if search_results.results.inventory['items'] %}
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>名称</th>
+                                            <th>类型</th>
+                                            <th>详细信息</th>
+                                            <th>操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for item_data in search_results.results.inventory['items'] %}
+                                        <tr>
+                                            <td>{{ item_data.display_name }}</td>
+                                            <td>
+                                                <span class="badge bg-{{ 'info' if item_data.type == 'raw_material' else 'success' }}">
+                                                    {{ '原材料' if item_data.type == 'raw_material' else '成品' }}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                {% if item_data.type == 'raw_material' %}
+                                                    供应商: {{ item_data.item.supplier }}
+                                                    {% if item_data.item.melt_number %} | 熔炼号: {{ item_data.item.melt_number }}{% endif %}
+                                                {% else %}
+                                                    {% if item_data.item.drawing_number %}图号: {{ item_data.item.drawing_number }}{% endif %}
+                                                    {% if item_data.item.model %} | 型号: {{ item_data.item.model }}{% endif %}
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <a href="{{ url_for('main.manage_inventory') }}" 
+                                                   class="btn btn-sm btn-outline-primary">查看</a>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% else %}
+                            <p class="text-muted">没有找到相关库存信息</p>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                        
+                        <!-- 销售订单搜索结果 -->
+                        {% if 'sales_orders' in search_results.results %}
+                        <div class="result-category mb-4" id="sales_orders-results">
+                            <h6 class="text-secondary mb-3">销售订单 ({{ search_results.results.sales_orders.total }})</h6>
+                            {% if search_results.results.sales_orders['items'] %}
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>订单编号</th>
+                                            <th>客户</th>
+                                            <th>订单来源</th>
+                                            <th>状态</th>
+                                            <th>下单时间</th>
+                                            <th>操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for order in search_results.results.sales_orders['items'] %}
+                                        <tr>
+                                            <td>{{ order.order_number }}</td>
+                                            <td>{{ order.customer.customer_name }}</td>
+                                            <td>{{ order.order_source }}</td>
+                                            <td>
+                                                <span class="badge bg-{% if order.status == 'completed' %}success{% elif order.status == 'pending' %}warning{% elif order.status == 'cancelled' %}danger{% else %}info{% endif %}">
+                                                    {% if order.status == 'pending' %}待处理
+                                                    {% elif order.status == 'confirmed' %}已确认
+                                                    {% elif order.status == 'in_production' %}生产中
+                                                    {% elif order.status == 'completed' %}已完成
+                                                    {% elif order.status == 'cancelled' %}已取消
+                                                    {% else %}{{ order.status }}{% endif %}
+                                                </span>
+                                            </td>
+                                            <td>{{ order.order_date.strftime('%Y-%m-%d') if order.order_date else '-' }}</td>
+                                            <td>
+                                                <a href="{{ url_for('main.sales_order_detail', order_id=order.id) }}" 
+                                                   class="btn btn-sm btn-outline-primary">查看</a>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% else %}
+                            <p class="text-muted">没有找到相关销售订单</p>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                        
+                        <!-- 生产订单搜索结果 -->
+                        {% if 'production_orders' in search_results.results %}
+                        <div class="result-category mb-4" id="production_orders-results">
+                            <h6 class="text-secondary mb-3">生产订单 ({{ search_results.results.production_orders.total }})</h6>
+                            {% if search_results.results.production_orders['items'] %}
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>订单编号</th>
+                                            <th>产品</th>
+                                            <th>计划数量</th>
+                                            <th>状态</th>
+                                            <th>计划开始</th>
+                                            <th>操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for order in search_results.results.production_orders['items'] %}
+                                        <tr>
+                                            <td>{{ order.order_number }}</td>
+                                            <td>{{ order.product.product_name if order.product else '-' }}</td>
+                                            <td>{{ order.planned_quantity }}</td>
+                                            <td>
+                                                <span class="badge bg-{% if order.status == 'completed' %}success{% elif order.status == 'pending' %}warning{% elif order.status == 'cancelled' %}danger{% else %}info{% endif %}">
+                                                    {% if order.status == 'pending' %}待开始
+                                                    {% elif order.status == 'in_progress' %}进行中
+                                                    {% elif order.status == 'completed' %}已完成
+                                                    {% elif order.status == 'cancelled' %}已取消
+                                                    {% else %}{{ order.status }}{% endif %}
+                                                </span>
+                                            </td>
+                                            <td>{{ order.planned_start_date.strftime('%Y-%m-%d') if order.planned_start_date else '-' }}</td>
+                                            <td>
+                                                <a href="{{ url_for('main.production_order_detail', order_id=order.id) }}" 
+                                                   class="btn btn-sm btn-outline-primary">查看</a>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% else %}
+                            <p class="text-muted">没有找到相关生产订单</p>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% elif request.method == 'POST' %}
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>没有找到匹配的搜索结果，请尝试其他关键词。
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* 简洁的搜索建议样式 */
+.search-suggestions {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 1050;
+    background: white;
+    border: 1px solid #ced4da;
+    border-top: none;
+    border-radius: 0 0 0.375rem 0.375rem;
+    box-shadow: 0 0.25rem 0.5rem rgba(0,0,0,0.1);
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.search-suggestions .suggestion-item {
+    padding: 0.5rem 0.75rem;
+    cursor: pointer;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.search-suggestions .suggestion-item:hover {
+    background-color: #f8f9fa;
+}
+
+.search-suggestions .suggestion-item:last-child {
+    border-bottom: none;
+}
+
+.search-suggestions .suggestion-category {
+    background-color: #f8f9fa;
+    font-weight: 500;
+    font-size: 0.8rem;
+    color: #6c757d;
+    padding: 0.375rem 0.75rem;
+    border-bottom: 1px solid #dee2e6;
+}
+
+/* 简洁的表格样式 */
+.table th {
+    background-color: #f8f9fa;
+    border-color: #dee2e6;
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: #495057;
+}
+
+.table td {
+    vertical-align: middle;
+    font-size: 0.875rem;
+}
+
+/* 响应式设计 */
+@media (max-width: 767.98px) {
+    .btn-group {
+        flex-wrap: wrap;
+    }
+    
+    .btn-group .btn {
+        margin-bottom: 0.25rem;
+        margin-right: 0.25rem;
+    }
+}
+</style>
+
+<script>
+// 显示所有结果
+function showAllResults() {
+    document.querySelectorAll('.result-category').forEach(el => {
+        el.style.display = 'block';
+    });
+    
+    // 更新按钮状态
+    document.querySelectorAll('.btn-group .btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    document.querySelector('.btn-group .btn').classList.add('active');
+}
+
+// 显示特定类别结果
+function showCategoryResults(category) {
+    document.querySelectorAll('.result-category').forEach(el => {
+        el.style.display = 'none';
+    });
+    
+    const targetElement = document.getElementById(category + '-results');
+    if (targetElement) {
+        targetElement.style.display = 'block';
+    }
+    
+    // 更新按钮状态
+    document.querySelectorAll('.btn-group .btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    event.target.classList.add('active');
+}
+
+// 搜索建议功能
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('searchInput');
+    const suggestionsDiv = document.getElementById('searchSuggestions');
+    let searchTimeout;
+    
+    if (searchInput) {
+        // 搜索建议功能
+        searchInput.addEventListener('input', function() {
+            const query = this.value.trim();
+            
+            if (query.length < 2) {
+                suggestionsDiv.style.display = 'none';
+                return;
+            }
+            
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                fetchSearchSuggestions(query);
+            }, 300);
+        });
+        
+        // 点击其他地方隐藏建议
+        document.addEventListener('click', function(event) {
+            if (!searchInput.contains(event.target) && !suggestionsDiv.contains(event.target)) {
+                suggestionsDiv.style.display = 'none';
+            }
+        });
+    }
+    
+    // 获取搜索建议
+    function fetchSearchSuggestions(query) {
+        fetch(`{{ url_for('main.search_suggestions') }}?q=${encodeURIComponent(query)}`)
+            .then(response => response.json())
+            .then(data => {
+                displaySearchSuggestions(data.suggestions);
+            })
+            .catch(error => {
+                console.error('Error fetching suggestions:', error);
+            });
+    }
+    
+    // 显示搜索建议
+    function displaySearchSuggestions(suggestions) {
+        let html = '';
+        
+        Object.keys(suggestions).forEach(category => {
+            if (suggestions[category].length > 0) {
+                const categoryName = getCategoryDisplayName(category);
+                html += `<div class="suggestion-category">${categoryName}</div>`;
+                
+                suggestions[category].forEach(item => {
+                    html += `<div class="suggestion-item" onclick="selectSuggestion('${item}')">${item}</div>`;
+                });
+            }
+        });
+        
+        if (html) {
+            suggestionsDiv.innerHTML = html;
+            suggestionsDiv.style.display = 'block';
+        } else {
+            suggestionsDiv.style.display = 'none';
+        }
+    }
+    
+    // 选择建议
+    window.selectSuggestion = function(suggestion) {
+        searchInput.value = suggestion;
+        suggestionsDiv.style.display = 'none';
+    }
+    
+    // 获取类别显示名称
+    function getCategoryDisplayName(category) {
+        const names = {
+            'employee_names': '员工姓名',
+            'process_names': '工序名称',
+            'product_names': '产品名称',
+            'customer_names': '客户名称'
+        };
+        return names[category] || category;
+    }
+});
+</script>
+{% endblock %} 

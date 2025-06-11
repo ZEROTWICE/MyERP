@@ -1,0 +1,402 @@
+{% extends "base.html" %}
+
+{% block title %}入库管理{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h4 class="card-title mb-0">批量入库管理</h4>
+            <div>
+                <button type="button" class="btn btn-success me-2" onclick="addInboundRow()">
+                    <i class="fas fa-plus"></i> 添加行
+                </button>
+                <a href="{{ url_for('main.manage_inventory') }}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left"></i> 返回库存管理
+                </a>
+            </div>
+        </div>
+        <div class="card-body">
+            <form method="POST" id="batchInboundForm">
+                {{ form.hidden_tag() }}
+                
+                <!-- 批量入库表格 -->
+                <div class="table-responsive">
+                    <table class="table table-bordered" id="inboundTable">
+                        <thead class="table-light">
+                            <tr>
+                                <th width="120">类型 <span class="text-danger">*</span></th>
+                                <th width="150">供应商/产品编号 <span class="text-danger">*</span></th>
+                                <th width="150">品名/图号 <span class="text-danger">*</span></th>
+                                <th width="120">炉号/型号</th>
+                                <th width="120">供应商编号/检验员</th>
+                                <th width="120">内部编号/生产日期</th>
+                                <th width="100">数量 <span class="text-danger">*</span></th>
+                                <th width="120">入库日期 <span class="text-danger">*</span></th>
+                                <th width="80">样品</th>
+                                <th width="150">备注</th>
+                                <th width="80">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inboundTableBody">
+                            <!-- 初始行 -->
+                            <tr class="inbound-row" data-row="0">
+                                <td>
+                                    <select class="form-control form-control-sm inventory-type" name="inventory_type_0" required onchange="updateRowFields(0)">
+                                        <option value="">选择类型</option>
+                                        <option value="raw">原材料</option>
+                                        <option value="finished">成品</option>
+                                    </select>
+                                </td>
+                                <td>
+                                    <input type="text" class="form-control form-control-sm field1" name="field1_0" placeholder="供应商/产品编号" required>
+                                </td>
+                                <td>
+                                    <input type="text" class="form-control form-control-sm field2" name="field2_0" placeholder="品名/图号" required>
+                                </td>
+                                <td>
+                                    <input type="text" class="form-control form-control-sm field3" name="field3_0" placeholder="炉号/型号">
+                                </td>
+                                <td>
+                                    <input type="text" class="form-control form-control-sm field4" name="field4_0" placeholder="供应商编号/检验员">
+                                </td>
+                                <td>
+                                    <input type="text" class="form-control form-control-sm field5" name="field5_0" placeholder="内部编号/生产日期">
+                                </td>
+                                <td>
+                                    <input type="number" class="form-control form-control-sm" name="quantity_0" min="0.01" step="0.01" placeholder="数量" required>
+                                </td>
+                                <td>
+                                    <input type="date" class="form-control form-control-sm" name="storage_date_0" required>
+                                </td>
+                                <td>
+                                    <div class="form-check form-check-sm d-flex justify-content-center">
+                                        <input type="checkbox" class="form-check-input" name="has_sample_0">
+                                    </div>
+                                </td>
+                                <td>
+                                    <textarea class="form-control form-control-sm" name="notes_0" rows="1" placeholder="备注"></textarea>
+                                </td>
+                                <td>
+                                    <button type="button" class="btn btn-sm btn-danger" onclick="removeInboundRow(0)" disabled>
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                        
+                <!-- 批量操作按钮 -->
+                <div class="mt-3 d-flex justify-content-between align-items-center">
+                    <div>
+                        <button type="button" class="btn btn-info me-2" onclick="fillCurrentDate()">
+                            <i class="fas fa-calendar"></i> 填充今日日期
+                        </button>
+                        <button type="button" class="btn btn-warning me-2" onclick="clearAllRows()">
+                            <i class="fas fa-broom"></i> 清空所有行
+                        </button>
+                        <span class="text-muted">共 <span id="rowCount">1</span> 行</span>
+                    </div>
+                    <div>
+                        <button type="button" class="btn btn-secondary me-2" onclick="resetForm()">
+                            <i class="fas fa-undo"></i> 重置
+                        </button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> 批量入库
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let rowCounter = 0;
+
+document.addEventListener('DOMContentLoaded', function() {
+    // 设置默认日期
+    fillCurrentDate();
+    updateRowCount();
+});
+
+// 添加入库行
+function addInboundRow() {
+    rowCounter++;
+    const tableBody = document.getElementById('inboundTableBody');
+    const newRow = createInboundRow(rowCounter);
+    tableBody.appendChild(newRow);
+    updateRowCount();
+    
+    // 设置新行的默认日期
+    const dateInput = newRow.querySelector(`input[name="storage_date_${rowCounter}"]`);
+    if (dateInput) {
+        dateInput.valueAsDate = new Date();
+    }
+}
+
+// 创建入库行
+function createInboundRow(rowIndex) {
+    const row = document.createElement('tr');
+    row.className = 'inbound-row';
+    row.setAttribute('data-row', rowIndex);
+    
+    row.innerHTML = `
+        <td>
+            <select class="form-control form-control-sm inventory-type" name="inventory_type_${rowIndex}" required onchange="updateRowFields(${rowIndex})">
+                <option value="">选择类型</option>
+                <option value="raw">原材料</option>
+                <option value="finished">成品</option>
+            </select>
+        </td>
+        <td>
+            <input type="text" class="form-control form-control-sm field1" name="field1_${rowIndex}" placeholder="供应商/产品编号" required>
+        </td>
+        <td>
+            <input type="text" class="form-control form-control-sm field2" name="field2_${rowIndex}" placeholder="品名/图号" required>
+        </td>
+        <td>
+            <input type="text" class="form-control form-control-sm field3" name="field3_${rowIndex}" placeholder="炉号/型号">
+        </td>
+        <td>
+            <input type="text" class="form-control form-control-sm field4" name="field4_${rowIndex}" placeholder="供应商编号/检验员">
+        </td>
+        <td>
+            <input type="text" class="form-control form-control-sm field5" name="field5_${rowIndex}" placeholder="内部编号/生产日期">
+        </td>
+        <td>
+            <input type="number" class="form-control form-control-sm" name="quantity_${rowIndex}" min="0.01" step="0.01" placeholder="数量" required>
+        </td>
+        <td>
+            <input type="date" class="form-control form-control-sm" name="storage_date_${rowIndex}" required>
+        </td>
+        <td>
+            <div class="form-check form-check-sm d-flex justify-content-center">
+                <input type="checkbox" class="form-check-input" name="has_sample_${rowIndex}">
+            </div>
+        </td>
+        <td>
+            <textarea class="form-control form-control-sm" name="notes_${rowIndex}" rows="1" placeholder="备注"></textarea>
+        </td>
+        <td>
+            <button type="button" class="btn btn-sm btn-danger" onclick="removeInboundRow(${rowIndex})">
+                <i class="fas fa-trash"></i>
+            </button>
+        </td>
+    `;
+    
+    return row;
+}
+
+// 删除入库行
+function removeInboundRow(rowIndex) {
+    const row = document.querySelector(`tr[data-row="${rowIndex}"]`);
+    if (row) {
+        row.remove();
+        updateRowCount();
+        updateDeleteButtons();
+    }
+}
+
+// 更新行计数
+function updateRowCount() {
+    const rows = document.querySelectorAll('.inbound-row');
+    document.getElementById('rowCount').textContent = rows.length;
+    updateDeleteButtons();
+}
+
+// 更新删除按钮状态
+function updateDeleteButtons() {
+    const rows = document.querySelectorAll('.inbound-row');
+    const deleteButtons = document.querySelectorAll('button[onclick*="removeInboundRow"]');
+    
+    deleteButtons.forEach(button => {
+        button.disabled = rows.length <= 1;
+    });
+}
+
+// 更新行字段提示
+function updateRowFields(rowIndex) {
+    const row = document.querySelector(`tr[data-row="${rowIndex}"]`);
+    const inventoryType = row.querySelector(`select[name="inventory_type_${rowIndex}"]`).value;
+    
+    const field1 = row.querySelector(`input[name="field1_${rowIndex}"]`);
+    const field2 = row.querySelector(`input[name="field2_${rowIndex}"]`);
+    const field3 = row.querySelector(`input[name="field3_${rowIndex}"]`);
+    const field4 = row.querySelector(`input[name="field4_${rowIndex}"]`);
+    const field5 = row.querySelector(`input[name="field5_${rowIndex}"]`);
+    const sampleDiv = row.querySelector(`input[name="has_sample_${rowIndex}"]`).closest('td');
+    
+    if (inventoryType === 'raw') {
+        // 原材料字段
+        field1.placeholder = '供应商*';
+        field2.placeholder = '品名*';
+        field3.placeholder = '原料冶炼炉号';
+        field4.placeholder = '供应商编号*';
+        field5.placeholder = '内部编号(可留空)';
+        field5.type = 'text';
+        sampleDiv.style.display = '';
+        
+        // 设置必填
+        field1.required = true;
+        field2.required = true;
+        field4.required = true;
+        field5.required = false;
+        
+    } else if (inventoryType === 'finished') {
+        // 成品字段
+        field1.placeholder = '产品编号*';
+        field2.placeholder = '图号*';
+        field3.placeholder = '型号*';
+        field4.placeholder = '检验员*';
+        field5.placeholder = '生产日期*';
+        field5.type = 'date';
+        sampleDiv.style.display = 'none';
+        
+        // 设置必填
+        field1.required = true;
+        field2.required = true;
+        field3.required = true;
+        field4.required = true;
+        field5.required = true;
+        
+        // 设置默认生产日期
+        if (!field5.value) {
+            field5.valueAsDate = new Date();
+        }
+    } else {
+        // 重置为默认状态
+        field1.placeholder = '供应商/产品编号';
+        field2.placeholder = '品名/图号';
+        field3.placeholder = '炉号/型号';
+        field4.placeholder = '供应商编号/检验员';
+        field5.placeholder = '内部编号/生产日期';
+        field5.type = 'text';
+        sampleDiv.style.display = '';
+        
+        field1.required = true;
+        field2.required = true;
+        field3.required = false;
+        field4.required = false;
+        field5.required = false;
+    }
+}
+
+// 填充今日日期
+function fillCurrentDate() {
+    const today = new Date();
+    const dateInputs = document.querySelectorAll('input[type="date"]');
+    dateInputs.forEach(input => {
+        if (!input.value) {
+            input.valueAsDate = today;
+        }
+    });
+}
+
+// 清空所有行
+function clearAllRows() {
+    if (confirm('确定要清空所有行吗？')) {
+        const tableBody = document.getElementById('inboundTableBody');
+        // 保留第一行，清空其内容
+        const firstRow = tableBody.querySelector('.inbound-row');
+        if (firstRow) {
+            const inputs = firstRow.querySelectorAll('input, select, textarea');
+            inputs.forEach(input => {
+                if (input.type === 'checkbox') {
+                    input.checked = false;
+                } else {
+                    input.value = '';
+                }
+            });
+        }
+        
+        // 删除其他行
+        const otherRows = tableBody.querySelectorAll('.inbound-row:not(:first-child)');
+        otherRows.forEach(row => row.remove());
+        
+        rowCounter = 0;
+        updateRowCount();
+        fillCurrentDate();
+    }
+}
+
+// 重置表单
+function resetForm() {
+    if (confirm('确定要重置所有数据吗？')) {
+        clearAllRows();
+    }
+}
+
+// 表单验证和提交
+document.getElementById('batchInboundForm').addEventListener('submit', function(e) {
+    const rows = document.querySelectorAll('.inbound-row');
+    let hasValidRows = false;
+    let errors = [];
+    
+    rows.forEach((row, index) => {
+        const rowIndex = row.getAttribute('data-row');
+        const inventoryType = row.querySelector(`select[name="inventory_type_${rowIndex}"]`).value;
+        
+        if (!inventoryType) {
+            errors.push(`第 ${index + 1} 行：请选择库存类型`);
+            return;
+        }
+        
+        const quantity = parseFloat(row.querySelector(`input[name="quantity_${rowIndex}"]`).value);
+        if (!quantity || quantity <= 0) {
+            errors.push(`第 ${index + 1} 行：请输入有效的数量`);
+            return;
+        }
+        
+        const storageDate = row.querySelector(`input[name="storage_date_${rowIndex}"]`).value;
+        if (!storageDate) {
+            errors.push(`第 ${index + 1} 行：请选择入库日期`);
+            return;
+        }
+        
+        // 验证必填字段
+        const field1 = row.querySelector(`input[name="field1_${rowIndex}"]`).value.trim();
+        const field2 = row.querySelector(`input[name="field2_${rowIndex}"]`).value.trim();
+        
+        if (!field1 || !field2) {
+            errors.push(`第 ${index + 1} 行：请填写必需字段`);
+            return;
+        }
+        
+        if (inventoryType === 'finished') {
+            const field3 = row.querySelector(`input[name="field3_${rowIndex}"]`).value.trim();
+            const field4 = row.querySelector(`input[name="field4_${rowIndex}"]`).value.trim();
+            const field5 = row.querySelector(`input[name="field5_${rowIndex}"]`).value.trim();
+            
+            if (!field3 || !field4 || !field5) {
+                errors.push(`第 ${index + 1} 行：成品信息不完整`);
+                return;
+            }
+        } else if (inventoryType === 'raw') {
+            const field4 = row.querySelector(`input[name="field4_${rowIndex}"]`).value.trim();
+            if (!field4) {
+                errors.push(`第 ${index + 1} 行：原材料供应商编号不能为空`);
+                return;
+            }
+        }
+        
+        hasValidRows = true;
+    });
+    
+    if (errors.length > 0) {
+        e.preventDefault();
+        alert('请修正以下错误：\n\n' + errors.join('\n'));
+        return;
+    }
+    
+    if (!hasValidRows) {
+        e.preventDefault();
+        alert('请至少添加一行有效的入库数据');
+        return;
+    }
+});
+</script>
+{% endblock %}

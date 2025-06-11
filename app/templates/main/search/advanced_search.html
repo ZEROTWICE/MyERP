@@ -1,0 +1,231 @@
+{% extends "base.html" %}
+
+{% block title %}高级搜索{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-filter me-2"></i>高级搜索
+                    </h5>
+                    <a href="{{ url_for('main.global_search') }}" class="btn btn-outline-secondary btn-sm">
+                        <i class="fas fa-search me-1"></i>全局搜索
+                    </a>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        {{ form.hidden_tag() }}
+                        
+                        <!-- 搜索选项卡 -->
+                        <ul class="nav nav-tabs" id="searchTabs" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active" id="employee-tab" data-bs-toggle="tab" data-bs-target="#employee" type="button" role="tab">
+                                    <i class="fas fa-users me-1"></i>员工信息
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="process-tab" data-bs-toggle="tab" data-bs-target="#process" type="button" role="tab">
+                                    <i class="fas fa-cogs me-1"></i>工序价格
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="product-tab" data-bs-toggle="tab" data-bs-target="#product" type="button" role="tab">
+                                    <i class="fas fa-box me-1"></i>产品管理
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="customer-tab" data-bs-toggle="tab" data-bs-target="#customer" type="button" role="tab">
+                                    <i class="fas fa-building me-1"></i>客户管理
+                                </button>
+                            </li>
+                        </ul>
+                        
+                        <div class="tab-content mt-3" id="searchTabsContent">
+                            <!-- 员工搜索 -->
+                            <div class="tab-pane fade show active" id="employee" role="tabpanel">
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        {{ form.employee_name.label(class="form-label") }}
+                                        {{ form.employee_name(class="form-control") }}
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        {{ form.employee_id.label(class="form-label") }}
+                                        {{ form.employee_id(class="form-control") }}
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        {{ form.department.label(class="form-label") }}
+                                        {{ form.department(class="form-control") }}
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        {{ form.position.label(class="form-label") }}
+                                        {{ form.position(class="form-control") }}
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        {{ form.is_active.label(class="form-label") }}
+                                        {{ form.is_active(class="form-select") }}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- 工序价格搜索 -->
+                            <div class="tab-pane fade" id="process" role="tabpanel">
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        {{ form.process_code.label(class="form-label") }}
+                                        {{ form.process_code(class="form-control") }}
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        {{ form.process_name.label(class="form-label") }}
+                                        {{ form.process_name(class="form-control") }}
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        {{ form.component.label(class="form-label") }}
+                                        {{ form.component(class="form-control") }}
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        {{ form.drawing_no.label(class="form-label") }}
+                                        {{ form.drawing_no(class="form-control") }}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- 产品搜索 -->
+                            <div class="tab-pane fade" id="product" role="tabpanel">
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        {{ form.product_code.label(class="form-label") }}
+                                        {{ form.product_code(class="form-control") }}
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        {{ form.product_name.label(class="form-label") }}
+                                        {{ form.product_name(class="form-control") }}
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        {{ form.drawing_number.label(class="form-label") }}
+                                        {{ form.drawing_number(class="form-control") }}
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        {{ form.model.label(class="form-label") }}
+                                        {{ form.model(class="form-control") }}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- 客户搜索 -->
+                            <div class="tab-pane fade" id="customer" role="tabpanel">
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        {{ form.customer_code.label(class="form-label") }}
+                                        {{ form.customer_code(class="form-control") }}
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        {{ form.customer_name.label(class="form-label") }}
+                                        {{ form.customer_name(class="form-control") }}
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        {{ form.contact_person.label(class="form-label") }}
+                                        {{ form.contact_person(class="form-control") }}
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        {{ form.customer_type.label(class="form-label") }}
+                                        {{ form.customer_type(class="form-select") }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-4">
+                            <div class="d-flex justify-content-between">
+                                <button type="button" class="btn btn-outline-secondary" onclick="clearForm()">
+                                    <i class="fas fa-eraser me-1"></i>清空条件
+                                </button>
+                                {{ form.submit(class="btn btn-primary") }}
+                            </div>
+                        </div>
+                    </form>
+                    
+                    <!-- 搜索结果 -->
+                    {% if search_results %}
+                    <hr class="mt-4">
+                    <div class="search-results">
+                        <h6 class="text-muted mb-3">
+                            找到 <span class="badge bg-success">{{ search_results.total_count }}</span> 条结果
+                        </h6>
+                        
+                        {% for category, results in search_results.results.items() %}
+                        {% if results.total > 0 %}
+                        <div class="mb-4">
+                            <h6 class="text-secondary">
+                                {% if category == 'employees' %}
+                                <i class="fas fa-users me-2"></i>员工信息
+                                {% elif category == 'process_prices' %}
+                                <i class="fas fa-cogs me-2"></i>工序价格
+                                {% elif category == 'products' %}
+                                <i class="fas fa-box me-2"></i>产品管理
+                                {% elif category == 'customers' %}
+                                <i class="fas fa-building me-2"></i>客户管理
+                                {% endif %}
+                                <span class="badge bg-secondary">{{ results.total }}</span>
+                            </h6>
+                            
+                            {% if category == 'employees' %}
+                            <div class="table-responsive">
+                                <table class="table table-sm table-hover">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>工号</th>
+                                            <th>姓名</th>
+                                            <th>部门</th>
+                                            <th>职位</th>
+                                            <th>状态</th>
+                                            <th>操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for employee in results['items'] %}
+                                        <tr>
+                                            <td>{{ employee.employee_id }}</td>
+                                            <td>{{ employee.name }}</td>
+                                            <td>{{ employee.department or '-' }}</td>
+                                            <td>{{ employee.position }}</td>
+                                            <td>
+                                                <span class="badge bg-{{ 'success' if employee.is_active else 'secondary' }}">
+                                                    {{ '在职' if employee.is_active else '离职' }}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <a href="{{ url_for('main.manage_employees') }}?search={{ employee.employee_id }}" 
+                                                   class="btn btn-sm btn-outline-primary">查看</a>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% else %}
+                            <div class="alert alert-info">
+                                找到 {{ results.total }} 条{{ category }}记录
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function clearForm() {
+    document.querySelectorAll('input[type="text"], select').forEach(field => {
+        field.value = '';
+    });
+}
+</script>
+{% endblock %}

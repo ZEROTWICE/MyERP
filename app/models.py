@@ -428,6 +428,37 @@ class FinishedProduct(db.Model):
         if not self.global_sn:
             self.global_sn = SerialNumber.get_next_number()
 
+class RawMaterialCategory(db.Model):
+    """原材料品类管理"""
+    __tablename__ = 'raw_material_categories'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False, unique=True)  # 品类名称
+    code = db.Column(db.String(20), nullable=False, unique=True)  # 品类编码
+    description = db.Column(db.Text)  # 品类描述
+    is_active = db.Column(db.Boolean, default=True)  # 是否启用
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_by = db.Column(db.Integer, db.ForeignKey('user.id'))  # 创建人
+    
+    # 关系
+    raw_materials = db.relationship('RawMaterial', backref='category', lazy='dynamic')
+    creator = db.relationship('User', backref='created_categories')
+    
+    def __repr__(self):
+        return f'<RawMaterialCategory {self.name}>'
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'code': self.code,
+            'description': self.description,
+            'is_active': self.is_active,
+            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+            'material_count': self.raw_materials.count()
+        }
+
 class RawMaterial(db.Model):
     """原材料管理"""
     id = db.Column(db.Integer, primary_key=True)
@@ -444,6 +475,7 @@ class RawMaterial(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     status = db.Column(db.String(20), nullable=False, default='in_stock', index=True)  # 状态: in_stock: 在库, used: 已使用, scrapped: 报废
     is_archived = db.Column(db.Boolean, default=False)  # 是否已存档
+    category_id = db.Column(db.Integer, db.ForeignKey('raw_material_categories.id'))  # 品类ID
     
     __table_args__ = (
         db.UniqueConstraint('global_sn', name='uq_raw_material_global_sn'),

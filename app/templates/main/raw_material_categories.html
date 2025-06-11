@@ -1,0 +1,309 @@
+{% extends "base.html" %}
+
+{% block title %}原材料品类管理{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h4 class="card-title mb-0">
+                <i class="fas fa-tags me-2"></i>原材料品类管理
+            </h4>
+            <div>
+                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addCategoryModal">
+                    <i class="fas fa-plus"></i> 添加原材料品类
+                </button>
+                <a href="{{ url_for('main.manage_inventory') }}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left"></i> 返回库存管理
+                </a>
+            </div>
+        </div>
+        <div class="card-body">
+            {% if categories %}
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>品类名称</th>
+                            <th>品类编码</th>
+                            <th>描述</th>
+                            <th>状态</th>
+                            <th>原材料数量</th>
+                            <th>创建时间</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for category in categories %}
+                        <tr>
+                            <td>
+                                <strong>{{ category.name }}</strong>
+                            </td>
+                            <td>
+                                <span class="badge bg-secondary">{{ category.code }}</span>
+                            </td>
+                            <td>
+                                <div class="text-truncate" style="max-width: 200px;" title="{{ category.description or '无' }}">
+                                    {{ category.description or '无' }}
+                                </div>
+                            </td>
+                            <td>
+                                {% if category.is_active %}
+                                    <span class="badge bg-success">启用</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">停用</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge bg-info">{{ category.raw_materials.count() }}</span>
+                            </td>
+                            <td>
+                                {{ category.created_at.strftime('%Y-%m-%d %H:%M') }}
+                            </td>
+                            <td>
+                                <div class="btn-group" role="group">
+                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="editCategory({{ category.id }})">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteCategory({{ category.id }}, '{{ category.name }}')" {% if category.raw_materials.count() > 0 %}disabled title="该品类下还有原材料，不能删除"{% endif %}>
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-5">
+                <i class="fas fa-tags fa-3x text-muted mb-3"></i>
+                <h5 class="text-muted">暂无原材料品类数据</h5>
+                <p class="text-muted">点击上方"添加原材料品类"按钮开始添加</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- 添加品类模态框 -->
+<div class="modal fade" id="addCategoryModal" tabindex="-1" aria-labelledby="addCategoryModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addCategoryModalLabel">添加原材料品类</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addCategoryForm">
+                    <div class="mb-3">
+                        <label for="categoryName" class="form-label">品类名称 <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="categoryName" name="name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="categoryCode" class="form-label">品类编码 <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="categoryCode" name="code" required placeholder="如：RAW001">
+                    </div>
+                    <div class="mb-3">
+                        <label for="categoryDescription" class="form-label">品类描述</label>
+                        <textarea class="form-control" id="categoryDescription" name="description" rows="3" placeholder="可选"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="categoryIsActive" name="is_active" checked>
+                            <label class="form-check-label" for="categoryIsActive">
+                                启用状态
+                            </label>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="submitCategory()">添加</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 编辑品类模态框 -->
+<div class="modal fade" id="editCategoryModal" tabindex="-1" aria-labelledby="editCategoryModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editCategoryModalLabel">编辑原材料品类</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editCategoryForm">
+                    <input type="hidden" id="editCategoryId" name="id">
+                    <div class="mb-3">
+                        <label for="editCategoryName" class="form-label">品类名称 <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="editCategoryName" name="name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editCategoryCode" class="form-label">品类编码 <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="editCategoryCode" name="code" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editCategoryDescription" class="form-label">品类描述</label>
+                        <textarea class="form-control" id="editCategoryDescription" name="description" rows="3"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="editCategoryIsActive" name="is_active">
+                            <label class="form-check-label" for="editCategoryIsActive">
+                                启用状态
+                            </label>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="updateCategory()">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// 提交新品类
+function submitCategory() {
+    const form = document.getElementById('addCategoryForm');
+    const formData = new FormData(form);
+    
+    const data = {
+        name: formData.get('name'),
+        code: formData.get('code'),
+        description: formData.get('description'),
+        is_active: formData.get('is_active') ? true : false
+    };
+    
+    if (!data.name || !data.code) {
+        alert('品类名称和编码不能为空');
+        return;
+    }
+    
+    fetch("{{ url_for('main.add_raw_material_category') }}", {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('原材料品类添加成功！');
+            location.reload();
+        } else {
+            alert('添加失败：' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('添加失败，请重试');
+    });
+}
+
+// 编辑品类
+function editCategory(categoryId) {
+    fetch(`/inventory/raw-material/categories/${categoryId}`)
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const category = data.data;
+            document.getElementById('editCategoryId').value = category.id;
+            document.getElementById('editCategoryName').value = category.name;
+            document.getElementById('editCategoryCode').value = category.code;
+            document.getElementById('editCategoryDescription').value = category.description || '';
+            document.getElementById('editCategoryIsActive').checked = category.is_active;
+            
+            const modal = new bootstrap.Modal(document.getElementById('editCategoryModal'));
+            modal.show();
+        } else {
+            alert('获取品类信息失败：' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('获取品类信息失败');
+    });
+}
+
+// 更新品类
+function updateCategory() {
+    const form = document.getElementById('editCategoryForm');
+    const formData = new FormData(form);
+    const categoryId = formData.get('id');
+    
+    const data = {
+        name: formData.get('name'),
+        code: formData.get('code'),
+        description: formData.get('description'),
+        is_active: formData.get('is_active') ? true : false
+    };
+    
+    if (!data.name || !data.code) {
+        alert('品类名称和编码不能为空');
+        return;
+    }
+    
+    fetch(`/inventory/raw-material/categories/${categoryId}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('原材料品类更新成功！');
+            location.reload();
+        } else {
+            alert('更新失败：' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('更新失败，请重试');
+    });
+}
+
+// 删除品类
+function deleteCategory(categoryId, categoryName) {
+    if (confirm(`确定要删除原材料品类"${categoryName}"吗？此操作不可撤销。`)) {
+        fetch(`/inventory/raw-material/categories/${categoryId}`, {
+            method: 'DELETE',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token() }}'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('原材料品类删除成功！');
+                location.reload();
+            } else {
+                alert('删除失败：' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('删除失败，请重试');
+        });
+    }
+}
+
+// 重置添加表单
+document.getElementById('addCategoryModal').addEventListener('hidden.bs.modal', function () {
+    document.getElementById('addCategoryForm').reset();
+});
+</script>
+{% endblock %} 

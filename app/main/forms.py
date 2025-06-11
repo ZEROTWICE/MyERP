@@ -380,3 +380,189 @@ class NotificationTemplateForm(FlaskForm):
     is_active = BooleanField('启用', default=True)
     
     submit = SubmitField('保存')
+
+class GlobalSearchForm(FlaskForm):
+    """全局搜索表单"""
+    query = StringField('搜索关键词', validators=[DataRequired(message='请输入搜索关键词')])
+    search_type = SelectField('搜索范围', choices=[
+        ('all', '全部数据'),
+        ('employees', '员工信息'),
+        ('process_prices', '工序价格'),
+        ('production_records', '生产记录'),
+        ('products', '产品管理'),
+        ('inventory', '库存管理'),
+        ('customers', '客户管理'),
+        ('sales_orders', '销售订单'),
+        ('production_orders', '生产订单')
+    ], default='all')
+    
+class AdvancedSearchForm(FlaskForm):
+    """高级搜索表单"""
+    
+    # 员工搜索
+    employee_name = StringField('员工姓名')
+    employee_id = StringField('工号')
+    department = StringField('部门')
+    position = StringField('职位')
+    is_active = SelectField('在职状态', choices=[('', '全部'), ('1', '在职'), ('0', '离职')])
+    
+    # 工序价格搜索
+    process_code = StringField('工序编号')
+    process_name = StringField('工序名称')
+    component = StringField('部件')
+    drawing_no = StringField('图号')
+    model_no = StringField('型号')
+    
+    # 生产记录搜索
+    production_date_start = DateField('生产日期开始')
+    production_date_end = DateField('生产日期结束')
+    
+    # 产品搜索
+    product_code = StringField('产品编码')
+    product_name = StringField('产品名称')
+    drawing_number = StringField('图号')
+    model = StringField('型号')
+    
+    # 库存搜索
+    inventory_type = SelectField('库存类型', choices=[('', '全部'), ('raw', '原材料'), ('finished', '成品')])
+    supplier = StringField('供应商')
+    material_name = StringField('品名')
+    storage_date_start = DateField('入库日期开始')
+    storage_date_end = DateField('入库日期结束')
+    
+    # 客户搜索
+    customer_code = StringField('客户编码')
+    customer_name = StringField('客户名称')
+    contact_person = StringField('联系人')
+    customer_type = SelectField('客户类型', choices=[('', '全部'), ('enterprise', '企业'), ('individual', '个人')])
+    
+    # 销售订单搜索
+    sales_order_number = StringField('订单编号')
+    order_source = StringField('订单来源')
+    year_month = StringField('年月 (YYYY-MM)')
+    order_status = SelectField('订单状态', choices=[
+        ('', '全部'),
+        ('pending', '待处理'),
+        ('confirmed', '已确认'),
+        ('in_production', '生产中'),
+        ('completed', '已完成'),
+        ('cancelled', '已取消')
+    ])
+    
+    # 生产订单搜索
+    production_order_number = StringField('生产订单编号')
+    production_status = SelectField('生产状态', choices=[
+        ('', '全部'),
+        ('pending', '待开始'),
+        ('in_progress', '进行中'),
+        ('completed', '已完成'),
+        ('cancelled', '已取消')
+    ])
+    planned_start_date = DateField('计划开始日期')
+    planned_end_date = DateField('计划结束日期')
+    
+    submit = SubmitField('搜索')
+
+class RawMaterialCategoryForm(FlaskForm):
+    """原材料品类管理表单"""
+    name = StringField('品类名称', validators=[DataRequired('请输入品类名称'), Length(max=100)])
+    code = StringField('品类编码', validators=[DataRequired('请输入品类编码'), Length(max=20)])
+    description = TextAreaField('品类描述', validators=[Optional(), Length(max=500)])
+    is_active = BooleanField('是否启用', default=True)
+    submit = SubmitField('保存')
+
+class RawMaterialInboundForm(FlaskForm):
+    """原材料入库表单"""
+    supplier = StringField('供应商', validators=[DataRequired('请输入供应商'), Length(max=100)])
+    material_name = StringField('品名', validators=[DataRequired('请输入品名'), Length(max=100)])
+    category_id = SelectField('品类', coerce=int, validators=[Optional()])
+    melt_number = StringField('原料冶炼炉号', validators=[Optional(), Length(max=100)])
+    supplier_number = StringField('供应商编号', validators=[DataRequired('请输入供应商编号'), Length(max=100)])
+    internal_number = StringField('内部编号', validators=[Optional(), Length(max=100)], description="留空则自动生成")
+    has_sample = BooleanField('是否带样品', default=False)
+    quantity = FloatField('数量', validators=[DataRequired('请输入数量'), NumberRange(min=0.01, message='数量必须大于0')])
+    storage_date = DateField('入库时间', validators=[DataRequired('请选择入库时间')], default=datetime.today)
+    notes = TextAreaField('备注', validators=[Optional(), Length(max=500)])
+    submit = SubmitField('确认入库')
+    
+    def __init__(self, *args, **kwargs):
+        super(RawMaterialInboundForm, self).__init__(*args, **kwargs)
+        from app.models import RawMaterialCategory
+        self.category_id.choices = [(0, '请选择品类')] + [(c.id, c.name) for c in RawMaterialCategory.query.filter_by(is_active=True).all()]
+
+class FinishedProductInboundForm(FlaskForm):
+    """成品入库表单"""
+    product_number = StringField('产品编号', validators=[DataRequired('请输入产品编号'), Length(max=50)])
+    drawing_number = StringField('图号', validators=[DataRequired('请输入图号'), Length(max=100)])
+    model = StringField('型号', validators=[DataRequired('请输入型号'), Length(max=100)])
+    inspector = StringField('检验员', validators=[DataRequired('请输入检验员'), Length(max=50)])
+    production_date = DateField('生产日期', validators=[DataRequired('请选择生产日期')])
+    quantity = IntegerField('数量', validators=[DataRequired('请输入数量'), NumberRange(min=1, message='数量必须大于0')])
+    storage_date = DateField('入库时间', validators=[DataRequired('请选择入库时间')], default=datetime.today)
+    notes = TextAreaField('备注', validators=[Optional(), Length(max=500)])
+    submit = SubmitField('确认入库')
+
+class InventoryInboundForm(FlaskForm):
+    """入库管理表单"""
+    inventory_type = SelectField('库存类型', choices=[
+        ('raw', '原材料'),
+        ('finished', '成品')
+    ], validators=[DataRequired('请选择库存类型')])
+    
+    # 原材料字段
+    supplier = StringField('供应商', validators=[Optional(), Length(max=100)])
+    material_name = StringField('品名', validators=[Optional(), Length(max=100)])
+    melt_number = StringField('原料冶炼炉号', validators=[Optional(), Length(max=100)])
+    supplier_number = StringField('供应商编号', validators=[Optional(), Length(max=100)])
+    internal_number = StringField('内部编号', validators=[Optional(), Length(max=100)])
+    has_sample = BooleanField('是否带样品', default=False)
+    
+    # 成品字段
+    product_number = StringField('产品编号', validators=[Optional(), Length(max=50)])
+    drawing_number = StringField('图号', validators=[Optional(), Length(max=100)])
+    model = StringField('型号', validators=[Optional(), Length(max=100)])
+    inspector = StringField('检验员', validators=[Optional(), Length(max=50)])
+    production_date = DateField('生产日期', validators=[Optional()])
+    
+    # 通用字段
+    quantity = FloatField('数量', validators=[DataRequired('请输入数量'), NumberRange(min=0.01, message='数量必须大于0')])
+    storage_date = DateField('入库时间', validators=[DataRequired('请选择入库时间')], default=datetime.today)
+    notes = TextAreaField('备注', validators=[Optional(), Length(max=500)])
+    
+    submit = SubmitField('确认入库')
+    
+    def validate(self, extra_validators=None):
+        """自定义验证"""
+        if not super().validate(extra_validators):
+            return False
+        
+        if self.inventory_type.data == 'raw':
+            # 原材料必需字段验证
+            if not self.supplier.data:
+                self.supplier.errors.append('供应商不能为空')
+                return False
+            if not self.material_name.data:
+                self.material_name.errors.append('品名不能为空')
+                return False
+            if not self.supplier_number.data:
+                self.supplier_number.errors.append('供应商编号不能为空')
+                return False
+        elif self.inventory_type.data == 'finished':
+            # 成品必需字段验证
+            if not self.product_number.data:
+                self.product_number.errors.append('产品编号不能为空')
+                return False
+            if not self.drawing_number.data:
+                self.drawing_number.errors.append('图号不能为空')
+                return False
+            if not self.model.data:
+                self.model.errors.append('型号不能为空')
+                return False
+            if not self.inspector.data:
+                self.inspector.errors.append('检验员不能为空')
+                return False
+            if not self.production_date.data:
+                self.production_date.errors.append('生产日期不能为空')
+                return False
+        
+        return True

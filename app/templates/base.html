@@ -122,37 +122,50 @@
             border-radius: .2rem;
         }
 
-        /* 导航栏样式统一 */
+        /* 导航栏优化样式 - 防止双排显示 */
+        .navbar {
+            padding: 0.5rem 0 !important;
+            min-height: 60px !important;
+        }
+
+        .navbar-brand {
+            font-size: 1.1rem !important;
+            font-weight: 600 !important;
+            white-space: nowrap !important;
+        }
+
         .navbar-nav .nav-link {
-            font-size: 1rem !important;
+            font-size: 0.9rem !important;
             font-weight: 500 !important;
-            line-height: 1.5 !important;
-            padding: 0.5rem 1rem !important;
+            line-height: 1.2 !important;
+            padding: 0.4rem 0.8rem !important;
             display: flex !important;
             align-items: center !important;
-            height: 40px !important;
+            height: 36px !important;
+            white-space: nowrap !important;
         }
 
         .navbar-nav .dropdown-toggle::after {
-            margin-left: 0.5rem !important;
+            margin-left: 0.4rem !important;
             vertical-align: middle !important;
         }
 
         .dropdown-menu {
-            font-size: 0.95rem !important;
-            min-width: 160px !important;
-            border-radius: 8px !important;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
-            border: 1px solid rgba(0,0,0,0.1) !important;
-            margin-top: 4px !important;
+            font-size: 0.9rem !important;
+            min-width: 140px !important;
+            border-radius: 6px !important;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.12) !important;
+            border: 1px solid rgba(0,0,0,0.08) !important;
+            margin-top: 2px !important;
         }
 
         .dropdown-item {
-            font-size: 0.95rem !important;
+            font-size: 0.9rem !important;
             font-weight: 400 !important;
-            line-height: 1.4 !important;
-            padding: 0.5rem 1rem !important;
-            transition: all 0.2s ease !important;
+            line-height: 1.3 !important;
+            padding: 0.4rem 0.8rem !important;
+            transition: all 0.15s ease !important;
+            white-space: nowrap !important;
         }
 
         .dropdown-item:hover {
@@ -175,24 +188,66 @@
             align-items: center !important;
         }
 
-        /* 右侧用户信息区域对齐 */
+        /* 右侧用户信息区域优化 */
         .navbar-nav.ms-auto .nav-item {
             display: flex !important;
             align-items: center !important;
         }
 
         .navbar-text {
-            font-size: 1rem !important;
+            font-size: 0.9rem !important;
             font-weight: 500 !important;
-            line-height: 1.5 !important;
+            line-height: 1.2 !important;
             margin: 0 !important;
+            white-space: nowrap !important;
+        }
+
+        /* 搜索和通知图标样式 */
+        .nav-link i {
+            font-size: 1rem !important;
+        }
+
+        .position-relative .badge {
+            font-size: 0.65rem !important;
+            padding: 0.2rem 0.35rem !important;
+        }
+
+        /* 紧凑型导航栏布局 */
+        .navbar-collapse {
+            flex-wrap: nowrap !important;
+        }
+
+        .navbar-nav {
+            flex-wrap: nowrap !important;
         }
 
         /* 响应式调整 */
+        @media (max-width: 1199.98px) {
+            .navbar-nav .nav-link {
+                font-size: 0.85rem !important;
+                padding: 0.35rem 0.6rem !important;
+            }
+            
+            .navbar-text {
+                font-size: 0.85rem !important;
+            }
+        }
+
         @media (max-width: 991.98px) {
             .navbar-nav .nav-link {
                 height: auto !important;
-                padding: 0.75rem 1rem !important;
+                padding: 0.6rem 1rem !important;
+                font-size: 0.9rem !important;
+            }
+            
+            .navbar-text {
+                font-size: 0.9rem !important;
+            }
+        }
+
+        @media (max-width: 767.98px) {
+            .navbar-brand {
+                font-size: 1rem !important;
             }
         }
     </style>
@@ -230,8 +285,28 @@
                                 <li><a class="dropdown-item" href="{{ url_for('main.manage_production_orders') }}">生产订单</a></li>
                             </ul>
                         </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('main.manage_inventory') }}">库存管理</a>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="inventoryDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                库存管理
+                            </a>
+                            <ul class="dropdown-menu" aria-labelledby="inventoryDropdown">
+                                <li><a class="dropdown-item" href="{{ url_for('main.manage_inventory') }}">
+                                    <i class="fas fa-search me-2"></i>库存查询
+                                </a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><h6 class="dropdown-header">原材料管理</h6></li>
+                                <li><a class="dropdown-item" href="{{ url_for('main.raw_material_inbound') }}">
+                                    <i class="fas fa-industry me-2"></i>原材料入库
+                                </a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('main.raw_material_categories') }}">
+                                    <i class="fas fa-tags me-2"></i>原材料品类管理
+                                </a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><h6 class="dropdown-header">成品管理</h6></li>
+                                <li><a class="dropdown-item" href="{{ url_for('main.finished_product_inbound') }}">
+                                    <i class="fas fa-box me-2"></i>成品入库
+                                </a></li>
+                            </ul>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link" href="{{ url_for('main.manage_products') }}">产品管理</a>
@@ -278,6 +353,30 @@
                 </ul>
                 <ul class="navbar-nav ms-auto">
                     {% if current_user.is_authenticated %}
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="searchDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false" title="搜索">
+                                <i class="fas fa-search"></i>
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="searchDropdown" style="min-width: 200px;">
+                                <li><a class="dropdown-item" href="{{ url_for('main.global_search') }}">
+                                    <i class="fas fa-search me-2"></i>全局搜索
+                                </a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('main.advanced_search') }}">
+                                    <i class="fas fa-filter me-2"></i>高级搜索
+                                </a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li>
+                                    <form class="px-3 py-2" onsubmit="quickSearch(event)">
+                                        <div class="input-group">
+                                            <input type="text" class="form-control form-control-sm" placeholder="快速搜索..." id="navQuickSearch">
+                                            <button class="btn btn-outline-secondary btn-sm" type="submit">
+                                                <i class="fas fa-search"></i>
+                                            </button>
+                                        </div>
+                                    </form>
+                                </li>
+                            </ul>
+                        </li>
                         <li class="nav-item">
                             <a class="nav-link position-relative" href="{{ url_for('main.manage_notifications') }}" title="通知中心">
                                 <i class="fas fa-bell"></i>
@@ -379,6 +478,16 @@
             // 每30秒刷新一次通知计数
             setInterval(loadNotificationCount, 30000);
         });
+
+        // 快速搜索功能
+        function quickSearch(event) {
+            event.preventDefault();
+            const query = document.getElementById('navQuickSearch').value.trim();
+            if (query) {
+                const searchUrl = "{{ url_for('main.global_search') }}" + "?query=" + encodeURIComponent(query);
+                window.location.href = searchUrl;
+            }
+        }
     </script>
     {% block scripts %}{% endblock %}
 </body>
