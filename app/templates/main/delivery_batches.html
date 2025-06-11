@@ -289,8 +289,7 @@ function saveBatches() {
     fetch(`/sales_order_item/${orderItem.id}/delivery_batches`, {
         method: 'POST',
         headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': document.querySelector('meta[name=csrf-token]').getAttribute('content')
+            'Content-Type': 'application/json'
         },
         body: JSON.stringify({
             batches: validBatches

@@ -734,7 +734,7 @@ document.getElementById('saveDeliveryBatches').addEventListener('click', functio
     fetch(`/sales_order_item/${window.currentItemId}/delivery_batches`, {
         method: 'POST',
         headers: {
-            'Content-Type': 'application/json',
+            'Content-Type': 'application/json'
         },
         body: JSON.stringify({
             batches: validBatches

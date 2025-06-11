@@ -3369,6 +3369,344 @@ def update_bonus_penalty(id):
         current_app.logger.error(f'更新奖惩记录失败: {str(e)}')
         return jsonify({'success': False, 'message': f'更新失败：{str(e)}'}), 500
 
+@bp.route('/tasks/<int:id>', methods=['GET'])
+@login_required
+def get_task(id):
+    """获取单个任务"""
+    try:
+        task = TaskAssignment.query.get_or_404(id)
+        return jsonify({
+            'success': True,
+            'data': {
+                'id': task.id,
+                'assigned_date': task.assigned_date.strftime('%Y-%m-%d'),
+                'target_date': task.target_date.strftime('%Y-%m-%d'),
+                'employee_id': task.employee_id,
+                'process_id': task.process_id,
+                'quantity': task.quantity,
+                'status': task.status
+            }
+        })
+    except Exception as e:
+        current_app.logger.error(f'获取任务失败: {str(e)}')
+        return jsonify({'success': False, 'message': f'获取失败：{str(e)}'}), 500
+
+@bp.route('/tasks/add', methods=['POST'])
+@login_required
+def add_task():
+    """添加任务"""
+    if current_user.role not in ['admin', 'hr']:
+        return jsonify({'success': False, 'message': '权限不足'}), 403
+    
+    try:
+        data = request.get_json()
+        
+        # 获取对应的工序价格记录和员工记录
+        process_price = ProcessPrice.query.get(data.get('process_id'))
+        employee = Employee.query.get(data.get('employee_id'))
+        
+        if not process_price:
+            return jsonify({'success': False, 'message': '未找到对应的工序'}), 400
+        
+        if not employee:
+            return jsonify({'success': False, 'message': '未找到对应的员工'}), 400
+        
+        # 创建任务分配记录
+        task = TaskAssignment(
+            global_sn=SerialNumber.get_next_number(),
+            employee_id=data.get('employee_id'),
+            process_id=data.get('process_id'),
+            quantity=data.get('quantity'),
+            target_date=datetime.strptime(data.get('target_date'), '%Y-%m-%d').date() if data.get('target_date') else None,
+            notes=data.get('notes'),
+            status='pending',  # 设置初始状态为待处理
+            assigned_date=datetime.now().date(),  # 设置分配日期
+            # 规格型号信息
+            spec_extended=data.get('spec_extended'),
+            spec_gasket=data.get('spec_gasket'),
+            spec_joint=data.get('spec_joint'),
+            spec_drilling=data.get('spec_drilling'),
+            spec_other=data.get('spec_other'),
+            spec_other_desc=data.get('spec_other_desc'),
+            direction=data.get('direction')
+        )
+        db.session.add(task)
+        db.session.flush()  # 获取task.id
+        
+        # 记录审计日志
+        log = AuditLog(
+            user_id=current_user.id,
+            action='分配生产任务',
+            details=f'将工序 {process_price.process_name} 分配给员工 {employee.name}，数量：{task.quantity}',
+            can_rollback=True,
+            rollback_type='add',
+            target_model='TaskAssignment',
+            target_id=task.id,
+            new_data={
+                'employee_id': task.employee_id,
+                'process_id': task.process_id,
+                'quantity': task.quantity,
+                'target_date': task.target_date.isoformat() if task.target_date else None,
+                'notes': task.notes,
+                'status': task.status
+            }
+        )
+        db.session.add(log)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': '任务分配成功',
+            'task': {
+                'id': task.id,
+                'employee_name': employee.name,
+                'process_name': process_price.process_name,
+                'quantity': task.quantity,
+                'target_date': task.target_date.strftime('%Y-%m-%d') if task.target_date else None,
+                'status': task.status
+            }
+        })
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f'添加任务失败: {str(e)}')
+        return jsonify({'success': False, 'message': f'添加失败：{str(e)}'}), 500
+
+@bp.route('/tasks/assignment/<int:id>', methods=['GET'])
+@login_required
+def get_task_assignment(id):
+    """获取任务分配详情"""
+    try:
+        task = TaskAssignment.query.get_or_404(id)
+        return jsonify({
+            'success': True,
+            'data': {
+                'id': task.id,
+                'assigned_date': task.assigned_date.strftime('%Y-%m-%d'),
+                'employee_id': task.employee_id,
+                'process_id': task.process_id,
+                'quantity': task.quantity,
+                'target_date': task.target_date.strftime('%Y-%m-%d') if task.target_date else None,
+                'notes': task.notes,
+                'status': task.status,
+                'completed_quantity': task.completed_quantity
+            }
+        })
+    except Exception as e:
+        current_app.logger.error(f'获取任务分配详情失败: {str(e)}')
+        return jsonify({'success': False, 'message': f'获取失败：{str(e)}'}), 500
+
+@bp.route('/tasks/<int:id>/edit', methods=['POST'])
+@login_required
+def edit_task(id):
+    if not current_user.role in ['admin', 'hr']:
+        return jsonify({'success': False, 'message': '权限不足'}), 403
+    
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'message': '无效的请求数据'}), 400
+        
+        task = TaskAssignment.query.get_or_404(id)
+        employee = Employee.query.get(data.get('employee_id'))
+        process = ProcessPrice.query.get(data.get('process_id'))
+        
+        if not employee or not process:
+            return jsonify({'success': False, 'message': '员工或工序不存在'}), 400
+            
+        # 保存旧数据用于回滚
+        old_data = {
+            'employee_id': task.employee_id,
+            'process_id': task.process_id,
+            'quantity': task.quantity,
+            'target_date': task.target_date.isoformat() if task.target_date else None,
+            'notes': task.notes,
+            'status': task.status,
+            'completed_quantity': task.completed_quantity
+        }
+            
+        # 更新任务信息
+        task.target_date = datetime.strptime(data.get('target_date'), '%Y-%m-%d').date()
+        task.employee_id = data.get('employee_id')
+        task.process_id = data.get('process_id')
+        task.quantity = data.get('quantity')
+        
+        # 更新状态
+        new_status = data.get('status')
+        if new_status in ['pending', 'completed', 'cancelled']:
+            task.status = new_status
+            if new_status == 'completed':
+                task.completed_date = datetime.now().date()
+            elif new_status == 'cancelled':
+                task.cancelled_date = datetime.now().date()
+        
+        # 记录可回滚的审计日志
+        log = AuditLog(
+            user_id=current_user.id,
+            action='修改生产任务',
+            details=f'修改任务：员工 {employee.name}，工序 {process.process_name}，数量：{task.quantity}',
+            can_rollback=True,
+            rollback_type='edit',
+            target_model='TaskAssignment',
+            target_id=task.id,
+            old_data=old_data,
+            new_data={
+                'employee_id': task.employee_id,
+                'process_id': task.process_id,
+                'quantity': task.quantity,
+                'target_date': task.target_date.isoformat() if task.target_date else None,
+                'notes': task.notes,
+                'status': task.status,
+                'completed_quantity': task.completed_quantity
+            },
+            timestamp=datetime.now()  # 使用本地时间
+        )
+        db.session.add(log)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': '任务修改成功',
+            'task': {
+                'id': task.id,
+                'employee_name': employee.name,
+                'process_name': process.process_name,
+                'quantity': task.quantity,
+                'target_date': task.target_date.strftime('%Y-%m-%d') if task.target_date else None,
+                'status': task.status
+            }
+        })
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f'更新任务失败: {str(e)}')
+        return jsonify({'success': False, 'message': f'更新失败：{str(e)}'}), 500
+
+@bp.route('/employee_salary_changes/<int:employee_id>')
+@login_required
+def employee_salary_changes(employee_id):
+    page = request.args.get('page', 1, type=int)
+    per_page = 20
+    
+    # 获取员工信息
+    employee = Employee.query.get_or_404(employee_id)
+    
+    # 直接查询对象而不是字段
+    salary_changes = SalaryChange.query.filter_by(employee_id=employee_id).all()
+    coefficient_changes = CoefficientChange.query.filter_by(employee_id=employee_id).all()
+    
+    # 合并两种变更记录并添加类型标记
+    records = []
+    for change in salary_changes:
+        records.append({
+            'id': change.id,
+            'global_sn': change.global_sn,
+            'change_type': 'salary',
+            'old_value': change.old_salary,
+            'new_value': change.new_salary,
+            'effective_date': change.effective_date,
+            'reason': change.reason,
+            'created_at': change.created_at,
+            'creator': User.query.get(change.created_by) if change.created_by else None
+        })
+    
+    for change in coefficient_changes:
+        records.append({
+            'id': change.id,
+            'global_sn': change.global_sn,
+            'change_type': 'coefficient',
+            'old_value': change.old_coefficient,
+            'new_value': change.new_coefficient,
+            'effective_date': change.effective_date,
+            'reason': change.reason,
+            'created_at': change.created_at,
+            'creator': User.query.get(change.created_by) if change.created_by else None
+        })
+    
+    # 按创建时间倒序排序
+    records.sort(key=lambda x: x['created_at'], reverse=True)
+    
+    # 手动分页
+    total = len(records)
+    start = (page - 1) * per_page
+    end = min(start + per_page, total)
+    paged_records = records[start:end]
+    
+    # 创建分页对象
+    pagination = Pagination(page=page, per_page=per_page, total=total, items=paged_records)
+    
+    # 为添加表单创建员工JSON数据
+    employee_json = {
+        'id': employee.id,
+        'employee_id': employee.employee_id,
+        'name': employee.name,
+        'base_salary': employee.base_salary,
+        'coefficient': employee.coefficient
+    }
+    
+    return render_template('main/employee_salary_changes.html',
+                          employee=employee,
+                          employee_json=employee_json,
+                          records=paged_records,
+                          pagination=pagination,
+                          now=datetime.now())
+
+@bp.route('/add_salary_change', methods=['POST'])
+@login_required
+def add_salary_change():
+    if current_user.role not in ['admin', 'hr']:
+        return jsonify({'success': False, 'message': '权限不足'})
+    
+    data = request.get_json()
+    employee_id = data.get('employee_id')
+    change_type = data.get('change_type')
+    old_value = float(data.get('old_value'))
+    new_value = float(data.get('new_value'))
+    effective_date = datetime.strptime(data.get('effective_date'), '%Y-%m-%d')
+    reason = data.get('reason')
+    
+    try:
+        if change_type == 'salary':
+            change = SalaryChange(
+                global_sn=SerialNumber.get_next_number(),
+                employee_id=employee_id,
+                old_salary=old_value,
+                new_salary=new_value,
+                effective_date=effective_date,
+                reason=reason,
+                creator_id=current_user.id
+            )
+        else:
+            change = CoefficientChange(
+                global_sn=SerialNumber.get_next_number(),
+                employee_id=employee_id,
+                old_coefficient=old_value,
+                new_coefficient=new_value,
+                effective_date=effective_date,
+                reason=reason,
+                creator_id=current_user.id
+            )
+        
+        db.session.add(change)
+        db.session.commit()
+        
+        # 添加审计日志
+        log = AuditLog(
+            user_id=current_user.id,
+            action=f"添加{'工资' if change_type == 'salary' else '工资系数'}变更记录",
+            details=f"为员工ID {employee_id} 添加{'工资' if change_type == 'salary' else '工资系数'}变更记录，从 {old_value} 变更为 {new_value}，生效日期 {data.get('effective_date')}",
+            can_rollback=True,
+            rollback_type='add',
+            target_model='SalaryChange' if change_type == 'salary' else 'CoefficientChange',
+            target_id=change.id
+        )
+        db.session.add(log)
+        db.session.commit()
+        
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"添加工资变更记录失败: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)})
+
 @bp.route('/delete_salary_change', methods=['POST'])
 @login_required
 def delete_salary_change():
@@ -7327,6 +7665,258 @@ def edit_sales_order_item(item_id):
         except Exception as e:
             db.session.rollback()
             flash(f'更新失败：{str(e)}', 'danger')
+    
+    return render_template('main/sales_order_item_form.html', form=form, title='编辑订单行', 
+                         order=order, order_item=order_item)
+
+@bp.route('/sales_order_item/<int:item_id>/delete', methods=['DELETE'])
+@login_required
+def delete_sales_order_item(item_id):
+    """删除销售订单行"""
+    if current_user.role not in ['admin', 'manager', 'sales']:
+        return jsonify({'success': False, 'message': '权限不足'}), 403
+    
+    try:
+        order_item = SalesOrderItem.query.get_or_404(item_id)
+        order = order_item.sales_order
+        
+        # 保存旧数据用于回滚
+        old_data = {
+            'sales_order_id': order_item.sales_order_id,
+            'product_id': order_item.product_id,
+            'quantity': order_item.quantity,
+            'direction': order_item.direction
+        }
+        
+        # 记录可回滚的审计日志
+        log = AuditLog(
+            user_id=current_user.id,
+            action='删除订单行',
+            details=f'删除订单 {order.order_number} 的订单行：{order_item.product_name} x {order_item.quantity}',
+            can_rollback=True,
+            rollback_type='delete',
+            target_model='SalesOrderItem',
+            target_id=order_item.id,
+            old_data=old_data
+        )
+        db.session.add(log)
+        
+        db.session.delete(order_item)
+        
+        # 更新订单合计数量
+        order.calculate_total_quantity()
+        
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': '订单行删除成功'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'删除失败：{str(e)}'})
+
+@bp.route('/sales_order_item/<int:item_id>/delivery_batches/manage', methods=['GET'])
+@login_required
+def manage_delivery_batches_page(item_id):
+    """分批到货管理页面"""
+    if current_user.role not in ['admin', 'manager', 'sales']:
+        flash('权限不足', 'danger')
+        return redirect(url_for('main.manage_sales_orders'))
+    
+    order_item = SalesOrderItem.query.get_or_404(item_id)
+    batches = order_item.delivery_batches_list
+    
+    return render_template('main/delivery_batches.html', 
+                         order_item=order_item, 
+                         batches=batches)
+
+@bp.route('/sales_order_item/<int:item_id>/delivery_batches', methods=['GET', 'POST'])
+@login_required
+@csrf.exempt  # 对分批到货API豁免CSRF保护
+def manage_delivery_batches(item_id):
+    """管理分批到货"""
+    if current_user.role not in ['admin', 'manager', 'sales']:
+        return jsonify({'success': False, 'message': '权限不足'}), 403
+    
+    order_item = SalesOrderItem.query.get_or_404(item_id)
+    
+    if request.method == 'POST':
+        try:
+            data = request.get_json()
+            batches = data.get('batches', [])
+            
+            # 验证分批数量总和不超过订单行数量
+            total_batch_quantity = sum(batch.get('quantity', 0) for batch in batches)
+            if total_batch_quantity > order_item.quantity:
+                return jsonify({'success': False, 'message': '分批数量总和不能超过订单数量'})
+            
+            # 保存分批信息
+            order_item.set_delivery_batches(batches)
+            db.session.commit()
+            
+            # 记录审计日志
+            log = AuditLog(
+                user_id=current_user.id,
+                action='设置分批到货',
+                details=f'为订单行 {order_item.product_name} 设置分批到货，共 {len(batches)} 批次'
+            )
+            db.session.add(log)
+            db.session.commit()
+            
+            return jsonify({'success': True, 'message': '分批到货设置成功'})
+            
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'success': False, 'message': f'设置失败：{str(e)}'})
+    
+    # GET请求返回当前分批信息
+    return jsonify({
+        'success': True,
+        'data': {
+            'order_item': {
+                'id': order_item.id,
+                'product_name': order_item.product_name,
+                'quantity': order_item.quantity,
+                'unit': order_item.unit
+            },
+            'batches': order_item.delivery_batches_list
+        }
+    })
+
+# ==================== 销售订单管理 API ====================
+
+@bp.route('/api/sales_orders/search')
+@login_required
+def api_search_sales_orders():
+    """销售订单搜索API"""
+    try:
+        search = request.args.get('search', '').strip()
+        status_filter = request.args.get('status', '')
+        
+        query = SalesOrder.query.join(Customer)
+        
+        if status_filter:
+            query = query.filter(SalesOrder.status == status_filter)
+        
+        if search:
+            search_term = f"%{search}%"
+            query = query.filter(db.or_(
+                SalesOrder.order_number.like(search_term),
+                Customer.customer_name.like(search_term),
+                Customer.customer_code.like(search_term)
+            ))
+        
+        sales_orders = query.order_by(SalesOrder.created_at.desc()).limit(50).all()
+        
+        return jsonify({
+            'success': True,
+            'data': [{
+                'id': order.id,
+                'order_number': order.order_number,
+                'customer_name': order.customer.customer_name,
+                'customer_code': order.customer.customer_code,
+                'year_month': order.year_month,
+                'total_quantity': order.total_quantity,
+                'status': order.status,
+                'order_date': order.order_date.strftime('%Y-%m-%d %H:%M')
+            } for order in sales_orders]
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'搜索失败：{str(e)}'})
+
+@bp.route('/api/products/search')
+@login_required
+def api_search_products_for_sales():
+    """产品搜索API（用于销售订单）"""
+    try:
+        search = request.args.get('search', '').strip()
+        only_active = request.args.get('only_active', 'true').lower() == 'true'
+        
+        query = Product.query
+        
+        if only_active:
+            query = query.filter(Product.status == 'active')
+        
+        if search:
+            search_term = f"%{search}%"
+            query = query.filter(db.or_(
+                Product.product_code.like(search_term),
+                Product.product_name.like(search_term),
+                Product.drawing_number.like(search_term)
+            ))
+        
+        products = query.order_by(Product.product_name).limit(50).all()
+        
+        return jsonify({
+            'success': True,
+            'data': [{
+                'id': product.id,
+                'product_code': product.product_code,
+                'product_name': product.product_name,
+                'drawing_number': product.drawing_number or '',
+                'unit': product.unit,
+                'status': product.status
+            } for product in products]
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'搜索失败：{str(e)}'})
+
+# ==================== 产品名称和图号选择 API ====================
+
+@bp.route('/api/products/names')
+@login_required
+def api_get_product_names():
+    """获取产品名称列表（去重）"""
+    try:
+        only_active = request.args.get('only_active', 'true').lower() == 'true'
+        
+        # 获取去重的产品名称
+        query = db.session.query(Product.product_name).distinct()
+        if only_active:
+            query = query.filter(Product.status == 'active')
+        
+        product_names = query.order_by(Product.product_name).all()
+        
+        return jsonify({
+            'success': True,
+            'data': [name[0] for name in product_names if name[0]]  # 过滤空值
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'获取产品名称失败：{str(e)}'})
+
+@bp.route('/api/products/drawings-by-name')
+@login_required
+def api_get_drawings_by_product_name():
+    """根据产品名称获取图号列表"""
+    try:
+        product_name = request.args.get('product_name', '').strip()
+        only_active = request.args.get('only_active', 'true').lower() == 'true'
+        
+        if not product_name:
+            return jsonify({'success': False, 'message': '产品名称不能为空'})
+        
+        query = Product.query.filter(Product.product_name == product_name)
+        if only_active:
+            query = query.filter(Product.status == 'active')
+        
+        products = query.order_by(Product.drawing_number).all()
+        
+        return jsonify({
+            'success': True,
+            'data': [{
+                'id': product.id,
+                'product_code': product.product_code,
+                'product_name': product.product_name,
+                'drawing_number': product.drawing_number or '',
+                'unit': product.unit,
+                'status': product.status
+            } for product in products]
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'获取图号列表失败：{str(e)}'})
 
 # ==================== 客户地址选择 API ====================
 
