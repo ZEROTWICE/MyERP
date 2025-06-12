@@ -11,7 +11,7 @@ pipeline {
         BACKUP_PATH = 'C:\\Deployed\\backups\\wage_management_system'
         
         // Anaconda环境配置
-        CONDA_ENV_NAME = 'OperaEnv_01'
+        CONDA_ENV_NAME = 'wage'
         CONDA_PATH = 'conda'  // 或者指定完整路径如 'C:\\Users\\%USERNAME%\\anaconda3\\Scripts\\conda.exe'
         
         // Python环境（使用conda环境中的python）

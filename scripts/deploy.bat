@@ -12,7 +12,7 @@ set BACKUP_PATH=C:\Apps\backups\wage_management_system
 set SERVICE_NAME=WageManagementSystem
 
 :: Anaconda环境配置
-set CONDA_ENV_NAME=OperaEnv_01
+set CONDA_ENV_NAME=wage
 set CONDA_PATH=conda
 
 :: 获取时间戳

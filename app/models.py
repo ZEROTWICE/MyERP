@@ -464,7 +464,7 @@ class RawMaterial(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     global_sn = db.Column(db.String(8), unique=True, nullable=False)  # 全局流水号
     supplier = db.Column(db.String(100), nullable=False)  # 供应商
-    material_name = db.Column(db.String(100), nullable=False)  # 品名
+    category_id = db.Column(db.Integer, db.ForeignKey('raw_material_categories.id'), nullable=False)  # 品类ID
     melt_number = db.Column(db.String(100), nullable=False)  # 原料冶炼炉号
     supplier_number = db.Column(db.String(100), nullable=False)  # 供应商编号
     has_sample = db.Column(db.Boolean, default=False)  # 是否带样品
@@ -475,12 +475,25 @@ class RawMaterial(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     status = db.Column(db.String(20), nullable=False, default='in_stock', index=True)  # 状态: in_stock: 在库, used: 已使用, scrapped: 报废
     is_archived = db.Column(db.Boolean, default=False)  # 是否已存档
-    category_id = db.Column(db.Integer, db.ForeignKey('raw_material_categories.id'))  # 品类ID
     
     __table_args__ = (
         db.UniqueConstraint('global_sn', name='uq_raw_material_global_sn'),
         db.UniqueConstraint('internal_number', name='uq_raw_material_internal_number'),
     )
+    
+    @property
+    def material_name(self):
+        """获取品名（通过品类）"""
+        if self.category:
+            return self.category.name
+        return "未设置品类"
+    
+    @property
+    def category_code(self):
+        """获取品类编码"""
+        if self.category:
+            return self.category.code
+        return ""
     
     def __init__(self, **kwargs):
         super(RawMaterial, self).__init__(**kwargs)
@@ -488,6 +501,110 @@ class RawMaterial(db.Model):
             self.global_sn = SerialNumber.get_next_number()
         if not self.internal_number or self.internal_number == '':
             self.internal_number = SerialNumber.get_next_number()
+
+class ConsumableCategory(db.Model):
+    """易耗品品类管理"""
+    __tablename__ = 'consumable_categories'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False, unique=True)  # 品类名称
+    code = db.Column(db.String(20), nullable=False, unique=True)  # 品类编码
+    description = db.Column(db.Text)  # 品类描述
+    is_active = db.Column(db.Boolean, default=True)  # 是否启用
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_by = db.Column(db.Integer, db.ForeignKey('user.id'))  # 创建人
+    
+    # 关系
+    consumables = db.relationship('Consumable', backref='category', lazy='dynamic')
+    creator = db.relationship('User', backref='created_consumable_categories')
+    
+    def __repr__(self):
+        return f'<ConsumableCategory {self.name}>'
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'code': self.code,
+            'description': self.description,
+            'is_active': self.is_active,
+            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+            'consumable_count': self.consumables.count()
+        }
+
+class Consumable(db.Model):
+    """易耗品管理"""
+    __tablename__ = 'consumables'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    global_sn = db.Column(db.String(8), unique=True, nullable=False)  # 全局流水号
+    supplier = db.Column(db.String(100), nullable=False)  # 供应商
+    category_id = db.Column(db.Integer, db.ForeignKey('consumable_categories.id'), nullable=False)  # 品类ID
+    specification = db.Column(db.String(200))  # 规格型号
+    supplier_number = db.Column(db.String(100), nullable=False)  # 供应商编号
+    storage_date = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)  # 入库时间
+    internal_number = db.Column(db.String(100), nullable=False)  # 内部编号
+    quantity = db.Column(db.Float, nullable=False)  # 数量
+    unit = db.Column(db.String(20), default='个')  # 单位
+    unit_price = db.Column(db.Float, default=0)  # 单价
+    total_price = db.Column(db.Float, default=0)  # 总价
+    expiry_date = db.Column(db.Date)  # 过期日期
+    storage_location = db.Column(db.String(100))  # 存放位置
+    min_stock_level = db.Column(db.Float, default=0)  # 最低库存预警
+    notes = db.Column(db.Text)  # 备注
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    status = db.Column(db.String(20), nullable=False, default='in_stock', index=True)  # 状态: in_stock: 在库, used: 已使用, scrapped: 报废, expired: 过期
+    is_archived = db.Column(db.Boolean, default=False)  # 是否已存档
+    
+    __table_args__ = (
+        db.UniqueConstraint('global_sn', name='uq_consumable_global_sn'),
+        db.UniqueConstraint('internal_number', name='uq_consumable_internal_number'),
+    )
+    
+    @property
+    def consumable_name(self):
+        """获取易耗品名称（通过品类）"""
+        if self.category:
+            return self.category.name
+        return "未设置品类"
+    
+    @property
+    def category_code(self):
+        """获取品类编码"""
+        if self.category:
+            return self.category.code
+        return ""
+    
+    @property
+    def is_low_stock(self):
+        """是否低库存"""
+        return self.quantity <= self.min_stock_level if self.min_stock_level > 0 else False
+    
+    @property
+    def is_expired(self):
+        """是否已过期"""
+        if self.expiry_date:
+            return datetime.now().date() > self.expiry_date
+        return False
+    
+    @property
+    def days_to_expiry(self):
+        """距离过期天数"""
+        if self.expiry_date:
+            delta = self.expiry_date - datetime.now().date()
+            return delta.days
+        return None
+    
+    def __init__(self, **kwargs):
+        super(Consumable, self).__init__(**kwargs)
+        if not self.global_sn:
+            self.global_sn = SerialNumber.get_next_number()
+        if not self.internal_number or self.internal_number == '':
+            self.internal_number = SerialNumber.get_next_number()
+        # 自动计算总价
+        if self.unit_price and self.quantity:
+            self.total_price = self.unit_price * self.quantity
 
 class CodeRule(db.Model):
     """编码规则管理"""

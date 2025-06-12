@@ -12,7 +12,7 @@ deployment:
   # Python环境配置
   python:
     use_conda: true
-    conda_env_name: "OperaEnv_01"
+    conda_env_name: "wage"
     conda_executable: "conda"  # 或指定完整路径如: "C:\\Users\\%USERNAME%\\anaconda3\\Scripts\\conda.exe"
     
   # 数据库配置

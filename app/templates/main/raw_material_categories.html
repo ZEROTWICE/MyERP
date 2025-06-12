@@ -58,7 +58,7 @@
                                 <span class="badge bg-info">{{ category.raw_materials.count() }}</span>
                             </td>
                             <td>
-                                {{ category.created_at.strftime('%Y-%m-%d %H:%M') }}
+                                {{ category.created_at.strftime('%Y-%m-%d %H:%M') if category.created_at else '未设置' }}
                             </td>
                             <td>
                                 <div class="btn-group" role="group">

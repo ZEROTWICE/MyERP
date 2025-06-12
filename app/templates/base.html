@@ -291,20 +291,31 @@
                             </a>
                             <ul class="dropdown-menu" aria-labelledby="inventoryDropdown">
                                 <li><a class="dropdown-item" href="{{ url_for('main.manage_inventory') }}">
-                                    <i class="fas fa-search me-2"></i>库存查询
+                                    库存查询
                                 </a></li>
                                 <li><hr class="dropdown-divider"></li>
                                 <li><h6 class="dropdown-header">原材料管理</h6></li>
                                 <li><a class="dropdown-item" href="{{ url_for('main.raw_material_inbound') }}">
-                                    <i class="fas fa-industry me-2"></i>原材料入库
+                                    原材料入库
                                 </a></li>
                                 <li><a class="dropdown-item" href="{{ url_for('main.raw_material_categories') }}">
-                                    <i class="fas fa-tags me-2"></i>原材料品类管理
+                                    原材料品类管理
+                                </a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><h6 class="dropdown-header">易耗品管理</h6></li>
+                                <li><a class="dropdown-item" href="{{ url_for('main.manage_consumables') }}">
+                                    易耗品管理
+                                </a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('main.consumable_inbound') }}">
+                                    易耗品入库
+                                </a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('main.consumable_categories') }}">
+                                    易耗品品类管理
                                 </a></li>
                                 <li><hr class="dropdown-divider"></li>
                                 <li><h6 class="dropdown-header">成品管理</h6></li>
                                 <li><a class="dropdown-item" href="{{ url_for('main.finished_product_inbound') }}">
-                                    <i class="fas fa-box me-2"></i>成品入库
+                                    成品入库
                                 </a></li>
                             </ul>
                         </li>

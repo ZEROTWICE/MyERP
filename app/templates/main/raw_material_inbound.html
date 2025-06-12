@@ -28,8 +28,7 @@
                         <thead class="table-light">
                             <tr>
                                 <th width="150">供应商 <span class="text-danger">*</span></th>
-                                <th width="150">品名 <span class="text-danger">*</span></th>
-                                <th width="120">原材料品类</th>
+                                <th width="150">原材料品类 <span class="text-danger">*</span></th>
                                 <th width="120">原料冶炼炉号</th>
                                 <th width="120">供应商编号 <span class="text-danger">*</span></th>
                                 <th width="120">内部编号</th>
@@ -47,10 +46,7 @@
                                     <input type="text" class="form-control form-control-sm" name="supplier_0" placeholder="供应商" required>
                                 </td>
                                 <td>
-                                    <input type="text" class="form-control form-control-sm" name="material_name_0" placeholder="品名" required>
-                                </td>
-                                <td>
-                                    <select class="form-control form-control-sm" name="category_id_0">
+                                    <select class="form-control form-control-sm" name="category_id_0" required>
                                         <option value="">选择原材料品类</option>
                                         <!-- 品类选项会通过JavaScript动态加载 -->
                                     </select>
@@ -200,10 +196,7 @@ function createInboundRow(rowIndex) {
             <input type="text" class="form-control form-control-sm" name="supplier_${rowIndex}" placeholder="供应商" required>
         </td>
         <td>
-            <input type="text" class="form-control form-control-sm" name="material_name_${rowIndex}" placeholder="品名" required>
-        </td>
-        <td>
-            <select class="form-control form-control-sm" name="category_id_${rowIndex}">
+            <select class="form-control form-control-sm" name="category_id_${rowIndex}" required>
                 <option value="">选择原材料品类</option>
                 <!-- 品类选项会通过JavaScript动态填充 -->
             </select>
@@ -323,17 +316,17 @@ document.getElementById('batchInboundForm').addEventListener('submit', function(
         const rowIndex = row.getAttribute('data-row');
         
         const supplier = row.querySelector(`input[name="supplier_${rowIndex}"]`).value.trim();
-        const materialName = row.querySelector(`input[name="material_name_${rowIndex}"]`).value.trim();
+        const categoryId = row.querySelector(`select[name="category_id_${rowIndex}"]`).value;
         const supplierNumber = row.querySelector(`input[name="supplier_number_${rowIndex}"]`).value.trim();
         const quantity = parseFloat(row.querySelector(`input[name="quantity_${rowIndex}"]`).value);
         const storageDate = row.querySelector(`input[name="storage_date_${rowIndex}"]`).value;
         
-        if (!supplier && !materialName && !supplierNumber && !quantity && !storageDate) {
+        if (!supplier && !categoryId && !supplierNumber && !quantity && !storageDate) {
             return; // 空行跳过
         }
         
-        if (!supplier || !materialName || !supplierNumber) {
-            errors.push(`第 ${index + 1} 行：供应商、品名、供应商编号不能为空`);
+        if (!supplier || !categoryId || !supplierNumber) {
+            errors.push(`第 ${index + 1} 行：供应商、原材料品类、供应商编号不能为空`);
             return;
         }
         

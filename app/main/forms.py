@@ -474,8 +474,7 @@ class RawMaterialCategoryForm(FlaskForm):
 class RawMaterialInboundForm(FlaskForm):
     """原材料入库表单"""
     supplier = StringField('供应商', validators=[DataRequired('请输入供应商'), Length(max=100)])
-    material_name = StringField('品名', validators=[DataRequired('请输入品名'), Length(max=100)])
-    category_id = SelectField('品类', coerce=int, validators=[Optional()])
+    category_id = SelectField('品类', coerce=int, validators=[DataRequired('请选择品类')])
     melt_number = StringField('原料冶炼炉号', validators=[Optional(), Length(max=100)])
     supplier_number = StringField('供应商编号', validators=[DataRequired('请输入供应商编号'), Length(max=100)])
     internal_number = StringField('内部编号', validators=[Optional(), Length(max=100)], description="留空则自动生成")
@@ -488,7 +487,7 @@ class RawMaterialInboundForm(FlaskForm):
     def __init__(self, *args, **kwargs):
         super(RawMaterialInboundForm, self).__init__(*args, **kwargs)
         from app.models import RawMaterialCategory
-        self.category_id.choices = [(0, '请选择品类')] + [(c.id, c.name) for c in RawMaterialCategory.query.filter_by(is_active=True).all()]
+        self.category_id.choices = [(c.id, c.name) for c in RawMaterialCategory.query.filter_by(is_active=True).all()]
 
 class FinishedProductInboundForm(FlaskForm):
     """成品入库表单"""
@@ -566,3 +565,94 @@ class InventoryInboundForm(FlaskForm):
                 return False
         
         return True
+
+class ConsumableCategoryForm(FlaskForm):
+    """易耗品品类管理表单"""
+    name = StringField('品类名称', validators=[DataRequired('请输入品类名称'), Length(max=100)])
+    code = StringField('品类编码', validators=[DataRequired('请输入品类编码'), Length(max=20)])
+    description = TextAreaField('品类描述', validators=[Optional(), Length(max=500)])
+    is_active = BooleanField('是否启用', default=True)
+    submit = SubmitField('保存')
+
+class ConsumableInboundForm(FlaskForm):
+    """易耗品入库表单"""
+    supplier = StringField('供应商', validators=[DataRequired('请输入供应商'), Length(max=100)])
+    category_id = SelectField('品类', coerce=int, validators=[DataRequired('请选择品类')])
+    specification = StringField('规格型号', validators=[Optional(), Length(max=200)])
+    supplier_number = StringField('供应商编号', validators=[DataRequired('请输入供应商编号'), Length(max=100)])
+    internal_number = StringField('内部编号', validators=[Optional(), Length(max=100)], description="留空则自动生成")
+    quantity = FloatField('数量', validators=[DataRequired('请输入数量'), NumberRange(min=0.01, message='数量必须大于0')])
+    unit = StringField('单位', validators=[DataRequired('请输入单位'), Length(max=20)], default='个')
+    unit_price = FloatField('单价', validators=[Optional(), NumberRange(min=0, message='单价不能为负数')], default=0)
+    expiry_date = DateField('过期日期', validators=[Optional()])
+    storage_location = StringField('存放位置', validators=[Optional(), Length(max=100)])
+    min_stock_level = FloatField('最低库存预警', validators=[Optional(), NumberRange(min=0, message='预警值不能为负数')], default=0)
+    storage_date = DateField('入库时间', validators=[DataRequired('请选择入库时间')], default=datetime.today)
+    notes = TextAreaField('备注', validators=[Optional(), Length(max=500)])
+    submit = SubmitField('确认入库')
+    
+    def __init__(self, *args, **kwargs):
+        super(ConsumableInboundForm, self).__init__(*args, **kwargs)
+        from app.models import ConsumableCategory
+        self.category_id.choices = [(c.id, c.name) for c in ConsumableCategory.query.filter_by(is_active=True).all()]
+
+class ConsumableSearchForm(FlaskForm):
+    """易耗品搜索表单"""
+    search = StringField('搜索', render_kw={"placeholder": "输入供应商、品类名称、规格型号或内部编号进行搜索"})
+    category_id = SelectField('品类', coerce=int, validators=[Optional()])
+    status = SelectField('状态', choices=[
+        ('', '全部'),
+        ('in_stock', '在库'),
+        ('used', '已使用'),
+        ('scrapped', '报废'),
+        ('expired', '过期')
+    ], default='')
+    supplier = StringField('供应商')
+    storage_date_start = DateField('入库日期开始')
+    storage_date_end = DateField('入库日期结束')
+    low_stock_only = BooleanField('仅显示低库存')
+    expired_only = BooleanField('仅显示已过期')
+    expiring_soon = BooleanField('仅显示即将过期(30天内)')
+    submit = SubmitField('搜索')
+    
+    def __init__(self, *args, **kwargs):
+        super(ConsumableSearchForm, self).__init__(*args, **kwargs)
+        from app.models import ConsumableCategory
+        categories = [(0, '全部品类')] + [(c.id, c.name) for c in ConsumableCategory.query.filter_by(is_active=True).all()]
+        self.category_id.choices = categories
+
+class ConsumableUsageForm(FlaskForm):
+    """易耗品使用表单"""
+    consumable_id = HiddenField('易耗品ID', validators=[DataRequired()])
+    usage_quantity = FloatField('使用数量', validators=[DataRequired('请输入使用数量'), NumberRange(min=0.01, message='使用数量必须大于0')])
+    usage_date = DateField('使用日期', validators=[DataRequired('请选择使用日期')], default=datetime.today)
+    used_by = StringField('使用人', validators=[DataRequired('请输入使用人'), Length(max=50)])
+    usage_purpose = StringField('使用用途', validators=[Optional(), Length(max=200)])
+    notes = TextAreaField('备注', validators=[Optional(), Length(max=500)])
+    submit = SubmitField('确认使用')
+
+class ConsumableUpdateForm(FlaskForm):
+    """易耗品更新表单"""
+    supplier = StringField('供应商', validators=[DataRequired('请输入供应商'), Length(max=100)])
+    category_id = SelectField('品类', coerce=int, validators=[DataRequired('请选择品类')])
+    specification = StringField('规格型号', validators=[Optional(), Length(max=200)])
+    supplier_number = StringField('供应商编号', validators=[DataRequired('请输入供应商编号'), Length(max=100)])
+    quantity = FloatField('数量', validators=[DataRequired('请输入数量'), NumberRange(min=0, message='数量不能为负数')])
+    unit = StringField('单位', validators=[DataRequired('请输入单位'), Length(max=20)])
+    unit_price = FloatField('单价', validators=[Optional(), NumberRange(min=0, message='单价不能为负数')])
+    expiry_date = DateField('过期日期', validators=[Optional()])
+    storage_location = StringField('存放位置', validators=[Optional(), Length(max=100)])
+    min_stock_level = FloatField('最低库存预警', validators=[Optional(), NumberRange(min=0, message='预警值不能为负数')])
+    status = SelectField('状态', choices=[
+        ('in_stock', '在库'),
+        ('used', '已使用'),
+        ('scrapped', '报废'),
+        ('expired', '过期')
+    ], validators=[DataRequired('请选择状态')])
+    notes = TextAreaField('备注', validators=[Optional(), Length(max=500)])
+    submit = SubmitField('更新')
+    
+    def __init__(self, *args, **kwargs):
+        super(ConsumableUpdateForm, self).__init__(*args, **kwargs)
+        from app.models import ConsumableCategory
+        self.category_id.choices = [(c.id, c.name) for c in ConsumableCategory.query.filter_by(is_active=True).all()]

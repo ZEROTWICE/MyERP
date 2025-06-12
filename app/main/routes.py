@@ -4624,11 +4624,22 @@ def add_raw_material():
             
             internal_number = rule.generate_code()
         
+        # 验证品类ID
+        category_id = data.get('category_id')
+        if not category_id:
+            return jsonify({'success': False, 'message': '请选择原材料品类'})
+        
+        # 验证品类是否存在
+        from app.models import RawMaterialCategory
+        category = RawMaterialCategory.query.get(category_id)
+        if not category or not category.is_active:
+            return jsonify({'success': False, 'message': '选择的原材料品类无效'})
+        
         # 创建原材料记录
         material = RawMaterial(
             global_sn=SerialNumber.get_next_number(),
             supplier=data['supplier'],
-            material_name=data['material_name'],
+            category_id=category_id,
             melt_number=data.get('melt_number', ''),  # 修改为可选字段
             supplier_number=data['supplier_number'],
             storage_date=datetime.strptime(data['storage_date'], '%Y-%m-%d').date(),
@@ -4645,14 +4656,15 @@ def add_raw_material():
         log = AuditLog(
             user_id=current_user.id,
             action='添加原材料',
-            details=f'添加原材料：{material.material_name}',
+            details=f'添加原材料：{material.material_name} ({material.category_code})',
             can_rollback=True,
             rollback_type='add',
             target_model='RawMaterial',
             target_id=material.id,
             new_data={
                 'supplier': material.supplier,
-                'material_name': material.material_name,
+                'category_id': material.category_id,
+                'material_name': material.material_name,  # 通过品类获取
                 'melt_number': material.melt_number,
                 'supplier_number': material.supplier_number,
                 'internal_number': material.internal_number,
@@ -5029,7 +5041,9 @@ def get_raw_material(id):
             'data': {
                 'id': material.id,
                 'supplier': material.supplier,
-                'material_name': material.material_name,
+                'category_id': material.category_id,
+                'material_name': material.material_name,  # 通过品类获取
+                'category_code': material.category_code,
                 'melt_number': material.melt_number,
                 'supplier_number': material.supplier_number,
                 'internal_number': material.internal_number,
@@ -5060,6 +5074,7 @@ def update_raw_material(id):
         # 保存旧数据用于审计日志
         old_data = {
             'supplier': material.supplier,
+            'category_id': material.category_id,
             'material_name': material.material_name,
             'melt_number': material.melt_number,
             'supplier_number': material.supplier_number,
@@ -5071,9 +5086,20 @@ def update_raw_material(id):
             'notes': material.notes
         }
         
+        # 验证品类ID
+        category_id = data.get('category_id')
+        if not category_id:
+            return jsonify({'success': False, 'message': '请选择原材料品类'})
+        
+        # 验证品类是否存在
+        from app.models import RawMaterialCategory
+        category = RawMaterialCategory.query.get(category_id)
+        if not category or not category.is_active:
+            return jsonify({'success': False, 'message': '选择的原材料品类无效'})
+        
         # 更新数据
         material.supplier = data['supplier']
-        material.material_name = data['material_name']
+        material.category_id = category_id
         material.melt_number = data.get('melt_number', '')  # 可选字段
         material.supplier_number = data['supplier_number']
         material.storage_date = datetime.strptime(data['storage_date'], '%Y-%m-%d').date()
@@ -5086,7 +5112,7 @@ def update_raw_material(id):
         log = AuditLog(
             user_id=current_user.id,
             action='更新原材料',
-            details=f'更新原材料：{material.material_name}',
+            details=f'更新原材料：{material.material_name} ({material.category_code})',
             can_rollback=True,
             rollback_type='edit',
             target_model='RawMaterial',
@@ -5094,7 +5120,8 @@ def update_raw_material(id):
             old_data=old_data,
             new_data={
                 'supplier': material.supplier,
-                'material_name': material.material_name,
+                'category_id': material.category_id,
+                'material_name': material.material_name,  # 通过品类获取
                 'melt_number': material.melt_number,
                 'supplier_number': material.supplier_number,
                 'internal_number': material.internal_number,
@@ -5168,7 +5195,8 @@ def delete_raw_material(id):
         # 保存旧数据用于审计日志
         old_data = {
             'supplier': material.supplier,
-            'material_name': material.material_name,
+            'category_id': material.category_id,
+            'material_name': material.material_name,  # 通过品类获取
             'melt_number': material.melt_number,
             'supplier_number': material.supplier_number,
             'internal_number': material.internal_number,
@@ -5183,7 +5211,7 @@ def delete_raw_material(id):
         log = AuditLog(
             user_id=current_user.id,
             action='删除原材料',
-            details=f'删除原材料：{material.material_name}',
+            details=f'删除原材料：{material.material_name} ({material.category_code})',
             can_rollback=True,
             rollback_type='delete',
             target_model='RawMaterial',
@@ -5766,9 +5794,21 @@ def raw_material_inbound():
                     else:
                         category_id = None
                     
+                    # 验证品类ID
+                    if not category_id:
+                        errors.append(f'第{row_index+1}行：请选择原材料品类')
+                        continue
+                    
+                    # 验证品类是否存在
+                    from app.models import RawMaterialCategory
+                    category = RawMaterialCategory.query.get(category_id)
+                    if not category or not category.is_active:
+                        errors.append(f'第{row_index+1}行：选择的原材料品类无效')
+                        continue
+                    
                     raw_material = RawMaterial(
                         supplier=supplier,
-                        material_name=material_name,
+                        category_id=category_id,
                         quantity=quantity,
                         storage_date=storage_date,
                         melt_number=melt_number,
@@ -5776,8 +5816,7 @@ def raw_material_inbound():
                         internal_number=internal_number,
                         has_sample=has_sample,
                         notes=notes,
-                        status='in_stock',
-                        category_id=category_id
+                        status='in_stock'
                     )
                     
                     db.session.add(raw_material)
@@ -5787,14 +5826,15 @@ def raw_material_inbound():
                     audit_log = AuditLog(
                         user_id=current_user.id,
                         action='原材料入库',
-                        details=f'入库原材料：{raw_material.material_name}，数量：{raw_material.quantity}',
+                        details=f'入库原材料：{raw_material.material_name} ({raw_material.category_code})，数量：{raw_material.quantity}',
                         can_rollback=True,
                         rollback_type='delete',
                         target_model='RawMaterial',
                         target_id=raw_material.id,
                         new_data={
                             'supplier': raw_material.supplier,
-                            'material_name': raw_material.material_name,
+                            'category_id': raw_material.category_id,
+                            'material_name': raw_material.material_name,  # 通过品类获取
                             'quantity': float(raw_material.quantity),
                             'storage_date': raw_material.storage_date.isoformat()
                         }
@@ -9140,4 +9180,690 @@ def api_chart_data_task():
         return jsonify({'success': True, 'data': data})
     except Exception as e:
         return jsonify({'success': False, 'message': f'获取任务统计数据失败: {str(e)}'})
+
+
+# ==================== 易耗品管理路由 ====================
+
+@bp.route('/consumables')
+@login_required
+@handle_pagination_args
+def manage_consumables():
+    """易耗品管理"""
+    from app.main.forms import ConsumableSearchForm
+    from app.models import Consumable, ConsumableCategory
+    from datetime import datetime, timedelta
+    
+    form = ConsumableSearchForm()
+    
+    # 构建查询
+    query = Consumable.query
+    
+    # 搜索条件
+    if form.search.data:
+        search_term = f"%{form.search.data}%"
+        query = query.join(ConsumableCategory).filter(
+            db.or_(
+                Consumable.supplier.like(search_term),
+                ConsumableCategory.name.like(search_term),
+                Consumable.specification.like(search_term),
+                Consumable.internal_number.like(search_term),
+                Consumable.supplier_number.like(search_term)
+            )
+        )
+    
+    # 品类筛选
+    if form.category_id.data and form.category_id.data != 0:
+        query = query.filter(Consumable.category_id == form.category_id.data)
+    
+    # 状态筛选
+    if form.status.data:
+        query = query.filter(Consumable.status == form.status.data)
+    
+    # 供应商筛选
+    if form.supplier.data:
+        query = query.filter(Consumable.supplier.like(f"%{form.supplier.data}%"))
+    
+    # 入库日期筛选
+    if form.storage_date_start.data:
+        query = query.filter(Consumable.storage_date >= form.storage_date_start.data)
+    if form.storage_date_end.data:
+        query = query.filter(Consumable.storage_date <= form.storage_date_end.data)
+    
+    # 特殊筛选条件
+    if form.low_stock_only.data:
+        query = query.filter(
+            db.and_(
+                Consumable.min_stock_level > 0,
+                Consumable.quantity <= Consumable.min_stock_level
+            )
+        )
+    
+    if form.expired_only.data:
+        today = datetime.now().date()
+        query = query.filter(
+            db.and_(
+                Consumable.expiry_date.isnot(None),
+                Consumable.expiry_date < today
+            )
+        )
+    
+    if form.expiring_soon.data:
+        today = datetime.now().date()
+        thirty_days_later = today + timedelta(days=30)
+        query = query.filter(
+            db.and_(
+                Consumable.expiry_date.isnot(None),
+                Consumable.expiry_date >= today,
+                Consumable.expiry_date <= thirty_days_later
+            )
+        )
+    
+    # 排序
+    query = query.order_by(Consumable.created_at.desc())
+    
+    # 分页
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 20, type=int)
+    consumables = query.paginate(
+        page=page, per_page=per_page, error_out=False
+    )
+    
+    # 统计信息
+    total_count = Consumable.query.count()
+    in_stock_count = Consumable.query.filter_by(status='in_stock').count()
+    low_stock_count = Consumable.query.filter(
+        db.and_(
+            Consumable.min_stock_level > 0,
+            Consumable.quantity <= Consumable.min_stock_level,
+            Consumable.status == 'in_stock'
+        )
+    ).count()
+    
+    today = datetime.now().date()
+    expired_count = Consumable.query.filter(
+        db.and_(
+            Consumable.expiry_date.isnot(None),
+            Consumable.expiry_date < today,
+            Consumable.status == 'in_stock'
+        )
+    ).count()
+    
+    thirty_days_later = today + timedelta(days=30)
+    expiring_soon_count = Consumable.query.filter(
+        db.and_(
+            Consumable.expiry_date.isnot(None),
+            Consumable.expiry_date >= today,
+            Consumable.expiry_date <= thirty_days_later,
+            Consumable.status == 'in_stock'
+        )
+    ).count()
+    
+    stats = {
+        'total': total_count,
+        'in_stock': in_stock_count,
+        'low_stock': low_stock_count,
+        'expired': expired_count,
+        'expiring_soon': expiring_soon_count
+    }
+    
+    return render_template('main/consumables.html', 
+                         consumables=consumables, 
+                         form=form, 
+                         stats=stats)
+
+@bp.route('/consumables/inbound', methods=['GET', 'POST'])
+@login_required
+def consumable_inbound():
+    """易耗品入库"""
+    from app.main.forms import ConsumableInboundForm
+    from app.models import Consumable, ConsumableCategory
+    
+    form = ConsumableInboundForm()
+    
+    if form.validate_on_submit():
+        try:
+            # 验证品类是否存在
+            category = ConsumableCategory.query.get(form.category_id.data)
+            if not category:
+                flash('选择的品类不存在', 'danger')
+                return render_template('main/consumable_inbound.html', form=form)
+            
+            # 创建易耗品记录
+            consumable = Consumable(
+                supplier=form.supplier.data,
+                category_id=form.category_id.data,
+                specification=form.specification.data,
+                supplier_number=form.supplier_number.data,
+                internal_number=form.internal_number.data or None,  # 留空则自动生成
+                quantity=form.quantity.data,
+                unit=form.unit.data,
+                unit_price=form.unit_price.data or 0,
+                expiry_date=form.expiry_date.data,
+                storage_location=form.storage_location.data,
+                min_stock_level=form.min_stock_level.data or 0,
+                storage_date=form.storage_date.data,
+                notes=form.notes.data
+            )
+            
+            db.session.add(consumable)
+            
+            # 记录审计日志
+            audit_log = AuditLog(
+                user_id=current_user.id,
+                action='添加易耗品',
+                details=f'添加易耗品：{category.name} - {consumable.supplier} - {consumable.supplier_number}',
+                can_rollback=True,
+                rollback_type='add',
+                target_model='Consumable',
+                target_id=consumable.id,
+                new_data={
+                    'supplier': consumable.supplier,
+                    'category_id': consumable.category_id,
+                    'specification': consumable.specification,
+                    'supplier_number': consumable.supplier_number,
+                    'quantity': consumable.quantity,
+                    'unit': consumable.unit,
+                    'unit_price': consumable.unit_price
+                }
+            )
+            db.session.add(audit_log)
+            
+            db.session.commit()
+            flash(f'易耗品入库成功！内部编号：{consumable.internal_number}', 'success')
+            return redirect(url_for('main.manage_consumables'))
+            
+        except Exception as e:
+            db.session.rollback()
+            current_app.logger.error(f'易耗品入库失败: {str(e)}')
+            flash(f'入库失败：{str(e)}', 'danger')
+    
+    return render_template('main/consumable_inbound.html', form=form)
+
+@bp.route('/consumables/<int:id>', methods=['GET'])
+@login_required
+def get_consumable(id):
+    """获取易耗品详情"""
+    consumable = Consumable.query.get_or_404(id)
+    
+    return jsonify({
+        'id': consumable.id,
+        'global_sn': consumable.global_sn,
+        'supplier': consumable.supplier,
+        'category_id': consumable.category_id,
+        'category_name': consumable.consumable_name,
+        'category_code': consumable.category_code,
+        'specification': consumable.specification,
+        'supplier_number': consumable.supplier_number,
+        'internal_number': consumable.internal_number,
+        'quantity': consumable.quantity,
+        'unit': consumable.unit,
+        'unit_price': consumable.unit_price,
+        'total_price': consumable.total_price,
+        'expiry_date': consumable.expiry_date.strftime('%Y-%m-%d') if consumable.expiry_date else None,
+        'storage_location': consumable.storage_location,
+        'min_stock_level': consumable.min_stock_level,
+        'storage_date': consumable.storage_date.strftime('%Y-%m-%d %H:%M:%S'),
+        'notes': consumable.notes,
+        'status': consumable.status,
+        'is_low_stock': consumable.is_low_stock,
+        'is_expired': consumable.is_expired,
+        'days_to_expiry': consumable.days_to_expiry,
+        'created_at': consumable.created_at.strftime('%Y-%m-%d %H:%M:%S')
+    })
+
+@bp.route('/consumables/<int:id>', methods=['PUT'])
+@login_required
+def update_consumable(id):
+    """更新易耗品"""
+    from app.main.forms import ConsumableUpdateForm
+    from app.models import Consumable, ConsumableCategory
+    
+    consumable = Consumable.query.get_or_404(id)
+    
+    # 保存旧数据用于审计日志
+    old_data = {
+        'supplier': consumable.supplier,
+        'category_id': consumable.category_id,
+        'specification': consumable.specification,
+        'supplier_number': consumable.supplier_number,
+        'quantity': consumable.quantity,
+        'unit': consumable.unit,
+        'unit_price': consumable.unit_price,
+        'expiry_date': consumable.expiry_date.strftime('%Y-%m-%d') if consumable.expiry_date else None,
+        'storage_location': consumable.storage_location,
+        'min_stock_level': consumable.min_stock_level,
+        'status': consumable.status,
+        'notes': consumable.notes
+    }
+    
+    try:
+        data = request.get_json()
+        
+        # 验证品类是否存在
+        if 'category_id' in data:
+            category = ConsumableCategory.query.get(data['category_id'])
+            if not category:
+                return jsonify({'success': False, 'message': '选择的品类不存在'}), 400
+        
+        # 更新字段
+        if 'supplier' in data:
+            consumable.supplier = data['supplier']
+        if 'category_id' in data:
+            consumable.category_id = data['category_id']
+        if 'specification' in data:
+            consumable.specification = data['specification']
+        if 'supplier_number' in data:
+            consumable.supplier_number = data['supplier_number']
+        if 'quantity' in data:
+            consumable.quantity = float(data['quantity'])
+        if 'unit' in data:
+            consumable.unit = data['unit']
+        if 'unit_price' in data:
+            consumable.unit_price = float(data['unit_price'])
+            # 重新计算总价
+            consumable.total_price = consumable.unit_price * consumable.quantity
+        if 'expiry_date' in data:
+            if data['expiry_date']:
+                consumable.expiry_date = datetime.strptime(data['expiry_date'], '%Y-%m-%d').date()
+            else:
+                consumable.expiry_date = None
+        if 'storage_location' in data:
+            consumable.storage_location = data['storage_location']
+        if 'min_stock_level' in data:
+            consumable.min_stock_level = float(data['min_stock_level']) if data['min_stock_level'] else 0
+        if 'status' in data:
+            consumable.status = data['status']
+        if 'notes' in data:
+            consumable.notes = data['notes']
+        
+        # 新数据
+        new_data = {
+            'supplier': consumable.supplier,
+            'category_id': consumable.category_id,
+            'specification': consumable.specification,
+            'supplier_number': consumable.supplier_number,
+            'quantity': consumable.quantity,
+            'unit': consumable.unit,
+            'unit_price': consumable.unit_price,
+            'expiry_date': consumable.expiry_date.strftime('%Y-%m-%d') if consumable.expiry_date else None,
+            'storage_location': consumable.storage_location,
+            'min_stock_level': consumable.min_stock_level,
+            'status': consumable.status,
+            'notes': consumable.notes
+        }
+        
+        # 记录审计日志
+        audit_log = AuditLog(
+            user_id=current_user.id,
+            action='更新易耗品',
+            details=f'更新易耗品：{consumable.consumable_name} - {consumable.internal_number}',
+            can_rollback=True,
+            rollback_type='edit',
+            target_model='Consumable',
+            target_id=consumable.id,
+            old_data=old_data,
+            new_data=new_data
+        )
+        db.session.add(audit_log)
+        
+        db.session.commit()
+        return jsonify({'success': True, 'message': '更新成功'})
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f'更新易耗品失败: {str(e)}')
+        return jsonify({'success': False, 'message': f'更新失败：{str(e)}'}), 500
+
+@bp.route('/consumables/<int:id>', methods=['DELETE'])
+@login_required
+@csrf.exempt
+def delete_consumable(id):
+    """删除易耗品"""
+    if current_user.role not in ['admin']:
+        return jsonify({'success': False, 'message': '权限不足'}), 403
+    
+    try:
+        consumable = Consumable.query.get_or_404(id)
+        
+        # 保存旧数据用于回滚
+        old_data = {
+            'supplier': consumable.supplier,
+            'category_id': consumable.category_id,
+            'specification': consumable.specification,
+            'supplier_number': consumable.supplier_number,
+            'internal_number': consumable.internal_number,
+            'quantity': consumable.quantity,
+            'unit': consumable.unit,
+            'unit_price': consumable.unit_price,
+            'total_price': consumable.total_price,
+            'expiry_date': consumable.expiry_date.strftime('%Y-%m-%d') if consumable.expiry_date else None,
+            'storage_location': consumable.storage_location,
+            'min_stock_level': consumable.min_stock_level,
+            'storage_date': consumable.storage_date.strftime('%Y-%m-%d %H:%M:%S'),
+            'notes': consumable.notes,
+            'status': consumable.status
+        }
+        
+        # 记录审计日志
+        audit_log = AuditLog(
+            user_id=current_user.id,
+            action='删除易耗品',
+            details=f'删除易耗品：{consumable.consumable_name} - {consumable.internal_number}',
+            can_rollback=True,
+            rollback_type='delete',
+            target_model='Consumable',
+            target_id=consumable.id,
+            old_data=old_data
+        )
+        db.session.add(audit_log)
+        
+        db.session.delete(consumable)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': '删除成功'})
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f'删除易耗品失败: {str(e)}')
+        return jsonify({'success': False, 'message': f'删除失败：{str(e)}'}), 500
+
+@bp.route('/consumables/<int:id>/use', methods=['POST'])
+@login_required
+def use_consumable(id):
+    """使用易耗品"""
+    from app.main.forms import ConsumableUsageForm
+    
+    consumable = Consumable.query.get_or_404(id)
+    
+    if consumable.status != 'in_stock':
+        return jsonify({'success': False, 'message': '该易耗品不在库存中，无法使用'}), 400
+    
+    try:
+        data = request.get_json()
+        usage_quantity = float(data.get('usage_quantity', 0))
+        
+        if usage_quantity <= 0:
+            return jsonify({'success': False, 'message': '使用数量必须大于0'}), 400
+        
+        if usage_quantity > consumable.quantity:
+            return jsonify({'success': False, 'message': '使用数量不能超过库存数量'}), 400
+        
+        # 保存旧数据
+        old_quantity = consumable.quantity
+        old_status = consumable.status
+        
+        # 更新库存
+        consumable.quantity -= usage_quantity
+        
+        # 如果库存耗尽，更新状态
+        if consumable.quantity <= 0:
+            consumable.status = 'used'
+        
+        # 记录审计日志
+        audit_log = AuditLog(
+            user_id=current_user.id,
+            action='使用易耗品',
+            details=f'使用易耗品：{consumable.consumable_name} - {consumable.internal_number}，使用数量：{usage_quantity}，使用人：{data.get("used_by", "")}',
+            can_rollback=True,
+            rollback_type='edit',
+            target_model='Consumable',
+            target_id=consumable.id,
+            old_data={
+                'quantity': old_quantity,
+                'status': old_status
+            },
+            new_data={
+                'quantity': consumable.quantity,
+                'status': consumable.status,
+                'usage_info': {
+                    'usage_quantity': usage_quantity,
+                    'used_by': data.get('used_by', ''),
+                    'usage_purpose': data.get('usage_purpose', ''),
+                    'usage_date': data.get('usage_date', datetime.now().strftime('%Y-%m-%d')),
+                    'notes': data.get('notes', '')
+                }
+            }
+        )
+        db.session.add(audit_log)
+        
+        db.session.commit()
+        return jsonify({'success': True, 'message': '使用记录成功'})
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f'使用易耗品失败: {str(e)}')
+        return jsonify({'success': False, 'message': f'使用失败：{str(e)}'}), 500
+
+@bp.route('/consumables/categories')
+@login_required
+def consumable_categories():
+    """易耗品品类管理"""
+    from app.models import ConsumableCategory
+    
+    categories = ConsumableCategory.query.order_by(ConsumableCategory.created_at.desc()).all()
+    return render_template('main/consumable_categories.html', categories=categories)
+
+@bp.route('/consumables/categories/add', methods=['POST'])
+@login_required
+def add_consumable_category():
+    """添加易耗品品类"""
+    from app.main.forms import ConsumableCategoryForm
+    from app.models import ConsumableCategory
+    
+    form = ConsumableCategoryForm()
+    
+    if form.validate_on_submit():
+        try:
+            # 检查品类名称是否已存在
+            existing_name = ConsumableCategory.query.filter_by(name=form.name.data).first()
+            if existing_name:
+                return jsonify({'success': False, 'message': '品类名称已存在'}), 400
+            
+            # 检查品类编码是否已存在
+            existing_code = ConsumableCategory.query.filter_by(code=form.code.data).first()
+            if existing_code:
+                return jsonify({'success': False, 'message': '品类编码已存在'}), 400
+            
+            category = ConsumableCategory(
+                name=form.name.data,
+                code=form.code.data,
+                description=form.description.data,
+                is_active=form.is_active.data,
+                created_by=current_user.id
+            )
+            
+            db.session.add(category)
+            
+            # 记录审计日志
+            audit_log = AuditLog(
+                user_id=current_user.id,
+                action='添加易耗品品类',
+                details=f'添加易耗品品类：{category.name} ({category.code})',
+                can_rollback=True,
+                rollback_type='add',
+                target_model='ConsumableCategory',
+                target_id=category.id,
+                new_data={
+                    'name': category.name,
+                    'code': category.code,
+                    'description': category.description,
+                    'is_active': category.is_active
+                }
+            )
+            db.session.add(audit_log)
+            
+            db.session.commit()
+            return jsonify({'success': True, 'message': '品类添加成功'})
+            
+        except Exception as e:
+            db.session.rollback()
+            current_app.logger.error(f'添加易耗品品类失败: {str(e)}')
+            return jsonify({'success': False, 'message': f'添加失败：{str(e)}'}), 500
+    
+    # 返回表单验证错误
+    errors = []
+    for field, field_errors in form.errors.items():
+        for error in field_errors:
+            errors.append(f'{form[field].label.text}: {error}')
+    
+    return jsonify({'success': False, 'message': '; '.join(errors)}), 400
+
+@bp.route('/consumables/categories/<int:category_id>', methods=['GET'])
+@login_required
+def get_consumable_category(category_id):
+    """获取易耗品品类详情"""
+    from app.models import ConsumableCategory
+    
+    category = ConsumableCategory.query.get_or_404(category_id)
+    return jsonify(category.to_dict())
+
+@bp.route('/consumables/categories/<int:category_id>', methods=['PUT'])
+@login_required
+def update_consumable_category(category_id):
+    """更新易耗品品类"""
+    from app.models import ConsumableCategory
+    
+    category = ConsumableCategory.query.get_or_404(category_id)
+    
+    # 保存旧数据
+    old_data = {
+        'name': category.name,
+        'code': category.code,
+        'description': category.description,
+        'is_active': category.is_active
+    }
+    
+    try:
+        data = request.get_json()
+        
+        # 检查名称唯一性
+        if 'name' in data and data['name'] != category.name:
+            existing_name = ConsumableCategory.query.filter_by(name=data['name']).first()
+            if existing_name:
+                return jsonify({'success': False, 'message': '品类名称已存在'}), 400
+        
+        # 检查编码唯一性
+        if 'code' in data and data['code'] != category.code:
+            existing_code = ConsumableCategory.query.filter_by(code=data['code']).first()
+            if existing_code:
+                return jsonify({'success': False, 'message': '品类编码已存在'}), 400
+        
+        # 更新字段
+        if 'name' in data:
+            category.name = data['name']
+        if 'code' in data:
+            category.code = data['code']
+        if 'description' in data:
+            category.description = data['description']
+        if 'is_active' in data:
+            category.is_active = data['is_active']
+        
+        category.updated_at = datetime.utcnow()
+        
+        # 新数据
+        new_data = {
+            'name': category.name,
+            'code': category.code,
+            'description': category.description,
+            'is_active': category.is_active
+        }
+        
+        # 记录审计日志
+        audit_log = AuditLog(
+            user_id=current_user.id,
+            action='更新易耗品品类',
+            details=f'更新易耗品品类：{category.name} ({category.code})',
+            can_rollback=True,
+            rollback_type='edit',
+            target_model='ConsumableCategory',
+            target_id=category.id,
+            old_data=old_data,
+            new_data=new_data
+        )
+        db.session.add(audit_log)
+        
+        db.session.commit()
+        return jsonify({'success': True, 'message': '更新成功'})
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f'更新易耗品品类失败: {str(e)}')
+        return jsonify({'success': False, 'message': f'更新失败：{str(e)}'}), 500
+
+@bp.route('/consumables/categories/<int:category_id>', methods=['DELETE'])
+@login_required
+def delete_consumable_category(category_id):
+    """删除易耗品品类"""
+    from app.models import ConsumableCategory, Consumable
+    
+    if current_user.role not in ['admin']:
+        return jsonify({'success': False, 'message': '权限不足'}), 403
+    
+    try:
+        category = ConsumableCategory.query.get_or_404(category_id)
+        
+        # 检查是否有易耗品使用该品类
+        consumable_count = Consumable.query.filter_by(category_id=category_id).count()
+        if consumable_count > 0:
+            return jsonify({'success': False, 'message': f'该品类下还有 {consumable_count} 个易耗品，无法删除'}), 400
+        
+        # 保存旧数据用于回滚
+        old_data = {
+            'name': category.name,
+            'code': category.code,
+            'description': category.description,
+            'is_active': category.is_active,
+            'created_at': category.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+            'created_by': category.created_by
+        }
+        
+        # 记录审计日志
+        audit_log = AuditLog(
+            user_id=current_user.id,
+            action='删除易耗品品类',
+            details=f'删除易耗品品类：{category.name} ({category.code})',
+            can_rollback=True,
+            rollback_type='delete',
+            target_model='ConsumableCategory',
+            target_id=category.id,
+            old_data=old_data
+        )
+        db.session.add(audit_log)
+        
+        db.session.delete(category)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': '删除成功'})
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f'删除易耗品品类失败: {str(e)}')
+        return jsonify({'success': False, 'message': f'删除失败：{str(e)}'}), 500
+
+@bp.route('/api/consumable-categories', methods=['GET'])
+@login_required
+def get_consumable_categories_api():
+    """获取易耗品品类列表API"""
+    from app.models import ConsumableCategory
+    
+    try:
+        categories = ConsumableCategory.query.filter_by(is_active=True).order_by(ConsumableCategory.name).all()
+        
+        result = []
+        for category in categories:
+            result.append({
+                'id': category.id,
+                'name': category.name,
+                'code': category.code,
+                'description': category.description
+            })
+        
+        return jsonify({
+            'success': True,
+            'categories': result
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f'获取易耗品品类列表失败: {str(e)}')
+        return jsonify({'success': False, 'message': f'获取失败：{str(e)}'}), 500
 

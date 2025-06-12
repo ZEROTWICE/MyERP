@@ -324,7 +324,7 @@ function editRawMaterial(id) {
                 document.getElementById('editRawMaterialId').value = data.data.id;
                 document.getElementById('editInternalNumber').value = data.data.internal_number;
                 document.getElementById('editSupplier').value = data.data.supplier;
-                document.getElementById('editMaterialName').value = data.data.material_name;
+                document.getElementById('editCategorySelect').value = data.data.category_id;
                 document.getElementById('editMeltNumber').value = data.data.melt_number || '';
                 document.getElementById('editSupplierNumber').value = data.data.supplier_number;
                 // 转换日期格式
@@ -397,7 +397,7 @@ function submitEditRawMaterial() {
     const id = document.getElementById('editRawMaterialId').value;
     const formData = {
         supplier: document.getElementById('editSupplier').value,
-        material_name: document.getElementById('editMaterialName').value,
+        category_id: document.getElementById('editCategorySelect').value,
         melt_number: document.getElementById('editMeltNumber').value,
         supplier_number: document.getElementById('editSupplierNumber').value,
         storage_date: document.getElementById('editStorageDate').value,
@@ -756,7 +756,7 @@ function submitRawMaterial() {
     const internalNumberType = document.getElementById('internalNumberType').value;
     let formData = {
         supplier: document.getElementById('supplier').value,
-        material_name: document.getElementById('materialName').value,
+        category_id: document.getElementById('categorySelect').value,
         melt_number: document.getElementById('meltNumber').value,
         supplier_number: document.getElementById('supplierNumber').value,
         internal_number_type: internalNumberType,
@@ -799,6 +799,45 @@ function submitRawMaterial() {
         alert('添加失败，请重试');
     });
 }
+
+// 加载原材料品类选项
+function loadRawMaterialCategories() {
+    fetch('/api/raw-material-categories')
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const addSelect = document.getElementById('categorySelect');
+            const editSelect = document.getElementById('editCategorySelect');
+            
+            // 清空选项
+            addSelect.innerHTML = '<option value="">请选择原材料品类</option>';
+            editSelect.innerHTML = '<option value="">请选择原材料品类</option>';
+            
+            // 添加品类选项
+            data.data.forEach(category => {
+                const option1 = document.createElement('option');
+                option1.value = category.id;
+                option1.textContent = `${category.name} (${category.code})`;
+                addSelect.appendChild(option1);
+                
+                const option2 = document.createElement('option');
+                option2.value = category.id;
+                option2.textContent = `${category.name} (${category.code})`;
+                editSelect.appendChild(option2);
+            });
+        } else {
+            console.error('加载原材料品类失败:', data.message);
+        }
+    })
+    .catch(error => {
+        console.error('加载原材料品类失败:', error);
+    });
+}
+
+// 页面加载时初始化品类选项
+document.addEventListener('DOMContentLoaded', function() {
+    loadRawMaterialCategories();
+});
 
 // 删除原材料
 function deleteRawMaterial(id) {
@@ -1005,8 +1044,11 @@ function executeAutoArchive() {
                         <input type="text" class="form-control" id="supplier" name="supplier" required>
                     </div>
                     <div class="mb-3">
-                        <label for="materialName" class="form-label">品名</label>
-                        <input type="text" class="form-control" id="materialName" name="material_name" required>
+                        <label for="categorySelect" class="form-label">原材料品类</label>
+                        <select class="form-control" id="categorySelect" name="category_id" required>
+                            <option value="">请选择原材料品类</option>
+                            <!-- 品类选项会通过JavaScript动态加载 -->
+                        </select>
                     </div>
                     <div class="mb-3">
                         <label for="meltNumber" class="form-label">原料冶炼炉号</label>
@@ -1139,8 +1181,11 @@ function executeAutoArchive() {
                         <input type="text" class="form-control" id="editSupplier" name="supplier" required>
                     </div>
                     <div class="mb-3">
-                        <label for="editMaterialName" class="form-label">品名</label>
-                        <input type="text" class="form-control" id="editMaterialName" name="material_name" required>
+                        <label for="editCategorySelect" class="form-label">原材料品类</label>
+                        <select class="form-control" id="editCategorySelect" name="category_id" required>
+                            <option value="">请选择原材料品类</option>
+                            <!-- 品类选项会通过JavaScript动态加载 -->
+                        </select>
                     </div>
                     <div class="mb-3">
                         <label for="editMeltNumber" class="form-label">原料冶炼炉号</label>
