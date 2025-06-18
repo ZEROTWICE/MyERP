@@ -1,0 +1,397 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-plus-circle me-2"></i>{{ title }}
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <form method="POST" id="materialRequisitionForm">
+                        {{ form.hidden_tag() }}
+                        
+                        <!-- 基本信息 -->
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    {{ form.employee_id.label(class="form-label required") }}
+                                    {{ form.employee_id(class="form-select") }}
+                                    {% if form.employee_id.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {% for error in form.employee_id.errors %}
+                                                {{ error }}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    {{ form.requisition_date.label(class="form-label required") }}
+                                    {{ form.requisition_date(class="form-control", id="requisitionDate") }}
+                                    {% if form.requisition_date.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {% for error in form.requisition_date.errors %}
+                                                {{ error }}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    {{ form.purpose.label(class="form-label required") }}
+                                    {{ form.purpose(class="form-control", placeholder="请输入领用用途") }}
+                                    {% if form.purpose.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {% for error in form.purpose.errors %}
+                                                {{ error }}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    {{ form.notes.label(class="form-label") }}
+                                    {{ form.notes(class="form-control", rows="3", placeholder="请输入备注信息（可选）") }}
+                                    {% if form.notes.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {% for error in form.notes.errors %}
+                                                {{ error }}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 物料明细表格 -->
+                        <div class="card mb-4">
+                            <div class="card-header bg-light">
+                                <h5 class="mb-0">
+                                    <i class="fas fa-list me-2"></i>物料明细
+                                    <button type="button" class="btn btn-sm btn-success float-end" id="addMaterialBtn">
+                                        <i class="fas fa-plus me-1"></i>添加物料
+                                    </button>
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-bordered" id="materialsTable">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th width="15%">物料类型</th>
+                                                <th width="25%">物料名称</th>
+                                                <th width="15%">领用数量</th>
+                                                <th width="10%">单位</th>
+                                                <th width="25%">备注</th>
+                                                <th width="10%">操作</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="materialsTableBody">
+                                            <tr id="emptyRow">
+                                                <td colspan="6" class="text-center text-muted">
+                                                    <i class="fas fa-info-circle me-2"></i>请点击"添加物料"按钮添加物料明细
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 隐藏字段存储物料数据 -->
+                        {{ form.materials_data() }}
+                        
+                        <!-- 提交按钮 -->
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="d-flex justify-content-between">
+                                    <a href="{{ url_for('main.manage_material_requisitions') }}" class="btn btn-secondary">
+                                        <i class="fas fa-arrow-left me-2"></i>返回列表
+                                    </a>
+                                    <button type="submit" class="btn btn-primary" id="submitBtn">
+                                        <i class="fas fa-save me-2"></i>{{ form.submit.label.text }}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 添加物料模态框 -->
+<div class="modal fade" id="addMaterialModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-plus-circle me-2"></i>添加物料
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="materialForm">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group mb-3">
+                                <label class="form-label required">物料类型</label>
+                                <select class="form-select" id="materialType" required>
+                                    <option value="">请选择物料类型</option>
+                                    <option value="raw">原材料</option>
+                                    <option value="consumable">易耗品</option>
+                                    <option value="finished">成品</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group mb-3">
+                                <label class="form-label required">物料名称</label>
+                                <input type="text" class="form-control" id="materialName" placeholder="请输入物料名称" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group mb-3">
+                                <label class="form-label required">领用数量</label>
+                                <input type="number" class="form-control" id="materialQuantity" step="0.01" min="0.01" placeholder="请输入数量" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group mb-3">
+                                <label class="form-label required">单位</label>
+                                <input type="text" class="form-control" id="materialUnit" placeholder="如：件、个、公斤等" value="件" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group mb-3">
+                        <label class="form-label">备注</label>
+                        <textarea class="form-control" id="materialNotes" rows="2" placeholder="请输入备注信息（可选）"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" id="confirmAddMaterial">
+                    <i class="fas fa-plus me-2"></i>添加到表格
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.required::after {
+    content: " *";
+    color: red;
+}
+
+.table th {
+    background-color: #f8f9fa;
+    font-weight: 600;
+}
+
+.material-row:hover {
+    background-color: #f8f9fa;
+}
+
+.btn-sm {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+}
+
+.card {
+    border-radius: 15px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.card-header {
+    border-radius: 15px 15px 0 0 !important;
+}
+
+.form-control, .form-select {
+    border-radius: 8px;
+    border: 1px solid #ddd;
+    transition: all 0.3s ease;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: #007bff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+.btn {
+    border-radius: 8px;
+    transition: all 0.3s ease;
+}
+
+.btn:hover {
+    transform: translateY(-1px);
+}
+
+.modal-content {
+    border-radius: 15px;
+}
+
+.modal-header {
+    border-radius: 15px 15px 0 0;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    let materialsData = [];
+    let materialIndex = 0;
+    
+    // 设置默认日期为今天
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('requisitionDate').value = today;
+    
+    // 物料类型映射
+    const materialTypeMap = {
+        'raw': '原材料',
+        'consumable': '易耗品',
+        'finished': '成品'
+    };
+    
+    // 添加物料按钮点击事件
+    document.getElementById('addMaterialBtn').addEventListener('click', function() {
+        // 清空表单
+        document.getElementById('materialForm').reset();
+        document.getElementById('materialUnit').value = '件';
+        
+        // 显示模态框
+        const modal = new bootstrap.Modal(document.getElementById('addMaterialModal'));
+        modal.show();
+    });
+    
+    // 确认添加物料
+    document.getElementById('confirmAddMaterial').addEventListener('click', function() {
+        const materialType = document.getElementById('materialType').value;
+        const materialName = document.getElementById('materialName').value.trim();
+        const materialQuantity = document.getElementById('materialQuantity').value;
+        const materialUnit = document.getElementById('materialUnit').value.trim();
+        const materialNotes = document.getElementById('materialNotes').value.trim();
+        
+        // 验证表单
+        if (!materialType) {
+            alert('请选择物料类型');
+            return;
+        }
+        if (!materialName) {
+            alert('请输入物料名称');
+            return;
+        }
+        if (!materialQuantity || parseFloat(materialQuantity) <= 0) {
+            alert('请输入有效的领用数量');
+            return;
+        }
+        if (!materialUnit) {
+            alert('请输入单位');
+            return;
+        }
+        
+        // 添加到数据数组
+        const materialData = {
+            id: materialIndex++,
+            material_type: materialType,
+            material_name: materialName,
+            quantity: parseFloat(materialQuantity),
+            unit: materialUnit,
+            notes: materialNotes
+        };
+        
+        materialsData.push(materialData);
+        
+        // 更新表格
+        updateMaterialsTable();
+        
+        // 更新隐藏字段
+        document.getElementById('materials_data').value = JSON.stringify(materialsData);
+        
+        // 关闭模态框
+        const modal = bootstrap.Modal.getInstance(document.getElementById('addMaterialModal'));
+        modal.hide();
+    });
+    
+    // 更新物料表格
+    function updateMaterialsTable() {
+        const tbody = document.getElementById('materialsTableBody');
+        
+        if (materialsData.length === 0) {
+            tbody.innerHTML = `
+                <tr id="emptyRow">
+                    <td colspan="6" class="text-center text-muted">
+                        <i class="fas fa-info-circle me-2"></i>请点击"添加物料"按钮添加物料明细
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+        
+        let html = '';
+        materialsData.forEach(function(material) {
+            html += `
+                <tr class="material-row" data-id="${material.id}">
+                    <td>${materialTypeMap[material.material_type]}</td>
+                    <td>${material.material_name}</td>
+                    <td class="text-end">${material.quantity}</td>
+                    <td>${material.unit}</td>
+                    <td>${material.notes || '-'}</td>
+                    <td>
+                        <button type="button" class="btn btn-sm btn-danger" onclick="removeMaterial(${material.id})">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+        
+        tbody.innerHTML = html;
+    }
+    
+    // 删除物料
+    window.removeMaterial = function(id) {
+        if (confirm('确定要删除这项物料吗？')) {
+            materialsData = materialsData.filter(material => material.id !== id);
+            updateMaterialsTable();
+            document.getElementById('materials_data').value = JSON.stringify(materialsData);
+        }
+    };
+    
+    // 表单提交验证
+    document.getElementById('materialRequisitionForm').addEventListener('submit', function(e) {
+        if (materialsData.length === 0) {
+            e.preventDefault();
+            alert('请至少添加一项物料明细');
+            return false;
+        }
+        
+        // 确认提交
+        if (!confirm('确定要创建这条物料领用记录吗？')) {
+            e.preventDefault();
+            return false;
+        }
+        
+        // 显示加载状态
+        const submitBtn = document.getElementById('submitBtn');
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>正在保存...';
+    });
+});
+</script>
+{% endblock %} 

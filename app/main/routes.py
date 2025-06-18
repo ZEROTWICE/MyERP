@@ -9867,3 +9867,424 @@ def get_consumable_categories_api():
         current_app.logger.error(f'获取易耗品品类列表失败: {str(e)}')
         return jsonify({'success': False, 'message': f'获取失败：{str(e)}'}), 500
 
+# ==================== 物料领用管理 ====================
+
+@bp.route('/material_requisitions')
+@login_required
+@handle_pagination_args
+def manage_material_requisitions():
+    """物料领用记录管理"""
+    from app.main.forms import MaterialRequisitionSearchForm
+    from app.models import MaterialRequisition, Employee
+    
+    form = MaterialRequisitionSearchForm()
+    
+    # 构建查询
+    query = MaterialRequisition.query.join(Employee)
+    
+    # 处理搜索条件
+    if request.method == 'POST' and form.validate_on_submit():
+        if form.search.data:
+            search_term = f"%{form.search.data}%"
+            query = query.filter(
+                db.or_(
+                    MaterialRequisition.requisition_number.like(search_term),
+                    Employee.name.like(search_term),
+                    MaterialRequisition.department.like(search_term),
+                    MaterialRequisition.purpose.like(search_term)
+                )
+            )
+        
+        if form.department.data:
+            query = query.filter(MaterialRequisition.department.like(f"%{form.department.data}%"))
+        
+        if form.employee_id.data and form.employee_id.data != 0:
+            query = query.filter(MaterialRequisition.employee_id == form.employee_id.data)
+        
+        if form.requisition_date_start.data:
+            query = query.filter(MaterialRequisition.required_date >= form.requisition_date_start.data)
+        
+        if form.requisition_date_end.data:
+            query = query.filter(MaterialRequisition.required_date <= form.requisition_date_end.data)
+    
+    # 排序和分页
+    query = query.order_by(MaterialRequisition.requested_date.desc())
+    
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 20, type=int)
+    
+    requisitions = query.paginate(
+        page=page, per_page=per_page, error_out=False
+    )
+    
+    # 统计数据
+    total_count = MaterialRequisition.query.count()
+    this_month_count = MaterialRequisition.query.filter(
+        MaterialRequisition.required_date >= datetime.now().replace(day=1).date()
+    ).count()
+    this_week_count = MaterialRequisition.query.filter(
+        MaterialRequisition.required_date >= (datetime.now() - timedelta(days=7)).date()
+    ).count()
+    today_count = MaterialRequisition.query.filter(
+        MaterialRequisition.required_date == datetime.now().date()
+    ).count()
+    
+    return render_template('main/material_requisitions.html',
+                         requisitions=requisitions,
+                         form=form,
+                         total_count=total_count,
+                         this_month_count=this_month_count,
+                         this_week_count=this_week_count,
+                         today_count=today_count)
+
+@bp.route('/material_requisitions/add', methods=['GET', 'POST'])
+@login_required
+def add_material_requisition():
+    """添加物料领用记录"""
+    from app.main.forms import MaterialRequisitionRecordForm
+    from app.models import MaterialRequisition, MaterialRequisitionItem, Employee
+    import json
+    
+    form = MaterialRequisitionRecordForm()
+    
+    if form.validate_on_submit():
+        try:
+            # 获取员工信息
+            employee = Employee.query.get(form.employee_id.data)
+            if not employee:
+                flash('员工不存在', 'error')
+                return render_template('main/material_requisition_form.html', form=form, title='创建物料领用记录')
+            
+            # 验证物料数据
+            materials_data = json.loads(form.materials_data.data or '[]')
+            if not materials_data:
+                flash('请至少添加一项物料', 'error')
+                return render_template('main/material_requisition_form.html', form=form, title='创建物料领用记录')
+            
+            # 生成领用单号
+            today = datetime.now()
+            prefix = f"MR{today.strftime('%Y%m%d')}"
+            
+            # 查找当天最大序号
+            last_requisition = MaterialRequisition.query.filter(
+                MaterialRequisition.requisition_number.like(f"{prefix}%")
+            ).order_by(MaterialRequisition.requisition_number.desc()).first()
+            
+            if last_requisition:
+                last_seq = int(last_requisition.requisition_number[-3:])
+                seq = last_seq + 1
+            else:
+                seq = 1
+            
+            requisition_number = f"{prefix}{seq:03d}"
+            
+            # 创建领用记录
+            requisition = MaterialRequisition(
+                requisition_number=requisition_number,
+                employee_id=form.employee_id.data,
+                department=employee.department,
+                purpose=form.purpose.data,
+                required_date=form.requisition_date.data,
+                notes=form.notes.data,
+                status='completed',  # 直接完成状态
+                requested_date=datetime.now()
+            )
+            
+            db.session.add(requisition)
+            db.session.flush()  # 获取ID
+            
+            # 添加物料明细
+            for material_data in materials_data:
+                item = MaterialRequisitionItem(
+                    requisition_id=requisition.id,
+                    material_type=material_data['material_type'],
+                    material_id=1,  # 临时设置，实际应该根据material_type和material_name查找对应ID
+                    quantity=float(material_data['quantity']),
+                    unit=material_data['unit'],
+                    notes=material_data.get('notes', ''),
+                    issued_quantity=float(material_data['quantity'])  # 直接设为已发料
+                )
+                db.session.add(item)
+            
+            db.session.commit()
+            
+            # 记录操作日志
+            from app.models import AuditLog
+            audit_log = AuditLog(
+                user_id=current_user.id,
+                action='创建物料领用记录',
+                details=f'创建物料领用记录：{requisition_number} - {employee.name}',
+                can_rollback=True,
+                rollback_type='add',
+                target_model='MaterialRequisition',
+                target_id=requisition.id,
+                new_data={
+                    'requisition_number': requisition_number,
+                    'employee_id': requisition.employee_id,
+                    'department': requisition.department,
+                    'purpose': requisition.purpose,
+                    'required_date': requisition.required_date.strftime('%Y-%m-%d')
+                }
+            )
+            db.session.add(audit_log)
+            db.session.commit()
+            
+            flash('物料领用记录创建成功！', 'success')
+            return redirect(url_for('main.material_requisition_detail', id=requisition.id))
+            
+        except Exception as e:
+            db.session.rollback()
+            current_app.logger.error(f'创建物料领用记录失败: {str(e)}')
+            flash(f'创建失败：{str(e)}', 'danger')
+    
+    return render_template('main/material_requisition_form.html', form=form, title='创建物料领用记录')
+
+@bp.route('/material_requisitions/<int:id>')
+@login_required
+def material_requisition_detail(id):
+    """物料领用详情"""
+    from app.models import MaterialRequisition
+    
+    requisition = MaterialRequisition.query.get_or_404(id)
+    
+    return render_template('main/material_requisition_detail.html', requisition=requisition)
+
+
+
+# ==================== 物料归还管理 ====================
+
+@bp.route('/material_returns')
+@login_required
+@handle_pagination_args
+def manage_material_returns():
+    """物料归还管理"""
+    from app.main.forms import MaterialReturnSearchForm
+    from app.models import MaterialReturn, Employee
+    
+    form = MaterialReturnSearchForm()
+    
+    # 构建查询
+    query = MaterialReturn.query.join(Employee)
+    
+    # 处理搜索条件
+    if request.method == 'POST' and form.validate_on_submit():
+        if form.search.data:
+            search_term = f"%{form.search.data}%"
+            query = query.filter(
+                db.or_(
+                    MaterialReturn.return_number.like(search_term),
+                    Employee.name.like(search_term),
+                    MaterialReturn.department.like(search_term),
+                    MaterialReturn.return_reason.like(search_term)
+                )
+            )
+        
+        if form.status.data:
+            query = query.filter(MaterialReturn.status == form.status.data)
+        
+        if form.department.data:
+            query = query.filter(MaterialReturn.department.like(f"%{form.department.data}%"))
+        
+        if form.employee_id.data and form.employee_id.data != 0:
+            query = query.filter(MaterialReturn.employee_id == form.employee_id.data)
+        
+        if form.returned_date_start.data:
+            query = query.filter(MaterialReturn.returned_date >= form.returned_date_start.data)
+        
+        if form.returned_date_end.data:
+            query = query.filter(MaterialReturn.returned_date <= form.returned_date_end.data)
+    
+    # 排序和分页
+    query = query.order_by(MaterialReturn.returned_date.desc())
+    
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 20, type=int)
+    
+    returns = query.paginate(
+        page=page, per_page=per_page, error_out=False
+    )
+    
+    # 统计数据
+    total_count = MaterialReturn.query.count()
+    pending_count = MaterialReturn.query.filter_by(status='pending').count()
+    confirmed_count = MaterialReturn.query.filter_by(status='confirmed').count()
+    
+    return render_template('main/material_returns.html',
+                         returns=returns,
+                         form=form,
+                         total_count=total_count,
+                         pending_count=pending_count,
+                         confirmed_count=confirmed_count)
+
+# ==================== 库存盘点管理 ====================
+
+@bp.route('/inventory_counts')
+@login_required
+@handle_pagination_args
+def manage_inventory_counts():
+    """库存盘点管理"""
+    from app.main.forms import InventoryCountSearchForm
+    from app.models import InventoryCount
+    
+    form = InventoryCountSearchForm()
+    
+    # 构建查询
+    query = InventoryCount.query
+    
+    # 处理搜索条件
+    if request.method == 'POST' and form.validate_on_submit():
+        if form.search.data:
+            search_term = f"%{form.search.data}%"
+            query = query.filter(
+                db.or_(
+                    InventoryCount.count_number.like(search_term),
+                    InventoryCount.count_name.like(search_term)
+                )
+            )
+        
+        if form.status.data:
+            query = query.filter(InventoryCount.status == form.status.data)
+        
+        if form.count_type.data:
+            query = query.filter(InventoryCount.count_type == form.count_type.data)
+        
+        if form.count_scope.data:
+            query = query.filter(InventoryCount.count_scope == form.count_scope.data)
+        
+        if form.planned_date_start.data:
+            query = query.filter(InventoryCount.planned_date >= form.planned_date_start.data)
+        
+        if form.planned_date_end.data:
+            query = query.filter(InventoryCount.planned_date <= form.planned_date_end.data)
+    
+    # 排序和分页
+    query = query.order_by(InventoryCount.planned_date.desc())
+    
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 20, type=int)
+    
+    counts = query.paginate(
+        page=page, per_page=per_page, error_out=False
+    )
+    
+    # 统计数据
+    total_count = InventoryCount.query.count()
+    in_progress_count = InventoryCount.query.filter_by(status='in_progress').count()
+    completed_count = InventoryCount.query.filter_by(status='completed').count()
+    approved_count = InventoryCount.query.filter_by(status='approved').count()
+    
+    return render_template('main/inventory_counts.html',
+                         counts=counts,
+                         form=form,
+                         total_count=total_count,
+                         in_progress_count=in_progress_count,
+                         completed_count=completed_count,
+                         approved_count=approved_count)
+
+# ==================== API接口 ====================
+
+@bp.route('/api/materials/search')
+@login_required
+def api_search_materials():
+    """搜索物料API"""
+    try:
+        material_type = request.args.get('type', 'all')
+        query = request.args.get('q', '')
+        only_available = request.args.get('only_available', 'false').lower() == 'true'
+        
+        materials = []
+        
+        if material_type in ['all', 'raw']:
+            from app.models import RawMaterial
+            raw_query = RawMaterial.query.filter_by(is_archived=False)
+            
+            if only_available:
+                raw_query = raw_query.filter(RawMaterial.quantity > 0, RawMaterial.status == 'in_stock')
+            
+            if query:
+                raw_query = raw_query.filter(
+                    db.or_(
+                        RawMaterial.internal_number.like(f"%{query}%"),
+                        RawMaterial.supplier.like(f"%{query}%"),
+                        RawMaterial.supplier_number.like(f"%{query}%")
+                    )
+                )
+            
+            for material in raw_query.all():
+                materials.append({
+                    'id': material.id,
+                    'type': 'raw',
+                    'name': material.material_name,
+                    'internal_number': material.internal_number,
+                    'supplier': material.supplier,
+                    'quantity': material.quantity,
+                    'unit': '件',
+                    'status': material.status
+                })
+        
+        if material_type in ['all', 'consumable']:
+            from app.models import Consumable
+            consumable_query = Consumable.query.filter_by(is_archived=False)
+            
+            if only_available:
+                consumable_query = consumable_query.filter(Consumable.quantity > 0, Consumable.status == 'in_stock')
+            
+            if query:
+                consumable_query = consumable_query.filter(
+                    db.or_(
+                        Consumable.internal_number.like(f"%{query}%"),
+                        Consumable.supplier.like(f"%{query}%"),
+                        Consumable.supplier_number.like(f"%{query}%"),
+                        Consumable.specification.like(f"%{query}%")
+                    )
+                )
+            
+            for material in consumable_query.all():
+                materials.append({
+                    'id': material.id,
+                    'type': 'consumable',
+                    'name': material.consumable_name,
+                    'internal_number': material.internal_number,
+                    'supplier': material.supplier,
+                    'quantity': material.quantity,
+                    'unit': material.unit,
+                    'status': material.status
+                })
+        
+        if material_type in ['all', 'finished']:
+            from app.models import FinishedProduct
+            finished_query = FinishedProduct.query.filter_by(is_archived=False)
+            
+            if only_available:
+                finished_query = finished_query.filter(FinishedProduct.quantity > 0, FinishedProduct.status == 'in_stock')
+            
+            if query:
+                finished_query = finished_query.filter(
+                    db.or_(
+                        FinishedProduct.product_number.like(f"%{query}%"),
+                        FinishedProduct.drawing_number.like(f"%{query}%"),
+                        FinishedProduct.model.like(f"%{query}%")
+                    )
+                )
+            
+            for material in finished_query.all():
+                materials.append({
+                    'id': material.id,
+                    'type': 'finished',
+                    'name': f"{material.product_number} - {material.model}",
+                    'internal_number': material.product_number,
+                    'supplier': '-',
+                    'quantity': material.quantity,
+                    'unit': '件',
+                    'status': material.status
+                })
+        
+        return jsonify({
+            'success': True,
+            'data': materials
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f'搜索物料失败: {str(e)}')
+        return jsonify({'success': False, 'message': f'搜索失败：{str(e)}'}), 500
+

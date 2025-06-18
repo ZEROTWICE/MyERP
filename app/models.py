@@ -1840,13 +1840,468 @@ class NotificationTemplate(db.Model):
     
     def render(self, variables):
         """渲染模板"""
-        try:
-            from jinja2 import Template
-            title = Template(self.title_template).render(**variables)
-            content = Template(self.content_template).render(**variables)
+        title = self.title_template
+        content = self.content_template
+        
+        for key, value in variables.items():
+            title = title.replace(f'{{{key}}}', str(value))
+            content = content.replace(f'{{{key}}}', str(value))
+        
             return title, content
-        except Exception as e:
-            return f"模板渲染错误: {str(e)}", f"模板渲染错误: {str(e)}"
     
     def __repr__(self):
-        return f'<NotificationTemplate {self.template_code}>'
+        return f'<NotificationTemplate {self.template_name}>'
+
+class MaterialRequisition(db.Model):
+    """物料领用记录"""
+    __tablename__ = 'material_requisitions'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    global_sn = db.Column(db.String(8), unique=True, nullable=False)  # 全局流水号
+    requisition_number = db.Column(db.String(50), unique=True, nullable=False, index=True)  # 领用单号
+    employee_id = db.Column(db.Integer, db.ForeignKey('employee.id'), nullable=False)  # 领用人
+    department = db.Column(db.String(50), nullable=False)  # 领用部门
+    purpose = db.Column(db.String(200), nullable=False)  # 领用用途
+    project_code = db.Column(db.String(50))  # 项目编号
+    production_order_id = db.Column(db.Integer, db.ForeignKey('production_orders.id'))  # 关联生产订单
+    status = db.Column(db.String(20), default='pending')  # pending: 待审批, approved: 已审批, rejected: 已拒绝, completed: 已完成, cancelled: 已取消
+    priority = db.Column(db.String(20), default='normal')  # low, normal, high, urgent
+    requested_date = db.Column(db.DateTime, default=datetime.utcnow)  # 申请时间
+    required_date = db.Column(db.Date, nullable=False)  # 需要日期
+    approved_by = db.Column(db.Integer, db.ForeignKey('user.id'))  # 审批人
+    approved_at = db.Column(db.DateTime)  # 审批时间
+    issued_by = db.Column(db.Integer, db.ForeignKey('user.id'))  # 发料人
+    issued_at = db.Column(db.DateTime)  # 发料时间
+    notes = db.Column(db.Text)  # 备注
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    __table_args__ = (
+        db.UniqueConstraint('global_sn', name='uq_material_requisition_global_sn'),
+        db.UniqueConstraint('requisition_number', name='uq_material_requisition_number'),
+        db.Index('ix_material_requisition_status', 'status'),
+        db.Index('ix_material_requisition_date', 'requested_date'),
+    )
+    
+    # 关系
+    employee = db.relationship('Employee', backref=db.backref('material_requisitions', lazy='dynamic'))
+    production_order = db.relationship('ProductionOrder', backref=db.backref('material_requisitions', lazy='dynamic'))
+    approver = db.relationship('User', foreign_keys=[approved_by], backref=db.backref('approved_requisitions', lazy='dynamic'))
+    issuer = db.relationship('User', foreign_keys=[issued_by], backref=db.backref('issued_requisitions', lazy='dynamic'))
+    items = db.relationship('MaterialRequisitionItem', backref='requisition', lazy='dynamic', cascade='all, delete-orphan')
+    
+    def __init__(self, **kwargs):
+        super(MaterialRequisition, self).__init__(**kwargs)
+        if not self.global_sn:
+            self.global_sn = SerialNumber.get_next_number()
+        if not self.requisition_number:
+            # 生成领用单号：REQ + 年月日 + 4位序号
+            today = datetime.now()
+            prefix = f"REQ{today.strftime('%Y%m%d')}"
+            # 查找当天最大序号
+            last_req = MaterialRequisition.query.filter(
+                MaterialRequisition.requisition_number.like(f"{prefix}%")
+            ).order_by(MaterialRequisition.requisition_number.desc()).first()
+            
+            if last_req:
+                last_seq = int(last_req.requisition_number[-4:])
+                new_seq = last_seq + 1
+            else:
+                new_seq = 1
+            
+            self.requisition_number = f"{prefix}{new_seq:04d}"
+    
+    @property
+    def total_items(self):
+        """总项目数"""
+        return self.items.count()
+    
+    @property
+    def total_quantity(self):
+        """总数量"""
+        return sum(item.quantity for item in self.items)
+    
+    @property
+    def can_approve(self):
+        """是否可以审批"""
+        return self.status == 'pending'
+    
+    @property
+    def can_issue(self):
+        """是否可以发料"""
+        return self.status == 'approved'
+    
+    @property
+    def can_cancel(self):
+        """是否可以取消"""
+        return self.status in ['pending', 'approved']
+    
+    def __repr__(self):
+        return f'<MaterialRequisition {self.requisition_number}>'
+
+class MaterialRequisitionItem(db.Model):
+    """物料领用明细"""
+    __tablename__ = 'material_requisition_items'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    global_sn = db.Column(db.String(8), unique=True, nullable=False)  # 全局流水号
+    requisition_id = db.Column(db.Integer, db.ForeignKey('material_requisitions.id', ondelete='CASCADE'), nullable=False)
+    material_type = db.Column(db.String(20), nullable=False)  # raw: 原材料, consumable: 易耗品, finished: 成品
+    material_id = db.Column(db.Integer, nullable=False)  # 物料ID
+    quantity = db.Column(db.Float, nullable=False)  # 申请数量
+    issued_quantity = db.Column(db.Float, default=0)  # 已发数量
+    unit = db.Column(db.String(20), default='件')  # 单位
+    notes = db.Column(db.Text)  # 备注
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    __table_args__ = (
+        db.UniqueConstraint('global_sn', name='uq_material_requisition_item_global_sn'),
+        db.Index('ix_material_requisition_item_material', 'material_type', 'material_id'),
+    )
+    
+    def __init__(self, **kwargs):
+        super(MaterialRequisitionItem, self).__init__(**kwargs)
+        if not self.global_sn:
+            self.global_sn = SerialNumber.get_next_number()
+    
+    @property
+    def material_info(self):
+        """获取物料信息"""
+        if self.material_type == 'raw':
+            return RawMaterial.query.get(self.material_id)
+        elif self.material_type == 'consumable':
+            return Consumable.query.get(self.material_id)
+        elif self.material_type == 'finished':
+            return FinishedProduct.query.get(self.material_id)
+        return None
+    
+    @property
+    def material_name(self):
+        """获取物料名称"""
+        material = self.material_info
+        if material:
+            if self.material_type == 'raw':
+                return material.material_name
+            elif self.material_type == 'consumable':
+                return material.consumable_name
+            elif self.material_type == 'finished':
+                return f"{material.product_number} - {material.model}"
+        return "未知物料"
+    
+    @property
+    def remaining_quantity(self):
+        """剩余待发数量"""
+        return self.quantity - self.issued_quantity
+    
+    @property
+    def is_fully_issued(self):
+        """是否已完全发料"""
+        return self.issued_quantity >= self.quantity
+    
+    def __repr__(self):
+        return f'<MaterialRequisitionItem {self.material_name}: {self.quantity}>'
+
+class MaterialReturn(db.Model):
+    """物料归还记录"""
+    __tablename__ = 'material_returns'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    global_sn = db.Column(db.String(8), unique=True, nullable=False)  # 全局流水号
+    return_number = db.Column(db.String(50), unique=True, nullable=False, index=True)  # 归还单号
+    employee_id = db.Column(db.Integer, db.ForeignKey('employee.id'), nullable=False)  # 归还人
+    department = db.Column(db.String(50), nullable=False)  # 归还部门
+    return_reason = db.Column(db.String(200), nullable=False)  # 归还原因
+    original_requisition_id = db.Column(db.Integer, db.ForeignKey('material_requisitions.id'))  # 原领用单
+    status = db.Column(db.String(20), default='pending')  # pending: 待确认, confirmed: 已确认, rejected: 已拒绝
+    returned_date = db.Column(db.DateTime, default=datetime.utcnow)  # 归还时间
+    confirmed_by = db.Column(db.Integer, db.ForeignKey('user.id'))  # 确认人
+    confirmed_at = db.Column(db.DateTime)  # 确认时间
+    notes = db.Column(db.Text)  # 备注
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    __table_args__ = (
+        db.UniqueConstraint('global_sn', name='uq_material_return_global_sn'),
+        db.UniqueConstraint('return_number', name='uq_material_return_number'),
+        db.Index('ix_material_return_status', 'status'),
+        db.Index('ix_material_return_date', 'returned_date'),
+    )
+    
+    # 关系
+    employee = db.relationship('Employee', backref=db.backref('material_returns', lazy='dynamic'))
+    original_requisition = db.relationship('MaterialRequisition', backref=db.backref('returns', lazy='dynamic'))
+    confirmer = db.relationship('User', foreign_keys=[confirmed_by], backref=db.backref('confirmed_returns', lazy='dynamic'))
+    items = db.relationship('MaterialReturnItem', backref='return_record', lazy='dynamic', cascade='all, delete-orphan')
+    
+    def __init__(self, **kwargs):
+        super(MaterialReturn, self).__init__(**kwargs)
+        if not self.global_sn:
+            self.global_sn = SerialNumber.get_next_number()
+        if not self.return_number:
+            # 生成归还单号：RET + 年月日 + 4位序号
+            today = datetime.now()
+            prefix = f"RET{today.strftime('%Y%m%d')}"
+            # 查找当天最大序号
+            last_ret = MaterialReturn.query.filter(
+                MaterialReturn.return_number.like(f"{prefix}%")
+            ).order_by(MaterialReturn.return_number.desc()).first()
+            
+            if last_ret:
+                last_seq = int(last_ret.return_number[-4:])
+                new_seq = last_seq + 1
+            else:
+                new_seq = 1
+            
+            self.return_number = f"{prefix}{new_seq:04d}"
+    
+    @property
+    def total_items(self):
+        """总项目数"""
+        return self.items.count()
+    
+    @property
+    def total_quantity(self):
+        """总数量"""
+        return sum(item.quantity for item in self.items)
+    
+    @property
+    def can_confirm(self):
+        """是否可以确认"""
+        return self.status == 'pending'
+    
+    def __repr__(self):
+        return f'<MaterialReturn {self.return_number}>'
+
+class MaterialReturnItem(db.Model):
+    """物料归还明细"""
+    __tablename__ = 'material_return_items'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    global_sn = db.Column(db.String(8), unique=True, nullable=False)  # 全局流水号
+    return_id = db.Column(db.Integer, db.ForeignKey('material_returns.id', ondelete='CASCADE'), nullable=False)
+    material_type = db.Column(db.String(20), nullable=False)  # raw: 原材料, consumable: 易耗品, finished: 成品
+    material_id = db.Column(db.Integer, nullable=False)  # 物料ID
+    quantity = db.Column(db.Float, nullable=False)  # 归还数量
+    condition = db.Column(db.String(20), default='good')  # good: 完好, damaged: 损坏, expired: 过期
+    unit = db.Column(db.String(20), default='件')  # 单位
+    notes = db.Column(db.Text)  # 备注
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    __table_args__ = (
+        db.UniqueConstraint('global_sn', name='uq_material_return_item_global_sn'),
+        db.Index('ix_material_return_item_material', 'material_type', 'material_id'),
+    )
+    
+    def __init__(self, **kwargs):
+        super(MaterialReturnItem, self).__init__(**kwargs)
+        if not self.global_sn:
+            self.global_sn = SerialNumber.get_next_number()
+    
+    @property
+    def material_info(self):
+        """获取物料信息"""
+        if self.material_type == 'raw':
+            return RawMaterial.query.get(self.material_id)
+        elif self.material_type == 'consumable':
+            return Consumable.query.get(self.material_id)
+        elif self.material_type == 'finished':
+            return FinishedProduct.query.get(self.material_id)
+        return None
+    
+    @property
+    def material_name(self):
+        """获取物料名称"""
+        material = self.material_info
+        if material:
+            if self.material_type == 'raw':
+                return material.material_name
+            elif self.material_type == 'consumable':
+                return material.consumable_name
+            elif self.material_type == 'finished':
+                return f"{material.product_number} - {material.model}"
+        return "未知物料"
+    
+    def __repr__(self):
+        return f'<MaterialReturnItem {self.material_name}: {self.quantity}>'
+
+class InventoryCount(db.Model):
+    """库存盘点记录"""
+    __tablename__ = 'inventory_counts'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    global_sn = db.Column(db.String(8), unique=True, nullable=False)  # 全局流水号
+    count_number = db.Column(db.String(50), unique=True, nullable=False, index=True)  # 盘点单号
+    count_name = db.Column(db.String(100), nullable=False)  # 盘点名称
+    count_type = db.Column(db.String(20), default='full')  # full: 全盘, partial: 抽盘, cycle: 循环盘点
+    count_scope = db.Column(db.String(50))  # 盘点范围：all, raw, consumable, finished
+    warehouse_location = db.Column(db.String(100))  # 仓库位置
+    status = db.Column(db.String(20), default='planning')  # planning: 计划中, counting: 盘点中, completed: 已完成, cancelled: 已取消
+    planned_date = db.Column(db.Date, nullable=False)  # 计划盘点日期
+    start_date = db.Column(db.DateTime)  # 开始盘点时间
+    end_date = db.Column(db.DateTime)  # 结束盘点时间
+    created_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)  # 创建人
+    count_team = db.Column(db.JSON)  # 盘点小组成员（JSON格式存储用户ID列表）
+    notes = db.Column(db.Text)  # 备注
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    __table_args__ = (
+        db.UniqueConstraint('global_sn', name='uq_inventory_count_global_sn'),
+        db.UniqueConstraint('count_number', name='uq_inventory_count_number'),
+        db.Index('ix_inventory_count_status', 'status'),
+        db.Index('ix_inventory_count_date', 'planned_date'),
+    )
+    
+    # 关系
+    creator = db.relationship('User', backref=db.backref('created_inventory_counts', lazy='dynamic'))
+    items = db.relationship('InventoryCountItem', backref='count_record', lazy='dynamic', cascade='all, delete-orphan')
+    
+    def __init__(self, **kwargs):
+        super(InventoryCount, self).__init__(**kwargs)
+        if not self.global_sn:
+            self.global_sn = SerialNumber.get_next_number()
+        if not self.count_number:
+            # 生成盘点单号：CNT + 年月日 + 4位序号
+            today = datetime.now()
+            prefix = f"CNT{today.strftime('%Y%m%d')}"
+            # 查找当天最大序号
+            last_cnt = InventoryCount.query.filter(
+                InventoryCount.count_number.like(f"{prefix}%")
+            ).order_by(InventoryCount.count_number.desc()).first()
+            
+            if last_cnt:
+                last_seq = int(last_cnt.count_number[-4:])
+                new_seq = last_seq + 1
+            else:
+                new_seq = 1
+            
+            self.count_number = f"{prefix}{new_seq:04d}"
+    
+    @property
+    def total_items(self):
+        """总盘点项目数"""
+        return self.items.count()
+    
+    @property
+    def completed_items(self):
+        """已完成盘点项目数"""
+        return self.items.filter(InventoryCountItem.actual_quantity.isnot(None)).count()
+    
+    @property
+    def progress_percentage(self):
+        """盘点进度百分比"""
+        total = self.total_items
+        if total == 0:
+            return 0
+        return round((self.completed_items / total) * 100, 2)
+    
+    @property
+    def variance_items(self):
+        """有差异的项目数"""
+        return self.items.filter(
+            InventoryCountItem.actual_quantity.isnot(None),
+            InventoryCountItem.system_quantity != InventoryCountItem.actual_quantity
+        ).count()
+    
+    @property
+    def can_start(self):
+        """是否可以开始盘点"""
+        return self.status == 'planning'
+    
+    @property
+    def can_complete(self):
+        """是否可以完成盘点"""
+        return self.status == 'counting' and self.completed_items == self.total_items
+    
+    @property
+    def count_team_members(self):
+        """获取盘点小组成员"""
+        if self.count_team:
+            user_ids = self.count_team
+            return User.query.filter(User.id.in_(user_ids)).all()
+        return []
+    
+    def __repr__(self):
+        return f'<InventoryCount {self.count_number}>'
+
+class InventoryCountItem(db.Model):
+    """库存盘点明细"""
+    __tablename__ = 'inventory_count_items'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    global_sn = db.Column(db.String(8), unique=True, nullable=False)  # 全局流水号
+    count_id = db.Column(db.Integer, db.ForeignKey('inventory_counts.id', ondelete='CASCADE'), nullable=False)
+    material_type = db.Column(db.String(20), nullable=False)  # raw: 原材料, consumable: 易耗品, finished: 成品
+    material_id = db.Column(db.Integer, nullable=False)  # 物料ID
+    system_quantity = db.Column(db.Float, nullable=False)  # 系统数量
+    actual_quantity = db.Column(db.Float)  # 实际数量（盘点结果）
+    variance_quantity = db.Column(db.Float)  # 差异数量（实际-系统）
+    variance_reason = db.Column(db.String(200))  # 差异原因
+    counted_by = db.Column(db.Integer, db.ForeignKey('user.id'))  # 盘点人
+    counted_at = db.Column(db.DateTime)  # 盘点时间
+    verified_by = db.Column(db.Integer, db.ForeignKey('user.id'))  # 复核人
+    verified_at = db.Column(db.DateTime)  # 复核时间
+    adjustment_applied = db.Column(db.Boolean, default=False)  # 是否已应用调整
+    notes = db.Column(db.Text)  # 备注
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    __table_args__ = (
+        db.UniqueConstraint('global_sn', name='uq_inventory_count_item_global_sn'),
+        db.Index('ix_inventory_count_item_material', 'material_type', 'material_id'),
+        db.Index('ix_inventory_count_item_variance', 'variance_quantity'),
+    )
+    
+    # 关系
+    counter = db.relationship('User', foreign_keys=[counted_by], backref=db.backref('counted_items', lazy='dynamic'))
+    verifier = db.relationship('User', foreign_keys=[verified_by], backref=db.backref('verified_items', lazy='dynamic'))
+    
+    def __init__(self, **kwargs):
+        super(InventoryCountItem, self).__init__(**kwargs)
+        if not self.global_sn:
+            self.global_sn = SerialNumber.get_next_number()
+    
+    @property
+    def material_info(self):
+        """获取物料信息"""
+        if self.material_type == 'raw':
+            return RawMaterial.query.get(self.material_id)
+        elif self.material_type == 'consumable':
+            return Consumable.query.get(self.material_id)
+        elif self.material_type == 'finished':
+            return FinishedProduct.query.get(self.material_id)
+        return None
+    
+    @property
+    def material_name(self):
+        """获取物料名称"""
+        material = self.material_info
+        if material:
+            if self.material_type == 'raw':
+                return material.material_name
+            elif self.material_type == 'consumable':
+                return material.consumable_name
+            elif self.material_type == 'finished':
+                return f"{material.product_number} - {material.model}"
+        return "未知物料"
+    
+    @property
+    def has_variance(self):
+        """是否有差异"""
+        if self.actual_quantity is None:
+            return False
+        return abs(self.variance_quantity or 0) > 0.001  # 考虑浮点数精度
+    
+    @property
+    def variance_percentage(self):
+        """差异百分比"""
+        if self.system_quantity == 0:
+            return 0 if self.actual_quantity == 0 else 100
+        return round((self.variance_quantity / self.system_quantity) * 100, 2) if self.variance_quantity else 0
+    
+    def calculate_variance(self):
+        """计算差异"""
+        if self.actual_quantity is not None:
+            self.variance_quantity = self.actual_quantity - self.system_quantity
+    
+    def __repr__(self):
+        return f'<InventoryCountItem {self.material_name}: {self.system_quantity} -> {self.actual_quantity}>'

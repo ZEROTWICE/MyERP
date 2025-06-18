@@ -14,3 +14,189 @@ body {
 .form-group {
     margin-bottom: 1.5rem;
 }
+
+/* ==================== 优化的统计卡片样式 ==================== */
+
+/* 统一的统计卡片基础样式 */
+.small-box, .info-box {
+    position: relative;
+    border-radius: 15px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    color: white;
+    overflow: hidden;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    border: none;
+}
+
+.small-box:hover, .info-box:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+}
+
+/* 内容区域样式 */
+.small-box .inner, .info-box .info-box-content {
+    position: relative;
+    z-index: 2;
+}
+
+.small-box .inner h3, .info-box .info-box-number {
+    font-size: 2.2rem;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: 0.5rem;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.small-box .inner p, .info-box .info-box-text {
+    font-size: 0.95rem;
+    font-weight: 500;
+    opacity: 0.9;
+    margin: 0;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* 图标样式 */
+.small-box .icon, .info-box .info-box-icon {
+    position: absolute;
+    top: 50%;
+    right: 1.5rem;
+    transform: translateY(-50%);
+    font-size: 3rem;
+    opacity: 0.3;
+    z-index: 1;
+}
+
+.info-box .info-box-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    position: absolute;
+    top: 50%;
+    right: 1.5rem;
+    transform: translateY(-50%);
+    font-size: 2rem;
+}
+
+/* 与Bootstrap按钮颜色对齐的配色方案 */
+
+/* Primary - 蓝色 */
+.small-box.bg-primary, .info-box.bg-primary {
+    background: linear-gradient(135deg, #0d6efd 0%, #0b5ed7 100%);
+}
+
+/* Success - 绿色 */
+.small-box.bg-success, .info-box.bg-success {
+    background: linear-gradient(135deg, #198754 0%, #157347 100%);
+}
+
+/* Info - 青色 */
+.small-box.bg-info, .info-box.bg-info {
+    background: linear-gradient(135deg, #0dcaf0 0%, #0aa2c0 100%);
+    color: #000;
+}
+
+.small-box.bg-info .inner h3,
+.small-box.bg-info .inner p,
+.info-box.bg-info .info-box-number,
+.info-box.bg-info .info-box-text {
+    color: #000;
+    text-shadow: 0 1px 3px rgba(255, 255, 255, 0.3);
+}
+
+/* Warning - 黄色 */
+.small-box.bg-warning, .info-box.bg-warning {
+    background: linear-gradient(135deg, #ffc107 0%, #ffca2c 100%);
+    color: #000;
+}
+
+.small-box.bg-warning .inner h3,
+.small-box.bg-warning .inner p,
+.info-box.bg-warning .info-box-number,
+.info-box.bg-warning .info-box-text {
+    color: #000;
+    text-shadow: 0 1px 3px rgba(255, 255, 255, 0.3);
+}
+
+/* Danger - 红色 */
+.small-box.bg-danger, .info-box.bg-danger {
+    background: linear-gradient(135deg, #dc3545 0%, #bb2d3b 100%);
+}
+
+/* Secondary - 灰色 */
+.small-box.bg-secondary, .info-box.bg-secondary {
+    background: linear-gradient(135deg, #6c757d 0%, #5c636a 100%);
+}
+
+/* 自定义橙色（保持兼容性） */
+.small-box.bg-orange, .info-box.bg-orange {
+    background: linear-gradient(135deg, #fd7e14 0%, #e8590c 100%);
+}
+
+/* 响应式优化 */
+@media (max-width: 768px) {
+    .small-box, .info-box {
+        padding: 1.25rem;
+        margin-bottom: 1rem;
+        text-align: center;
+    }
+    
+    .small-box .inner h3, .info-box .info-box-number {
+        font-size: 1.8rem;
+    }
+    
+    .small-box .inner p, .info-box .info-box-text {
+        font-size: 0.85rem;
+    }
+    
+    .small-box .icon, .info-box .info-box-icon {
+        position: static;
+        transform: none;
+        margin-bottom: 0.5rem;
+        opacity: 0.6;
+        font-size: 2.5rem;
+    }
+    
+    .info-box .info-box-icon {
+        width: 60px;
+        height: 60px;
+        margin: 0 auto 0.5rem;
+        font-size: 1.5rem;
+    }
+}
+
+/* 添加微妙的动画效果 */
+@keyframes statsCardPulse {
+    0% { box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1); }
+    50% { box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15); }
+    100% { box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1); }
+}
+
+.small-box:hover, .info-box:hover {
+    animation: statsCardPulse 2s ease-in-out infinite;
+}
+
+/* 确保文字在所有背景上都清晰可见 */
+.small-box *, .info-box * {
+    position: relative;
+    z-index: 2;
+}
+
+/* 添加渐变遮罩以增强视觉效果 */
+.small-box::before, .info-box::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(45deg, rgba(255, 255, 255, 0.1) 0%, transparent 50%, rgba(0, 0, 0, 0.1) 100%);
+    z-index: 1;
+    pointer-events: none;
+}

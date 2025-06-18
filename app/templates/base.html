@@ -317,6 +317,17 @@
                                 <li><a class="dropdown-item" href="{{ url_for('main.finished_product_inbound') }}">
                                     成品入库
                                 </a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><h6 class="dropdown-header">物料管理</h6></li>
+                                <li><a class="dropdown-item" href="{{ url_for('main.manage_material_requisitions') }}">
+                                    物料领用
+                                </a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('main.manage_material_returns') }}">
+                                    物料归还
+                                </a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('main.manage_inventory_counts') }}">
+                                    库存盘点
+                                </a></li>
                             </ul>
                         </li>
                         <li class="nav-item">

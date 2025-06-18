@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+
+{% block title %}物料归还管理{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <!-- 统计卡片 -->
+            <div class="row mb-4">
+                <div class="col-lg-4 col-6">
+                    <div class="small-box bg-info">
+                        <div class="inner">
+                            <h3>{{ total_count }}</h3>
+                            <p>总归还数</p>
+                        </div>
+                        <div class="icon">
+                            <i class="fas fa-undo"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-4 col-6">
+                    <div class="small-box bg-warning">
+                        <div class="inner">
+                            <h3>{{ pending_count }}</h3>
+                            <p>待确认</p>
+                        </div>
+                        <div class="icon">
+                            <i class="fas fa-clock"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-4 col-6">
+                    <div class="small-box bg-success">
+                        <div class="inner">
+                            <h3>{{ confirmed_count }}</h3>
+                            <p>已确认</p>
+                        </div>
+                        <div class="icon">
+                            <i class="fas fa-check"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 主要内容卡片 -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-undo"></i> 物料归还管理
+                    </h3>
+                    <div class="card-tools">
+                        <button class="btn btn-primary btn-sm" onclick="alert('新建归还功能开发中...')">
+                            <i class="fas fa-plus"></i> 新建归还
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- 搜索表单 -->
+                <div class="card-body">
+                    <form method="POST" class="mb-3">
+                        {{ form.hidden_tag() }}
+                        <div class="row">
+                            <div class="col-md-3">
+                                {{ form.search.label(class="form-label") }}
+                                {{ form.search(class="form-control") }}
+                            </div>
+                            <div class="col-md-2">
+                                {{ form.status.label(class="form-label") }}
+                                {{ form.status(class="form-control") }}
+                            </div>
+                            <div class="col-md-2">
+                                {{ form.employee_id.label(class="form-label") }}
+                                {{ form.employee_id(class="form-control") }}
+                            </div>
+                            <div class="col-md-2">
+                                {{ form.department.label(class="form-label") }}
+                                {{ form.department(class="form-control") }}
+                            </div>
+                            <div class="col-md-2">
+                                {{ form.returned_date_start.label(class="form-label") }}
+                                {{ form.returned_date_start(class="form-control") }}
+                            </div>
+                            <div class="col-md-1 d-flex align-items-end">
+                                {{ form.submit(class="btn btn-info") }}
+                            </div>
+                        </div>
+                    </form>
+
+                    <!-- 数据表格 -->
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-striped">
+                            <thead>
+                                <tr>
+                                    <th>归还单号</th>
+                                    <th>归还人</th>
+                                    <th>部门</th>
+                                    <th>归还原因</th>
+                                    <th>状态</th>
+                                    <th>归还时间</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for return_record in returns.items %}
+                                <tr>
+                                    <td>
+                                        <span class="text-primary" style="cursor: pointer;" onclick="alert('查看详情功能开发中...')">
+                                            {{ return_record.return_number }}
+                                        </span>
+                                    </td>
+                                    <td>{{ return_record.employee.name }}</td>
+                                    <td>{{ return_record.department }}</td>
+                                    <td>{{ return_record.return_reason }}</td>
+                                    <td>
+                                        {% if return_record.status == 'pending' %}
+                                            <span class="badge badge-warning">待确认</span>
+                                        {% elif return_record.status == 'confirmed' %}
+                                            <span class="badge badge-success">已确认</span>
+                                        {% elif return_record.status == 'rejected' %}
+                                            <span class="badge badge-danger">已拒绝</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ return_record.returned_date.strftime('%Y-%m-%d %H:%M') }}</td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <button class="btn btn-info btn-sm" title="查看详情" onclick="alert('查看详情功能开发中...')">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- 分页 -->
+                    {% if returns.pages > 1 %}
+                    <nav aria-label="分页导航">
+                        <ul class="pagination justify-content-center">
+                            {% if returns.has_prev %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('main.manage_material_returns', page=returns.prev_num) }}">上一页</a>
+                            </li>
+                            {% endif %}
+                            
+                            {% for page_num in returns.iter_pages() %}
+                                {% if page_num %}
+                                    {% if page_num != returns.page %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="{{ url_for('main.manage_material_returns', page=page_num) }}">{{ page_num }}</a>
+                                    </li>
+                                    {% else %}
+                                    <li class="page-item active">
+                                        <span class="page-link">{{ page_num }}</span>
+                                    </li>
+                                    {% endif %}
+                                {% else %}
+                                <li class="page-item disabled">
+                                    <span class="page-link">…</span>
+                                </li>
+                                {% endif %}
+                            {% endfor %}
+                            
+                            {% if returns.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('main.manage_material_returns', page=returns.next_num) }}">下一页</a>
+                            </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

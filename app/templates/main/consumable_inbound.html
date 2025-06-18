@@ -1,1 +1,294 @@
- 
+{% extends "base.html" %}
+
+{% block title %}易耗品入库管理{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-plus-circle"></i> 易耗品入库管理
+                    </h3>
+                    <div class="card-tools">
+                        <a href="{{ url_for('main.manage_consumables') }}" class="btn btn-secondary btn-sm">
+                            <i class="fas fa-list"></i> 返回列表
+                        </a>
+                    </div>
+                </div>
+                
+                <div class="card-body">
+                    <form method="POST" id="inboundForm">
+                        {{ form.hidden_tag() }}
+                        
+                        <div class="row">
+                            <!-- 基本信息 -->
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    {{ form.supplier.label(class="form-label") }}
+                                    {{ form.supplier(class="form-control") }}
+                                    {% if form.supplier.errors %}
+                                        <div class="text-danger">
+                                            {% for error in form.supplier.errors %}
+                                                <small>{{ error }}</small>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    {{ form.category_id.label(class="form-label") }}
+                                    {{ form.category_id(class="form-control") }}
+                                    {% if form.category_id.errors %}
+                                        <div class="text-danger">
+                                            {% for error in form.category_id.errors %}
+                                                <small>{{ error }}</small>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    {{ form.specification.label(class="form-label") }}
+                                    {{ form.specification(class="form-control") }}
+                                    {% if form.specification.errors %}
+                                        <div class="text-danger">
+                                            {% for error in form.specification.errors %}
+                                                <small>{{ error }}</small>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    {{ form.supplier_number.label(class="form-label") }}
+                                    {{ form.supplier_number(class="form-control") }}
+                                    {% if form.supplier_number.errors %}
+                                        <div class="text-danger">
+                                            {% for error in form.supplier_number.errors %}
+                                                <small>{{ error }}</small>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    {{ form.internal_number.label(class="form-label") }}
+                                    {{ form.internal_number(class="form-control", placeholder="留空则自动生成") }}
+                                    {% if form.internal_number.errors %}
+                                        <div class="text-danger">
+                                            {% for error in form.internal_number.errors %}
+                                                <small>{{ error }}</small>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    {{ form.storage_location.label(class="form-label") }}
+                                    {{ form.storage_location(class="form-control") }}
+                                    {% if form.storage_location.errors %}
+                                        <div class="text-danger">
+                                            {% for error in form.storage_location.errors %}
+                                                <small>{{ error }}</small>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 数量和价格 -->
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    {{ form.quantity.label(class="form-label") }}
+                                    {{ form.quantity(class="form-control", id="quantity") }}
+                                    {% if form.quantity.errors %}
+                                        <div class="text-danger">
+                                            {% for error in form.quantity.errors %}
+                                                <small>{{ error }}</small>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    {{ form.unit.label(class="form-label") }}
+                                    {{ form.unit(class="form-control") }}
+                                    {% if form.unit.errors %}
+                                        <div class="text-danger">
+                                            {% for error in form.unit.errors %}
+                                                <small>{{ error }}</small>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    {{ form.unit_price.label(class="form-label") }}
+                                    {{ form.unit_price(class="form-control", id="unit_price") }}
+                                    {% if form.unit_price.errors %}
+                                        <div class="text-danger">
+                                            {% for error in form.unit_price.errors %}
+                                                <small>{{ error }}</small>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label class="form-label">总价</label>
+                                    <input type="text" class="form-control" id="total_price" readonly>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 日期和预警 -->
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    {{ form.storage_date.label(class="form-label") }}
+                                    {{ form.storage_date(class="form-control") }}
+                                    {% if form.storage_date.errors %}
+                                        <div class="text-danger">
+                                            {% for error in form.storage_date.errors %}
+                                                <small>{{ error }}</small>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    {{ form.expiry_date.label(class="form-label") }}
+                                    {{ form.expiry_date(class="form-control") }}
+                                    {% if form.expiry_date.errors %}
+                                        <div class="text-danger">
+                                            {% for error in form.expiry_date.errors %}
+                                                <small>{{ error }}</small>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    {{ form.min_stock_level.label(class="form-label") }}
+                                    {{ form.min_stock_level(class="form-control") }}
+                                    {% if form.min_stock_level.errors %}
+                                        <div class="text-danger">
+                                            {% for error in form.min_stock_level.errors %}
+                                                <small>{{ error }}</small>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 备注 -->
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="form-group">
+                                    {{ form.notes.label(class="form-label") }}
+                                    {{ form.notes(class="form-control", rows="3") }}
+                                    {% if form.notes.errors %}
+                                        <div class="text-danger">
+                                            {% for error in form.notes.errors %}
+                                                <small>{{ error }}</small>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="form-group text-center">
+                                    {{ form.submit(class="btn btn-primary btn-lg") }}
+                                    <a href="{{ url_for('main.manage_consumables') }}" class="btn btn-secondary btn-lg ml-2">取消</a>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+$(document).ready(function() {
+    // 自动计算总价
+    function calculateTotal() {
+        var quantity = parseFloat($('#quantity').val()) || 0;
+        var unitPrice = parseFloat($('#unit_price').val()) || 0;
+        var total = quantity * unitPrice;
+        $('#total_price').val(total.toFixed(2));
+    }
+    
+    $('#quantity, #unit_price').on('input', calculateTotal);
+    
+    // 页面加载时计算一次
+    calculateTotal();
+    
+    // 表单验证
+    $('#inboundForm').on('submit', function(e) {
+        var quantity = parseFloat($('#quantity').val());
+        if (!quantity || quantity <= 0) {
+            alert('请输入有效的数量');
+            e.preventDefault();
+            return false;
+        }
+        
+        var supplier = $('input[name="supplier"]').val().trim();
+        if (!supplier) {
+            alert('请输入供应商');
+            e.preventDefault();
+            return false;
+        }
+        
+        var categoryId = $('select[name="category_id"]').val();
+        if (!categoryId || categoryId == '0') {
+            alert('请选择品类');
+            e.preventDefault();
+            return false;
+        }
+        
+        var supplierNumber = $('input[name="supplier_number"]').val().trim();
+        if (!supplierNumber) {
+            alert('请输入供应商编号');
+            e.preventDefault();
+            return false;
+        }
+        
+        return true;
+    });
+});
+</script>
+{% endblock %} 

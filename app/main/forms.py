@@ -656,3 +656,251 @@ class ConsumableUpdateForm(FlaskForm):
         super(ConsumableUpdateForm, self).__init__(*args, **kwargs)
         from app.models import ConsumableCategory
         self.category_id.choices = [(c.id, c.name) for c in ConsumableCategory.query.filter_by(is_active=True).all()]
+
+# 物料领用相关表单
+class MaterialRequisitionRecordForm(FlaskForm):
+    """物料领用记录表单"""
+    employee_id = SelectField('领用人', coerce=int, validators=[DataRequired('请选择领用人')])
+    purpose = StringField('领用用途', validators=[DataRequired('请输入领用用途'), Length(max=200)])
+    requisition_date = DateField('领用日期', validators=[DataRequired('请选择领用日期')])
+    notes = TextAreaField('备注', validators=[Optional(), Length(max=500)])
+    
+    # 物料明细字段（动态添加）
+    materials_data = HiddenField('物料数据')
+    
+    submit = SubmitField('保存记录')
+    
+    def __init__(self, *args, **kwargs):
+        super(MaterialRequisitionRecordForm, self).__init__(*args, **kwargs)
+        from app.models import Employee
+        
+        # 加载员工选项
+        employees = Employee.query.filter_by(is_active=True).all()
+        self.employee_id.choices = [(e.id, f"{e.name} ({e.employee_id})") for e in employees]
+
+class MaterialRequisitionItemForm(FlaskForm):
+    """物料领用明细表单（用于表格行添加）"""
+    material_type = SelectField('物料类型', choices=[
+        ('raw', '原材料'),
+        ('consumable', '易耗品'),
+        ('finished', '成品')
+    ], validators=[DataRequired('请选择物料类型')])
+    material_name = StringField('物料名称', validators=[DataRequired('请输入物料名称'), Length(max=100)])
+    quantity = FloatField('领用数量', validators=[DataRequired('请输入领用数量'), NumberRange(min=0.01, message='数量必须大于0')])
+    unit = StringField('单位', validators=[DataRequired('请输入单位'), Length(max=20)], default='件')
+    notes = TextAreaField('备注', validators=[Optional(), Length(max=500)])
+    submit = SubmitField('添加到表格')
+
+class MaterialRequisitionSearchForm(FlaskForm):
+    """物料领用记录搜索表单"""
+    search = StringField('搜索', render_kw={"placeholder": "输入领用单号、员工姓名、部门或用途进行搜索"})
+    department = StringField('部门')
+    employee_id = SelectField('领用人', coerce=int, validators=[Optional()])
+    requisition_date_start = DateField('领用日期开始')
+    requisition_date_end = DateField('领用日期结束')
+    submit = SubmitField('搜索')
+    
+    def __init__(self, *args, **kwargs):
+        super(MaterialRequisitionSearchForm, self).__init__(*args, **kwargs)
+        from app.models import Employee
+        employees = [(0, '全部员工')] + [(e.id, f"{e.name} ({e.employee_id})") for e in Employee.query.filter_by(is_active=True).all()]
+        self.employee_id.choices = employees
+
+# 物料归还相关表单
+class MaterialReturnForm(FlaskForm):
+    """物料归还表单"""
+    employee_id = SelectField('归还人', coerce=int, validators=[DataRequired('请选择归还人')])
+    department = StringField('归还部门', validators=[DataRequired('请输入归还部门'), Length(max=50)])
+    return_reason = StringField('归还原因', validators=[DataRequired('请输入归还原因'), Length(max=200)])
+    original_requisition_id = SelectField('原领用单', coerce=int, validators=[Optional()])
+    returned_date = DateTimeField('归还时间', validators=[DataRequired('请选择归还时间')], default=datetime.utcnow)
+    notes = TextAreaField('备注', validators=[Optional(), Length(max=500)])
+    submit = SubmitField('提交归还')
+    
+    def __init__(self, *args, **kwargs):
+        super(MaterialReturnForm, self).__init__(*args, **kwargs)
+        from app.models import Employee, MaterialRequisition
+        
+        # 加载员工选项
+        employees = Employee.query.filter_by(is_active=True).all()
+        self.employee_id.choices = [(e.id, f"{e.name} ({e.employee_id})") for e in employees]
+        
+        # 加载已完成的领用单
+        requisitions = MaterialRequisition.query.filter_by(status='completed').order_by(MaterialRequisition.requested_date.desc()).limit(50).all()
+        self.original_requisition_id.choices = [(0, '无关联领用单')] + [(r.id, f"{r.requisition_number} - {r.employee.name}") for r in requisitions]
+
+class MaterialReturnItemForm(FlaskForm):
+    """物料归还明细表单"""
+    material_type = SelectField('物料类型', choices=[
+        ('raw', '原材料'),
+        ('consumable', '易耗品'),
+        ('finished', '成品')
+    ], validators=[DataRequired('请选择物料类型')])
+    material_id = SelectField('物料', coerce=int, validators=[DataRequired('请选择物料')])
+    quantity = FloatField('归还数量', validators=[DataRequired('请输入归还数量'), NumberRange(min=0.01, message='数量必须大于0')])
+    condition = SelectField('物料状态', choices=[
+        ('good', '完好'),
+        ('damaged', '损坏'),
+        ('expired', '过期')
+    ], default='good', validators=[DataRequired('请选择物料状态')])
+    unit = StringField('单位', validators=[DataRequired('请输入单位'), Length(max=20)], default='件')
+    notes = TextAreaField('备注', validators=[Optional(), Length(max=500)])
+    submit = SubmitField('添加')
+
+class MaterialReturnSearchForm(FlaskForm):
+    """物料归还搜索表单"""
+    search = StringField('搜索', render_kw={"placeholder": "输入归还单号、员工姓名、部门或原因进行搜索"})
+    status = SelectField('状态', choices=[
+        ('', '全部'),
+        ('pending', '待确认'),
+        ('confirmed', '已确认'),
+        ('rejected', '已拒绝')
+    ], default='')
+    department = StringField('部门')
+    employee_id = SelectField('归还人', coerce=int, validators=[Optional()])
+    returned_date_start = DateField('归还日期开始')
+    returned_date_end = DateField('归还日期结束')
+    submit = SubmitField('搜索')
+    
+    def __init__(self, *args, **kwargs):
+        super(MaterialReturnSearchForm, self).__init__(*args, **kwargs)
+        from app.models import Employee
+        employees = [(0, '全部员工')] + [(e.id, f"{e.name} ({e.employee_id})") for e in Employee.query.filter_by(is_active=True).all()]
+        self.employee_id.choices = employees
+
+class MaterialReturnConfirmForm(FlaskForm):
+    """物料归还确认表单"""
+    action = SelectField('确认操作', choices=[
+        ('confirm', '确认归还'),
+        ('reject', '拒绝归还')
+    ], validators=[DataRequired('请选择确认操作')])
+    notes = TextAreaField('确认意见', validators=[Optional(), Length(max=500)])
+    submit = SubmitField('提交确认')
+
+# 库存盘点相关表单
+class InventoryCountForm(FlaskForm):
+    """库存盘点表单"""
+    count_name = StringField('盘点名称', validators=[DataRequired('请输入盘点名称'), Length(max=100)])
+    count_type = SelectField('盘点类型', choices=[
+        ('full', '全盘'),
+        ('partial', '抽盘'),
+        ('cycle', '循环盘点')
+    ], default='full', validators=[DataRequired('请选择盘点类型')])
+    count_scope = SelectField('盘点范围', choices=[
+        ('all', '全部'),
+        ('raw', '原材料'),
+        ('consumable', '易耗品'),
+        ('finished', '成品')
+    ], default='all', validators=[DataRequired('请选择盘点范围')])
+    warehouse_location = StringField('仓库位置', validators=[Optional(), Length(max=100)])
+    planned_date = DateField('计划盘点日期', validators=[DataRequired('请选择计划盘点日期')])
+    count_team = SelectMultipleField('盘点小组', coerce=int, validators=[DataRequired('请选择盘点小组成员')])
+    notes = TextAreaField('备注', validators=[Optional(), Length(max=500)])
+    submit = SubmitField('创建盘点')
+    
+    def __init__(self, *args, **kwargs):
+        super(InventoryCountForm, self).__init__(*args, **kwargs)
+        from app.models import User
+        users = User.query.filter_by(role='admin').all() + User.query.filter_by(role='manager').all()
+        self.count_team.choices = [(u.id, u.username) for u in users]
+
+class InventoryCountSearchForm(FlaskForm):
+    """库存盘点搜索表单"""
+    search = StringField('搜索', render_kw={"placeholder": "输入盘点单号或盘点名称进行搜索"})
+    status = SelectField('状态', choices=[
+        ('', '全部'),
+        ('draft', '草稿'),
+        ('in_progress', '进行中'),
+        ('completed', '已完成'),
+        ('approved', '已审批'),
+        ('cancelled', '已取消')
+    ], default='')
+    count_type = SelectField('盘点类型', choices=[
+        ('', '全部'),
+        ('full', '全盘'),
+        ('partial', '抽盘'),
+        ('cycle', '循环盘点')
+    ], default='')
+    count_scope = SelectField('盘点范围', choices=[
+        ('', '全部'),
+        ('all', '全部物料'),
+        ('raw', '原材料'),
+        ('consumable', '易耗品'),
+        ('finished', '成品')
+    ], default='')
+    employee_id = SelectField('盘点人', coerce=int, validators=[Optional()])
+    planned_date_start = DateField('计划日期开始')
+    planned_date_end = DateField('计划日期结束')
+    submit = SubmitField('搜索')
+    
+    def __init__(self, *args, **kwargs):
+        super(InventoryCountSearchForm, self).__init__(*args, **kwargs)
+        from app.models import Employee
+        employees = [(0, '全部员工')] + [(e.id, f"{e.name} ({e.employee_id})") for e in Employee.query.filter_by(is_active=True).all()]
+        self.employee_id.choices = employees
+
+class InventoryCountItemForm(FlaskForm):
+    """库存盘点明细表单"""
+    actual_quantity = FloatField('实际数量', validators=[DataRequired('请输入实际数量'), NumberRange(min=0, message='数量不能为负数')])
+    variance_reason = StringField('差异原因', validators=[Optional(), Length(max=200)])
+    notes = TextAreaField('备注', validators=[Optional(), Length(max=500)])
+    submit = SubmitField('保存盘点结果')
+
+class InventoryCountBatchForm(FlaskForm):
+    """批量盘点表单"""
+    count_data = TextAreaField('盘点数据', validators=[DataRequired('请输入盘点数据')], 
+                              render_kw={"placeholder": "格式：物料编号,实际数量,差异原因\n每行一条记录"})
+    submit = SubmitField('批量提交')
+
+class InventoryAdjustmentForm(FlaskForm):
+    """库存调整表单"""
+    adjustment_reason = StringField('调整原因', validators=[DataRequired('请输入调整原因'), Length(max=200)])
+    notes = TextAreaField('调整说明', validators=[Optional(), Length(max=500)])
+    submit = SubmitField('应用调整')
+
+# 物料管理统计表单
+class MaterialStatisticsForm(FlaskForm):
+    """物料管理统计表单"""
+    report_type = SelectField('报表类型', choices=[
+        ('requisition_summary', '领用汇总'),
+        ('return_summary', '归还汇总'),
+        ('inventory_turnover', '库存周转'),
+        ('material_usage', '物料使用分析'),
+        ('department_usage', '部门使用统计')
+    ], validators=[DataRequired('请选择报表类型')])
+    date_range = SelectField('时间范围', choices=[
+        ('today', '今天'),
+        ('week', '本周'),
+        ('month', '本月'),
+        ('quarter', '本季度'),
+        ('year', '本年'),
+        ('custom', '自定义')
+    ], default='month', validators=[DataRequired('请选择时间范围')])
+    start_date = DateField('开始日期', validators=[Optional()])
+    end_date = DateField('结束日期', validators=[Optional()])
+    department = StringField('部门', validators=[Optional(), Length(max=50)])
+    material_type = SelectField('物料类型', choices=[
+        ('', '全部'),
+        ('raw', '原材料'),
+        ('consumable', '易耗品'),
+        ('finished', '成品')
+    ], default='')
+    submit = SubmitField('生成报表')
+    
+    def validate(self, extra_validators=None):
+        """自定义验证"""
+        if not super().validate(extra_validators):
+            return False
+        
+        if self.date_range.data == 'custom':
+            if not self.start_date.data:
+                self.start_date.errors.append('自定义时间范围时开始日期不能为空')
+                return False
+            if not self.end_date.data:
+                self.end_date.errors.append('自定义时间范围时结束日期不能为空')
+                return False
+            if self.start_date.data > self.end_date.data:
+                self.end_date.errors.append('结束日期不能早于开始日期')
+                return False
+        
+        return True
