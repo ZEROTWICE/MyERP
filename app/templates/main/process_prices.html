@@ -3,6 +3,38 @@
 {% block title %}工序价格管理{% endblock %}
 
 {% block content %}
+<style>
+/* 防止模态框闪烁的CSS */
+.modal.fade .modal-dialog {
+    transition: transform 0.2s ease-out;
+}
+
+.modal.show .modal-dialog {
+    transform: none;
+}
+
+/* 确保模态框背景不闪烁 */
+.modal-backdrop {
+    transition: opacity 0.15s linear;
+}
+
+/* 防止模态框内容加载时的闪烁 */
+#includedProcessesContent {
+    min-height: 200px;
+}
+
+.spinner-border {
+    width: 2rem;
+    height: 2rem;
+}
+
+/* 防止模态框重复显示 */
+.modal-open .modal {
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+</style>
+
 <div class="container mt-4">
     <h2>工序价格管理</h2>
     
@@ -98,47 +130,9 @@
                         </td>
                         <td>
                             {% if process.price_type == 'subtotal' %}
-                            <button type="button" class="btn btn-sm btn-outline-info" data-bs-toggle="modal" data-bs-target="#includedProcessesModal{{ process.id }}">
+                            <button type="button" class="btn btn-sm btn-outline-info" onclick="showIncludedProcesses({{ process.id }})">
                                 查看包含工序
                             </button>
-                            <!-- 包含工序详情模态框 -->
-                            <div class="modal fade" id="includedProcessesModal{{ process.id }}" tabindex="-1" aria-labelledby="includedProcessesModalLabel{{ process.id }}" aria-hidden="true">
-                                <div class="modal-dialog modal-lg">
-                                    <div class="modal-content">
-                                        <div class="modal-header">
-                                            <h5 class="modal-title" id="includedProcessesModalLabel{{ process.id }}">包含的工序</h5>
-                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                        </div>
-                                        <div class="modal-body">
-                                            <div class="table-responsive">
-                                                <table class="table table-striped">
-                                                    <thead>
-                                                        <tr>
-                                                            <th>工序编号</th>
-                                                            <th>工序名称</th>
-                                                            <th>部件</th>
-                                                            <th>单价</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        {% for group in process.included_processes %}
-                                                        <tr>
-                                                            <td>{{ group.process.process_code }}</td>
-                                                            <td>{{ group.process.process_name }}</td>
-                                                            <td>{{ group.process.component }}</td>
-                                                            <td>{{ "%.2f"|format(group.process.price) }}</td>
-                                                        </tr>
-                                                        {% endfor %}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        </div>
-                                        <div class="modal-footer">
-                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
                             {% else %}
                             -
                             {% endif %}
@@ -213,6 +207,32 @@
             </div>
         </div>
     </div>
+
+    <!-- 包含工序详情模态框 -->
+    <div class="modal fade" id="includedProcessesModal" tabindex="-1" aria-labelledby="includedProcessesModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="includedProcessesModalLabel">包含的工序</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="includedProcessesContent">
+                        <!-- 内容将通过JavaScript动态加载 -->
+                        <div class="text-center">
+                            <div class="spinner-border" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-2">正在加载包含的工序...</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}
 
@@ -262,10 +282,108 @@ $(document).ready(function() {
     });
 });
 
+// 显示包含工序的函数
+function showIncludedProcesses(processId) {
+    // 重置模态框内容为加载状态
+    $('#includedProcessesModalLabel').text('包含的工序');
+    $('#includedProcessesContent').html(`
+        <div class="text-center py-5">
+            <div class="spinner-border" role="status" style="width: 3rem; height: 3rem;">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-3 text-muted">正在加载包含的工序...</p>
+        </div>
+    `);
+    
+    // 立即显示模态框，避免内容加载时的闪烁
+    $('#includedProcessesModal').modal('show');
+    
+    // 获取工序价格详情
+    $.ajax({
+        url: '{{ url_for("main.get_process_price", id=0) }}'.replace('0', processId),
+        type: 'GET',
+        headers: {
+            'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
+        },
+        success: function(result) {
+            if (result.success && result.process) {
+                const process = result.process;
+                
+                // 构建包含工序的表格HTML
+                let tableHtml = `
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>工序编号</th>
+                                    <th>工序名称</th>
+                                    <th>部件</th>
+                                    <th>单价</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                `;
+                
+                if (process.included_processes && process.included_processes.length > 0) {
+                    process.included_processes.forEach(function(group) {
+                        tableHtml += `
+                            <tr>
+                                <td>${group.process.process_code}</td>
+                                <td>${group.process.process_name}</td>
+                                <td>${group.process.component || '-'}</td>
+                                <td>${parseFloat(group.process.price).toFixed(2)}</td>
+                            </tr>
+                        `;
+                    });
+                } else {
+                    tableHtml += `
+                        <tr>
+                            <td colspan="4" class="text-center text-muted">暂无包含的工序</td>
+                        </tr>
+                    `;
+                }
+                
+                tableHtml += `
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+                
+                // 更新模态框标题和内容 - 添加平滑过渡
+                setTimeout(() => {
+                    $('#includedProcessesModalLabel').text(`包含的工序 - ${process.process_name}`);
+                    $('#includedProcessesContent').fadeOut(200, function() {
+                        $(this).html(tableHtml).fadeIn(200);
+                    });
+                }, 300);
+            } else {
+                $('#includedProcessesContent').html(`
+                    <div class="alert alert-warning text-center">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        获取工序详情失败
+                    </div>
+                `);
+            }
+        },
+        error: function(xhr) {
+            $('#includedProcessesContent').html(`
+                <div class="alert alert-danger text-center">
+                    <i class="fas fa-times-circle"></i>
+                    获取工序详情失败：${xhr.responseJSON?.message || '网络错误'}
+                </div>
+            `);
+        }
+    });
+}
+
 function importProcessPrices(input) {
     if (!input.files || !input.files[0]) return;
     
     const file = input.files[0];
+    
+    // 显示导入进度
+    showImportProgress('正在上传文件...');
+    
     const formData = new FormData();
     formData.append('file', file);
     
@@ -278,36 +396,123 @@ function importProcessPrices(input) {
     })
     .then(response => response.json())
     .then(data => {
+        hideImportProgress();
+        
         if (data.success) {
-            showAlert('success', data.message);
-            setTimeout(() => location.reload(), 2000);
+            // 显示成功信息
+            let message = data.message;
+            if (data.details) {
+                message += `\n\n统计信息：\n- 总处理记录：${data.details.total_processed}\n- 成功导入：${data.details.success_count}\n- 失败记录：${data.details.error_count}`;
+                if (data.details.warning_count > 0) {
+                    message += `\n- 警告信息：${data.details.warning_count}`;
+                }
+            }
+            showDetailedAlert('success', '导入成功', message);
+            setTimeout(() => location.reload(), 3000);
         } else {
-            showAlert('danger', data.message);
+            // 显示详细错误信息
+            showDetailedAlert('danger', '导入失败', data.message);
         }
     })
     .catch(error => {
-        showAlert('danger', '导入失败，请重试');
-        console.error('Error:', error);
+        hideImportProgress();
+        showDetailedAlert('danger', '导入失败', '网络错误或服务器异常，请重试');
+        console.error('Import error:', error);
     })
     .finally(() => {
         input.value = ''; // 清除文件选择
     });
 }
 
-function showAlert(type, message) {
-    const alertDiv = document.createElement('div');
-    alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
-    alertDiv.role = 'alert';
-    alertDiv.innerHTML = `
-        ${message}
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    `;
-    document.querySelector('.container').insertBefore(alertDiv, document.querySelector('.card'));
+function showImportProgress(message) {
+    // 移除现有的进度提示
+    const existingProgress = document.getElementById('import-progress');
+    if (existingProgress) {
+        existingProgress.remove();
+    }
     
-    // 3秒后自动消失
+    const progressDiv = document.createElement('div');
+    progressDiv.id = 'import-progress';
+    progressDiv.className = 'alert alert-info d-flex align-items-center mb-3';
+    progressDiv.style.position = 'fixed';
+    progressDiv.style.top = '20px';
+    progressDiv.style.left = '50%';
+    progressDiv.style.transform = 'translateX(-50%)';
+    progressDiv.style.zIndex = '9999';
+    progressDiv.style.minWidth = '300px';
+    progressDiv.style.backgroundColor = '#cff4fc';
+    progressDiv.style.border = '1px solid #b8daff';
+    progressDiv.style.opacity = '1';
+    progressDiv.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.1)';
+    progressDiv.innerHTML = `
+        <div class="spinner-border spinner-border-sm me-2" role="status" style="color: #055160;">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <span style="color: #055160; font-weight: 500;">${message}</span>
+    `;
+    
+    // 直接添加到body，使用固定定位避免DOM结构问题
+    document.body.appendChild(progressDiv);
+}
+
+function hideImportProgress() {
+    const progressDiv = document.getElementById('import-progress');
+    if (progressDiv) {
+        progressDiv.remove();
+    }
+}
+
+function showDetailedAlert(type, title, message) {
+    // 移除现有的提示
+    const existingAlerts = document.querySelectorAll('.import-alert');
+    existingAlerts.forEach(alert => alert.remove());
+    
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show import-alert`;
+    alertDiv.role = 'alert';
+    alertDiv.style.position = 'fixed';
+    alertDiv.style.top = '20px';
+    alertDiv.style.left = '50%';
+    alertDiv.style.transform = 'translateX(-50%)';
+    alertDiv.style.zIndex = '9999';
+    alertDiv.style.maxWidth = '80%';
+    alertDiv.style.maxHeight = '400px';
+    alertDiv.style.overflowY = 'auto';
+    alertDiv.style.backgroundColor = type === 'success' ? '#d1e7dd' : '#f8d7da';
+    alertDiv.style.border = type === 'success' ? '1px solid #badbcc' : '1px solid #f5c2c7';
+    alertDiv.style.opacity = '1';
+    alertDiv.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.1)';
+    
+    // 处理换行符
+    const formattedMessage = message.replace(/\n/g, '<br>');
+    
+    alertDiv.innerHTML = `
+        <div class="d-flex">
+            <div class="me-2" style="color: ${type === 'success' ? '#0a3622' : '#58151c'};">
+                ${type === 'success' ? '<i class="fas fa-check-circle"></i>' : '<i class="fas fa-exclamation-triangle"></i>'}
+            </div>
+            <div class="flex-grow-1">
+                <h6 class="alert-heading mb-2" style="color: ${type === 'success' ? '#0a3622' : '#58151c'};">${title}</h6>
+                <div style="white-space: pre-wrap; font-family: monospace; font-size: 0.9em; color: ${type === 'success' ? '#0a3622' : '#58151c'};">${formattedMessage}</div>
+            </div>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    `;
+    
+    // 直接添加到body，使用固定定位避免DOM结构问题
+    document.body.appendChild(alertDiv);
+    
+    // 根据类型设置自动消失时间
+    const autoHideDelay = type === 'success' ? 5000 : 10000;
     setTimeout(() => {
+        if (alertDiv.parentNode) {
         alertDiv.remove();
-    }, 3000);
+        }
+    }, autoHideDelay);
+}
+
+function showAlert(type, message) {
+    showDetailedAlert(type, type === 'success' ? '成功' : '错误', message);
 }
 </script>
 {% endblock %}

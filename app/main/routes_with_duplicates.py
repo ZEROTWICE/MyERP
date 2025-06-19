@@ -29,17 +29,116 @@ import pandas as pd
 from app.decorators import admin_required
 import numpy as np
 from werkzeug.datastructures import FileStorage
-from typing import List, Dict, Any, Optional, Union
+from typing import List, Dict, Any, Optional, Union, Tuple
 import shutil
 from openpyxl import Workbook
 import json
 from io import BytesIO
 from openpyxl import load_workbook
+import traceback
 
 # 导入质量管理路由
 from .quality import *
 
 from app.services.search_service import SearchService
+
+def create_detailed_error_message(errors: List[str], success_count: int, total_count: int) -> str:
+    """创建详细的错误消息"""
+    if not errors:
+        return f'成功导入 {success_count} 条记录'
+    
+    error_summary = f'成功导入 {success_count} 条记录，{len(errors)} 条记录导入失败（共 {total_count} 条）'
+    
+    # 按错误类型分组
+    error_groups = {}
+    for error in errors:
+        error_type = error.split('：')[0] if '：' in error else '未知错误'
+        if error_type not in error_groups:
+            error_groups[error_type] = []
+        error_groups[error_type].append(error)
+    
+    # 构建详细错误信息
+    detailed_errors = []
+    for error_type, error_list in error_groups.items():
+        if len(error_list) > 5:
+            # 如果同类错误太多，只显示前5个
+            detailed_errors.append(f"{error_type}（{len(error_list)}个）:")
+            detailed_errors.extend(error_list[:5])
+            detailed_errors.append(f"... 还有 {len(error_list) - 5} 个类似错误")
+        else:
+            detailed_errors.extend(error_list)
+    
+    return error_summary + '\n\n错误详情:\n' + '\n'.join(detailed_errors)
+
+def validate_excel_structure(df, required_columns: List[str], optional_columns: List[str] = None) -> Tuple[bool, str]:
+    """验证Excel文件结构"""
+    if df.empty:
+        return False, "Excel文件为空，请检查文件内容"
+    
+    # 检查必需列
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    if missing_columns:
+        available_columns = list(df.columns)
+        return False, f"缺少必需的列: {', '.join(missing_columns)}\n可用的列: {', '.join(available_columns)}"
+    
+    # 检查数据行数
+    if len(df) == 0:
+        return False, "Excel文件没有数据行"
+    
+    return True, ""
+
+def safe_convert_value(value, target_type, field_name: str, row_index: int):
+    """安全地转换值类型"""
+    try:
+        if pd.isna(value) or value == '':
+            if target_type == str:
+                return ''
+            elif target_type == float:
+                return 0.0
+            elif target_type == int:
+                return 0
+            else:
+                return None
+        
+        if target_type == str:
+            return str(value).strip()
+        elif target_type == float:
+            return float(value)
+        elif target_type == int:
+            return int(float(value))  # 先转float再转int，处理'1.0'这种情况
+        elif target_type == 'date':
+            if isinstance(value, str):
+                # 尝试多种日期格式
+                for fmt in ['%Y-%m-%d', '%Y/%m/%d', '%m/%d/%Y', '%d/%m/%Y']:
+                    try:
+                        return datetime.strptime(value, fmt).date()
+                    except ValueError:
+                        continue
+                raise ValueError(f"无法解析日期格式: {value}")
+            else:
+                return pd.to_datetime(value).date()
+        else:
+            return value
+    except Exception as e:
+        raise ValueError(f"第{row_index+2}行 '{field_name}' 字段值 '{value}' 转换失败: {str(e)}")
+
+def handle_import_error(e: Exception, context: str = "") -> str:
+    """统一处理导入错误"""
+    error_msg = str(e)
+    
+    # 常见错误的友好提示
+    if "Permission denied" in error_msg:
+        return f"文件访问权限错误，请确保文件未被其他程序占用: {context}"
+    elif "No such file" in error_msg:
+        return f"文件不存在或路径错误: {context}"
+    elif "Invalid file format" in error_msg or "Excel file format" in error_msg:
+        return f"文件格式错误，请确保上传的是有效的Excel文件(.xlsx): {context}"
+    elif "Memory" in error_msg:
+        return f"文件过大，请减少数据量或联系管理员: {context}"
+    elif "Encoding" in error_msg:
+        return f"文件编码错误，请确保文件使用UTF-8编码保存: {context}"
+    else:
+        return f"导入过程中发生错误: {error_msg} {context}"
 
 def handle_pagination_args(f):
     @wraps(f)
@@ -1696,62 +1795,89 @@ def import_employees():
     if not file.filename.endswith('.xlsx'):
         return jsonify({'success': False, 'message': '请上传Excel文件(.xlsx)'})
     
+    temp_path = None
     try:
         filename = secure_filename(file.filename)
         temp_path = os.path.join(current_app.config['TEMP_FOLDER'], filename)
         file.save(temp_path)
         
-        employee_data = ExcelGenerator.parse_employee_data(temp_path)
-        os.remove(temp_path)  # 删除临时文件
+        # 首先读取并验证Excel文件结构
+        try:
+            df = pd.read_excel(temp_path)
+        except Exception as e:
+            return jsonify({'success': False, 'message': handle_import_error(e, "读取Excel文件时")})
+        
+        # 验证文件结构
+        required_columns = ['工号', '姓名', '职位', '部门', '基本工资', '系数']
+        is_valid, error_msg = validate_excel_structure(df, required_columns)
+        if not is_valid:
+            return jsonify({'success': False, 'message': error_msg})
         
         success_count = 0
         error_messages = []
+        total_count = len(df)
         
-        for data in employee_data:
+        for index, row in df.iterrows():
             try:
+                # 安全转换数据
+                employee_id = safe_convert_value(row['工号'], str, '工号', index)
+                name = safe_convert_value(row['姓名'], str, '姓名', index)
+                position = safe_convert_value(row['职位'], str, '职位', index)
+                department = safe_convert_value(row['部门'], str, '部门', index)
+                base_salary = safe_convert_value(row['基本工资'], float, '基本工资', index)
+                coefficient = safe_convert_value(row['系数'], float, '系数', index)
+                
+                # 数据验证
+                if not employee_id:
+                    error_messages.append(f"第{index+2}行：工号不能为空")
+                    continue
+                
+                if not name:
+                    error_messages.append(f"第{index+2}行：姓名不能为空")
+                    continue
+                
+                if base_salary < 0:
+                    error_messages.append(f"第{index+2}行：基本工资不能为负数")
+                    continue
+                
+                if coefficient < 0:
+                    error_messages.append(f"第{index+2}行：系数不能为负数")
+                    continue
+                
                 # 检查工号是否已存在
-                if Employee.query.filter_by(employee_id=data['employee_id']).first():
-                    error_messages.append(f"工号 {data['employee_id']} 已存在")
+                if Employee.query.filter_by(employee_id=employee_id).first():
+                    error_messages.append(f"第{index+2}行：工号 {employee_id} 已存在")
                     continue
                 
                 # 检查用户名是否已存在
-                if User.query.filter_by(username=data['employee_id']).first():
-                    error_messages.append(f"用户名 {data['employee_id']} 已存在")
+                if User.query.filter_by(username=employee_id).first():
+                    error_messages.append(f"第{index+2}行：用户名 {employee_id} 已存在")
                     continue
                 
                 # 创建用户账号
-                user = User(username=data['employee_id'], role='user')
-                user.set_password(data['employee_id'])  # 初始密码与工号相同
+                user = User(username=employee_id, role='user')
+                user.set_password(employee_id)  # 初始密码与工号相同
                 db.session.add(user)
-                
-                # 验证入职时间
-                if not data.get('hire_date'):
-                    error_messages.append(f"工号 {data['employee_id']} 缺少入职时间")
-                    continue
-                
-                # 验证离职时间（如果提供）
-                if data.get('termination_date') and data['termination_date'] < data['hire_date']:
-                    error_messages.append(f"工号 {data['employee_id']} 离职时间不能早于入职时间")
-                    continue
+                db.session.flush()  # 获取用户ID
                 
                 # 创建员工记录
                 employee = Employee(
                     global_sn=SerialNumber.get_next_number(),
-                    employee_id=data['employee_id'],
-                    name=data['name'],
-                    position=data['position'],
-                    department=data['department'],
-                    base_salary=data['base_salary'],
-                    coefficient=data['coefficient'],
-                    hire_date=data['hire_date'],
-                    termination_date=data.get('termination_date'),
-                    user=user
+                    employee_id=employee_id,
+                    name=name,
+                    position=position,
+                    department=department,
+                    base_salary=base_salary,
+                    coefficient=coefficient,
+                    user_id=user.id
                 )
                 db.session.add(employee)
                 success_count += 1
                 
+            except ValueError as ve:
+                error_messages.append(str(ve))
             except Exception as e:
-                error_messages.append(f"处理 {data['employee_id']} 时出错: {str(e)}")
+                error_messages.append(f"第{index+2}行：处理数据时出错 - {str(e)}")
         
         if success_count > 0:
             db.session.commit()
@@ -1759,22 +1885,34 @@ def import_employees():
             log = AuditLog(
                 user_id=current_user.id,
                 action='批量导入员工',
-                details=f'成功导入 {success_count} 条员工记录'
+                details=f'成功导入 {success_count} 条员工记录，失败 {len(error_messages)} 条'
             )
             db.session.add(log)
             db.session.commit()
+        else:
+            db.session.rollback()
         
-        message = f'成功导入 {success_count} 条记录'
-        if error_messages:
-            message += f'，{len(error_messages)} 条记录导入失败：\n' + '\n'.join(error_messages)
+        message = create_detailed_error_message(error_messages, success_count, total_count)
         
         return jsonify({
-            'success': True,
+            'success': success_count > 0,
             'message': message
         })
         
     except Exception as e:
-        return jsonify({'success': False, 'message': f'导入失败：{str(e)}'})
+        if temp_path and os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except:
+                pass
+        db.session.rollback()
+        return jsonify({'success': False, 'message': handle_import_error(e, "导入员工数据时")})
+    finally:
+        if temp_path and os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except:
+                pass
 
 def cleanup_temp_files():
     """清理超过5分钟的临时文件"""
@@ -1920,298 +2058,3464 @@ def import_process_prices():
         temp_path = os.path.join(current_app.config['TEMP_FOLDER'], filename)
         file.save(temp_path)
         
-        # 解析Excel数据
+        # 首先读取并验证Excel文件结构
         try:
-            process_data = ExcelGenerator.parse_process_price_data(temp_path)
+            df = pd.read_excel(temp_path)
         except Exception as e:
-            return jsonify({'success': False, 'message': f'Excel文件解析失败：{str(e)}。请检查文件格式是否正确。'})
+            return jsonify({'success': False, 'message': handle_import_error(e, "读取Excel文件时")})
         
-        if not process_data:
-            return jsonify({'success': False, 'message': 'Excel文件中没有找到有效数据。请检查文件内容。'})
+        # 验证文件结构
+        required_columns = ['工序编号', '工序名称', '部件', '图号', '型号', '价格', '生效日期']
+        is_valid, error_msg = validate_excel_structure(df, required_columns)
+        if not is_valid:
+            return jsonify({'success': False, 'message': error_msg})
         
         success_count = 0
         error_messages = []
-        warning_messages = []
+        total_count = len(df)
         
-        # 数据验证
-        for i, data in enumerate(process_data, 1):
-            row_errors = []
-            
-            # 必填字段验证
-            if not data.get('process_code'):
-                row_errors.append('工序编号不能为空')
-            elif len(str(data['process_code'])) > 50:
-                row_errors.append('工序编号长度不能超过50个字符')
-            
-            if not data.get('process_name'):
-                row_errors.append('工序名称不能为空')
-            elif len(str(data['process_name'])) > 100:
-                row_errors.append('工序名称长度不能超过100个字符')
-            
-            if not data.get('effective_date'):
-                row_errors.append('生效日期不能为空')
-            else:
-                # 验证日期格式
-                try:
-                    if isinstance(data['effective_date'], str):
-                        from datetime import datetime
-                        data['effective_date'] = datetime.strptime(data['effective_date'], '%Y-%m-%d').date()
-                    elif hasattr(data['effective_date'], 'date'):
-                        data['effective_date'] = data['effective_date'].date()
-                except (ValueError, AttributeError):
-                    row_errors.append('生效日期格式错误，应为YYYY-MM-DD格式')
-            
-            # 价格验证
-            if data.get('price') is None:
-                if data.get('price_type') != 'subtotal':
-                    row_errors.append('单价不能为空')
-            else:
-                try:
-                    price = float(data['price'])
-                    if price < 0:
-                        row_errors.append('单价不能为负数')
-                    data['price'] = price
-                except (ValueError, TypeError):
-                    row_errors.append('单价必须是有效数字')
-            
-            # 价格类型验证
-            price_type = data.get('price_type', 'normal').lower()
-            if price_type not in ['normal', 'subtotal']:
-                row_errors.append('价格类型必须是normal或subtotal')
-            data['price_type'] = price_type
-            
-            # 小计工序特殊验证
-            if price_type == 'subtotal':
-                if not data.get('included_processes'):
-                    row_errors.append('小计工序必须指定包含的工序编号')
-                elif not isinstance(data['included_processes'], list) or len(data['included_processes']) == 0:
-                    row_errors.append('小计工序的包含工序列表不能为空')
-            
-            # 字符串长度验证
-            if data.get('component') and len(str(data['component'])) > 100:
-                row_errors.append('部件名称长度不能超过100个字符')
-            if data.get('drawing_no') and len(str(data['drawing_no'])) > 100:
-                row_errors.append('图号长度不能超过100个字符')
-            if data.get('model_no') and len(str(data['model_no'])) > 100:
-                row_errors.append('型号长度不能超过100个字符')
-            
-            if row_errors:
-                error_messages.append(f'第{i+1}行数据错误：{"; ".join(row_errors)}')
-        
-        # 如果有验证错误，直接返回
-        if error_messages:
-            return jsonify({
-                'success': False, 
-                'message': f'数据验证失败，共发现{len(error_messages)}个错误：\n' + '\n'.join(error_messages[:10]) + 
-                          (f'\n... 还有{len(error_messages)-10}个错误未显示' if len(error_messages) > 10 else '')
-            })
-        
-        # 检查重复的工序编号
-        process_codes = [data['process_code'] for data in process_data]
-        duplicate_codes = [code for code in set(process_codes) if process_codes.count(code) > 1]
-        if duplicate_codes:
-            return jsonify({
-                'success': False, 
-                'message': f'Excel文件中存在重复的工序编号：{", ".join(duplicate_codes)}'
-            })
-        
-        # 检查数据库中已存在的工序编号
-        existing_codes = []
-        for data in process_data:
-            existing = ProcessPrice.query.filter_by(
-                process_code=data['process_code'], 
-                is_current=True
-            ).first()
-            if existing:
-                existing_codes.append(data['process_code'])
-        
-        if existing_codes:
-            warning_messages.append(f'以下工序编号在数据库中已存在，将创建新版本：{", ".join(existing_codes)}')
-        
-        # 第一遍：处理普通工序
-        normal_processes = {}  # 用于存储导入的普通工序，以便后续建立小计关联
-        
-        for i, data in enumerate(process_data, 1):
-            if data['price_type'] != 'subtotal':
-                try:
-                    # 如果工序已存在，将现有版本设为非当前
-                    existing_process = ProcessPrice.query.filter_by(
-                        process_code=data['process_code'], 
-                        is_current=True
-                    ).first()
-                    
-                    if existing_process:
-                        existing_process.is_current = False
-                        next_version = existing_process.version + 1
-                    else:
-                        next_version = 1
-                    
-                    # 创建新工序价格记录
-                    process = ProcessPrice(
-                        global_sn=SerialNumber.get_next_number(),
-                        process_code=data['process_code'],
-                        process_name=data['process_name'],
-                        component=data['component'],
-                        drawing_no=data['drawing_no'],
-                        model_no=data['model_no'],
-                        price=data['price'],
-                        effective_date=data['effective_date'],
-                        notes=data['notes'],
-                        version=next_version,
-                        is_current=True,
-                        price_type='normal'
-                    )
-                    db.session.add(process)
-                    db.session.flush()  # 获取ID
-                            
-                    normal_processes[data['process_code']] = process.id
-                    success_count += 1
-                    
-                except Exception as e:
-                    error_messages.append(f"第{i+1}行普通工序 {data['process_code']} 处理失败: {str(e)}")
-        
-        # 提交普通工序，以便后续小计能找到
-        try:
-            db.session.commit()
-        except Exception as e:
-            db.session.rollback()
-            return jsonify({'success': False, 'message': f'保存普通工序时发生错误：{str(e)}'})
-        
-        # 第二遍：处理小计工序
-        for i, data in enumerate(process_data, 1):
-            if data['price_type'] == 'subtotal':
-                try:
-                    # 查找包含的普通工序
-                    included_process_ids = []
-                    missing_processes = []
-                    
-                    # 首先查找本次导入的工序
-                    for code in data['included_processes']:
-                        if code in normal_processes:
-                            included_process_ids.append(normal_processes[code])
-                        else:
-                            # 查找数据库中已有的工序
-                            existing_process = ProcessPrice.query.filter_by(
-                                process_code=code, 
-                                price_type='normal', 
-                                is_current=True
-                            ).first()
-                            if existing_process:
-                                included_process_ids.append(existing_process.id)
-                            else:
-                                missing_processes.append(code)
-                    
-                    if missing_processes:
-                        error_messages.append(f"第{i+1}行小计工序 {data['process_code']} 包含的工序未找到：{', '.join(missing_processes)}")
-                        continue
-                    
-                    if not included_process_ids:
-                        error_messages.append(f"第{i+1}行小计工序 {data['process_code']} 没有找到有效的包含工序")
-                        continue
-                    
-                    # 计算小计总价
-                    total_price = 0
-                    for pid in included_process_ids:
-                        process = ProcessPrice.query.get(pid)
-                        if process:
-                            total_price += process.price
-                    
-                    # 如果工序已存在，将现有版本设为非当前
-                    existing_process = ProcessPrice.query.filter_by(
-                        process_code=data['process_code'], 
-                        is_current=True
-                    ).first()
-                    
-                    if existing_process:
-                        existing_process.is_current = False
-                        next_version = existing_process.version + 1
-                    else:
-                        next_version = 1
-                    
-                    # 创建小计工序
-                    subtotal = ProcessPrice(
-                        global_sn=SerialNumber.get_next_number(),
-                        process_code=data['process_code'],
-                        process_name=data['process_name'],
-                        component=data['component'],
-                        drawing_no=data['drawing_no'],
-                        model_no=data['model_no'],
-                        price=total_price,
-                        effective_date=data['effective_date'],
-                        notes=data['notes'],
-                        version=next_version,
-                        is_current=True,
-                        price_type='subtotal'
-                    )
-                    db.session.add(subtotal)
-                    db.session.flush()  # 获取ID
-                    
-                    # 创建小计关联
-                    for pid in included_process_ids:
-                        group = ProcessPriceGroup(
-                            subtotal_id=subtotal.id,
-                            process_id=pid
-                        )
-                        db.session.add(group)
-                    
-                    success_count += 1
-                    
-                except Exception as e:
-                    error_messages.append(f"第{i+1}行小计工序 {data['process_code']} 处理失败: {str(e)}")
-        
-        # 最终提交
-        try:
-            if success_count > 0:
-                db.session.commit()
-                # 记录审计日志
-                log = AuditLog(
-                    user_id=current_user.id,
-                    action='批量导入工序价格',
-                    details=f'成功导入 {success_count} 条工序价格记录'
+        for index, row in df.iterrows():
+            try:
+                # 安全转换数据
+                process_code = safe_convert_value(row['工序编号'], str, '工序编号', index)
+                process_name = safe_convert_value(row['工序名称'], str, '工序名称', index)
+                component = safe_convert_value(row['部件'], str, '部件', index)
+                drawing_no = safe_convert_value(row['图号'], str, '图号', index)
+                model_no = safe_convert_value(row['型号'], str, '型号', index)
+                price = safe_convert_value(row['价格'], float, '价格', index)
+                effective_date = safe_convert_value(row['生效日期'], 'date', '生效日期', index)
+                notes = safe_convert_value(row.get('备注', ''), str, '备注', index)
+                
+                # 数据验证
+                if not process_code:
+                    error_messages.append(f"第{index+2}行：工序编号不能为空")
+                    continue
+                
+                if not process_name:
+                    error_messages.append(f"第{index+2}行：工序名称不能为空")
+                    continue
+                
+                if price < 0:
+                    error_messages.append(f"第{index+2}行：价格不能为负数")
+                    continue
+                
+                # 检查工序编号是否已存在
+                existing_process = ProcessPrice.query.filter_by(
+                    process_code=process_code,
+                    is_current=True
+                ).first()
+                
+                if existing_process:
+                    error_messages.append(f"第{index+2}行：工序编号 {process_code} 已存在")
+                    continue
+                
+                # 创建新工序价格记录
+                process = ProcessPrice(
+                    global_sn=SerialNumber.get_next_number(),
+                    process_code=process_code,
+                    process_name=process_name,
+                    component=component,
+                    drawing_no=drawing_no,
+                    model_no=model_no,
+                    price=price,
+                    effective_date=effective_date,
+                    notes=notes,
+                    version=1,  # 新工序的初始版本为1
+                    is_current=True,  # 新工序默认为当前生效
+                    price_type='normal'
                 )
-                db.session.add(log)
-                db.session.commit()
-            else:
-                db.session.rollback()
-        except Exception as e:
-            db.session.rollback()
-            return jsonify({'success': False, 'message': f'保存数据时发生错误：{str(e)}'})
+                db.session.add(process)
+                success_count += 1
+                
+            except ValueError as ve:
+                error_messages.append(str(ve))
+            except Exception as e:
+                error_messages.append(f"第{index+2}行：处理数据时出错 - {str(e)}")
         
-        # 构建返回消息
-        message_parts = []
         if success_count > 0:
-            message_parts.append(f'成功导入 {success_count} 条记录')
+            db.session.commit()
+            # 记录审计日志
+            log = AuditLog(
+                user_id=current_user.id,
+                action='批量导入工序价格',
+                details=f'成功导入 {success_count} 条工序价格记录，失败 {len(error_messages)} 条'
+            )
+            db.session.add(log)
+            db.session.commit()
+        else:
+            db.session.rollback()
         
-        if warning_messages:
-            message_parts.append(f'警告：{"; ".join(warning_messages)}')
+        message = create_detailed_error_message(error_messages, success_count, total_count)
         
-        if error_messages:
-            message_parts.append(f'失败：{len(error_messages)} 条记录导入失败')
-            if len(error_messages) <= 5:
-                message_parts.append('\n错误详情：\n' + '\n'.join(error_messages))
-            else:
-                message_parts.append(f'\n错误详情（前5条）：\n' + '\n'.join(error_messages[:5]) + 
-                                   f'\n... 还有{len(error_messages)-5}个错误未显示')
-        
-        final_message = '\n'.join(message_parts)
-        
-        # 如果有成功导入的记录，则认为操作成功
         return jsonify({
             'success': success_count > 0,
-            'message': final_message,
-            'details': {
-                'total_processed': len(process_data),
-                'success_count': success_count,
-                'error_count': len(error_messages),
-                'warning_count': len(warning_messages)
-            }
+            'message': message
         })
         
     except Exception as e:
+        if temp_path and os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except:
+                pass
         db.session.rollback()
-        return jsonify({'success': False, 'message': f'导入过程中发生未预期的错误：{str(e)}'})
+        return jsonify({'success': False, 'message': handle_import_error(e, "导入工序价格数据时")})
     finally:
-        # 清理临时文件
+        if temp_path and os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except:
+                pass
+
+@bp.route('/process_prices/export', methods=['GET', 'POST'])
+@login_required
+def export_process_prices():
+    form = ExportProcessForm()
+    if form.validate_on_submit():
+        query = ProcessPrice.query
+        if form.component.data:
+            query = query.filter(ProcessPrice.component == form.component.data)
+        if form.model_no.data:
+            query = query.filter(ProcessPrice.model_no == form.model_no.data)
+        if form.start_date.data:
+            query = query.filter(ProcessPrice.effective_date >= form.start_date.data)
+        if form.end_date.data:
+            query = query.filter(ProcessPrice.effective_date <= form.end_date.data)
+        
+        processes = query.all()
+        wb = ExcelGenerator.export_process_prices(processes)
+        
+        temp_path = None
+    try:
+            # 创建临时文件
+        fd, temp_path = tempfile.mkstemp(suffix='.xlsx')
+            # 关闭文件描述符
+        os.close(fd)
+            # 保存Excel文件
+        wb.save(temp_path)
+            # 发送文件
+        return send_file(
+            temp_path,
+                mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+                download_name=f'processes_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
+        )
+    except Exception as e:
+        if temp_path and os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except:
+                pass
+        flash(f'导出失败：{str(e)}', 'danger')
+        return redirect(url_for('main.process_prices'))
+    finally:
+            # 确保在请求结束后删除临时文件
+        if temp_path and os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except:
+                pass
+    
+    return render_template('main/export_form.html', title='导出工序数据', form=form)
+
+@bp.route('/production_records/template')
+@login_required
+def download_production_record_template():
+    """下载生产记录导入模板"""
+    if current_user.role not in ['admin', 'hr']:
+        flash('权限不足', 'danger')
+        return redirect(url_for('main.index'))
+    
+    temp_path = None
+    try:
+        wb = ExcelGenerator.create_production_record_template()
+        filename = 'production_record_template.xlsx'
+        temp_path = os.path.join(current_app.config['TEMP_FOLDER'], filename)
+        
+        # 保存并关闭工作簿
+        wb.save(temp_path)
+        wb.close()
+        
+        # 确保文件写入完成
+        time.sleep(0.1)
+        
+        return send_file(
+            temp_path,
+            as_attachment=True,
+            download_name=filename,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+    except Exception as e:
+        if temp_path and os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except:
+                pass
+        flash(f'下载模板失败：{str(e)}', 'danger')
+        return redirect(url_for('main.manage_production_records'))
+    finally:
+        # 确保在请求结束后删除临时文件
+        if temp_path and os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except:
+                pass
+
+@bp.route('/production_records/import', methods=['POST'])
+@login_required
+def import_production_records():
+    """导入生产记录数据"""
+    if current_user.role not in ['admin', 'hr']:
+        return jsonify({'success': False, 'message': '权限不足'})
+    
+    if 'file' not in request.files:
+        return jsonify({'success': False, 'message': '没有上传文件'})
+    
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'success': False, 'message': '没有选择文件'})
+    
+    if not file.filename.endswith('.xlsx'):
+        return jsonify({'success': False, 'message': '请上传Excel文件(.xlsx)'})
+    
+    temp_path = None
+    try:
+        filename = secure_filename(file.filename)
+        temp_path = os.path.join(current_app.config['TEMP_FOLDER'], filename)
+        file.save(temp_path)
+        
+        # 首先读取并验证Excel文件结构
+        try:
+            df = pd.read_excel(temp_path)
+        except Exception as e:
+            return jsonify({'success': False, 'message': handle_import_error(e, "读取Excel文件时")})
+        
+        # 验证文件结构
+        required_columns = ['工号', '工序编号', '数量', '日期']
+        is_valid, error_msg = validate_excel_structure(df, required_columns)
+        if not is_valid:
+            return jsonify({'success': False, 'message': error_msg})
+        
+        success_count = 0
+        error_messages = []
+        total_count = len(df)
+        
+        for index, row in df.iterrows():
+            try:
+                # 安全转换数据
+                employee_id = safe_convert_value(row['工号'], str, '工号', index)
+                process_code = safe_convert_value(row['工序编号'], str, '工序编号', index)
+                quantity = safe_convert_value(row['数量'], float, '数量', index)
+                record_date = safe_convert_value(row['日期'], 'date', '日期', index)
+                notes = safe_convert_value(row.get('备注', ''), str, '备注', index)
+                
+                # 数据验证
+                if not employee_id:
+                    error_messages.append(f"第{index+2}行：工号不能为空")
+                    continue
+                
+                if not process_code:
+                    error_messages.append(f"第{index+2}行：工序编号不能为空")
+                    continue
+                
+                if quantity <= 0:
+                    error_messages.append(f"第{index+2}行：数量必须大于0")
+                    continue
+                
+                # 查找员工
+                employee = Employee.query.filter_by(employee_id=employee_id).first()
+                if not employee:
+                    error_messages.append(f"第{index+2}行：员工工号 {employee_id} 不存在")
+                    continue
+                
+                # 查找工序价格，使用改进的日期处理逻辑
+                end_of_day = datetime.combine(record_date, datetime.max.time())
+                
+                process_price = ProcessPrice.query.filter(
+                    ProcessPrice.process_code == process_code,
+                    ProcessPrice.effective_date <= end_of_day + timedelta(days=1),
+                    ProcessPrice.is_current == True
+                ).order_by(ProcessPrice.effective_date.desc()).first()
+                
+                if not process_price:
+                    error_messages.append(f"第{index+2}行：未找到工序 {process_code} 在 {record_date} 的有效价格")
+                    continue
+                
+                # 创建生产记录
+                record = ProductionRecord(
+                    global_sn=SerialNumber.get_next_number(),
+                    employee_id=employee.id,
+                    process_id=process_price.id,
+                    quantity=quantity,
+                    date=record_date,
+                    notes=notes
+                )
+                db.session.add(record)
+                success_count += 1
+                
+            except ValueError as ve:
+                error_messages.append(str(ve))
+            except Exception as e:
+                error_messages.append(f"第{index+2}行：处理数据时出错 - {str(e)}")
+        
+        if success_count > 0:
+            db.session.commit()
+            # 记录审计日志
+            log = AuditLog(
+                user_id=current_user.id,
+                action='批量导入生产记录',
+                details=f'成功导入 {success_count} 条生产记录，失败 {len(error_messages)} 条'
+            )
+            db.session.add(log)
+            db.session.commit()
+        else:
+            db.session.rollback()
+        
+        message = create_detailed_error_message(error_messages, success_count, total_count)
+        
+        return jsonify({
+            'success': success_count > 0,
+            'message': message
+        })
+        
+    except Exception as e:
+        if temp_path and os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except:
+                pass
+        db.session.rollback()
+        return jsonify({'success': False, 'message': handle_import_error(e, "导入生产记录数据时")})
+    finally:
+        if temp_path and os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except:
+                pass
+
+@bp.route('/production_records/export', methods=['GET', 'POST'])
+@login_required
+def export_production_records():
+    form = ExportProductionRecordForm()
+    if form.validate_on_submit():
+        query = ProductionRecord.query
+        if form.employee_id.data:
+            query = query.join(Employee).filter(Employee.employee_id == form.employee_id.data)
+        if form.process_code.data:
+            query = query.join(ProcessPrice).filter(ProcessPrice.process_code == form.process_code.data)
+        if form.start_date.data:
+            query = query.filter(ProductionRecord.date >= form.start_date.data)
+        if form.end_date.data:
+            query = query.filter(ProductionRecord.date <= form.end_date.data)
+        
+        records = query.all()
+        wb = ExcelGenerator.export_production_records(records)
+        
+        temp_path = None
+        try:
+            # 创建临时文件
+            fd, temp_path = tempfile.mkstemp(suffix='.xlsx')
+            # 关闭文件描述符
+            os.close(fd)
+            # 保存Excel文件
+            wb.save(temp_path)
+            # 发送文件
+            return send_file(
+                temp_path,
+                mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                as_attachment=True,
+                download_name=f'production_records_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
+            )
+        except Exception as e:
+            if temp_path and os.path.exists(temp_path):
+                try:
+                    os.remove(temp_path)
+                except:
+                    pass
+            flash(f'导出失败：{str(e)}', 'danger')
+            return redirect(url_for('main.manage_production_records'))
+        finally:
+            # 确保在请求结束后删除临时文件
+            if temp_path and os.path.exists(temp_path):
+                try:
+                    os.remove(temp_path)
+                except:
+                    pass
+    
+    return render_template('main/export_form.html', form=form, title='导出生产记录')
+
+@bp.route('/bonus_penalties/export', methods=['GET', 'POST'])
+@login_required
+def export_bonus_penalties():
+    form = ExportBonusPenaltyForm()
+    if form.validate_on_submit():
+        query = BonusPenalty.query
+        if form.employee_id.data:
+            query = query.join(Employee).filter(Employee.employee_id == form.employee_id.data)
+        if form.process_code.data:
+            query = query.join(ProcessPrice).filter(ProcessPrice.process_code == form.process_code.data)
+        if form.type.data:
+            query = query.filter(BonusPenalty.type == form.type.data)
+        if form.start_date.data:
+            query = query.filter(BonusPenalty.date >= form.start_date.data)
+        if form.end_date.data:
+            query = query.filter(BonusPenalty.date <= form.end_date.data)
+        
+        records = query.all()
+        wb = ExcelGenerator.export_bonus_penalties(records)
+        
+        temp_path = None
+        try:
+            # 创建临时文件
+            fd, temp_path = tempfile.mkstemp(suffix='.xlsx')
+            # 关闭文件描述符
+            os.close(fd)
+            # 保存Excel文件
+            wb.save(temp_path)
+            # 发送文件
+            return send_file(
+                temp_path,
+                mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                as_attachment=True,
+                download_name=f'bonus_penalties_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
+            )
+        except Exception as e:
+            if temp_path and os.path.exists(temp_path):
+                try:
+                    os.remove(temp_path)
+                except:
+                    pass
+            flash(f'导出失败：{str(e)}', 'danger')
+            return redirect(url_for('main.manage_bonus_penalties'))
+        finally:
+            # 确保在请求结束后删除临时文件
+            if temp_path and os.path.exists(temp_path):
+                try:
+                    os.remove(temp_path)
+                except:
+                    pass
+    
+    return render_template('main/export_form.html', form=form, title='导出奖惩记录')
+
+@bp.route('/search', methods=['GET', 'POST'])
+@login_required
+def global_search():
+    """全局搜索页面"""
+    form = GlobalSearchForm()
+    search_results = None
+    
+    # 处理URL参数传递的搜索（快速搜索）
+    url_query = request.args.get('query')
+    if url_query and request.method == 'GET':
+        form.query.data = url_query
+        form.search_type.data = request.args.get('search_type', 'all')
+        
+        page = request.args.get('page', 1, type=int)
+        per_page = 20
+        
+        search_results = SearchService.global_search(
+            query=url_query,
+            search_type=form.search_type.data,
+            page=page,
+            per_page=per_page
+        )
+    elif form.validate_on_submit():
+        query = form.query.data
+        search_type = form.search_type.data
+        page = request.args.get('page', 1, type=int)
+        per_page = 20
+        
+        search_results = SearchService.global_search(
+            query=query,
+            search_type=search_type,
+            page=page,
+            per_page=per_page
+        )
+    
+    return render_template('main/search/global_search.html', 
+                         form=form, 
+                         search_results=search_results)
+
+@bp.route('/search/advanced', methods=['GET', 'POST'])
+@login_required
+def advanced_search():
+    """高级搜索页面"""
+    form = AdvancedSearchForm()
+    search_results = None
+    
+    if form.validate_on_submit():
+        # 构建搜索参数字典
+        search_params = {}
+        
+        # 员工搜索参数
+        if form.employee_name.data:
+            search_params['employee_name'] = form.employee_name.data
+        if form.employee_id.data:
+            search_params['employee_id'] = form.employee_id.data
+        if form.department.data:
+            search_params['department'] = form.department.data
+        if form.position.data:
+            search_params['position'] = form.position.data
+        if form.is_active.data:
+            search_params['is_active'] = form.is_active.data
+        
+        # 工序价格搜索参数
+        if form.process_code.data:
+            search_params['process_code'] = form.process_code.data
+        if form.process_name.data:
+            search_params['process_name'] = form.process_name.data
+        if form.component.data:
+            search_params['component'] = form.component.data
+        if form.drawing_no.data:
+            search_params['drawing_no'] = form.drawing_no.data
+        if form.model_no.data:
+            search_params['model_no'] = form.model_no.data
+        
+        # 生产记录搜索参数
+        if form.production_date_start.data:
+            search_params['production_date_start'] = form.production_date_start.data
+        if form.production_date_end.data:
+            search_params['production_date_end'] = form.production_date_end.data
+        
+        # 产品搜索参数
+        if form.product_code.data:
+            search_params['product_code'] = form.product_code.data
+        if form.product_name.data:
+            search_params['product_name'] = form.product_name.data
+        if form.drawing_number.data:
+            search_params['drawing_number'] = form.drawing_number.data
+        if form.model.data:
+            search_params['model'] = form.model.data
+        
+        # 库存搜索参数
+        if form.inventory_type.data:
+            search_params['inventory_type'] = form.inventory_type.data
+        if form.supplier.data:
+            search_params['supplier'] = form.supplier.data
+        if form.material_name.data:
+            search_params['material_name'] = form.material_name.data
+        if form.storage_date_start.data:
+            search_params['storage_date_start'] = form.storage_date_start.data
+        if form.storage_date_end.data:
+            search_params['storage_date_end'] = form.storage_date_end.data
+        
+        # 客户搜索参数
+        if form.customer_code.data:
+            search_params['customer_code'] = form.customer_code.data
+        if form.customer_name.data:
+            search_params['customer_name'] = form.customer_name.data
+        if form.contact_person.data:
+            search_params['contact_person'] = form.contact_person.data
+        if form.customer_type.data:
+            search_params['customer_type'] = form.customer_type.data
+        
+        # 销售订单搜索参数
+        if form.sales_order_number.data:
+            search_params['sales_order_number'] = form.sales_order_number.data
+        if form.order_source.data:
+            search_params['order_source'] = form.order_source.data
+        if form.year_month.data:
+            search_params['year_month'] = form.year_month.data
+        if form.order_status.data:
+            search_params['order_status'] = form.order_status.data
+        
+        # 生产订单搜索参数
+        if form.production_order_number.data:
+            search_params['production_order_number'] = form.production_order_number.data
+        if form.production_status.data:
+            search_params['production_status'] = form.production_status.data
+        if form.planned_start_date.data:
+            search_params['planned_start_date'] = form.planned_start_date.data
+        if form.planned_end_date.data:
+            search_params['planned_end_date'] = form.planned_end_date.data
+        
+        page = request.args.get('page', 1, type=int)
+        per_page = 20
+        
+        search_results = SearchService.advanced_search(
+            search_params=search_params,
+            page=page,
+            per_page=per_page
+        )
+    
+    return render_template('main/search/advanced_search.html', 
+                         form=form, 
+                         search_results=search_results)
+
+@bp.route('/api/search/suggestions')
+@login_required
+def search_suggestions():
+    """搜索建议API"""
+    query = request.args.get('q', '')
+    limit = request.args.get('limit', 10, type=int)
+    
+    if not query or len(query) < 2:
+        return jsonify({'suggestions': {}})
+    
+    suggestions = SearchService.get_search_suggestions(query, limit)
+    return jsonify({'suggestions': suggestions})
+
+@bp.route('/search/quick', methods=['POST'])
+@login_required
+def quick_search():
+    """快速搜索API"""
+    data = request.get_json()
+    query = data.get('query', '')
+    search_type = data.get('search_type', 'all')
+    
+    if not query:
+        return jsonify({'error': '请输入搜索关键词'}), 400
+    
+    # 只返回前5个结果用于快速预览
+    search_results = SearchService.global_search(
+        query=query,
+        search_type=search_type,
+        page=1,
+        per_page=5
+    )
+    
+    # 简化结果格式
+    simplified_results = {}
+    for category, results in search_results['results'].items():
+        simplified_results[category] = {
+            'total': results['total'],
+            'items': []
+        }
+        
+        for item in results['items']:
+            if category == 'employees':
+                simplified_results[category]['items'].append({
+                    'id': item.id,
+                    'name': item.name,
+                    'employee_id': item.employee_id,
+                    'department': item.department,
+                    'url': url_for('main.manage_employees') + f'?search={item.employee_id}'
+                })
+            elif category == 'process_prices':
+                simplified_results[category]['items'].append({
+                    'id': item.id,
+                    'process_name': item.process_name,
+                    'process_code': item.process_code,
+                    'price': item.price,
+                    'url': url_for('main.process_prices') + f'?search={item.process_code}'
+                })
+            elif category == 'products':
+                simplified_results[category]['items'].append({
+                    'id': item.id,
+                    'product_name': item.product_name,
+                    'product_code': item.product_code,
+                    'model': item.model,
+                    'url': url_for('main.manage_products') + f'?search={item.product_code}'
+                })
+            elif category == 'customers':
+                simplified_results[category]['items'].append({
+                    'id': item.id,
+                    'customer_name': item.customer_name,
+                    'customer_code': item.customer_code,
+                    'contact_person': item.contact_person,
+                    'url': url_for('main.customer_detail', customer_id=item.id)
+                })
+            # 可以继续添加其他类别的简化格式
+    
+    return jsonify({
+        'results': simplified_results,
+        'total_count': search_results['total_count'],
+        'query': query
+    })
+
+@bp.route('/tasks', methods=['GET', 'POST'])
+@login_required
+@handle_pagination_args
+def manage_tasks():
+    """管理任务分配"""
+    if current_user.role not in ['admin', 'hr']:
+        flash('权限不足', 'danger')
+        return redirect(url_for('main.index'))
+    
+    form = TaskAssignmentForm()
+    search_form = TaskSearchForm()
+    
+    # 获取所有员工
+    employees = Employee.query.all()
+    form.employee_id.choices = [(e.id, f"{e.employee_id} - {e.name} ({e.department})") for e in employees]
+    
+    # 获取所有当前生效的工序
+    today = datetime.now().date()
+    latest_versions = db.session.query(
+        ProcessPrice.process_code,
+        db.func.max(ProcessPrice.effective_date).label('max_date')
+    ).filter(ProcessPrice.effective_date <= today + timedelta(days=1))\
+     .group_by(ProcessPrice.process_code)\
+     .subquery()
+    
+    current_processes = ProcessPrice.query.join(
+        latest_versions,
+        db.and_(
+            ProcessPrice.process_code == latest_versions.c.process_code,
+            ProcessPrice.effective_date == latest_versions.c.max_date
+        )
+    ).order_by(ProcessPrice.process_code).all()
+    
+    form.process_id.choices = [(0, '无')] + [(p.id, f"{p.process_code} - {p.process_name} ({p.component or ''} {p.drawing_no or ''} {p.model_no or ''})".strip()) for p in current_processes]
+    
+    # 构建查询
+    query = TaskAssignment.query.join(Employee).join(ProcessPrice)
+    
+    # 处理搜索条件
+    if request.args.get('search'):
+        search_term = f"%{request.args.get('search')}%"
+        query = query.filter(db.or_(
+            Employee.name.like(search_term),
+            Employee.employee_id.like(search_term),
+            ProcessPrice.process_code.like(search_term),
+            ProcessPrice.process_name.like(search_term),
+            TaskAssignment.notes.like(search_term)
+        ))
+    
+    # 状态筛选，默认为pending（未完成）
+    status_filter = request.args.get('status', 'pending')
+    if status_filter and status_filter != '':
+        query = query.filter(TaskAssignment.status == status_filter)
+    
+    if request.args.get('start_date'):
+        try:
+            start_date = datetime.strptime(request.args.get('start_date'), '%Y-%m-%d')
+            query = query.filter(TaskAssignment.target_date >= start_date)
+        except (ValueError, TypeError):
+            pass
+    
+    if request.args.get('end_date'):
+        try:
+            end_date = datetime.strptime(request.args.get('end_date'), '%Y-%m-%d')
+            query = query.filter(TaskAssignment.target_date <= end_date)
+        except (ValueError, TypeError):
+            pass
+    
+    # 处理排序
+    sort_column = request.args.get('sort', 'assigned_date')
+    sort_direction = request.args.get('direction', 'desc')
+    
+    # 定义排序映射
+    sort_mapping = {
+        'assigned_date': TaskAssignment.assigned_date,
+        'target_date': TaskAssignment.target_date,
+        'employee_name': Employee.name,
+        'process_name': ProcessPrice.process_name,
+        'status': TaskAssignment.status,
+        'completion_rate': TaskAssignment.completed_quantity / TaskAssignment.quantity
+    }
+    
+    if sort_column in sort_mapping:
+        column = sort_mapping[sort_column]
+        if sort_direction == 'desc':
+            column = column.desc()
+        query = query.order_by(column)
+    else:
+        query = query.order_by(TaskAssignment.assigned_date.desc())
+    
+    # 分页
+    pagination = query.paginate(page=request.validated_page, per_page=request.validated_per_page)
+    tasks = pagination.items
+    
+    # 处理任务分配表单提交
+    if request.method == 'POST' and form.validate_on_submit():
+        try:
+            # 获取对应的工序价格记录和员工记录
+            process_price = ProcessPrice.query.get(form.process_id.data)
+            employee = Employee.query.get(form.employee_id.data)
+            
+            if not process_price:
+                flash('未找到对应的工序', 'danger')
+                return redirect(url_for('main.manage_tasks'))
+            
+            if not employee:
+                flash('未找到对应的员工', 'danger')
+                return redirect(url_for('main.manage_tasks'))
+            
+            # 创建任务分配记录
+            task = TaskAssignment(
+                global_sn=SerialNumber.get_next_number(),
+                employee_id=form.employee_id.data,
+                process_id=process_price.id,
+                quantity=form.quantity.data,
+                target_date=form.target_date.data,
+                notes=form.notes.data,
+                status='pending',  # 设置初始状态为待处理
+                assigned_date=datetime.now().date(),  # 设置分配日期
+                # 规格型号信息
+                spec_extended=form.spec_extended.data,
+                spec_gasket=form.spec_gasket.data,
+                spec_joint=form.spec_joint.data,
+                spec_drilling=form.spec_drilling.data,
+                spec_other=form.spec_other.data,
+                spec_other_desc=form.spec_other_desc.data,
+                direction=form.direction.data
+            )
+            db.session.add(task)
+            db.session.flush()  # 获取task.id
+            
+            # 记录审计日志
+            log = AuditLog(
+                user_id=current_user.id,
+                action='分配生产任务',
+                details=f'将工序 {process_price.process_name} 分配给员工 {employee.name}，数量：{task.quantity}',
+                can_rollback=True,
+                rollback_type='add',
+                target_model='TaskAssignment',
+                target_id=task.id,
+                new_data={
+                    'employee_id': task.employee_id,
+                    'process_id': task.process_id,
+                    'quantity': task.quantity,
+                    'target_date': task.target_date.isoformat() if task.target_date else None,
+                    'notes': task.notes,
+                    'status': task.status
+                }
+            )
+            db.session.add(log)
+            db.session.commit()
+            
+            flash('任务分配成功', 'success')
+            return redirect(url_for('main.manage_tasks'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'任务分配失败：{str(e)}', 'danger')
+    
+    # 从请求参数填充搜索表单
+    search_form.search.data = request.args.get('search', '')
+    search_form.status.data = request.args.get('status', 'pending')
+    if request.args.get('start_date'):
+        try:
+            search_form.start_date.data = datetime.strptime(request.args.get('start_date'), '%Y-%m-%d')
+        except (ValueError, TypeError):
+            pass
+    if request.args.get('end_date'):
+        try:
+            search_form.end_date.data = datetime.strptime(request.args.get('end_date'), '%Y-%m-%d')
+        except (ValueError, TypeError):
+            pass
+    
+    return render_template('main/tasks.html',
+                         form=form,
+                         search_form=search_form,
+                         tasks=tasks,
+                         pagination=pagination,
+                         current_sort=sort_column,
+                         current_direction=sort_direction)
+
+@bp.route('/tasks/<int:id>/update_status', methods=['POST'])
+@login_required
+def update_task_status(id):
+    """更新任务状态"""
+    try:
+        task = TaskAssignment.query.get_or_404(id)
+        
+        # 兼容JSON和表单数据
+        if request.is_json:
+            data = request.get_json()
+            completed_quantity = int(data.get('completed_quantity', 0))
+            materials_data = data.get('materials', [])
+        else:
+            # 处理表单数据
+            completed_quantity = int(request.form.get('completed_quantity', 0))
+            materials_json = request.form.get('materials', '[]')
+            try:
+                import json
+                materials_data = json.loads(materials_json)
+            except (json.JSONDecodeError, TypeError):
+                materials_data = []
+        
+        # 验证完成数量
+        if completed_quantity < 0:
+            return jsonify({'success': False, 'message': '完成数量不能为负数'}), 400
+        if completed_quantity > task.quantity:
+            return jsonify({'success': False, 'message': '完成数量不能超过任务数量'}), 400
+        
+        # 验证原材料数据
+        for material in materials_data:
+            if not isinstance(material, dict) or 'raw_material_id' not in material or 'quantity' not in material:
+                return jsonify({'success': False, 'message': '原材料数据格式错误'}), 400
+                
+            try:
+                material_id = int(material['raw_material_id'])
+                quantity = float(material['quantity'])
+            except (ValueError, TypeError):
+                return jsonify({'success': False, 'message': '原材料数据格式错误'}), 400
+                
+            raw_material = RawMaterial.query.get(material_id)
+            if not raw_material:
+                return jsonify({'success': False, 'message': f'原材料不存在'}), 400
+            if raw_material.quantity < quantity:
+                return jsonify({'success': False, 'message': f'原材料 {raw_material.material_name} 库存不足'}), 400
+        
+        # 更新任务状态
+        task.completed_quantity = completed_quantity
+        if completed_quantity >= task.quantity:
+            task.status = 'completed'
+            task.completed_at = datetime.now()
+            
+            # 创建生产记录
+            production_record = ProductionRecord(
+                employee_id=task.employee_id,
+                process_id=task.process_id,
+                quantity=task.quantity,
+                global_sn=task.global_sn,
+                date=datetime.now().date()
+            )
+            db.session.add(production_record)
+            db.session.flush()
+            
+            # 检查工序是否需要检验，如果需要则自动创建质检任务
+            process = ProcessPrice.query.get(task.process_id)
+            if process and process.needs_inspection:
+                try:
+                    # 查找默认的质检员
+                    default_inspector = User.query.filter(
+                        db.or_(
+                            User.role == 'inspector',
+                            User.role == 'admin'
+                        )
+                    ).first()
+                    
+                    if default_inspector:
+                        # 创建质检任务
+                        from app.models import InspectionTask, SerialNumber
+                        inspection_task = InspectionTask(
+                            global_sn=SerialNumber.get_next_number(),
+                            target_type='production_record',
+                            target_id=production_record.id,
+                            inspector_id=default_inspector.id,
+                            priority=1,  # 中等优先级
+                            deadline=datetime.now() + timedelta(days=3),  # 3天内完成
+                            notes=f'工序 {process.process_name} 完成后自动创建的质检任务',
+                            created_by=current_user.id,
+                            status='pending'
+                        )
+                        db.session.add(inspection_task)
+                        
+                        # 记录质检任务创建的审计日志
+                        inspection_log = AuditLog(
+            user_id=current_user.id,
+                            action='自动创建质检任务',
+                            details=f'工序 {process.process_name} 完成后自动创建质检任务：{inspection_task.global_sn}',
+            can_rollback=True,
+                            rollback_type='add',
+                            target_model='InspectionTask',
+                            target_id=inspection_task.id,
+            new_data={
+                                'target_type': 'production_record',
+                                'target_id': production_record.id,
+                                'inspector_id': default_inspector.id,
+                                'priority': 1,
+                                'auto_created': True
+                            }
+                        )
+                        db.session.add(inspection_log)
+                        
+                        current_app.logger.info(f'自动创建质检任务：{inspection_task.global_sn}，对应生产记录：{production_record.global_sn}')
+                    else:
+                        current_app.logger.warning(f'未找到可用的质检员，无法为生产记录 {production_record.global_sn} 创建质检任务')
+                        
+                except Exception as e:
+                    current_app.logger.error(f'自动创建质检任务失败: {str(e)}')
+                    # 不影响主流程，继续执行
+            
+            # 添加原材料使用记录
+            for material in materials_data:
+                material_usage = ProductionRecordMaterial(
+                    production_record_id=production_record.id,
+                    raw_material_id=int(material['raw_material_id']),
+                    quantity=float(material['quantity'])
+                )
+                db.session.add(material_usage)
+                
+                # 更新原材料库存
+                raw_material = RawMaterial.query.get(int(material['raw_material_id']))
+                old_quantity = raw_material.quantity
+                raw_material.quantity -= float(material['quantity'])
+                
+                # 如果原材料数量耗尽（小于等于0），将状态修改为已使用
+                if raw_material.quantity <= 0:
+                    raw_material.status = 'used'
+                    # 记录状态变更的审计日志
+                    status_log = AuditLog(
+                        user_id=current_user.id,
+                        action='自动更新原材料状态',
+                        details=f'原材料 {raw_material.material_name} 数量耗尽，状态自动更新为已使用',
+                        can_rollback=True,
+                        rollback_type='edit',
+                        target_model='RawMaterial',
+                        target_id=raw_material.id,
+                        old_data={'status': 'in_stock', 'quantity': old_quantity},
+                        new_data={'status': 'used', 'quantity': raw_material.quantity}
+                    )
+                    db.session.add(status_log)
+        else:
+            # 如果任务还未完成，但已经开始，更新状态为进行中
+            task.status = 'in_progress'
+        
+        # 记录审计日志
+        audit_log = AuditLog(
+            user_id=current_user.id,
+            action='update_task',
+            details=f'更新任务 {task.id} 的完成数量为 {completed_quantity}'
+        )
+        db.session.add(audit_log)
+        
+        # 如果任务关联了生产批次，同步更新批次状态
+        if task.production_batch_id:
+            try:
+                # 获取同一批次的所有任务
+                batch_tasks = TaskAssignment.query.filter_by(production_batch_id=task.production_batch_id).all()
+                
+                # 计算批次任务的完成情况
+                total_tasks = len(batch_tasks)
+                completed_tasks = len([t for t in batch_tasks if t.status == 'completed'])
+                in_progress_tasks = len([t for t in batch_tasks if t.status in ['in_progress', 'completed']])
+                
+                # 获取生产批次
+                batch = ProductionBatch.query.get(task.production_batch_id)
+                if batch:
+                    old_status = batch.status
+                    
+                    # 根据任务完成情况更新批次状态
+                    if completed_tasks == total_tasks:
+                        # 所有任务都完成了
+                        batch.status = 'completed'
+                        if not batch.end_date:
+                            batch.end_date = datetime.now().date()
+                    elif in_progress_tasks > 0:
+                        # 有任务在进行中
+                        batch.status = 'in_progress'
+                        if not batch.start_date:
+                            batch.start_date = datetime.now().date()
+                    else:
+                        # 所有任务都是待开始状态
+                        batch.status = 'pending'
+                    
+                    # 如果状态发生变化，记录审计日志
+                    if old_status != batch.status:
+                        batch_log = AuditLog(
+                            user_id=current_user.id,
+                            action='自动更新生产批次状态',
+                            details=f'由于任务状态变化，生产批次 {batch.batch_number} 状态从 {old_status} 更新为 {batch.status}',
+                            target_model='ProductionBatch',
+                            target_id=batch.id,
+                            old_data={'status': old_status},
+                            new_data={'status': batch.status}
+                        )
+                        db.session.add(batch_log)
+                        
+                        current_app.logger.info(f'生产批次 {batch.batch_number} 状态自动更新：{old_status} -> {batch.status}')
+                
+                # 更新生产状态层次结构
+                update_production_status_hierarchy()
+                
+            except Exception as e:
+                current_app.logger.error(f'同步更新生产批次状态失败: {str(e)}')
+                # 不影响主流程，继续执行
+        
+        db.session.commit()
+        return jsonify({'success': True, 'message': '更新成功'})
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f'更新任务状态失败: {str(e)}')
+        return jsonify({'success': False, 'message': f'更新失败：{str(e)}'}), 500
+
+@bp.route('/tasks/<int:id>', methods=['DELETE'])
+@login_required
+def delete_task(id):
+    """删除任务"""
+    if current_user.role not in ['admin', 'hr']:
+        return jsonify({'success': False, 'message': '权限不足'}), 403
+    
+    try:
+        task = TaskAssignment.query.get_or_404(id)
+        
+        # 保存旧数据用于回滚
+        old_data = {
+            'employee_id': task.employee_id,
+            'process_id': task.process_id,
+            'quantity': task.quantity,
+            'target_date': task.target_date.isoformat() if task.target_date else None,
+            'notes': task.notes,
+            'status': task.status,
+            'completed_quantity': task.completed_quantity
+        }
+        
+        # 记录审计日志
+        log = AuditLog(
+            user_id=current_user.id,
+            action='删除任务',
+            details=f'删除任务：员工 {task.employee.name}，工序 {task.process.process_name}',
+            can_rollback=True,
+            rollback_type='delete',
+            target_model='TaskAssignment',
+            target_id=task.id,
+            old_data=old_data
+        )
+        db.session.add(log)
+        
+        db.session.delete(task)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': '任务删除成功'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'删除失败：{str(e)}'}), 500
+
+@bp.route('/my_tasks')
+@login_required
+def my_tasks():
+    """查看我的任务"""
+    # 获取当前用户的员工记录
+    employee = Employee.query.filter_by(user_id=current_user.id).first()
+    if not employee:
+        flash('未找到您的员工信息', 'danger')
+        return redirect(url_for('main.index'))
+    
+    # 获取该员工的所有任务
+    tasks = TaskAssignment.query.filter_by(employee_id=employee.id)\
+        .order_by(TaskAssignment.assigned_date.desc()).all()
+    
+    return render_template('main/my_tasks.html', tasks=tasks)
+
+@bp.route('/bonus_penalties/template')
+@login_required
+def download_bonus_penalty_template():
+    """下载奖金/罚款导入模板"""
+    if current_user.role not in ['admin', 'hr']:
+        flash('权限不足', 'danger')
+        return redirect(url_for('main.manage_bonus_penalties'))
+    
+    temp_path = None
+    try:
+        wb = ExcelGenerator.create_bonus_penalty_template()
+        filename = 'bonus_penalty_template.xlsx'
+        temp_path = os.path.join(current_app.config['TEMP_FOLDER'], filename)
+        
+        # 保存并关闭工作簿
+        wb.save(temp_path)
+        wb.close()
+        
+        # 确保文件写入完成
+        time.sleep(0.1)
+        
+        return send_file(
+            temp_path,
+            as_attachment=True,
+            download_name=filename,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+    except Exception as e:
+        if temp_path and os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except:
+                pass
+        flash(f'下载模板失败：{str(e)}', 'danger')
+        return redirect(url_for('main.manage_bonus_penalties'))
+    finally:
+        # 确保在请求结束后删除临时文件
+        if temp_path and os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except:
+                pass
+
+@bp.route('/bonus_penalties/import', methods=['POST'])
+@login_required
+def import_bonus_penalties():
+    """导入奖金/罚款数据"""
+    if current_user.role not in ['admin', 'hr']:
+        return jsonify({'success': False, 'message': '权限不足'})
+    
+    if 'file' not in request.files:
+        return jsonify({'success': False, 'message': '没有上传文件'})
+    
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'success': False, 'message': '没有选择文件'})
+    
+    if not file.filename.endswith('.xlsx'):
+        return jsonify({'success': False, 'message': '请上传Excel文件(.xlsx)'})
+    
+    temp_path = None
+    try:
+        filename = secure_filename(file.filename)
+        temp_path = os.path.join(current_app.config['TEMP_FOLDER'], filename)
+        file.save(temp_path)
+        
+        # 首先读取并验证Excel文件结构
+        try:
+            df = pd.read_excel(temp_path)
+        except Exception as e:
+            return jsonify({'success': False, 'message': handle_import_error(e, "读取Excel文件时")})
+        
+        # 验证文件结构
+        required_columns = ['工号', '类型', '金额', '日期', '原因']
+        is_valid, error_msg = validate_excel_structure(df, required_columns)
+        if not is_valid:
+            return jsonify({'success': False, 'message': error_msg})
+        
+        success_count = 0
+        error_messages = []
+        total_count = len(df)
+        
+        for index, row in df.iterrows():
+            try:
+                # 安全转换数据
+                employee_id = safe_convert_value(row['工号'], str, '工号', index)
+                type = safe_convert_value(row['类型'], str, '类型', index)
+                amount = safe_convert_value(row['金额'], float, '金额', index)
+                date = safe_convert_value(row['日期'], 'date', '日期', index)
+                reason = safe_convert_value(row['原因'], str, '原因', index)
+                process_code = safe_convert_value(row.get('工序编号', ''), str, '工序编号', index)
+                
+                # 数据验证
+                if not employee_id:
+                    error_messages.append(f"第{index+2}行：工号不能为空")
+                    continue
+                
+                if type not in ['bonus', 'penalty']:
+                    error_messages.append(f"第{index+2}行：类型必须是 'bonus' 或 'penalty'")
+                    continue
+                
+                if amount <= 0:
+                    error_messages.append(f"第{index+2}行：金额必须大于0")
+                    continue
+                
+                if not reason:
+                    error_messages.append(f"第{index+2}行：原因不能为空")
+                    continue
+                
+                # 查找员工
+                employee = Employee.query.filter_by(employee_id=employee_id).first()
+                if not employee:
+                    error_messages.append(f"第{index+2}行：员工工号 {employee_id} 不存在")
+                    continue
+                
+                # 查找工序（如果有）
+                process_id = None
+                if process_code:
+                    process = ProcessPrice.query.filter_by(process_code=process_code).first()
+                    if process:
+                        process_id = process.id
+                
+                # 创建奖惩记录
+                record = BonusPenalty(
+                    global_sn=SerialNumber.get_next_number(),
+                    employee_id=employee.id,
+                    type=type,
+                    amount=amount,
+                    date=date,
+                    process_id=process_id,
+                    reason=reason
+                )
+                db.session.add(record)
+                success_count += 1
+                
+            except ValueError as ve:
+                error_messages.append(str(ve))
+            except Exception as e:
+                error_messages.append(f"第{index+2}行：处理数据时出错 - {str(e)}")
+        
+        if success_count > 0:
+            db.session.commit()
+            # 记录审计日志
+            log = AuditLog(
+                user_id=current_user.id,
+                action='批量导入奖惩记录',
+                details=f'成功导入 {success_count} 条奖惩记录，失败 {len(error_messages)} 条'
+            )
+            db.session.add(log)
+            db.session.commit()
+        else:
+            db.session.rollback()
+        
+        message = create_detailed_error_message(error_messages, success_count, total_count)
+        
+        return jsonify({
+            'success': success_count > 0,
+            'message': message
+        })
+        
+    except Exception as e:
+        if temp_path and os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except:
+                pass
+        db.session.rollback()
+        return jsonify({'success': False, 'message': handle_import_error(e, "导入奖惩记录数据时")})
+    finally:
+        if temp_path and os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except:
+                pass
+from flask_login import login_required, current_user
+from app import db, csrf
+from app.models import Employee, ProcessPrice, ProductionRecord, BonusPenalty, AuditLog, ProcessPrice, User, TaskAssignment, SerialNumber, SalaryChange, CoefficientChange, EmployeeSalaryHistory, EmployeeCoefficientHistory, ProcessPriceGroup, FinishedProduct, RawMaterial, CodeRule, CodeGenerationLog, ProductionRecordMaterial, InspectionTemplate, InspectionBaseItem, InspectionItem, InspectionTask, InspectionRecord, Product, ProductBOM, ProductProcess, ProductionOrder, MaterialAllocation, ProductionBatch, ProductionBatchItem, Customer, CustomerAddress, SalesOrder, SalesOrderItem, SalesOrder, SalesOrderItem
+from datetime import datetime, timedelta, date
+from . import bp
+from app.main.forms import (
+    EmployeeForm, ProcessPriceForm, ProductionRecordForm, BonusPenaltyForm,
+    SalaryCalculationForm, AuditLogSearchForm, ProcessPriceSearchForm,
+    ProductionRecordSearchForm, TaskAssignmentForm, TaskSearchForm,
+    BonusPenaltySearchForm, ExportEmployeeForm, ExportProcessForm,
+    ExportProductionRecordForm, ExportBonusPenaltyForm, ExportTaskForm,
+    CustomerForm, CustomerAddressForm, SalesOrderForm, SalesOrderItemForm,
+    ProductionOrderForm, NotificationRuleForm, NotificationTemplateForm,
+    GlobalSearchForm, AdvancedSearchForm
+)
+from sqlalchemy import desc, or_
+from app.utils.excel_generator import ExcelGenerator
+import os
+import time
+from werkzeug.utils import secure_filename
+from werkzeug.datastructures import FileStorage
+from typing import Optional
+from flask import after_this_request
+from functools import wraps
+import tempfile
+from flask_paginate import Pagination
+import pandas as pd
+from app.decorators import admin_required
+import numpy as np
+from werkzeug.datastructures import FileStorage
+from typing import List, Dict, Any, Optional, Union, Tuple
+import shutil
+from openpyxl import Workbook
+import json
+from io import BytesIO
+from openpyxl import load_workbook
+import traceback
+
+# 导入质量管理路由
+from .quality import *
+
+from app.services.search_service import SearchService
+
+def create_detailed_error_message(errors: List[str], success_count: int, total_count: int) -> str:
+    """创建详细的错误消息"""
+    if not errors:
+        return f'成功导入 {success_count} 条记录'
+    
+    error_summary = f'成功导入 {success_count} 条记录，{len(errors)} 条记录导入失败（共 {total_count} 条）'
+    
+    # 按错误类型分组
+    error_groups = {}
+    for error in errors:
+        error_type = error.split('：')[0] if '：' in error else '未知错误'
+        if error_type not in error_groups:
+            error_groups[error_type] = []
+        error_groups[error_type].append(error)
+    
+    # 构建详细错误信息
+    detailed_errors = []
+    for error_type, error_list in error_groups.items():
+        if len(error_list) > 5:
+            # 如果同类错误太多，只显示前5个
+            detailed_errors.append(f"{error_type}（{len(error_list)}个）:")
+            detailed_errors.extend(error_list[:5])
+            detailed_errors.append(f"... 还有 {len(error_list) - 5} 个类似错误")
+        else:
+            detailed_errors.extend(error_list)
+    
+    return error_summary + '\n\n错误详情:\n' + '\n'.join(detailed_errors)
+
+def validate_excel_structure(df, required_columns: List[str], optional_columns: List[str] = None) -> Tuple[bool, str]:
+    """验证Excel文件结构"""
+    if df.empty:
+        return False, "Excel文件为空，请检查文件内容"
+    
+    # 检查必需列
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    if missing_columns:
+        available_columns = list(df.columns)
+        return False, f"缺少必需的列: {', '.join(missing_columns)}\n可用的列: {', '.join(available_columns)}"
+    
+    # 检查数据行数
+    if len(df) == 0:
+        return False, "Excel文件没有数据行"
+    
+    return True, ""
+
+def safe_convert_value(value, target_type, field_name: str, row_index: int):
+    """安全地转换值类型"""
+    try:
+        if pd.isna(value) or value == '':
+            if target_type == str:
+                return ''
+            elif target_type == float:
+                return 0.0
+            elif target_type == int:
+                return 0
+            else:
+                return None
+        
+        if target_type == str:
+            return str(value).strip()
+        elif target_type == float:
+            return float(value)
+        elif target_type == int:
+            return int(float(value))  # 先转float再转int，处理'1.0'这种情况
+        elif target_type == 'date':
+            if isinstance(value, str):
+                # 尝试多种日期格式
+                for fmt in ['%Y-%m-%d', '%Y/%m/%d', '%m/%d/%Y', '%d/%m/%Y']:
+                    try:
+                        return datetime.strptime(value, fmt).date()
+                    except ValueError:
+                        continue
+                raise ValueError(f"无法解析日期格式: {value}")
+            else:
+                return pd.to_datetime(value).date()
+        else:
+            return value
+    except Exception as e:
+        raise ValueError(f"第{row_index+2}行 '{field_name}' 字段值 '{value}' 转换失败: {str(e)}")
+
+def handle_import_error(e: Exception, context: str = "") -> str:
+    """统一处理导入错误"""
+    error_msg = str(e)
+    
+    # 常见错误的友好提示
+    if "Permission denied" in error_msg:
+        return f"文件访问权限错误，请确保文件未被其他程序占用: {context}"
+    elif "No such file" in error_msg:
+        return f"文件不存在或路径错误: {context}"
+    elif "Invalid file format" in error_msg or "Excel file format" in error_msg:
+        return f"文件格式错误，请确保上传的是有效的Excel文件(.xlsx): {context}"
+    elif "Memory" in error_msg:
+        return f"文件过大，请减少数据量或联系管理员: {context}"
+    elif "Encoding" in error_msg:
+        return f"文件编码错误，请确保文件使用UTF-8编码保存: {context}"
+    else:
+        return f"导入过程中发生错误: {error_msg} {context}"
+
+def handle_pagination_args(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        try:
+            # 获取并验证分页参数
+            page = request.args.get('page', 1, type=int)
+            per_page = int(request.args.get('per_page', '20'))
+            
+            # 确保分页参数在合理范围内
+            if page < 1:
+                page = 1
+            if per_page not in [20, 50, 100]:
+                per_page = 20
+                
+            # 将验证后的参数存储在request对象中
+            request.validated_page = page
+            request.validated_per_page = per_page
+            
+            return f(*args, **kwargs)
+        except (ValueError, TypeError):
+            flash('分页参数无效，已使用默认值', 'warning')
+            request.validated_page = 1
+            request.validated_per_page = 20
+            return f(*args, **kwargs)
+    return decorated_function
+
+@bp.route('/')
+@login_required
+def index():
+    if current_user.role == 'user':
+        return redirect(url_for('main.user_dashboard'))
+    elif current_user.role == 'admin':
+        return render_template('main/admin_dashboard.html')
+    else:
+        flash('权限不足', 'danger')
+        return redirect(url_for('main.user_dashboard'))
+
+@bp.route('/user_dashboard')
+@login_required
+def user_dashboard():
+    print(f"DEBUG: user_dashboard accessed by user {current_user.id} ({current_user.username}) with role {current_user.role}")
+    
+    if current_user.role not in ['user', 'inspector', 'admin', 'manager']:
+        print(f"DEBUG: Role check failed for user {current_user.username} with role {current_user.role}")
+        flash('权限不足：您的角色无法访问此页面', 'danger')
+        return redirect(url_for('main.index'))
+    
+    # 获取当前用户的员工信息
+    employee = Employee.query.filter_by(user_id=current_user.id).first()
+    if not employee:
+        print(f"DEBUG: Employee record not found for user {current_user.username}")
+        flash('未找到员工信息', 'error')
+        return redirect(url_for('main.index'))
+
+    # 获取待完成任务（最多5个）
+    pending_tasks = TaskAssignment.query.filter_by(employee_id=employee.id)\
+        .filter(TaskAssignment.status.in_(['pending', 'in_progress']))\
+        .order_by(TaskAssignment.assigned_date.desc())\
+        .limit(5).all()
+
+    # 获取已完成任务（最多5个）
+    completed_tasks = TaskAssignment.query.filter_by(employee_id=employee.id)\
+        .filter(TaskAssignment.status == 'completed')\
+        .order_by(TaskAssignment.assigned_date.desc())\
+        .limit(5).all()
+
+    # 获取最近的生产记录（最多5个）
+    recent_records = ProductionRecord.query.filter_by(employee_id=employee.id)\
+        .order_by(ProductionRecord.date.desc())\
+        .limit(5).all()
+
+    # 获取最近的奖惩记录（最多5个）
+    recent_bonuses = BonusPenalty.query.filter_by(employee_id=employee.id)\
+        .order_by(BonusPenalty.date.desc())\
+        .limit(5).all()
+
+    # 工资计算
+    from datetime import datetime, date
+    today = date.today()
+    current_month_start = date(today.year, today.month, 1)
+
+    # 计算当日工资
+    daily_production = ProductionRecord.query.filter_by(employee_id=employee.id, date=today).all()
+    daily_piecework = sum(record.quantity * record.process.price for record in daily_production)
+    daily_bonuses = BonusPenalty.query.filter_by(employee_id=employee.id)\
+        .filter(db.func.date(BonusPenalty.date) == today).all()
+    daily_adjustments = sum(bp.amount if bp.type == 'bonus' else -bp.amount for bp in daily_bonuses)
+    daily_salary = daily_piecework * employee.coefficient + daily_adjustments
+
+    # 计算当月工资
+    monthly_production = ProductionRecord.query.filter_by(employee_id=employee.id)\
+        .filter(ProductionRecord.date >= current_month_start).all()
+    monthly_piecework = sum(record.quantity * record.process.price for record in monthly_production)
+    monthly_bonuses = BonusPenalty.query.filter_by(employee_id=employee.id)\
+        .filter(BonusPenalty.date >= datetime.combine(current_month_start, datetime.min.time())).all()
+    monthly_adjustments = sum(bp.amount if bp.type == 'bonus' else -bp.amount for bp in monthly_bonuses)
+    monthly_salary = employee.base_salary + monthly_piecework * employee.coefficient + monthly_adjustments
+    
+    # 质检员相关数据 - 基于员工职位检查
+    inspection_tasks = []
+    pending_inspections = 0
+    # 检查员工职位是否包含"质检"
+    is_inspector = employee.position and ('质检' in employee.position)
+    
+    if is_inspector:
+        from app.models import InspectionTask
+        # 获取分配给当前质检员的任务（最多5个）
+        inspection_tasks = InspectionTask.query.filter_by(inspector_id=current_user.id)\
+            .order_by(InspectionTask.created_at.desc())\
+            .limit(5).all()
+        
+        # 获取待处理的质检任务数量
+        pending_inspections = InspectionTask.query.filter_by(
+            inspector_id=current_user.id,
+            status='pending'
+        ).count()
+    
+    from datetime import datetime
+    
+    return render_template('main/user_dashboard.html',
+                         employee=employee,
+                         pending_tasks=pending_tasks,
+                         completed_tasks=completed_tasks,
+                         recent_records=recent_records,
+                         recent_bonuses=recent_bonuses,
+                         inspection_tasks=inspection_tasks,
+                         pending_inspections=pending_inspections,
+                         current_time=datetime.now(),
+                         is_inspector=is_inspector,
+                         daily_salary=daily_salary,
+                         monthly_salary=monthly_salary)
+
+@bp.route('/employees')
+@login_required
+@handle_pagination_args
+def manage_employees():
+    if current_user.role not in ['admin', 'hr']:
+        flash('权限不足', 'danger')
+        return redirect(url_for('main.index'))
+    
+    search_form = ProductionRecordSearchForm()
+    
+    # 构建基础查询
+    query = Employee.query
+    
+    # 处理搜索
+    if search_form.search.data:
+        search_term = f"%{search_form.search.data}%"
+        query = query.filter(db.or_(
+            Employee.name.like(search_term),
+            Employee.employee_id.like(search_term),
+            Employee.department.like(search_term),
+            Employee.position.like(search_term)
+        ))
+    
+    # 分页
+    page = request.validated_page
+    pagination = query.paginate(page=page, per_page=request.validated_per_page)
+    employees = pagination.items
+    
+    return render_template('main/employees.html',
+                         employees=employees,
+                         pagination=pagination,
+                         search_form=search_form)
+
+@bp.route('/employee/<int:id>', methods=['DELETE'])
+@login_required
+def delete_employee(id):
+    if not current_user.role == 'admin':
+        return jsonify({'success': False, 'message': '权限不足'}), 403
+    
+    try:
+        employee = Employee.query.get_or_404(id)
+        
+        # 保存旧数据用于回滚
+        old_data = {
+            'employee_id': employee.employee_id,
+            'name': employee.name,
+            'position': employee.position,
+            'base_salary': employee.base_salary,
+            'coefficient': employee.coefficient,
+            'department': employee.department,
+            'user_id': employee.user_id
+        }
+        
+        # 记录可回滚的审计日志
+        log = AuditLog(
+            user_id=current_user.id,
+            action='删除员工',
+            details=f'删除员工：{employee.name}（工号：{employee.employee_id}）',
+            can_rollback=True,
+            rollback_type='delete',
+            target_model='Employee',
+            target_id=employee.id,
+            old_data=old_data
+        )
+        db.session.add(log)
+        
+        # 级联删除相关记录
+        ProductionRecord.query.filter_by(employee_id=id).delete()
+        BonusPenalty.query.filter_by(employee_id=id).delete()
+        
+        db.session.delete(employee)
+        db.session.commit()
+        return jsonify({'success': True, 'message': '员工删除成功'})
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        current_app.logger.error(f'删除员工失败: {str(e)}')
+        return jsonify({'success': False, 'message': '删除失败，请重试'}), 500
+
+@bp.route('/employee/add', methods=['GET', 'POST'])
+@login_required
+def add_employee():
+    if current_user.role not in ['admin', 'hr']:
+        flash('权限不足', 'danger')
+        return redirect(url_for('main.index'))
+    
+    form = EmployeeForm()
+    if form.validate_on_submit():
+        # 检查工号是否已存在
+        if Employee.query.filter_by(employee_id=form.employee_id.data).first():
+            flash('工号已存在', 'danger')
+            return render_template('main/employee_form.html', form=form, title='新增员工')
+        
+        # 检查用户名是否已存在
+        if User.query.filter_by(username=form.employee_id.data).first():
+            flash('该工号已被用作其他用户的用户名，请使用其他工号', 'danger')
+            return render_template('main/employee_form.html', form=form, title='新增员工')
+        
+        # 创建用户账号
+        user = User(
+            username=form.employee_id.data,
+            role='admin' if form.is_admin.data else 'user'
+        )
+        user.set_password(form.password.data or form.employee_id.data)  # 如果没有设置密码，使用工号作为密码
+        db.session.add(user)
+        
+        # 创建员工记录
+        employee = Employee(
+            global_sn=SerialNumber.get_next_number(),
+            employee_id=form.employee_id.data,
+            name=form.name.data,
+            position=form.position.data,
+            base_salary=form.base_salary.data,
+            coefficient=form.coefficient.data,
+            department=form.department.data,
+            hire_date=form.hire_date.data,
+            termination_date=form.termination_date.data,
+            is_active=True if not form.termination_date.data or form.termination_date.data > datetime.now().date() else False,
+            user=user  # 关联用户账号
+        )
+        db.session.add(employee)
+        db.session.flush()
+        
+        try:
+            # 记录可回滚的审计日志
+            log = AuditLog(
+                user_id=current_user.id,
+                action='添加员工',
+                details=f'添加员工：{employee.name}（工号：{employee.employee_id}）',
+                can_rollback=True,
+                rollback_type='add',
+                target_model='Employee',
+                target_id=employee.id,
+                new_data={
+                    'employee_id': employee.employee_id,
+                    'name': employee.name,
+                    'position': employee.position,
+                    'base_salary': employee.base_salary,
+                    'coefficient': employee.coefficient,
+                    'department': employee.department,
+                    'hire_date': employee.hire_date.strftime('%Y-%m-%d'),
+                    'termination_date': employee.termination_date.strftime('%Y-%m-%d') if employee.termination_date else None,
+                    'is_active': employee.is_active,
+                    'user_id': user.id
+                }
+            )
+            db.session.add(log)
+            db.session.commit()
+            
+            flash('员工添加成功', 'success')
+            return redirect(url_for('main.manage_employees'))
+        except SQLAlchemyError as e:
+            db.session.rollback()
+            current_app.logger.error(f'添加员工失败: {str(e)}')
+            flash('操作失败，请重试', 'danger')
+            return render_template('main/employee_form.html', form=form, title='新增员工')
+    
+    return render_template('main/employee_form.html', form=form, title='新增员工')
+
+@bp.route('/employees/<int:id>/edit', methods=['GET', 'POST'])
+@login_required
+def edit_employee(id):
+    if current_user.role not in ['admin', 'hr']:
+        flash('权限不足', 'danger')
+        return redirect(url_for('main.index'))
+    
+    employee = Employee.query.get_or_404(id)
+    form = EmployeeForm()
+    
+    if form.validate_on_submit():
+        try:
+            # 检查工号是否已存在（排除当前员工）
+            existing_employee = Employee.query.filter(
+                Employee.employee_id == form.employee_id.data,
+                Employee.id != id
+            ).first()
+            if existing_employee:
+                flash('工号已存在', 'danger')
+                return redirect(url_for('main.manage_employees'))
+            
+            # 保存旧数据用于回滚
+            old_data = {
+                'employee_id': employee.employee_id,
+                'name': employee.name,
+                'position': employee.position,
+                'base_salary': employee.base_salary,
+                'coefficient': employee.coefficient,
+                'department': employee.department,
+                'hire_date': employee.hire_date.strftime('%Y-%m-%d') if employee.hire_date else None,
+                'termination_date': employee.termination_date.strftime('%Y-%m-%d') if employee.termination_date else None,
+                'is_active': employee.is_active
+            }
+            
+            # 检查工资是否变更
+            salary_changed = employee.base_salary != form.base_salary.data
+            coefficient_changed = employee.coefficient != form.coefficient.data
+            
+            # 更新数据
+            employee.employee_id = form.employee_id.data
+            employee.name = form.name.data
+            employee.department = form.department.data
+            employee.position = form.position.data
+            employee.base_salary = form.base_salary.data
+            employee.coefficient = form.coefficient.data
+            employee.hire_date = form.hire_date.data
+            employee.termination_date = form.termination_date.data
+            employee.update_active_status()  # 根据入职和离职时间更新状态
+            
+            # 如果设置了新密码
+            if form.password.data:
+                employee.user.set_password(form.password.data)
+            
+            # 更新用户角色
+            if current_user.role == 'admin':
+                employee.user.role = 'admin' if form.is_admin.data else 'user'
+            
+            # 记录工资变更历史
+            if salary_changed:
+                salary_history = EmployeeSalaryHistory(
+                    serial_number=SerialNumber.get_next_number(),
+                    employee_id=employee.id,
+                    old_salary=old_data['base_salary'],
+                    new_salary=employee.base_salary,
+                    effective_date=datetime.now().date(),
+                    reason='员工信息更新',
+                    created_by=current_user.id
+                )
+                db.session.add(salary_history)
+            
+            # 记录系数变更历史
+            if coefficient_changed:
+                coefficient_history = EmployeeCoefficientHistory(
+                    serial_number=SerialNumber.get_next_number(),
+                    employee_id=employee.id,
+                    old_coefficient=old_data['coefficient'],
+                    new_coefficient=employee.coefficient,
+                    effective_date=datetime.now().date(),
+                    reason='员工信息更新',
+                    created_by=current_user.id
+                )
+                db.session.add(coefficient_history)
+            
+            # 记录审计日志
+            log = AuditLog(
+                user_id=current_user.id,
+                action='编辑员工信息',
+                details=f'编辑员工：{employee.name}（工号：{employee.employee_id}）',
+                can_rollback=True,
+                rollback_type='edit',
+                target_model='Employee',
+                target_id=employee.id,
+                old_data=old_data,
+                new_data={
+                    'employee_id': employee.employee_id,
+                    'name': employee.name,
+                    'position': employee.position,
+                    'base_salary': employee.base_salary,
+                    'coefficient': employee.coefficient,
+                    'department': employee.department,
+                    'hire_date': employee.hire_date.strftime('%Y-%m-%d'),
+                    'termination_date': employee.termination_date.strftime('%Y-%m-%d') if employee.termination_date else None,
+                    'is_active': employee.is_active
+                }
+            )
+            db.session.add(log)
+            db.session.commit()
+            
+            flash('员工信息更新成功', 'success')
+            return redirect(url_for('main.manage_employees'))
+        except SQLAlchemyError as e:
+            db.session.rollback()
+            current_app.logger.error(f'更新员工信息失败: {str(e)}')
+            flash('操作失败，请重试', 'danger')
+    
+    # GET请求时，填充表单数据
+    if request.method == 'GET':
+        form.employee_id.data = employee.employee_id
+        form.name.data = employee.name
+        form.department.data = employee.department
+        form.position.data = employee.position
+        form.base_salary.data = employee.base_salary
+        form.coefficient.data = employee.coefficient
+        form.hire_date.data = employee.hire_date
+        form.termination_date.data = employee.termination_date
+        if employee.user:
+            form.is_admin.data = employee.user.role == 'admin'
+    
+    return render_template('main/employee_form.html', form=form, title='编辑员工信息', employee=employee)
+
+@bp.route('/process_prices', methods=['GET'])
+@handle_pagination_args
+def process_prices():
+    search_form = ProcessPriceSearchForm()
+    
+    # 从请求参数获取搜索条件
+    search_form.search.data = request.args.get('search', '')
+    search_form.show_all.data = request.args.get('show_all') == 'y'
+    
+    # 使用验证后的分页参数
+    page = request.validated_page
+    per_page = request.validated_per_page
+    
+    # 基本查询
+    query = ProcessPrice.query
+
+    # 处理搜索
+    if search_form.search.data:
+        search_term = f"%{search_form.search.data}%"
+        query = query.filter(db.or_(
+            ProcessPrice.process_code.like(search_term),
+            ProcessPrice.process_name.like(search_term),
+            ProcessPrice.component.like(search_term),
+            ProcessPrice.drawing_no.like(search_term),
+            ProcessPrice.model_no.like(search_term)
+        ))
+
+    # 如果不显示所有工序，则只显示当前生效的工序
+    if not search_form.show_all.data:
+        today = datetime.now().date()
+        
+        # 创建子查询，获取每个工序编号的最新生效版本
+        latest_versions = db.session.query(
+            ProcessPrice.process_code,
+            db.func.max(ProcessPrice.effective_date).label('max_date')
+        ).filter(ProcessPrice.effective_date <= today + timedelta(days=1))\
+         .group_by(ProcessPrice.process_code)\
+         .subquery()
+        
+        # 将主查询与子查询关联
+        query = query.join(
+            latest_versions,
+            db.and_(
+                ProcessPrice.process_code == latest_versions.c.process_code,
+                ProcessPrice.effective_date == latest_versions.c.max_date
+            )
+        )
+
+    # 处理排序
+    sort_column = request.args.get('sort', 'process_code')
+    sort_direction = request.args.get('direction', 'asc')
+    
+    if sort_column in ['process_code', 'process_name', 'component', 'drawing_no', 'model_no', 'price', 'effective_date']:
+        column = getattr(ProcessPrice, sort_column)
+        if sort_direction == 'desc':
+            column = column.desc()
+        query = query.order_by(column)
+    else:
+        query = query.order_by(ProcessPrice.process_code)
+
+    pagination = query.paginate(page=page, per_page=per_page)
+    process_prices = pagination.items
+
+    # 获取每个工序的最新版本信息
+    today = datetime.now().date()
+    latest_versions = {}
+    for process in process_prices:
+        if process.process_code not in latest_versions:
+            latest_version = ProcessPrice.query\
+                .filter(ProcessPrice.process_code == process.process_code)\
+                .filter(ProcessPrice.effective_date <= today + timedelta(days=1))\
+                .order_by(ProcessPrice.effective_date.desc())\
+                .first()
+            latest_versions[process.process_code] = latest_version.id if latest_version else None
+
+    return render_template('main/process_prices.html', 
+                         process_prices=process_prices, 
+                         pagination=pagination,
+                         search_form=search_form,
+                         current_sort=sort_column,
+                         current_direction=sort_direction,
+                         latest_versions=latest_versions,
+                         today=today)
+
+@bp.route('/add_process_price', methods=['GET', 'POST'])
+@login_required
+def add_process_price():
+    """添加工序价格"""
+    if current_user.role not in ['admin', 'hr']:
+        flash('权限不足', 'danger')
+        return redirect(url_for('main.index'))
+    
+    form = ProcessPriceForm()
+    
+    # 获取所有普通工序供小计选择
+    normal_processes = ProcessPrice.query.filter_by(price_type='normal', is_current=True).all()
+    form.included_processes.choices = [(p.id, f"{p.process_code} - {p.process_name} (单价: {p.price}元)") for p in normal_processes]
+    
+    # 获取可用的编码规则
+    finished_rules = CodeRule.query.filter_by(code_type='product', is_active=True).all()
+    raw_rules = CodeRule.query.filter_by(code_type='material', is_active=True).all()
+    # 将编码规则数据传递给模板
+    finished_rules_json = [{'id': r.id, 'name': r.name} for r in finished_rules]
+    raw_rules_json = [{'id': r.id, 'name': r.name} for r in raw_rules]
+    
+    # 设置编码规则选项 - 修改此处，包含所有可能的选项
+    all_rules = [(0, '请选择')]
+    all_rules.extend([(r.id, r.name) for r in finished_rules])
+    all_rules.extend([(r.id, r.name) for r in raw_rules])
+    form.code_rule_id.choices = all_rules
+    
+    if form.validate_on_submit():
+        try:
+            # 如果是小计类型，计算总价
+            price = form.price.data
+            if form.price_type.data == 'subtotal':
+                price = 0
+                for process_id in form.included_processes.data:
+                    process = ProcessPrice.query.get(process_id)
+                    if process:
+                        price += process.price
+
+            # 创建新的工序价格记录
+            process_price = ProcessPrice(
+                global_sn=SerialNumber.get_next_number(),
+                process_code=form.process_code.data,
+                process_name=form.process_name.data,
+                component=form.component.data,
+                drawing_no=form.drawing_no.data,
+                model_no=form.model_no.data,
+                price=price,
+                effective_date=form.effective_date.data,
+                notes=form.notes.data,
+                version=1,  # 新工序的初始版本为1
+                is_current=True,  # 新工序默认为当前生效
+                price_type=form.price_type.data,
+                has_output=form.has_output.data,
+                output_type=form.output_type.data if form.has_output.data else None,
+                code_rule_id=form.code_rule_id.data if form.has_output.data and form.code_rule_id.data != 0 else None,
+                needs_inspection=form.needs_inspection.data
+            )
+            db.session.add(process_price)
+            db.session.flush()  # 获取process_price.id
+            
+            # 如果是小计类型，创建与普通工序的关联
+            if form.price_type.data == 'subtotal' and form.included_processes.data:
+                for process_id in form.included_processes.data:
+                    group = ProcessPriceGroup(
+                        subtotal_id=process_price.id,
+                        process_id=process_id
+                    )
+                    db.session.add(group)
+            
+                # 记录可回滚的审计日志
+            log = AuditLog(
+            user_id=current_user.id,
+            action='添加工序价格',
+                details=f'添加工序：{process_price.process_name}，编号：{process_price.process_code}',
+                can_rollback=True,
+                rollback_type='add',
+                target_model='ProcessPrice',
+                target_id=process_price.id,
+                new_data={
+                    'process_code': process_price.process_code,
+                    'process_name': process_price.process_name,
+                    'component': process_price.component,
+                    'drawing_no': process_price.drawing_no,
+                    'model_no': process_price.model_no,
+                    'price': process_price.price,
+                    'version': process_price.version,
+                    'effective_date': process_price.effective_date.isoformat() if process_price.effective_date else None,
+                    'notes': process_price.notes,
+                    'is_current': process_price.is_current,
+                    'price_type': process_price.price_type,
+                    'has_output': process_price.has_output,
+                    'output_type': process_price.output_type,
+                    'code_rule_id': process_price.code_rule_id,
+                    'needs_inspection': process_price.needs_inspection
+                }
+        )
+            db.session.add(log)
+            db.session.commit()
+            flash('工序价格添加成功', 'success')
+            return redirect(url_for('main.process_prices'))
+        except Exception as e:
+            db.session.rollback()
+            current_app.logger.error(f'添加工序价格失败: {str(e)}')
+            flash('操作失败，请重试', 'danger')
+            return render_template('main/process_price_form.html', 
+                                form=form, 
+                                title='新增工序价格',
+                                finished_rules_json=finished_rules_json,
+                                raw_rules_json=raw_rules_json)
+    
+    return render_template('main/process_price_form.html', 
+                         form=form, 
+                         title='新增工序价格',
+                         finished_rules_json=finished_rules_json,
+                         raw_rules_json=raw_rules_json)
+
+@bp.route('/process_prices/<int:id>/edit', methods=['GET', 'POST'])
+@login_required
+def edit_process_price(id):
+    if current_user.role not in ['admin', 'hr']:
+        flash('权限不足', 'danger')
+        return redirect(url_for('main.index'))
+    
+    process_price = ProcessPrice.query.get_or_404(id)
+    form = ProcessPriceForm()
+    
+    # 获取所有普通工序供小计选择（排除当前工序）
+    normal_processes = ProcessPrice.query.filter(
+        ProcessPrice.price_type == 'normal',
+        ProcessPrice.id != id,
+        ProcessPrice.is_current == True
+    ).all()
+    form.included_processes.choices = [(p.id, f"{p.process_code} - {p.process_name} (单价: {p.price}元)") for p in normal_processes]
+    
+    # 获取可用的编码规则
+    finished_rules = CodeRule.query.filter_by(code_type='product', is_active=True).all()
+    raw_rules = CodeRule.query.filter_by(code_type='material', is_active=True).all()
+    # 将编码规则数据传递给模板
+    finished_rules_json = [{'id': r.id, 'name': r.name} for r in finished_rules]
+    raw_rules_json = [{'id': r.id, 'name': r.name} for r in raw_rules]
+    
+    # 设置编码规则选项 - 修改此处，包含所有可能的选项
+    all_rules = [(0, '请选择')]
+    all_rules.extend([(r.id, r.name) for r in finished_rules])
+    all_rules.extend([(r.id, r.name) for r in raw_rules])
+    form.code_rule_id.choices = all_rules
+    
+    if form.validate_on_submit():
+        try:
+            # 保存旧数据用于回滚
+            old_data = {
+                'process_code': process_price.process_code,
+                'process_name': process_price.process_name,
+                'component': process_price.component,
+                'drawing_no': process_price.drawing_no,
+                'model_no': process_price.model_no,
+                'price': process_price.price,
+                'effective_date': process_price.effective_date.isoformat() if process_price.effective_date else None,
+                'notes': process_price.notes,
+                'version': process_price.version,
+                'is_current': process_price.is_current,
+                'price_type': process_price.price_type,
+                'has_output': process_price.has_output,
+                'output_type': process_price.output_type,
+                'code_rule_id': process_price.code_rule_id,
+                'needs_inspection': process_price.needs_inspection
+            }
+            
+            # 如果是小计类型，计算总价
+            price = form.price.data
+            if form.price_type.data == 'subtotal':
+                price = 0
+                for process_id in form.included_processes.data:
+                    process = ProcessPrice.query.get(process_id)
+                    if process:
+                        price += process.price
+            
+            # 更新数据
+            process_price.process_code = form.process_code.data
+            process_price.process_name = form.process_name.data
+            process_price.component = form.component.data
+            process_price.drawing_no = form.drawing_no.data
+            process_price.model_no = form.model_no.data
+            process_price.price = price
+            process_price.effective_date = form.effective_date.data
+            process_price.notes = form.notes.data
+            process_price.price_type = form.price_type.data
+            process_price.has_output = form.has_output.data
+            process_price.output_type = form.output_type.data if form.has_output.data else None
+            process_price.code_rule_id = form.code_rule_id.data if form.has_output.data and form.code_rule_id.data != 0 else None
+            process_price.needs_inspection = form.needs_inspection.data
+            
+            # 更新小计关联
+            if form.price_type.data == 'subtotal':
+                # 删除旧的关联
+                ProcessPriceGroup.query.filter_by(subtotal_id=id).delete()
+                # 创建新的关联
+                for process_id in form.included_processes.data:
+                    group = ProcessPriceGroup(
+                        subtotal_id=id,
+                        process_id=process_id
+                    )
+                    db.session.add(group)
+            
+            # 记录可回滚的审计日志
+            log = AuditLog(
+                user_id=current_user.id,
+                action='修改工序价格',
+                details=f'修改工序 {process_price.process_name}（编号：{process_price.process_code}）的价格信息',
+                can_rollback=True,
+                rollback_type='edit',
+                target_model='ProcessPrice',
+                target_id=process_price.id,
+                old_data=old_data,
+                new_data={
+                    'process_code': process_price.process_code,
+                    'process_name': process_price.process_name,
+                    'component': process_price.component,
+                    'drawing_no': process_price.drawing_no,
+                    'model_no': process_price.model_no,
+                    'price': process_price.price,
+                    'effective_date': process_price.effective_date.isoformat() if process_price.effective_date else None,
+                    'notes': process_price.notes,
+                    'version': process_price.version,
+                    'is_current': process_price.is_current,
+                    'price_type': process_price.price_type,
+                    'has_output': process_price.has_output,
+                    'output_type': process_price.output_type,
+                    'code_rule_id': process_price.code_rule_id,
+                    'needs_inspection': process_price.needs_inspection
+                }
+            )
+            db.session.add(log)
+            db.session.commit()
+            
+            flash('工序价格修改成功', 'success')
+            return redirect(url_for('main.process_prices'))
+        except Exception as e:
+            db.session.rollback()
+            current_app.logger.error(f'修改工序价格失败: {str(e)}')
+            flash('操作失败，请重试', 'danger')
+            return render_template('main/process_price_form.html', 
+                                form=form, 
+                                title='编辑工序价格', 
+                                employee=process_price,
+                                finished_rules_json=finished_rules_json,
+                                raw_rules_json=raw_rules_json)
+    
+    # 如果是GET请求，填充表单数据
+    if request.method == 'GET':
+        form.process_code.data = process_price.process_code
+        form.process_name.data = process_price.process_name
+        form.component.data = process_price.component
+        form.drawing_no.data = process_price.drawing_no
+        form.model_no.data = process_price.model_no
+        form.price.data = process_price.price
+        form.effective_date.data = process_price.effective_date
+        form.notes.data = process_price.notes
+        form.price_type.data = process_price.price_type
+        form.has_output.data = process_price.has_output
+        form.output_type.data = process_price.output_type or ''
+        form.code_rule_id.data = process_price.code_rule_id or 0
+        form.needs_inspection.data = process_price.needs_inspection
+
+        # 如果是小计，获取包含的工序
+        if process_price.price_type == 'subtotal':
+            included_process_ids = [group.process_id for group in process_price.included_processes]
+            form.included_processes.data = included_process_ids
+            
+    # 添加代码规则ID初始值，传递给JS使用
+    code_rule_id_initial = process_price.code_rule_id if process_price.code_rule_id else 0
+    
+    return render_template(
+        'main/process_price_form.html',
+        title='编辑工序价格',
+        form=form,
+        process_price=process_price,
+        finished_rules_json=finished_rules_json,
+        raw_rules_json=raw_rules_json,
+        code_rule_id_initial=code_rule_id_initial
+    )
+
+@bp.route('/process_price/<int:id>', methods=['DELETE'])
+@login_required
+def delete_process_price(id):
+    if not current_user.role == 'admin':
+        return jsonify({'success': False, 'message': '权限不足'}), 403
+    
+    try:
+        process = ProcessPrice.query.get_or_404(id)
+        
+        # 保存旧数据用于回滚
+        old_data = {
+            'process_code': process.process_code,
+            'process_name': process.process_name,
+            'component': process.component,
+            'drawing_no': process.drawing_no,
+            'model_no': process.model_no,
+            'price': process.price,
+            'version': process.version,
+            'effective_date': process.effective_date.isoformat() if process.effective_date else None,
+            'notes': process.notes,
+            'is_current': process.is_current,
+            'output_type': process.output_type,
+            'code_rule_id': process.code_rule_id,
+            'needs_inspection': process.needs_inspection
+        }
+        
+        # 记录可回滚的审计日志
+        log = AuditLog(
+            user_id=current_user.id,
+            action='删除工序价格',
+            details=f'删除工序：{process.process_name}（编号：{process.process_code}）',
+            can_rollback=True,
+            rollback_type='delete',
+            target_model='ProcessPrice',
+            target_id=process.id,
+            old_data=old_data
+        )
+        db.session.add(log)
+        
+        db.session.delete(process)
+        db.session.commit()
+        return jsonify({'success': True, 'message': '工序删除成功'})
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        current_app.logger.error(f'删除工序失败: {str(e)}')
+        return jsonify({'success': False, 'message': '删除失败，请重试'}), 500
+
+@bp.route('/salary/<int:employee_id>')
+@login_required
+def salary_details(employee_id):
+    employee = Employee.query.get_or_404(employee_id)
+    production_records = ProductionRecord.query.filter_by(employee_id=employee_id).all()
+    bonuses_penalties = BonusPenalty.query.filter_by(employee_id=employee_id).all()
+    return render_template('main/salary_details.html',
+                         employee=employee,
+                         production_records=production_records,
+                         bonuses_penalties=bonuses_penalties,
+                         total_salary=employee.total_salary)
+
+@bp.route('/production_records', methods=['GET', 'POST'])
+@login_required
+@handle_pagination_args
+def manage_production_records():
+    """管理生产记录"""
+    form = ProductionRecordForm()
+    search_form = ProductionRecordSearchForm(request.args)
+    
+    # 获取所有员工
+    employees = Employee.query.filter_by(is_active=True).all()
+    form.employee_id.choices = [(0, '请选择员工')] + [(e.id, f"{e.employee_id} - {e.name} ({e.department})") for e in employees]
+
+    # 获取所有当前生效的工序
+    today = datetime.now().date()
+    
+    # 创建子查询，获取每个工序编号的最新生效版本
+    latest_versions = db.session.query(
+        ProcessPrice.process_code,
+        db.func.max(ProcessPrice.effective_date).label('max_date')
+    ).filter(ProcessPrice.effective_date <= today + timedelta(days=1))\
+     .group_by(ProcessPrice.process_code)\
+     .subquery()
+    
+    # 获取当前生效的工序
+    current_processes = ProcessPrice.query.join(
+        latest_versions,
+        db.and_(
+            ProcessPrice.process_code == latest_versions.c.process_code,
+            ProcessPrice.effective_date == latest_versions.c.max_date
+        )
+    ).order_by(ProcessPrice.process_code).all()
+    
+    # 设置工序选项
+    form.process_id.choices = [(0, '请选择工序')] + [(p.id, f"{p.process_code} - {p.process_name} ({p.component or ''} {p.drawing_no or ''} {p.model_no or ''})".strip()) for p in current_processes]
+
+    # 获取可用的原材料列表 - 用于前端展示
+    available_raw_materials = RawMaterial.query.filter(RawMaterial.quantity > 0).all()
+    raw_materials_json = [{
+        'id': m.id,
+        'name': m.material_name,
+        'quantity': m.quantity
+    } for m in available_raw_materials]
+
+    if form.validate_on_submit():
+        try:
+            # 验证选择的值
+            if form.employee_id.data == 0:
+                flash('请选择员工', 'danger')
+                return redirect(url_for('main.manage_production_records'))
+            if form.process_id.data == 0:
+                flash('请选择工序', 'danger')
+                return redirect(url_for('main.manage_production_records'))
+            
+            record = ProductionRecord(
+                global_sn=SerialNumber.get_next_number(),
+                employee_id=form.employee_id.data,
+                process_id=form.process_id.data,
+                quantity=form.quantity.data,
+                date=form.date.data,
+                notes=form.notes.data
+            )
+            
+            if form.inspector.data:
+                # 获取工序信息
+                process = ProcessPrice.query.get(form.process_id.data)
+                
+                # 生成产品编号
+                if process and process.code_rule_id:
+                    # 如果工序有关联的编码规则，使用该规则生成编号
+                    code_rule = CodeRule.query.get(process.code_rule_id)
+                    if code_rule and code_rule.is_active:
+                        product_number = code_rule.generate_code()
+                    else:
+                        product_number = SerialNumber.get_next_number()
+                else:
+                    product_number = SerialNumber.get_next_number()
+                
+                # 如果提供了检验员信息，创建成品记录
+                finished_product = FinishedProduct(
+                    global_sn=SerialNumber.get_next_number(),
+                    serial_number=SerialNumber.get_next_number(),
+                    product_number=product_number,  # 使用生成的产品编号
+                    production_date=form.date.data,  # 使用生产记录的日期
+                    drawing_number=process.drawing_no if process and process.drawing_no else "未知",  # 使用工序的图号
+                    model=process.model_no if process and process.model_no else "未知",  # 使用工序的型号
+                    inspector=form.inspector.data,
+                    quantity=1,  # 默认数量为1
+                    status='in_stock'  # 默认状态为在库
+                )
+                db.session.add(finished_product)
+                db.session.flush()  # 获取成品ID
+                record.finished_product_id = finished_product.id
+            
+            db.session.add(record)
+            db.session.flush()  # 获取生产记录ID
+            
+            # 处理多个原材料
+            material_data = []
+            for key, value in request.form.items():
+                if key.startswith('material_data_'):
+                    try:
+                        data = json.loads(value)
+                        material_data.append(data)
+                    except (json.JSONDecodeError, ValueError) as e:
+                        current_app.logger.error(f"解析材料数据失败: {str(e)}")
+                        continue
+            
+            # 添加原材料关联记录
+            for data in material_data:
+                material_id = data.get('id')
+                quantity = data.get('quantity')
+                
+                if material_id and quantity:
+                    # 获取原材料
+                    raw_material = RawMaterial.query.get(material_id)
+                    if raw_material:
+                        # 检查库存是否足够
+                        if raw_material.quantity >= float(quantity):
+                            # 创建关联记录
+                            record_material = ProductionRecordMaterial(
+                                production_record_id=record.id,
+                                raw_material_id=material_id,
+                                quantity=float(quantity)
+                            )
+                            db.session.add(record_material)
+                            
+                            # 更新原材料库存
+                            old_quantity = raw_material.quantity
+                            raw_material.quantity -= float(quantity)
+                            
+                            # 如果原材料数量耗尽（小于等于0），将状态修改为已使用
+                            if raw_material.quantity <= 0:
+                                raw_material.status = 'used'
+                                # 记录状态变更的审计日志
+                                status_log = AuditLog(
+                                    user_id=current_user.id,
+                                    action='自动更新原材料状态',
+                                    details=f'原材料 {raw_material.material_name} 数量耗尽，状态自动更新为已使用',
+                                    can_rollback=True,
+                                    rollback_type='edit',
+                                    target_model='RawMaterial',
+                                    target_id=raw_material.id,
+                                    old_data={'status': 'in_stock', 'quantity': old_quantity},
+                                    new_data={'status': 'used', 'quantity': raw_material.quantity}
+                                )
+                                db.session.add(status_log)
+                        else:
+                            db.session.rollback()
+                            flash(f'原材料 {raw_material.material_name} 库存不足！', 'danger')
+                            return redirect(url_for('main.manage_production_records'))
+            
+            # 添加审计日志
+            log = AuditLog(
+            user_id=current_user.id,
+            action='添加生产记录',
+                details=f'添加生产记录：员工 {Employee.query.get(form.employee_id.data).name}，工序 {ProcessPrice.query.get(form.process_id.data).process_name}，数量 {form.quantity.data}',
+                can_rollback=True,
+                rollback_type='add',
+                target_model='ProductionRecord',
+                target_id=record.id
+        )
+            db.session.add(log)
+
+            db.session.commit()
+            flash('生产记录添加成功', 'success')
+            return redirect(url_for('main.manage_production_records'))
+        except Exception as e:
+            db.session.rollback()
+            current_app.logger.error(f'添加生产记录失败: {str(e)}')
+            flash(f'添加失败：{str(e)}', 'danger')
+            return redirect(url_for('main.manage_production_records'))
+
+    # 处理搜索和排序
+    query = ProductionRecord.query.join(Employee).join(ProcessPrice)
+    
+    # 获取搜索参数
+    search_term_input = request.args.get('search', '').strip()
+    if search_term_input:
+        search_term = f"%{search_term_input}%"
+        
+        # 构建基本搜索条件
+        search_conditions = [
+            ProductionRecord.global_sn.like(search_term),
+            Employee.name.like(search_term),
+            Employee.employee_id.like(search_term),
+            ProcessPrice.process_code.like(search_term),
+            ProcessPrice.process_name.like(search_term),
+            ProcessPrice.component.like(search_term),
+            ProcessPrice.drawing_no.like(search_term),
+            ProcessPrice.model_no.like(search_term)
+        ]
+        
+        # 添加原材料搜索条件
+        try:
+            # 搜索通过 ProductionRecordMaterial 关联的原材料
+            material_ids = db.session.query(ProductionRecordMaterial.production_record_id).join(
+                RawMaterial, ProductionRecordMaterial.raw_material_id == RawMaterial.id
+            ).filter(db.or_(
+                RawMaterial.material_name.like(search_term),
+                RawMaterial.internal_number.like(search_term)
+            )).distinct().all()
+            
+            if material_ids:
+                material_record_ids = [row[0] for row in material_ids]
+                search_conditions.append(ProductionRecord.id.in_(material_record_ids))
+            
+            # 搜索直接关联的原材料
+            direct_material_ids = db.session.query(ProductionRecord.id).join(
+                RawMaterial, ProductionRecord.raw_material_id == RawMaterial.id
+            ).filter(db.or_(
+                RawMaterial.material_name.like(search_term),
+                RawMaterial.internal_number.like(search_term)
+            )).distinct().all()
+            
+            if direct_material_ids:
+                direct_record_ids = [row[0] for row in direct_material_ids]
+                search_conditions.append(ProductionRecord.id.in_(direct_record_ids))
+                
+        except Exception as e:
+            current_app.logger.error(f'原材料搜索失败: {str(e)}')
+            # 如果原材料搜索失败，继续使用基本搜索条件
+        
+        query = query.filter(db.or_(*search_conditions))
+
+    # 处理排序
+    sort_column = request.args.get('sort', 'date')
+    sort_direction = request.args.get('direction', 'desc')
+    
+    # 定义排序映射
+    sort_mapping = {
+        'global_sn': ProductionRecord.global_sn,
+        'date': ProductionRecord.date,
+        'employee_name': Employee.name,
+        'process_code': ProcessPrice.process_code,
+        'process_name': ProcessPrice.process_name,
+        'component': ProcessPrice.component,
+        'quantity': ProductionRecord.quantity
+    }
+    
+    # 应用排序
+    if sort_column in sort_mapping:
+        column = sort_mapping[sort_column]
+        if sort_direction == 'desc':
+            column = column.desc()
+        query = query.order_by(column)
+    else:
+        # 默认按日期降序排序
+        query = query.order_by(ProductionRecord.date.desc())
+
+    # 分页
+    page = request.validated_page
+    pagination = query.paginate(page=page, per_page=request.validated_per_page)
+    records = pagination.items
+
+    return render_template('main/production_records.html',
+                         form=form,
+                         search_form=search_form,
+                         records=records,
+                         pagination=pagination,
+                         current_sort=sort_column,
+                         current_direction=sort_direction,
+                         raw_materials=raw_materials_json)
+
+@bp.route('/delete_production_record/<int:id>', methods=['DELETE'])
+@login_required
+def delete_production_record(id):
+    if not current_user.role in ['admin', 'hr']:
+        return jsonify({'success': False, 'message': '权限不足'}), 403
+    
+    try:
+        record = ProductionRecord.query.get_or_404(id)
+        
+        # 保存旧数据用于回滚
+        old_data = {
+            'employee_id': record.employee_id,
+            'process_id': record.process_id,
+            'quantity': record.quantity,
+            'date': record.date.isoformat() if record.date else None,
+            'notes': record.notes,
+            'materials': []
+        }
+        
+        # 恢复所有使用的原材料库存
+        for material in record.materials:
+            # 保存原材料数据用于回滚
+            old_data['materials'].append({
+                'material_id': material.raw_material_id,
+                'quantity': material.quantity
+            })
+            
+            # 恢复库存
+            if material.raw_material:
+                old_quantity = material.raw_material.quantity
+                old_status = material.raw_material.status
+                material.raw_material.quantity += material.quantity
+                
+                # 如果原材料状态是"已使用"且恢复库存后数量大于0，将状态改回"在库"
+                if material.raw_material.status == 'used' and material.raw_material.quantity > 0:
+                    material.raw_material.status = 'in_stock'
+                    # 记录状态变更的审计日志
+                    status_log = AuditLog(
+                        user_id=current_user.id,
+                        action='自动恢复原材料状态',
+                        details=f'删除生产记录后，原材料 {material.raw_material.material_name} 库存恢复，状态自动更新为在库',
+                        can_rollback=True,
+                        rollback_type='edit',
+                        target_model='RawMaterial',
+                        target_id=material.raw_material.id,
+                        old_data={'status': old_status, 'quantity': old_quantity},
+                        new_data={'status': 'in_stock', 'quantity': material.raw_material.quantity}
+                    )
+                    db.session.add(status_log)
+        
+        # 如果使用旧方式存储了原材料，也需要恢复
+        if record.raw_material and record.raw_material_quantity:
+            # 保存原材料数据用于回滚
+            old_data['raw_material_id'] = record.raw_material_id
+            old_data['raw_material_quantity'] = record.raw_material_quantity
+            
+            # 恢复库存
+            old_quantity = record.raw_material.quantity
+            old_status = record.raw_material.status
+            record.raw_material.quantity += record.raw_material_quantity
+            
+            # 如果原材料状态是"已使用"且恢复库存后数量大于0，将状态改回"在库"
+            if record.raw_material.status == 'used' and record.raw_material.quantity > 0:
+                record.raw_material.status = 'in_stock'
+                # 记录状态变更的审计日志
+                status_log = AuditLog(
+                    user_id=current_user.id,
+                    action='自动恢复原材料状态',
+                    details=f'删除生产记录后，原材料 {record.raw_material.material_name} 库存恢复，状态自动更新为在库',
+                    can_rollback=True,
+                    rollback_type='edit',
+                    target_model='RawMaterial',
+                    target_id=record.raw_material.id,
+                    old_data={'status': old_status, 'quantity': old_quantity},
+                    new_data={'status': 'in_stock', 'quantity': record.raw_material.quantity}
+                )
+                db.session.add(status_log)
+        
+        # 记录审计日志
+        log = AuditLog(
+            user_id=current_user.id,
+            action='删除生产记录',
+            details=f'删除生产记录：员工 {record.employee.name}，工序 {record.process.process_name}，数量 {record.quantity}',
+            can_rollback=True,
+            rollback_type='delete',
+            target_model='ProductionRecord',
+            target_id=record.id,
+            old_data=old_data
+        )
+        db.session.add(log)
+        
+        # 删除记录及其关联的原材料记录
+        db.session.delete(record)  # 由于材料上的cascade设置，关联的材料记录会被自动删除
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': '生产记录删除成功'})
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        current_app.logger.error(f'删除生产记录失败: {str(e)}')
+        return jsonify({'success': False, 'message': '删除失败，请重试'}), 500
+
+@bp.route('/bonus_penalties', methods=['GET', 'POST'])
+@login_required
+@handle_pagination_args
+def manage_bonus_penalties():
+    """管理奖惩记录"""
+    if current_user.role not in ['admin', 'hr']:
+        flash('权限不足', 'danger')
+        return redirect(url_for('main.index'))
+    
+    form = BonusPenaltyForm()
+    search_form = BonusPenaltySearchForm()
+    
+    # 获取所有员工
+    employees = Employee.query.all()
+    form.employee_id.choices = [(e.id, f"{e.employee_id} - {e.name} ({e.department})") for e in employees]
+    
+    # 获取所有当前生效的工序
+    today = datetime.now().date()
+    latest_versions = db.session.query(
+        ProcessPrice.process_code,
+        db.func.max(ProcessPrice.effective_date).label('max_date')
+    ).filter(ProcessPrice.effective_date <= today)\
+     .group_by(ProcessPrice.process_code)\
+     .subquery()
+    
+    current_processes = ProcessPrice.query.join(
+        latest_versions,
+        db.and_(
+            ProcessPrice.process_code == latest_versions.c.process_code,
+            ProcessPrice.effective_date == latest_versions.c.max_date
+        )
+    ).order_by(ProcessPrice.process_code).all()
+    
+    form.process_id.choices = [(0, '无')] + [(p.id, f"{p.process_code} - {p.process_name} ({p.component or ''} {p.drawing_no or ''} {p.model_no or ''})".strip()) for p in current_processes]
+    
+    # 构建查询
+    query = BonusPenalty.query.join(Employee)
+    
+    # 处理搜索条件
+    if request.args.get('search'):
+        search_term = f"%{request.args.get('search')}%"
+        query = query.filter(db.or_(
+            Employee.name.like(search_term),
+            Employee.employee_id.like(search_term),
+            BonusPenalty.reason.like(search_term)
+        ))
+    
+    if request.args.get('type'):
+        query = query.filter(BonusPenalty.type == request.args.get('type'))
+    
+    if request.args.get('start_date'):
+        try:
+            start_date = datetime.strptime(request.args.get('start_date'), '%Y-%m-%d')
+            query = query.filter(BonusPenalty.date >= start_date)
+        except (ValueError, TypeError):
+            pass
+    
+    if request.args.get('end_date'):
+        try:
+            end_date = datetime.strptime(request.args.get('end_date'), '%Y-%m-%d')
+            query = query.filter(BonusPenalty.date <= end_date)
+        except (ValueError, TypeError):
+            pass
+    
+    # 处理排序
+    sort_column = request.args.get('sort', 'date')
+    sort_direction = request.args.get('direction', 'desc')
+    
+    # 定义排序映射
+    sort_mapping = {
+        'date': BonusPenalty.date,
+        'employee_name': Employee.name,
+        'type': BonusPenalty.type,
+        'amount': BonusPenalty.amount
+    }
+    
+    if sort_column in sort_mapping:
+        column = sort_mapping[sort_column]
+        if sort_direction == 'desc':
+            column = column.desc()
+        query = query.order_by(column)
+    else:
+        query = query.order_by(BonusPenalty.date.desc())
+
+    # 分页
+    pagination = query.paginate(page=request.validated_page, per_page=request.validated_per_page)
+    records = pagination.items
+
+    # 从请求参数填充搜索表单
+    search_form.search.data = request.args.get('search', '')
+    search_form.type.data = request.args.get('type', '')
+    if request.args.get('start_date'):
+        try:
+            search_form.start_date.data = datetime.strptime(request.args.get('start_date'), '%Y-%m-%d')
+        except (ValueError, TypeError):
+            pass
+    if request.args.get('end_date'):
+        try:
+            search_form.end_date.data = datetime.strptime(request.args.get('end_date'), '%Y-%m-%d')
+        except (ValueError, TypeError):
+            pass
+
+    return render_template('main/bonus_penalties.html',
+                         form=form,
+                         search_form=search_form,
+                         records=records,
+                         pagination=pagination,
+                         current_sort=sort_column,
+                         current_direction=sort_direction)
+
+@bp.route('/bonus_penalty/<int:id>', methods=['DELETE'])
+@login_required
+def delete_bonus_penalty(id):
+    if not current_user.role in ['admin', 'hr']:
+        return jsonify({'success': False, 'message': '权限不足'}), 403
+    
+    try:
+        record = BonusPenalty.query.get_or_404(id)
+        
+        # 记录可回滚的审计日志
+        log = AuditLog(
+            user_id=current_user.id,
+            action='删除奖惩记录',
+            details=f'删除{"奖金" if record.type == "bonus" else "罚款"}记录：员工 {record.employee.name}，金额 {record.amount}',
+            can_rollback=True,
+            rollback_type='delete',
+            target_model='BonusPenalty',
+            target_id=record.id,
+            old_data={
+                'employee_id': record.employee_id,
+                'type': record.type,
+                'amount': record.amount,
+                'reason': record.reason,
+                'date': record.date.isoformat() if record.date else None
+            }
+        )
+        db.session.add(log)
+        
+        db.session.delete(record)
+        db.session.commit()
+        return jsonify({'success': True, 'message': '记录删除成功'})
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        current_app.logger.error(f'删除奖惩记录失败: {str(e)}')
+        return jsonify({'success': False, 'message': '删除失败，请重试'}), 500
+
+@bp.route('/bonus_penalties/<int:id>/edit', methods=['POST'])
+@login_required
+def edit_bonus_penalty(id):
+    if current_user.role not in ['admin', 'hr']:
+        flash('权限不足', 'danger')
+        return redirect(url_for('main.index'))
+    
+    form = BonusPenaltyForm()
+    if form.validate_on_submit():
+        try:
+            record = BonusPenalty.query.get_or_404(id)
+            
+            # 保存旧数据用于回滚
+            old_data = {
+                'employee_id': record.employee_id,
+                'type': record.type,
+                'amount': record.amount,
+                'reason': record.reason,
+                'date': record.date.isoformat() if record.date else None
+            }
+            
+            # 更新数据
+            record.employee_id = form.employee_id.data
+            record.type = form.type.data
+            record.amount = form.amount.data
+            record.reason = form.reason.data
+            record.date = form.date.data
+            
+            # 记录可回滚的审计日志
+            log = AuditLog(
+                user_id=current_user.id,
+                action='修改奖金/罚款记录',
+                details=f'修改奖金/罚款记录（ID：{record.id}）',
+                can_rollback=True,
+                rollback_type='edit',
+                target_model='BonusPenalty',
+                target_id=record.id,
+                old_data=old_data,
+                new_data={
+                    'employee_id': record.employee_id,
+                    'type': record.type,
+                    'amount': record.amount,
+                    'reason': record.reason,
+                    'date': record.date.isoformat() if record.date else None
+                }
+            )
+            db.session.add(log)
+            
+            db.session.commit()
+            flash('记录修改成功', 'success')
+            return redirect(url_for('main.manage_bonus_penalties'))
+        except Exception as e:
+            db.session.rollback()
+            flash('修改失败，请重试', 'danger')
+            return redirect(url_for('main.manage_bonus_penalties'))
+    return render_template('main/edit_bonus_penalty.html', form=form, record=record)
+
+@bp.route('/bonus_penalties/add', methods=['POST'])
+@login_required
+def add_bonus_penalty():
+    """添加奖金/罚款记录"""
+    if current_user.role not in ['admin', 'hr']:
+        return jsonify({'success': False, 'message': '权限不足'}), 403
+    
+    try:
+        data = request.get_json()
+        
+        # 创建新的奖金/罚款记录
+        bonus_penalty = BonusPenalty(
+            global_sn=SerialNumber.get_next_number(),
+            employee_id=data.get('employee_id'),
+            amount=data.get('amount'),
+            reason=data.get('reason'),
+            date=datetime.strptime(data.get('date'), '%Y-%m-%d').date(),
+            type=data.get('type'),
+            process_id=data.get('process_id')
+        )
+        db.session.add(bonus_penalty)
+        db.session.flush()  # 获取bonus_penalty.id
+        
+        # 记录可回滚的审计日志
+        log = AuditLog(
+            user_id=current_user.id,
+            action='添加奖金/罚款记录',
+            details=f'添加{"奖金" if bonus_penalty.type == "bonus" else "罚款"}记录：员工ID {bonus_penalty.employee_id}，金额 {bonus_penalty.amount}',
+            can_rollback=True,
+            rollback_type='add',
+            target_model='BonusPenalty',
+            target_id=bonus_penalty.id,
+            new_data={
+                'employee_id': bonus_penalty.employee_id,
+                'type': bonus_penalty.type,
+                'amount': bonus_penalty.amount,
+                'reason': bonus_penalty.reason,
+                'date': bonus_penalty.date.isoformat() if bonus_penalty.date else None,
+                'process_id': bonus_penalty.process_id
+            }
+        )
+        db.session.add(log)
+        db.session.commit()
+        flash('记录添加成功', 'success')
+        return redirect(url_for('main.manage_bonus_penalties'))
+    except Exception as e:
+        db.session.rollback()
+        flash('添加失败，请重试', 'danger')
+        current_app.logger.error(f'添加奖金/罚款记录失败: {str(e)}')
+        return redirect(url_for('main.manage_bonus_penalties'))
+
+@bp.route('/salary_calculation', methods=['GET', 'POST'])
+@login_required
+def salary_calculation():
+    if current_user.role not in ['admin', 'accountant']:
+        flash('权限不足')
+        return redirect(url_for('main.index'))
+    
+    form = SalaryCalculationForm()
+    
+    # 获取所有部门
+    departments = [(d[0], d[0]) for d in db.session.query(Employee.department).distinct().all()]
+    form.department.choices = [('', '全部')] + departments
+    
+    # 获取所有员工
+    employees = Employee.query.order_by(Employee.name).all()
+    form.employee_id.choices = [(0, '全部')] + [(e.id, f"{e.employee_id} - {e.name} ({e.department})") for e in employees]
+    
+    if form.validate_on_submit():
+        start_date = form.start_date.data
+        end_date = form.end_date.data
+        department = form.department.data
+        employee_id = form.employee_id.data
+        
+        # 构建查询
+        query = Employee.query
+        
+        # 如果选择了特定员工，则只查询该员工
+        if employee_id and employee_id != 0:
+            query = query.filter_by(id=employee_id)
+        # 否则，如果选择了部门，则按部门筛选
+        elif department:
+            query = query.filter_by(department=department)
+        
+        employees = query.all()
+        
+        # 计算每个员工的工资
+        salary_data = []
+        total_stats = {
+            'base_salary': 0,
+            'piecework': 0,
+            'bonus': 0,
+            'penalty': 0,
+            'total_salary': 0
+        }
+        
+        for employee in employees:
+            # 获取指定日期范围内的生产记录
+            production_records = ProductionRecord.query.filter(
+                ProductionRecord.employee_id == employee.id,
+                ProductionRecord.date.between(start_date, end_date)
+            ).all()
+            
+            # 获取指定日期范围内的奖金/罚款记录
+            bonus_penalty_records = BonusPenalty.query.filter(
+                BonusPenalty.employee_id == employee.id,
+                BonusPenalty.date.between(start_date, end_date)
+            ).all()
+            
+            # 计算工资
+            base_salary = employee.base_salary
+            piecework = sum(record.quantity * record.process.price for record in production_records)
+            piecework = piecework * employee.coefficient
+            bonus = sum(bp.amount for bp in bonus_penalty_records if bp.type == 'bonus')
+            penalty = sum(bp.amount for bp in bonus_penalty_records if bp.type == 'penalty')
+            total_salary = base_salary + piecework + bonus - penalty
+            
+            # 更新总计
+            total_stats['base_salary'] += base_salary
+            total_stats['piecework'] += piecework
+            total_stats['bonus'] += bonus
+            total_stats['penalty'] += penalty
+            total_stats['total_salary'] += total_salary
+            
+            salary_data.append({
+                'employee': employee,
+                'base_salary': base_salary,
+                'piecework': piecework,
+                'bonus': bonus,
+                'penalty': penalty,
+                'total_salary': total_salary,
+                'production_records': production_records,
+                'bonus_penalty_records': bonus_penalty_records
+            })
+        
+        return render_template('main/salary_calculation.html', 
+                             form=form, 
+                             salary_data=salary_data,
+                             total_stats=total_stats,
+                             start_date=start_date,
+                             end_date=end_date)
+    
+    return render_template('main/salary_calculation.html', form=form)
+
+@bp.route('/audit_logs', methods=['GET', 'POST'])
+@login_required
+def view_audit_logs():
+    if current_user.role != 'admin':
+        flash('权限不足', 'danger')
+        return redirect(url_for('main.index'))
+    
+    form = AuditLogSearchForm()
+    # 获取所有用户供选择
+    form.user_id.choices = [(0, '全部')] + [(u.id, u.username) for u in User.query.all()]
+    
+    # 修改查询，明确指定join条件
+    query = AuditLog.query.join(
+        User,
+        AuditLog.user_id == User.id
+    ).order_by(desc(AuditLog.timestamp))
+    
+    if form.validate_on_submit():
+        if form.start_date.data:
+            query = query.filter(AuditLog.timestamp >= form.start_date.data)
+        if form.end_date.data:
+            # 将结束日期设置为当天的最后一秒
+            end_date = datetime.combine(form.end_date.data, datetime.max.time())
+            query = query.filter(AuditLog.timestamp <= end_date)
+        if form.action.data:
+            query = query.filter(AuditLog.action == form.action.data)
+        if form.user_id.data and form.user_id.data != 0:
+            query = query.filter(AuditLog.user_id == form.user_id.data)
+    
+    # 分页
+    page = request.args.get('page', 1, type=int)
+    pagination = query.paginate(page=page, per_page=20, error_out=False)
+    logs = pagination.items
+    
+    return render_template('main/audit_logs.html', 
+                         form=form, 
+                         logs=logs, 
+                         pagination=pagination)
+
+@bp.route('/employees/template')
+@login_required
+def download_employee_template():
+    """下载员工导入模板"""
+    if current_user.role not in ['admin', 'hr']:
+        flash('权限不足', 'danger')
+        return redirect(url_for('main.index'))
+    
+    temp_path = None
+    try:
+        wb = ExcelGenerator.create_employee_template()
+        filename = 'employee_template.xlsx'
+        temp_path = os.path.join(current_app.config['TEMP_FOLDER'], filename)
+        
+        # 保存并关闭工作簿
+        wb.save(temp_path)
+        wb.close()
+        
+        # 确保文件写入完成
+        time.sleep(0.1)
+        
+        return send_file(
+            temp_path,
+            as_attachment=True,
+            download_name=filename,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+    except Exception as e:
+        if temp_path and os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except:
+                pass
+        flash(f'下载模板失败：{str(e)}', 'danger')
+        return redirect(url_for('main.manage_employees'))
+    finally:
+        # 确保在请求结束后删除临时文件
+        if temp_path and os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except:
+                pass
+
+@bp.route('/employees/import', methods=['POST'])
+@login_required
+def import_employees():
+    """导入员工数据"""
+    if current_user.role not in ['admin', 'hr']:
+        return jsonify({'success': False, 'message': '权限不足'})
+    
+    if 'file' not in request.files:
+        return jsonify({'success': False, 'message': '没有上传文件'})
+    
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'success': False, 'message': '没有选择文件'})
+    
+    if not file.filename.endswith('.xlsx'):
+        return jsonify({'success': False, 'message': '请上传Excel文件(.xlsx)'})
+    
+    temp_path = None
+    try:
+        filename = secure_filename(file.filename)
+        temp_path = os.path.join(current_app.config['TEMP_FOLDER'], filename)
+        file.save(temp_path)
+        
+        # 首先读取并验证Excel文件结构
+        try:
+            df = pd.read_excel(temp_path)
+        except Exception as e:
+            return jsonify({'success': False, 'message': handle_import_error(e, "读取Excel文件时")})
+        
+        # 验证文件结构
+        required_columns = ['工号', '姓名', '职位', '部门', '基本工资', '系数']
+        is_valid, error_msg = validate_excel_structure(df, required_columns)
+        if not is_valid:
+            return jsonify({'success': False, 'message': error_msg})
+        
+        success_count = 0
+        error_messages = []
+        total_count = len(df)
+        
+        for index, row in df.iterrows():
+            try:
+                # 安全转换数据
+                employee_id = safe_convert_value(row['工号'], str, '工号', index)
+                name = safe_convert_value(row['姓名'], str, '姓名', index)
+                position = safe_convert_value(row['职位'], str, '职位', index)
+                department = safe_convert_value(row['部门'], str, '部门', index)
+                base_salary = safe_convert_value(row['基本工资'], float, '基本工资', index)
+                coefficient = safe_convert_value(row['系数'], float, '系数', index)
+                
+                # 数据验证
+                if not employee_id:
+                    error_messages.append(f"第{index+2}行：工号不能为空")
+                    continue
+                
+                if not name:
+                    error_messages.append(f"第{index+2}行：姓名不能为空")
+                    continue
+                
+                if base_salary < 0:
+                    error_messages.append(f"第{index+2}行：基本工资不能为负数")
+                    continue
+                
+                if coefficient < 0:
+                    error_messages.append(f"第{index+2}行：系数不能为负数")
+                    continue
+                
+                # 检查工号是否已存在
+                if Employee.query.filter_by(employee_id=employee_id).first():
+                    error_messages.append(f"第{index+2}行：工号 {employee_id} 已存在")
+                    continue
+                
+                # 检查用户名是否已存在
+                if User.query.filter_by(username=employee_id).first():
+                    error_messages.append(f"第{index+2}行：用户名 {employee_id} 已存在")
+                    continue
+                
+                # 创建用户账号
+                user = User(username=employee_id, role='user')
+                user.set_password(employee_id)  # 初始密码与工号相同
+                db.session.add(user)
+                db.session.flush()  # 获取用户ID
+                
+                # 创建员工记录
+                employee = Employee(
+                    global_sn=SerialNumber.get_next_number(),
+                    employee_id=employee_id,
+                    name=name,
+                    position=position,
+                    department=department,
+                    base_salary=base_salary,
+                    coefficient=coefficient,
+                    user_id=user.id
+                )
+                db.session.add(employee)
+                success_count += 1
+                
+            except ValueError as ve:
+                error_messages.append(str(ve))
+            except Exception as e:
+                error_messages.append(f"第{index+2}行：处理数据时出错 - {str(e)}")
+        
+        if success_count > 0:
+            db.session.commit()
+            # 记录审计日志
+            log = AuditLog(
+                user_id=current_user.id,
+                action='批量导入员工',
+                details=f'成功导入 {success_count} 条员工记录，失败 {len(error_messages)} 条'
+            )
+            db.session.add(log)
+            db.session.commit()
+        else:
+            db.session.rollback()
+        
+        message = create_detailed_error_message(error_messages, success_count, total_count)
+        
+        return jsonify({
+            'success': success_count > 0,
+            'message': message
+        })
+        
+    except Exception as e:
+        if temp_path and os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except:
+                pass
+        db.session.rollback()
+        return jsonify({'success': False, 'message': handle_import_error(e, "导入员工数据时")})
+    finally:
+        if temp_path and os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except:
+                pass
+
+def cleanup_temp_files():
+    """清理超过5分钟的临时文件"""
+    try:
+        temp_folder = current_app.config['TEMP_FOLDER']
+        current_time = time.time()
+        
+        # 遍历临时文件夹
+        for filename in os.listdir(temp_folder):
+            file_path = os.path.join(temp_folder, filename)
+            # 检查文件是否存在且是否为文件（不是文件夹）
+            if os.path.isfile(file_path):
+                # 获取文件的最后修改时间
+                file_time = os.path.getmtime(file_path)
+                # 如果文件超过5分钟未被修改，则删除
+                if current_time - file_time > 300:  # 300秒 = 5分钟
+                    try:
+                        os.remove(file_path)
+                        current_app.logger.info(f"Cleaned up temp file: {filename}")
+                    except Exception as e:
+                        current_app.logger.error(f"Error cleaning up temp file {filename}: {str(e)}")
+    except Exception as e:
+        current_app.logger.error(f"Error during temp files cleanup: {str(e)}")
+
+@bp.before_request
+def before_request():
+    """在每个请求之前执行清理操作"""
+    # 每次请求都检查是否需要清理临时文件
+    cleanup_temp_files()
+
+@bp.route('/employees/export', methods=['GET', 'POST'])
+@login_required
+def export_employees():
+    form = ExportEmployeeForm()
+    if form.validate_on_submit():
+        query = Employee.query
+        if form.department.data:
+            query = query.filter(Employee.department == form.department.data)
+        if form.position.data:
+            query = query.filter(Employee.position == form.position.data)
+        if form.status.data:
+            query = query.filter(Employee.status == form.status.data)
+        
+        employees = query.all()
+        wb = ExcelGenerator.export_employees(employees)
+        
+        temp_path = None
+    try:
+        # 创建临时文件
+        fd, temp_path = tempfile.mkstemp(suffix='.xlsx')
+        # 关闭文件描述符
+        os.close(fd)
+        # 保存Excel文件
+        wb.save(temp_path)
+        # 发送文件
+        return send_file(
+            temp_path,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name=f'employees_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
+        )
+    except Exception as e:
+        if temp_path and os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except:
+                pass
+        flash(f'导出失败：{str(e)}', 'danger')
+        return redirect(url_for('main.manage_employees'))
+    finally:
+        # 确保在请求结束后删除临时文件
+        if temp_path and os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except:
+                pass
+
+    return render_template('main/export_form.html', title='导出员工数据', form=form)
+
+@bp.route('/process_prices/template')
+@login_required
+def download_process_price_template():
+    """下载工序价格导入模板"""
+    if current_user.role not in ['admin', 'hr']:
+        flash('权限不足', 'danger')
+        return redirect(url_for('main.index'))
+    
+    temp_path = None
+    try:
+        wb = ExcelGenerator.create_process_price_template()
+        filename = 'process_price_template.xlsx'
+        temp_path = os.path.join(current_app.config['TEMP_FOLDER'], filename)
+        
+        # 保存并关闭工作簿
+        wb.save(temp_path)
+        wb.close()
+        
+        # 确保文件写入完成
+        time.sleep(0.1)
+        
+        return send_file(
+            temp_path,
+            as_attachment=True,
+            download_name=filename,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+    except Exception as e:
+        if temp_path and os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except:
+                pass
+        flash(f'下载模板失败：{str(e)}', 'danger')
+        return redirect(url_for('main.process_prices'))
+    finally:
+        # 确保在请求结束后删除临时文件
+        if temp_path and os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except:
+                pass
+
+@bp.route('/process_prices/import', methods=['POST'])
+@login_required
+def import_process_prices():
+    """导入工序价格数据"""
+    if current_user.role not in ['admin', 'hr']:
+        return jsonify({'success': False, 'message': '权限不足'})
+    
+    if 'file' not in request.files:
+        return jsonify({'success': False, 'message': '没有上传文件'})
+    
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'success': False, 'message': '没有选择文件'})
+    
+    if not file.filename.endswith('.xlsx'):
+        return jsonify({'success': False, 'message': '请上传Excel文件(.xlsx)'})
+    
+    temp_path = None
+    try:
+        filename = secure_filename(file.filename)
+        temp_path = os.path.join(current_app.config['TEMP_FOLDER'], filename)
+        file.save(temp_path)
+        
+        # 首先读取并验证Excel文件结构
+        try:
+            df = pd.read_excel(temp_path)
+        except Exception as e:
+            return jsonify({'success': False, 'message': handle_import_error(e, "读取Excel文件时")})
+        
+        # 验证文件结构
+        required_columns = ['工序编号', '工序名称', '部件', '图号', '型号', '价格', '生效日期']
+        is_valid, error_msg = validate_excel_structure(df, required_columns)
+        if not is_valid:
+            return jsonify({'success': False, 'message': error_msg})
+        
+        success_count = 0
+        error_messages = []
+        total_count = len(df)
+        
+        for index, row in df.iterrows():
+            try:
+                # 安全转换数据
+                process_code = safe_convert_value(row['工序编号'], str, '工序编号', index)
+                process_name = safe_convert_value(row['工序名称'], str, '工序名称', index)
+                component = safe_convert_value(row['部件'], str, '部件', index)
+                drawing_no = safe_convert_value(row['图号'], str, '图号', index)
+                model_no = safe_convert_value(row['型号'], str, '型号', index)
+                price = safe_convert_value(row['价格'], float, '价格', index)
+                effective_date = safe_convert_value(row['生效日期'], 'date', '生效日期', index)
+                notes = safe_convert_value(row.get('备注', ''), str, '备注', index)
+                
+                # 数据验证
+                if not process_code:
+                    error_messages.append(f"第{index+2}行：工序编号不能为空")
+                    continue
+                
+                if not process_name:
+                    error_messages.append(f"第{index+2}行：工序名称不能为空")
+                    continue
+                
+                if price < 0:
+                    error_messages.append(f"第{index+2}行：价格不能为负数")
+                    continue
+                
+                # 检查工序编号是否已存在
+                existing_process = ProcessPrice.query.filter_by(
+                    process_code=process_code,
+                    is_current=True
+                ).first()
+                
+                if existing_process:
+                    error_messages.append(f"第{index+2}行：工序编号 {process_code} 已存在")
+                    continue
+                
+                # 创建新工序价格记录
+                process = ProcessPrice(
+                    global_sn=SerialNumber.get_next_number(),
+                    process_code=process_code,
+                    process_name=process_name,
+                    component=component,
+                    drawing_no=drawing_no,
+                    model_no=model_no,
+                    price=price,
+                    effective_date=effective_date,
+                    notes=notes,
+                    version=1,  # 新工序的初始版本为1
+                    is_current=True,  # 新工序默认为当前生效
+                    price_type='normal'
+                )
+                db.session.add(process)
+                success_count += 1
+                
+            except ValueError as ve:
+                error_messages.append(str(ve))
+            except Exception as e:
+                error_messages.append(f"第{index+2}行：处理数据时出错 - {str(e)}")
+        
+        if success_count > 0:
+            db.session.commit()
+            # 记录审计日志
+            log = AuditLog(
+                user_id=current_user.id,
+                action='批量导入工序价格',
+                details=f'成功导入 {success_count} 条工序价格记录，失败 {len(error_messages)} 条'
+            )
+            db.session.add(log)
+            db.session.commit()
+        else:
+            db.session.rollback()
+        
+        message = create_detailed_error_message(error_messages, success_count, total_count)
+        
+        return jsonify({
+            'success': success_count > 0,
+            'message': message
+        })
+        
+    except Exception as e:
+        if temp_path and os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except:
+                pass
+        db.session.rollback()
+        return jsonify({'success': False, 'message': handle_import_error(e, "导入工序价格数据时")})
+    finally:
         if temp_path and os.path.exists(temp_path):
             try:
                 os.remove(temp_path)
@@ -5340,38 +8644,23 @@ def get_process_price(id):
     """获取工序详情"""
     try:
         process = ProcessPrice.query.get_or_404(id)
-        
-        # 构建包含工序的数据
-        included_processes = []
-        if process.price_type == 'subtotal' and process.included_processes:
-            for group in process.included_processes:
-                included_processes.append({
-                    'process': {
-                        'process_code': group.process.process_code,
-                        'process_name': group.process.process_name,
-                        'component': group.process.component,
-                        'price': float(group.process.price)
-                    }
-                })
-        
         return jsonify({
             'success': True,
-            'process': {
+            'data': {
                 'id': process.id,
                 'process_code': process.process_code,
                 'process_name': process.process_name,
                 'component': process.component,
                 'drawing_no': process.drawing_no,
                 'model_no': process.model_no,
-                'price': float(process.price),
+                'price': process.price,
                 'effective_date': process.effective_date.strftime('%Y-%m-%d'),
                 'price_type': process.price_type,
                 'has_output': process.has_output,
                 'output_type': process.output_type,
                 'needs_inspection': process.needs_inspection,
                 'code_rule_id': process.code_rule_id,
-                'notes': process.notes,
-                'included_processes': included_processes
+                'notes': process.notes
             }
         })
     except Exception as e:
@@ -10189,7 +13478,7 @@ def add_material_requisition():
                 employee_id=form.employee_id.data,
                 department=employee.department,
                 purpose=form.purpose.data,
-                required_date=form.requisition_date.data,
+                required_date=form.required_date.data,
                 notes=form.notes.data,
                 status='completed',  # 直接完成状态
                 requested_date=datetime.now()

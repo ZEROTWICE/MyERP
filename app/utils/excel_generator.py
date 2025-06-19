@@ -35,18 +35,26 @@ class ExcelGenerator:
         ws.title = "员工信息"
         
         # 设置表头
-        headers = ['工号*', '姓名*', '职位*', '部门*', '基本工资*', '系数*']
+        headers = ['工号*', '姓名*', '职位*', '部门*', '基本工资*', '系数*', '入职时间*', '离职时间']
         for col, header in enumerate(headers, 1):
             cell = ws.cell(row=1, column=col, value=header)
             ExcelGenerator._apply_header_style(cell)
             
         # 添加说明行
-        ws.cell(row=2, column=1, value='示例：EMP001')
+        ws.cell(row=2, column=1, value='EMP001')
         ws.cell(row=2, column=2, value='张三')
         ws.cell(row=2, column=3, value='技术员')
         ws.cell(row=2, column=4, value='生产部')
         ws.cell(row=2, column=5, value=5000)
         ws.cell(row=2, column=6, value=1.0)
+        ws.cell(row=2, column=7, value='2024-01-01')
+        ws.cell(row=2, column=8, value='')
+        
+        # 添加格式说明
+        ws.cell(row=4, column=1, value='说明：')
+        ws.cell(row=5, column=1, value='入职时间格式：YYYY-MM-DD（必填）')
+        ws.cell(row=6, column=1, value='离职时间格式：YYYY-MM-DD（可选，留空表示在职）')
+        ws.cell(row=7, column=1, value='带*号的字段为必填项')
         
         # 调整列宽
         for col in ws.columns:
@@ -220,21 +228,53 @@ class ExcelGenerator:
     def parse_employee_data(file_path):
         """解析员工导入数据"""
         from openpyxl import load_workbook
+        from datetime import datetime, date
+        
         wb = load_workbook(file_path)
         ws = wb.active
         data = []
         
-        for row in ws.iter_rows(min_row=2):  # 跳过表头
+        for row_num, row in enumerate(ws.iter_rows(min_row=2), start=2):  # 跳过表头
             if not any(cell.value for cell in row):  # 跳过空行
                 continue
-            data.append({
-                'employee_id': str(row[0].value).strip(),
-                'name': str(row[1].value).strip(),
-                'position': str(row[2].value).strip(),
-                'department': str(row[3].value).strip(),
-                'base_salary': float(row[4].value),
-                'coefficient': float(row[5].value)
-            })
+                
+            # 跳过说明行（从第4行开始的说明）
+            if row_num >= 4 and row[0].value and str(row[0].value).startswith('说明'):
+                continue
+                
+            try:
+                # 处理入职时间
+                hire_date_value = row[6].value if len(row) > 6 else None
+                hire_date = None
+                if hire_date_value:
+                    if isinstance(hire_date_value, date):
+                        hire_date = hire_date_value
+                    elif isinstance(hire_date_value, str):
+                        hire_date = datetime.strptime(hire_date_value.strip(), '%Y-%m-%d').date()
+                
+                # 处理离职时间
+                termination_date_value = row[7].value if len(row) > 7 else None
+                termination_date = None
+                if termination_date_value:
+                    if isinstance(termination_date_value, date):
+                        termination_date = termination_date_value
+                    elif isinstance(termination_date_value, str) and termination_date_value.strip():
+                        termination_date = datetime.strptime(termination_date_value.strip(), '%Y-%m-%d').date()
+                
+                data.append({
+                    'employee_id': str(row[0].value).strip(),
+                    'name': str(row[1].value).strip(),
+                    'position': str(row[2].value).strip(),
+                    'department': str(row[3].value).strip(),
+                    'base_salary': float(row[4].value),
+                    'coefficient': float(row[5].value),
+                    'hire_date': hire_date,
+                    'termination_date': termination_date
+                })
+            except (ValueError, IndexError, TypeError) as e:
+                # 记录解析错误，但继续处理其他行
+                print(f"第{row_num}行数据解析失败: {e}")
+                continue
         
         return data
 
@@ -353,7 +393,7 @@ class ExcelGenerator:
         ws.title = "员工信息"
 
         # 设置表头
-        headers = ['工号', '姓名', '职位', '基本工资', '系数', '部门', '是否管理员']
+        headers = ['工号', '姓名', '职位', '部门', '基本工资', '系数', '入职时间', '离职时间', '状态', '是否管理员']
         for col, header in enumerate(headers, 1):
             cell = ws.cell(row=1, column=col, value=header)
             ExcelGenerator._apply_header_style(cell)
@@ -363,10 +403,13 @@ class ExcelGenerator:
             ws.cell(row=row, column=1, value=employee.employee_id)
             ws.cell(row=row, column=2, value=employee.name)
             ws.cell(row=row, column=3, value=employee.position)
-            ws.cell(row=row, column=4, value=employee.base_salary)
-            ws.cell(row=row, column=5, value=employee.coefficient)
-            ws.cell(row=row, column=6, value=employee.department)
-            ws.cell(row=row, column=7, value='是' if employee.user and employee.user.role == 'admin' else '否')
+            ws.cell(row=row, column=4, value=employee.department)
+            ws.cell(row=row, column=5, value=employee.base_salary)
+            ws.cell(row=row, column=6, value=employee.coefficient)
+            ws.cell(row=row, column=7, value=employee.hire_date.strftime('%Y-%m-%d') if employee.hire_date else '')
+            ws.cell(row=row, column=8, value=employee.termination_date.strftime('%Y-%m-%d') if employee.termination_date else '')
+            ws.cell(row=row, column=9, value=employee.status)
+            ws.cell(row=row, column=10, value='是' if employee.user and employee.user.role == 'admin' else '否')
 
         # 调整列宽
         for col in ws.columns:
