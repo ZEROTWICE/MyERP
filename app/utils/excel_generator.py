@@ -262,15 +262,15 @@ class ExcelGenerator:
                         termination_date = datetime.strptime(termination_date_value.strip(), '%Y-%m-%d').date()
                 
                 data.append({
-                    'employee_id': str(row[0].value).strip(),
-                    'name': str(row[1].value).strip(),
-                    'position': str(row[2].value).strip(),
-                    'department': str(row[3].value).strip(),
-                    'base_salary': float(row[4].value),
+                'employee_id': str(row[0].value).strip(),
+                'name': str(row[1].value).strip(),
+                'position': str(row[2].value).strip(),
+                'department': str(row[3].value).strip(),
+                'base_salary': float(row[4].value),
                     'coefficient': float(row[5].value),
                     'hire_date': hire_date,
                     'termination_date': termination_date
-                })
+            })
             except (ValueError, IndexError, TypeError) as e:
                 # 记录解析错误，但继续处理其他行
                 print(f"第{row_num}行数据解析失败: {e}")

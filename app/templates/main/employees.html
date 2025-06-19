@@ -213,32 +213,142 @@ $(document).ready(function() {
 });
 
 function importEmployees(input) {
-    if (input.files && input.files[0]) {
-        var formData = new FormData();
-        formData.append('file', input.files[0]);
-
-        $.ajax({
-            url: '{{ url_for("main.import_employees") }}',
-            type: 'POST',
-            data: formData,
-            processData: false,
-            contentType: false,
-            headers: {
-                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
-            },
-            success: function(response) {
-                if (response.success) {
-                    alert(response.message);
-                    location.reload();
-                } else {
-                    alert(response.message);
+    if (!input.files || !input.files[0]) return;
+    
+    const file = input.files[0];
+    
+    // 显示导入进度
+    showImportProgress('正在上传文件...');
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    fetch('{{ url_for("main.import_employees") }}', {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        hideImportProgress();
+        
+        if (data.success) {
+            // 显示成功信息
+            let message = data.message;
+            if (data.details) {
+                message += `\n\n统计信息：\n- 总处理记录：${data.details.total_processed}\n- 成功导入：${data.details.success_count}\n- 失败记录：${data.details.error_count}`;
+                if (data.details.warning_count > 0) {
+                    message += `\n- 警告信息：${data.details.warning_count}`;
                 }
-            },
-            error: function() {
-                alert('导入失败，请重试');
             }
-        });
+            showDetailedAlert('success', '导入成功', message);
+            setTimeout(() => location.reload(), 3000);
+        } else {
+            // 显示详细错误信息
+            showDetailedAlert('danger', '导入失败', data.message);
+        }
+    })
+    .catch(error => {
+        hideImportProgress();
+        showDetailedAlert('danger', '导入失败', '网络错误或服务器异常，请重试');
+        console.error('Import error:', error);
+    })
+    .finally(() => {
+        input.value = ''; // 清除文件选择
+    });
+}
+
+function showImportProgress(message) {
+    // 移除现有的进度提示
+    const existingProgress = document.getElementById('import-progress');
+    if (existingProgress) {
+        existingProgress.remove();
     }
+    
+    const progressDiv = document.createElement('div');
+    progressDiv.id = 'import-progress';
+    progressDiv.className = 'alert alert-info d-flex align-items-center mb-3';
+    progressDiv.style.position = 'fixed';
+    progressDiv.style.top = '20px';
+    progressDiv.style.left = '50%';
+    progressDiv.style.transform = 'translateX(-50%)';
+    progressDiv.style.zIndex = '9999';
+    progressDiv.style.minWidth = '300px';
+    progressDiv.style.backgroundColor = '#cff4fc';
+    progressDiv.style.border = '1px solid #b8daff';
+    progressDiv.style.opacity = '1';
+    progressDiv.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.1)';
+    progressDiv.innerHTML = `
+        <div class="spinner-border spinner-border-sm me-2" role="status" style="color: #055160;">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <span style="color: #055160; font-weight: 500;">${message}</span>
+    `;
+    
+    // 直接添加到body，使用固定定位避免DOM结构问题
+    document.body.appendChild(progressDiv);
+}
+
+function hideImportProgress() {
+    const progressDiv = document.getElementById('import-progress');
+    if (progressDiv) {
+        progressDiv.remove();
+    }
+}
+
+function showDetailedAlert(type, title, message) {
+    // 移除现有的提示
+    const existingAlerts = document.querySelectorAll('.import-alert');
+    existingAlerts.forEach(alert => alert.remove());
+    
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show import-alert`;
+    alertDiv.role = 'alert';
+    alertDiv.style.position = 'fixed';
+    alertDiv.style.top = '20px';
+    alertDiv.style.left = '50%';
+    alertDiv.style.transform = 'translateX(-50%)';
+    alertDiv.style.zIndex = '9999';
+    alertDiv.style.maxWidth = '80%';
+    alertDiv.style.maxHeight = '400px';
+    alertDiv.style.overflowY = 'auto';
+    alertDiv.style.backgroundColor = type === 'success' ? '#d1e7dd' : '#f8d7da';
+    alertDiv.style.border = type === 'success' ? '1px solid #badbcc' : '1px solid #f5c2c7';
+    alertDiv.style.opacity = '1';
+    alertDiv.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.1)';
+    
+    // 处理换行符
+    const formattedMessage = message.replace(/\n/g, '<br>');
+    
+    alertDiv.innerHTML = `
+        <div class="d-flex">
+            <div class="me-2" style="color: ${type === 'success' ? '#0a3622' : '#58151c'};">
+                ${type === 'success' ? '<i class="fas fa-check-circle"></i>' : '<i class="fas fa-exclamation-triangle"></i>'}
+            </div>
+            <div class="flex-grow-1">
+                <h6 class="alert-heading mb-2" style="color: ${type === 'success' ? '#0a3622' : '#58151c'};">${title}</h6>
+                <div style="white-space: pre-wrap; font-family: monospace; font-size: 0.9em; color: ${type === 'success' ? '#0a3622' : '#58151c'};">${formattedMessage}</div>
+            </div>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    `;
+    
+    // 直接添加到body，使用固定定位避免DOM结构问题
+    document.body.appendChild(alertDiv);
+    
+    // 根据类型设置自动消失时间
+    const autoHideDelay = type === 'success' ? 5000 : 10000;
+    setTimeout(() => {
+        if (alertDiv.parentNode) {
+        alertDiv.remove();
+        }
+    }, autoHideDelay);
+}
+
+function showAlert(type, message) {
+    showDetailedAlert(type, type === 'success' ? '成功' : '错误', message);
 }
 </script>
 {% endblock %}
