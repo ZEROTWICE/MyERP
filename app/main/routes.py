@@ -7199,6 +7199,7 @@ def import_products():
                             existing_product.category = product_data.get('category', '')
                             existing_product.version = product_data.get('version', '1.0')
                             existing_product.status = product_data.get('status', 'active')
+                            existing_product.code_rule_id = product_data.get('code_rule_id')
                             existing_product.notes = product_data.get('notes', '')
                             existing_product.updated_at = datetime.utcnow()
                             
@@ -7237,6 +7238,7 @@ def import_products():
                             category=product_data.get('category', ''),
                             version=product_data.get('version', '1.0'),
                             status=product_data.get('status', 'active'),
+                            code_rule_id=product_data.get('code_rule_id'),
                             notes=product_data.get('notes', ''),
                             created_by=current_user.id
                         )

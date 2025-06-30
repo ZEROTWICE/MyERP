@@ -633,13 +633,13 @@ class ExcelGenerator:
         ws_product.title = "产品信息"
         
         # 产品信息表头
-        product_headers = ['产品编码*', '产品名称*', '图号', '型号', '规格说明', '单位', '类别', '版本', '状态', '备注']
+        product_headers = ['产品编码*', '产品名称*', '图号', '型号', '规格说明', '单位', '类别', '版本', '状态', '编码规则', '备注']
         for col, header in enumerate(product_headers, 1):
             cell = ws_product.cell(row=1, column=col, value=header)
             ExcelGenerator._apply_header_style(cell)
             
         # 产品信息示例
-        product_example = ['PROD001', '示例产品', 'DWG001', 'Model001', '示例规格说明', '件', '电子产品', '1.0', 'active', '示例产品备注']
+        product_example = ['PROD001', '示例产品', 'DWG001', 'Model001', '示例规格说明', '件', '电子产品', '1.0', 'active', '产品编码规则', '示例产品备注']
         for col, value in enumerate(product_example, 1):
             ws_product.cell(row=2, column=col, value=value)
         
@@ -653,6 +653,8 @@ class ExcelGenerator:
         ws_product.cell(row=7, column=2, value='默认为"件"')
         ws_product.cell(row=8, column=1, value='版本')
         ws_product.cell(row=8, column=2, value='默认为"1.0"')
+        ws_product.cell(row=9, column=1, value='编码规则')
+        ws_product.cell(row=9, column=2, value='填写编码规则名称，用于自动生成产品编码（可选）')
         
         # 第二个工作表：BOM物料清单
         ws_bom = wb.create_sheet(title="BOM物料清单")
@@ -736,7 +738,7 @@ class ExcelGenerator:
     def parse_product_data(file_path):
         """解析产品（含BOM和工序）导入数据"""
         from openpyxl import load_workbook
-        from app.models import RawMaterial, FinishedProduct, ProcessPrice
+        from app.models import RawMaterial, FinishedProduct, ProcessPrice, CodeRule
         
         wb = load_workbook(file_path)
         result = {
@@ -754,6 +756,18 @@ class ExcelGenerator:
                     continue
                     
                 try:
+                    # 处理编码规则
+                    code_rule_name = str(row[9]).strip() if row[9] else None
+                    code_rule_id = None
+                    if code_rule_name:
+                        # 查找编码规则
+                        code_rule = CodeRule.query.filter_by(name=code_rule_name, code_type='product', is_active=True).first()
+                        if code_rule:
+                            code_rule_id = code_rule.id
+                        else:
+                            # 编码规则是可选的，记录警告但不跳过整行
+                            result['errors'].append(f'产品信息第{row_num}行：找不到名为"{code_rule_name}"的产品编码规则，已忽略该编码规则')
+                    
                     product_data = {
                         'product_code': str(row[0]).strip() if row[0] else None,
                         'product_name': str(row[1]).strip() if row[1] else None,
@@ -764,7 +778,8 @@ class ExcelGenerator:
                         'category': str(row[6]).strip() if row[6] else None,
                         'version': str(row[7]).strip() if row[7] else '1.0',
                         'status': str(row[8]).strip() if row[8] else 'active',
-                        'notes': str(row[9]).strip() if row[9] else None
+                        'code_rule_id': code_rule_id,
+                        'notes': str(row[10]).strip() if row[10] else None
                     }
                     
                     # 验证必填字段
@@ -910,7 +925,7 @@ class ExcelGenerator:
         ws_product.title = "产品信息"
 
         # 产品信息表头
-        product_headers = ['产品编码', '产品名称', '图号', '型号', '规格说明', '单位', '类别', '版本', '状态', '总成本', '创建时间', '备注']
+        product_headers = ['产品编码', '产品名称', '图号', '型号', '规格说明', '单位', '类别', '版本', '状态', '编码规则', '总成本', '创建时间', '备注']
         for col, header in enumerate(product_headers, 1):
             cell = ws_product.cell(row=1, column=col, value=header)
             ExcelGenerator._apply_header_style(cell)
@@ -926,9 +941,12 @@ class ExcelGenerator:
             ws_product.cell(row=row, column=7, value=product.category)
             ws_product.cell(row=row, column=8, value=product.version)
             ws_product.cell(row=row, column=9, value=product.status)
-            ws_product.cell(row=row, column=10, value=product.total_cost)
-            ws_product.cell(row=row, column=11, value=product.created_at.strftime('%Y-%m-%d %H:%M:%S'))
-            ws_product.cell(row=row, column=12, value=product.notes)
+            # 获取编码规则名称
+            code_rule_name = product.code_rule.name if product.code_rule else ''
+            ws_product.cell(row=row, column=10, value=code_rule_name)
+            ws_product.cell(row=row, column=11, value=product.total_cost)
+            ws_product.cell(row=row, column=12, value=product.created_at.strftime('%Y-%m-%d %H:%M:%S'))
+            ws_product.cell(row=row, column=13, value=product.notes)
 
         # 第二个工作表：BOM物料清单
         ws_bom = wb.create_sheet(title="BOM物料清单")
