@@ -126,84 +126,68 @@
     </div>
 </div>
 
-<!-- 添加工序模态框 -->
+<!-- 批量添加工序模态框 -->
 <div class="modal fade" id="addProcessModal" tabindex="-1" aria-labelledby="addProcessModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
+    <div class="modal-dialog modal-xl">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="addProcessModalLabel">添加工序</h5>
+                <h5 class="modal-title" id="addProcessModalLabel">批量添加工序</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <form id="addProcessForm">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="processId" class="form-label">工序 *</label>
-                                <select class="form-control" id="processId" name="process_id" required>
-                                    <option value="">请选择工序</option>
-                                    {% for process in processes %}
-                                    <option value="{{ process.id }}" data-price="{{ process.price }}">
-                                        {{ process.process_name }} ({{ process.process_code }}) - ¥{{ "%.2f"|format(process.price) }}
-                                        {% if process.component %} - {{ process.component }}{% endif %}
-                                    </option>
-                                    {% endfor %}
-                                </select>
-                                <small class="form-text text-muted">选择工序后会自动填入默认单价，您可以根据需要修改</small>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="sequence" class="form-label">序号 *</label>
-                                <input type="number" class="form-control" id="sequence" name="sequence" min="1" required>
-                            </div>
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <p class="text-muted mb-0">您可以一次添加多个工序，系统会自动检查序号冲突</p>
+                        <div>
+                            <button type="button" class="btn btn-success btn-sm me-2" onclick="addProcessRow()">
+                                <i class="fas fa-plus"></i> 添加行
+                            </button>
+                            <button type="button" class="btn btn-info btn-sm" onclick="autoFillSequence()">
+                                <i class="fas fa-sort-numeric-up"></i> 自动序号
+                            </button>
                         </div>
                     </div>
-                    <div class="row">
-                        <div class="col-md-4">
-                            <div class="mb-3">
-                                <label for="processQuantity" class="form-label">数量</label>
-                                <input type="number" class="form-control" id="processQuantity" name="quantity" min="1" value="1">
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="mb-3">
-                                <label for="unitPrice" class="form-label">单价(覆盖默认价格)</label>
-                                <input type="number" class="form-control" id="unitPrice" name="unit_price" step="0.01" min="0">
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="mb-3">
-                                <label for="isRequired" class="form-check-label">
-                                    <input type="checkbox" class="form-check-input" id="isRequired" name="is_required" checked>
-                                    必需工序
-                                </label>
-                            </div>
-                        </div>
+                </div>
+                
+                <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+                    <table class="table table-bordered table-sm" id="processTable">
+                        <thead class="table-light sticky-top">
+                            <tr>
+                                <th style="width: 25%;">工序 *</th>
+                                <th style="width: 8%;">序号 *</th>
+                                <th style="width: 8%;">数量</th>
+                                <th style="width: 12%;">单价(¥)</th>
+                                <th style="width: 10%;">准备时间(分钟)</th>
+                                <th style="width: 10%;">加工时间(分钟)</th>
+                                <th style="width: 8%;">必需</th>
+                                <th style="width: 15%;">备注</th>
+                                <th style="width: 4%;">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="processTableBody">
+                            <!-- 工序行将通过JavaScript动态添加 -->
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="mt-3">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        <strong>使用说明：</strong>
+                        <ul class="mb-0 mt-2">
+                            <li>工序支持搜索功能，输入工序名称或编号快速查找</li>
+                            <li>序号必须唯一，不能与现有工序冲突</li>
+                            <li>单价可留空，将使用工序默认价格</li>
+                            <li>点击"自动序号"可自动填充连续的序号</li>
+                        </ul>
                     </div>
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="setupTime" class="form-label">准备时间(分钟)</label>
-                                <input type="number" class="form-control" id="setupTime" name="setup_time" step="0.1" min="0" value="0">
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="processTime" class="form-label">加工时间(分钟)</label>
-                                <input type="number" class="form-control" id="processTime" name="process_time" step="0.1" min="0" value="0">
-                            </div>
-                        </div>
-                    </div>
-                    <div class="mb-3">
-                        <label for="processNotes" class="form-label">备注</label>
-                        <textarea class="form-control" id="processNotes" name="notes" rows="2"></textarea>
-                    </div>
-                </form>
+                </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                <button type="button" class="btn btn-primary" onclick="submitProcessItem()">保存</button>
+                <button type="button" class="btn btn-primary" onclick="submitBatchProcesses()">
+                    <i class="fas fa-save"></i> 批量保存
+                </button>
             </div>
         </div>
     </div>
@@ -290,28 +274,170 @@
 </div>
 
 <script>
-// 当选择工序时自动填入默认价格
-document.getElementById('processId').addEventListener('change', function() {
-    const selectedOption = this.options[this.selectedIndex];
-    const price = selectedOption.getAttribute('data-price');
-    if (price) {
-        document.getElementById('unitPrice').value = price;
-    }
+// 全局变量
+let processRowCounter = 0;
+const processOptions = [
+    {% for process in processes %}
+    {
+        id: {{ process.id }},
+        name: "{{ process.process_name }}",
+        code: "{{ process.process_code }}",
+        price: {{ process.price }},
+        component: "{{ process.component or '' }}",
+        displayText: "{{ process.process_name }} ({{ process.process_code }}) - ¥{{ '%.2f'|format(process.price) }}{% if process.component %} - {{ process.component }}{% endif %}"
+    },
+    {% endfor %}
+];
+
+// 当模态框显示时初始化
+document.getElementById('addProcessModal').addEventListener('shown.bs.modal', function () {
+    // 清空表格并添加第一行
+    document.getElementById('processTableBody').innerHTML = '';
+    processRowCounter = 0;
+    addProcessRow();
 });
 
-// 添加工序项
-function submitProcessItem() {
-    const formData = {
-        process_id: document.getElementById('processId').value,
-        sequence: document.getElementById('sequence').value,
-        quantity: document.getElementById('processQuantity').value,
-        unit_price: document.getElementById('unitPrice').value,
-        setup_time: document.getElementById('setupTime').value,
-        process_time: document.getElementById('processTime').value,
-        is_required: document.getElementById('isRequired').checked,
-        notes: document.getElementById('processNotes').value
-    };
+// 添加工序行
+function addProcessRow() {
+    const tbody = document.getElementById('processTableBody');
+    const rowId = ++processRowCounter;
     
+    const row = document.createElement('tr');
+    row.id = `processRow_${rowId}`;
+    row.innerHTML = `
+        <td>
+            <select class="form-select form-select-sm process-select" name="process_id_${rowId}" required>
+                <option value="">请选择工序</option>
+                ${processOptions.map(p => `<option value="${p.id}" data-price="${p.price}">${p.displayText}</option>`).join('')}
+            </select>
+        </td>
+        <td>
+            <input type="number" class="form-control form-control-sm" name="sequence_${rowId}" min="1" required>
+        </td>
+        <td>
+            <input type="number" class="form-control form-control-sm" name="quantity_${rowId}" value="1" min="1">
+        </td>
+        <td>
+            <input type="number" class="form-control form-control-sm" name="unit_price_${rowId}" step="0.01" min="0" placeholder="默认价格">
+        </td>
+        <td>
+            <input type="number" class="form-control form-control-sm" name="setup_time_${rowId}" value="0" step="0.1" min="0">
+        </td>
+        <td>
+            <input type="number" class="form-control form-control-sm" name="process_time_${rowId}" value="0" step="0.1" min="0">
+        </td>
+        <td>
+            <div class="form-check">
+                <input type="checkbox" class="form-check-input" name="is_required_${rowId}" checked>
+            </div>
+        </td>
+        <td>
+            <input type="text" class="form-control form-control-sm" name="notes_${rowId}" placeholder="备注">
+        </td>
+        <td>
+            <button type="button" class="btn btn-danger btn-sm" onclick="removeProcessRow(${rowId})" title="删除行">
+                <i class="fas fa-trash"></i>
+            </button>
+        </td>
+    `;
+    
+    tbody.appendChild(row);
+    
+    // 初始化Select2
+    $(`select[name="process_id_${rowId}"]`).select2({
+        placeholder: '搜索工序...',
+        allowClear: true,
+        width: '100%',
+        dropdownParent: $('#addProcessModal')
+    });
+    
+    // 当选择工序时自动填入价格
+    $(`select[name="process_id_${rowId}"]`).on('change', function() {
+        const selectedOption = $(this).find('option:selected');
+        const price = selectedOption.data('price');
+        if (price) {
+            $(`input[name="unit_price_${rowId}"]`).attr('placeholder', `默认: ¥${price.toFixed(2)}`);
+        }
+    });
+}
+
+// 删除工序行
+function removeProcessRow(rowId) {
+    const row = document.getElementById(`processRow_${rowId}`);
+    if (row) {
+        // 销毁Select2
+        $(`select[name="process_id_${rowId}"]`).select2('destroy');
+        row.remove();
+        
+        // 如果没有行了，至少保留一行
+        const tbody = document.getElementById('processTableBody');
+        if (tbody.children.length === 0) {
+            addProcessRow();
+        }
+    }
+}
+
+// 自动填充序号
+function autoFillSequence() {
+    const rows = document.querySelectorAll('#processTableBody tr');
+    let maxSequence = 0;
+    
+    // 获取现有的最大序号
+    {% for item in process_items %}
+    maxSequence = Math.max(maxSequence, {{ item.sequence }});
+    {% endfor %}
+    
+    // 为每一行填充连续序号
+    rows.forEach((row, index) => {
+        const sequenceInput = row.querySelector('input[name^="sequence_"]');
+        if (sequenceInput) {
+            sequenceInput.value = maxSequence + index + 1;
+        }
+    });
+}
+
+// 批量提交工序
+function submitBatchProcesses() {
+    const rows = document.querySelectorAll('#processTableBody tr');
+    const processes = [];
+    let hasError = false;
+    
+    rows.forEach((row, index) => {
+        const rowNum = index + 1;
+        const processId = row.querySelector('select[name^="process_id_"]').value;
+        const sequence = row.querySelector('input[name^="sequence_"]').value;
+        
+        if (!processId) {
+            alert(`第${rowNum}行：请选择工序`);
+            hasError = true;
+            return;
+        }
+        
+        if (!sequence) {
+            alert(`第${rowNum}行：请填写序号`);
+            hasError = true;
+            return;
+        }
+        
+        const processData = {
+            process_id: processId,
+            sequence: sequence,
+            quantity: row.querySelector('input[name^="quantity_"]').value || 1,
+            unit_price: row.querySelector('input[name^="unit_price_"]').value || null,
+            setup_time: row.querySelector('input[name^="setup_time_"]').value || 0,
+            process_time: row.querySelector('input[name^="process_time_"]').value || 0,
+            is_required: row.querySelector('input[name^="is_required_"]').checked,
+            notes: row.querySelector('input[name^="notes_"]').value || ''
+        };
+        
+        processes.push(processData);
+    });
+    
+    if (hasError || processes.length === 0) {
+        return;
+    }
+    
+    // 提交数据
     fetch(`{{ url_for('main.add_product_process', product_id=product.id) }}`, {
         method: 'POST',
         headers: {
@@ -319,22 +445,22 @@ function submitProcessItem() {
             'X-CSRFToken': '{{ csrf_token() }}'
         },
         credentials: 'same-origin',
-        body: JSON.stringify(formData)
+        body: JSON.stringify({ processes: processes })
     })
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            alert('工序添加成功！');
+            alert(data.message);
             const modal = bootstrap.Modal.getInstance(document.getElementById('addProcessModal'));
             modal.hide();
             location.reload();
         } else {
-            alert('添加失败：' + data.message);
+            alert('保存失败：\n' + data.message);
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('添加失败，请重试');
+        alert('保存失败，请重试');
     });
 }
 

@@ -6958,43 +6958,91 @@ def product_processes(product_id):
 @bp.route('/products/<int:product_id>/processes/add', methods=['POST'])
 @login_required
 def add_product_process(product_id):
-    """添加产品工序"""
+    """批量添加产品工序"""
     try:
         product = Product.query.get_or_404(product_id)
         data = request.get_json()
         
-        # 验证必填字段
-        required_fields = ['process_id', 'sequence']
-        for field in required_fields:
-            if not data.get(field):
-                return jsonify({'success': False, 'message': f'{field} 是必填字段'})
+        # 支持单个添加（向后兼容）
+        if 'process_id' in data:
+            processes = [data]
+        else:
+            # 批量添加
+            processes = data.get('processes', [])
         
-        # 检查序号是否已存在
-        existing = ProductProcess.query.filter_by(
-            product_id=product_id,
-            sequence=data['sequence']
-        ).first()
+        if not processes:
+            return jsonify({'success': False, 'message': '没有工序数据'})
         
-        if existing:
-            return jsonify({'success': False, 'message': '该序号已存在'})
+        # 验证所有工序数据
+        errors = []
+        sequence_list = []
         
-        # 创建工序项
-        process_item = ProductProcess(
-            product_id=product_id,
-            process_id=data['process_id'],
-            sequence=int(data['sequence']),
-            quantity=int(data.get('quantity', 1)),
-            unit_price=float(data['unit_price']) if data.get('unit_price') else None,
-            setup_time=float(data.get('setup_time', 0)),
-            process_time=float(data.get('process_time', 0)),
-            notes=data.get('notes', ''),
-            is_required=data.get('is_required', True)
-        )
+        for i, process_data in enumerate(processes):
+            row_num = i + 1
+            
+            # 验证必填字段
+            if not process_data.get('process_id'):
+                errors.append(f'第{row_num}行：工序是必填字段')
+                continue
+                
+            if not process_data.get('sequence'):
+                errors.append(f'第{row_num}行：序号是必填字段')
+                continue
+            
+            sequence = int(process_data['sequence'])
+            
+            # 检查序号重复（在提交的数据中）
+            if sequence in sequence_list:
+                errors.append(f'第{row_num}行：序号{sequence}重复')
+            else:
+                sequence_list.append(sequence)
+            
+            # 检查序号是否与数据库中已存在的冲突
+            existing = ProductProcess.query.filter_by(
+                product_id=product_id,
+                sequence=sequence
+            ).first()
+            
+            if existing:
+                errors.append(f'第{row_num}行：序号{sequence}已存在')
         
-        db.session.add(process_item)
+        if errors:
+            return jsonify({'success': False, 'message': '数据验证失败:\n' + '\n'.join(errors)})
+        
+        # 批量创建工序项
+        created_count = 0
+        for process_data in processes:
+            process_item = ProductProcess(
+                product_id=product_id,
+                process_id=int(process_data['process_id']),
+                sequence=int(process_data['sequence']),
+                quantity=int(process_data.get('quantity', 1)),
+                unit_price=float(process_data['unit_price']) if process_data.get('unit_price') else None,
+                setup_time=float(process_data.get('setup_time', 0)),
+                process_time=float(process_data.get('process_time', 0)),
+                notes=process_data.get('notes', ''),
+                is_required=process_data.get('is_required', True)
+            )
+            
+            db.session.add(process_item)
+            created_count += 1
+        
         db.session.commit()
         
-        return jsonify({'success': True, 'message': '工序添加成功'})
+        # 记录审计日志
+        audit_log = AuditLog(
+            user_id=current_user.id,
+            action='批量添加产品工序',
+            details=f'为产品{product.product_name}批量添加{created_count}个工序'
+        )
+        db.session.add(audit_log)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True, 
+            'message': f'成功添加{created_count}个工序',
+            'created_count': created_count
+        })
         
     except Exception as e:
         db.session.rollback()

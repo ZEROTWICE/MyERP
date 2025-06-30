@@ -621,7 +621,7 @@ class ExcelGenerator:
             mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             as_attachment=True,
             download_name=filename
-        )
+        ) 
 
     @staticmethod
     def create_product_template():
