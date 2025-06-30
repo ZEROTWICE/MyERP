@@ -621,4 +621,400 @@ class ExcelGenerator:
             mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             as_attachment=True,
             download_name=filename
-        ) 
+        )
+
+    @staticmethod
+    def create_product_template():
+        """创建产品（含BOM和工序）导入模板"""
+        wb = Workbook()
+        
+        # 第一个工作表：产品信息
+        ws_product = wb.active
+        ws_product.title = "产品信息"
+        
+        # 产品信息表头
+        product_headers = ['产品编码*', '产品名称*', '图号', '型号', '规格说明', '单位', '类别', '版本', '状态', '备注']
+        for col, header in enumerate(product_headers, 1):
+            cell = ws_product.cell(row=1, column=col, value=header)
+            ExcelGenerator._apply_header_style(cell)
+            
+        # 产品信息示例
+        product_example = ['PROD001', '示例产品', 'DWG001', 'Model001', '示例规格说明', '件', '电子产品', '1.0', 'active', '示例产品备注']
+        for col, value in enumerate(product_example, 1):
+            ws_product.cell(row=2, column=col, value=value)
+        
+        # 产品信息说明
+        ws_product.cell(row=4, column=1, value='说明')
+        ws_product.cell(row=5, column=1, value='产品编码')
+        ws_product.cell(row=5, column=2, value='必填，产品的唯一标识，必须与BOM表和工序表中的产品编码一致')
+        ws_product.cell(row=6, column=1, value='状态')
+        ws_product.cell(row=6, column=2, value='active-启用，inactive-停用，obsolete-淘汰')
+        ws_product.cell(row=7, column=1, value='单位')
+        ws_product.cell(row=7, column=2, value='默认为"件"')
+        ws_product.cell(row=8, column=1, value='版本')
+        ws_product.cell(row=8, column=2, value='默认为"1.0"')
+        
+        # 第二个工作表：BOM物料清单
+        ws_bom = wb.create_sheet(title="BOM物料清单")
+        
+        # BOM表头
+        bom_headers = ['产品编码*', '物料类型*', '物料编码*', '物料名称', '用量*', '单位', '单价', '损耗率%', '备注', '序号']
+        for col, header in enumerate(bom_headers, 1):
+            cell = ws_bom.cell(row=1, column=col, value=header)
+            ExcelGenerator._apply_header_style(cell)
+        
+        # BOM示例数据
+        bom_examples = [
+            ['PROD001', 'raw', '内部编号001', '钢材', 2.5, 'kg', 15.0, 5.0, '主要原材料', 1],
+            ['PROD001', 'finished', '成品编号001', '轴承', 1, '个', 50.0, 2.0, '成品配件', 2],
+            ['PROD001', 'product', 'SUB001', '子产品', 1, '件', 100.0, 0, '子产品组件', 3]
+        ]
+        for row_idx, example in enumerate(bom_examples, 2):
+            for col, value in enumerate(example, 1):
+                ws_bom.cell(row=row_idx, column=col, value=value)
+        
+        # BOM说明
+        ws_bom.cell(row=6, column=1, value='说明')
+        ws_bom.cell(row=7, column=1, value='产品编码')
+        ws_bom.cell(row=7, column=2, value='必填，必须与产品信息表中的产品编码一致')
+        ws_bom.cell(row=8, column=1, value='物料类型')
+        ws_bom.cell(row=8, column=2, value='raw-原材料，finished-成品，product-产品')
+        ws_bom.cell(row=9, column=1, value='物料编码')
+        ws_bom.cell(row=9, column=2, value='原材料使用内部编号，成品使用产品编号，产品使用产品编码')
+        ws_bom.cell(row=10, column=1, value='损耗率')
+        ws_bom.cell(row=10, column=2, value='填写百分比数值，如5表示5%损耗率')
+        ws_bom.cell(row=11, column=1, value='序号')
+        ws_bom.cell(row=11, column=2, value='BOM中的排序序号，数字越小排序越靠前')
+        
+        # 第三个工作表：产品工序
+        ws_process = wb.create_sheet(title="产品工序")
+        
+        # 工序表头
+        process_headers = ['产品编码*', '工序编号*', '工序名称', '序号*', '加工数量', '单价', '准备时间(分钟)', '加工时间(分钟)', '是否必需', '备注']
+        for col, header in enumerate(process_headers, 1):
+            cell = ws_process.cell(row=1, column=col, value=header)
+            ExcelGenerator._apply_header_style(cell)
+        
+        # 工序示例数据
+        process_examples = [
+            ['PROD001', 'P001', '车削', 1, 1, 15.0, 10, 30, True, '第一道工序'],
+            ['PROD001', 'P002', '铣削', 2, 1, 20.0, 15, 45, True, '第二道工序'],
+            ['PROD001', 'P003', '检验', 3, 1, 10.0, 5, 15, False, '质量检验']
+        ]
+        for row_idx, example in enumerate(process_examples, 2):
+            for col, value in enumerate(example, 1):
+                ws_process.cell(row=row_idx, column=col, value=value)
+        
+        # 工序说明
+        ws_process.cell(row=6, column=1, value='说明')
+        ws_process.cell(row=7, column=1, value='产品编码')
+        ws_process.cell(row=7, column=2, value='必填，必须与产品信息表中的产品编码一致')
+        ws_process.cell(row=8, column=1, value='工序编号')
+        ws_process.cell(row=8, column=2, value='必填，必须是系统中已存在的工序编号')
+        ws_process.cell(row=9, column=1, value='序号')
+        ws_process.cell(row=9, column=2, value='工序执行顺序，数字越小执行越早')
+        ws_process.cell(row=10, column=1, value='是否必需')
+        ws_process.cell(row=10, column=2, value='TRUE-必需工序，FALSE-可选工序')
+        ws_process.cell(row=11, column=1, value='单价')
+        ws_process.cell(row=11, column=2, value='留空则使用工序价格表中的价格')
+        
+        # 调整所有工作表的列宽
+        for ws in [ws_product, ws_bom, ws_process]:
+            for col in ws.columns:
+                max_length = 0
+                for cell in col:
+                    try:
+                        if len(str(cell.value)) > max_length:
+                            max_length = len(str(cell.value))
+                    except:
+                        pass
+                ws.column_dimensions[col[0].column_letter].width = max_length + 2
+        
+        return wb
+
+    @staticmethod
+    def parse_product_data(file_path):
+        """解析产品（含BOM和工序）导入数据"""
+        from openpyxl import load_workbook
+        from app.models import RawMaterial, FinishedProduct, ProcessPrice
+        
+        wb = load_workbook(file_path)
+        result = {
+            'products': [],
+            'bom_items': [],
+            'process_items': [],
+            'errors': []
+        }
+        
+        # 解析产品信息
+        if '产品信息' in wb.sheetnames:
+            ws_product = wb['产品信息']
+            for row_num, row in enumerate(ws_product.iter_rows(min_row=2, values_only=True), start=2):
+                if not any(row) or (row[0] and str(row[0]).startswith('说明')):  # 跳过空行和说明行
+                    continue
+                    
+                try:
+                    product_data = {
+                        'product_code': str(row[0]).strip() if row[0] else None,
+                        'product_name': str(row[1]).strip() if row[1] else None,
+                        'drawing_number': str(row[2]).strip() if row[2] else None,
+                        'model': str(row[3]).strip() if row[3] else None,
+                        'specification': str(row[4]).strip() if row[4] else None,
+                        'unit': str(row[5]).strip() if row[5] else '件',
+                        'category': str(row[6]).strip() if row[6] else None,
+                        'version': str(row[7]).strip() if row[7] else '1.0',
+                        'status': str(row[8]).strip() if row[8] else 'active',
+                        'notes': str(row[9]).strip() if row[9] else None
+                    }
+                    
+                    # 验证必填字段
+                    if not product_data['product_code']:
+                        result['errors'].append(f'产品信息第{row_num}行：产品编码不能为空')
+                        continue
+                    if not product_data['product_name']:
+                        result['errors'].append(f'产品信息第{row_num}行：产品名称不能为空')
+                        continue
+                    
+                    result['products'].append(product_data)
+                    
+                except Exception as e:
+                    result['errors'].append(f'产品信息第{row_num}行解析错误：{str(e)}')
+        
+        # 解析BOM物料清单
+        if 'BOM物料清单' in wb.sheetnames:
+            ws_bom = wb['BOM物料清单']
+            for row_num, row in enumerate(ws_bom.iter_rows(min_row=2, values_only=True), start=2):
+                if not any(row) or (row[0] and str(row[0]).startswith('说明')):  # 跳过空行和说明行
+                    continue
+                    
+                try:
+                    # 获取物料信息
+                    material_type = str(row[1]).strip().lower() if row[1] else None
+                    material_code = str(row[2]).strip() if row[2] else None
+                    material_name = str(row[3]).strip() if row[3] else None
+                    
+                    # 验证物料类型
+                    if material_type not in ['raw', 'finished', 'product']:
+                        result['errors'].append(f'BOM第{row_num}行：物料类型必须是raw、finished或product')
+                        continue
+                    
+                    # 查找物料ID
+                    material_id = None
+                    if material_type == 'raw':
+                        material = RawMaterial.query.filter_by(internal_number=material_code).first()
+                        if material:
+                            material_id = material.id
+                        else:
+                            result['errors'].append(f'BOM第{row_num}行：找不到内部编号为"{material_code}"的原材料')
+                            continue
+                    elif material_type == 'finished':
+                        material = FinishedProduct.query.filter_by(product_number=material_code).first()
+                        if material:
+                            material_id = material.id
+                        else:
+                            result['errors'].append(f'BOM第{row_num}行：找不到产品编号为"{material_code}"的成品')
+                            continue
+                    elif material_type == 'product':
+                        # 对于产品类型，我们先记录编码，稍后在导入时处理
+                        material_id = material_code  # 临时使用编码作为ID
+                    
+                    bom_data = {
+                        'product_code': str(row[0]).strip() if row[0] else None,
+                        'material_type': material_type,
+                        'material_id': material_id,
+                        'material_code': material_code,  # 保留编码用于后续处理
+                        'quantity': float(row[4]) if row[4] else 0,
+                        'unit': str(row[5]).strip() if row[5] else '件',
+                        'unit_cost': float(row[6]) if row[6] else 0,
+                        'waste_rate': float(row[7]) if row[7] else 0,
+                        'notes': str(row[8]).strip() if row[8] else None,
+                        'sequence': int(row[9]) if row[9] else 0
+                    }
+                    
+                    # 验证必填字段
+                    if not bom_data['product_code']:
+                        result['errors'].append(f'BOM第{row_num}行：产品编码不能为空')
+                        continue
+                    if not material_code:
+                        result['errors'].append(f'BOM第{row_num}行：物料编码不能为空')
+                        continue
+                    if bom_data['quantity'] <= 0:
+                        result['errors'].append(f'BOM第{row_num}行：用量必须大于0')
+                        continue
+                    
+                    result['bom_items'].append(bom_data)
+                    
+                except Exception as e:
+                    result['errors'].append(f'BOM第{row_num}行解析错误：{str(e)}')
+        
+        # 解析产品工序
+        if '产品工序' in wb.sheetnames:
+            ws_process = wb['产品工序']
+            for row_num, row in enumerate(ws_process.iter_rows(min_row=2, values_only=True), start=2):
+                if not any(row) or (row[0] and str(row[0]).startswith('说明')):  # 跳过空行和说明行
+                    continue
+                    
+                try:
+                    process_code = str(row[1]).strip() if row[1] else None
+                    
+                    # 查找工序
+                    process = ProcessPrice.query.filter_by(process_code=process_code, is_current=True).first()
+                    if not process:
+                        result['errors'].append(f'工序第{row_num}行：找不到工序编号为"{process_code}"的工序')
+                        continue
+                    
+                    # 处理是否必需字段
+                    is_required = True  # 默认值
+                    if row[8] is not None:
+                        is_required_str = str(row[8]).strip().lower()
+                        if is_required_str in ['false', '否', 'no', '0']:
+                            is_required = False
+                        elif is_required_str in ['true', '是', 'yes', '1']:
+                            is_required = True
+                    
+                    process_data = {
+                        'product_code': str(row[0]).strip() if row[0] else None,
+                        'process_id': process.id,
+                        'process_code': process_code,
+                        'sequence': int(row[3]) if row[3] else 0,
+                        'quantity': int(row[4]) if row[4] else 1,
+                        'unit_price': float(row[5]) if row[5] else None,
+                        'setup_time': float(row[6]) if row[6] else 0,
+                        'process_time': float(row[7]) if row[7] else 0,
+                        'is_required': is_required,
+                        'notes': str(row[9]).strip() if row[9] else None
+                    }
+                    
+                    # 验证必填字段
+                    if not process_data['product_code']:
+                        result['errors'].append(f'工序第{row_num}行：产品编码不能为空')
+                        continue
+                    if process_data['sequence'] <= 0:
+                        result['errors'].append(f'工序第{row_num}行：序号必须大于0')
+                        continue
+                    
+                    result['process_items'].append(process_data)
+                    
+                except Exception as e:
+                    result['errors'].append(f'工序第{row_num}行解析错误：{str(e)}')
+        
+        return result 
+
+    @staticmethod
+    def export_products(products):
+        """导出产品信息（含BOM和工序）"""
+        wb = Workbook()
+        
+        # 第一个工作表：产品信息
+        ws_product = wb.active
+        ws_product.title = "产品信息"
+
+        # 产品信息表头
+        product_headers = ['产品编码', '产品名称', '图号', '型号', '规格说明', '单位', '类别', '版本', '状态', '总成本', '创建时间', '备注']
+        for col, header in enumerate(product_headers, 1):
+            cell = ws_product.cell(row=1, column=col, value=header)
+            ExcelGenerator._apply_header_style(cell)
+
+        # 写入产品数据
+        for row, product in enumerate(products, 2):
+            ws_product.cell(row=row, column=1, value=product.product_code)
+            ws_product.cell(row=row, column=2, value=product.product_name)
+            ws_product.cell(row=row, column=3, value=product.drawing_number)
+            ws_product.cell(row=row, column=4, value=product.model)
+            ws_product.cell(row=row, column=5, value=product.specification)
+            ws_product.cell(row=row, column=6, value=product.unit)
+            ws_product.cell(row=row, column=7, value=product.category)
+            ws_product.cell(row=row, column=8, value=product.version)
+            ws_product.cell(row=row, column=9, value=product.status)
+            ws_product.cell(row=row, column=10, value=product.total_cost)
+            ws_product.cell(row=row, column=11, value=product.created_at.strftime('%Y-%m-%d %H:%M:%S'))
+            ws_product.cell(row=row, column=12, value=product.notes)
+
+        # 第二个工作表：BOM物料清单
+        ws_bom = wb.create_sheet(title="BOM物料清单")
+        
+        # BOM表头
+        bom_headers = ['产品编码', '物料类型', '物料编码', '物料名称', '用量', '单位', '单价', '损耗率%', '实际用量', '总成本', '备注', '序号']
+        for col, header in enumerate(bom_headers, 1):
+            cell = ws_bom.cell(row=1, column=col, value=header)
+            ExcelGenerator._apply_header_style(cell)
+        
+        # 写入BOM数据
+        bom_row = 2
+        for product in products:
+            for bom_item in product.bom_items.order_by('sequence'):
+                ws_bom.cell(row=bom_row, column=1, value=product.product_code)
+                ws_bom.cell(row=bom_row, column=2, value=bom_item.material_type)
+                
+                # 获取物料编码和名称
+                material_code = ''
+                material_name = ''
+                if bom_item.material_type == 'raw':
+                    material = bom_item.material_info
+                    if material:
+                        material_code = material.internal_number
+                        material_name = material.material_name
+                elif bom_item.material_type == 'finished':
+                    material = bom_item.material_info
+                    if material:
+                        material_code = material.product_number
+                        material_name = material.product_number
+                elif bom_item.material_type == 'product':
+                    material = bom_item.material_info
+                    if material:
+                        material_code = material.product_code
+                        material_name = f"{material.product_name} ({material.product_code})"
+                
+                ws_bom.cell(row=bom_row, column=3, value=material_code)
+                ws_bom.cell(row=bom_row, column=4, value=material_name)
+                ws_bom.cell(row=bom_row, column=5, value=bom_item.quantity)
+                ws_bom.cell(row=bom_row, column=6, value=bom_item.unit)
+                ws_bom.cell(row=bom_row, column=7, value=bom_item.unit_cost)
+                ws_bom.cell(row=bom_row, column=8, value=bom_item.waste_rate)
+                ws_bom.cell(row=bom_row, column=9, value=bom_item.actual_quantity)
+                ws_bom.cell(row=bom_row, column=10, value=bom_item.total_cost)
+                ws_bom.cell(row=bom_row, column=11, value=bom_item.notes)
+                ws_bom.cell(row=bom_row, column=12, value=bom_item.sequence)
+                bom_row += 1
+
+        # 第三个工作表：产品工序
+        ws_process = wb.create_sheet(title="产品工序")
+        
+        # 工序表头
+        process_headers = ['产品编码', '工序编号', '工序名称', '序号', '加工数量', '单价', '有效价格', '准备时间(分钟)', '加工时间(分钟)', '总时间(分钟)', '总成本', '是否必需', '备注']
+        for col, header in enumerate(process_headers, 1):
+            cell = ws_process.cell(row=1, column=col, value=header)
+            ExcelGenerator._apply_header_style(cell)
+        
+        # 写入工序数据
+        process_row = 2
+        for product in products:
+            for process_item in product.process_items.order_by('sequence'):
+                ws_process.cell(row=process_row, column=1, value=product.product_code)
+                ws_process.cell(row=process_row, column=2, value=process_item.process.process_code)
+                ws_process.cell(row=process_row, column=3, value=process_item.process.process_name)
+                ws_process.cell(row=process_row, column=4, value=process_item.sequence)
+                ws_process.cell(row=process_row, column=5, value=process_item.quantity)
+                ws_process.cell(row=process_row, column=6, value=process_item.unit_price)
+                ws_process.cell(row=process_row, column=7, value=process_item.effective_price)
+                ws_process.cell(row=process_row, column=8, value=process_item.setup_time)
+                ws_process.cell(row=process_row, column=9, value=process_item.process_time)
+                ws_process.cell(row=process_row, column=10, value=process_item.total_time)
+                ws_process.cell(row=process_row, column=11, value=process_item.total_cost)
+                ws_process.cell(row=process_row, column=12, value='是' if process_item.is_required else '否')
+                ws_process.cell(row=process_row, column=13, value=process_item.notes)
+                process_row += 1
+
+        # 调整所有工作表的列宽
+        for ws in [ws_product, ws_bom, ws_process]:
+            for col in ws.columns:
+                max_length = 0
+                for cell in col:
+                    try:
+                        if len(str(cell.value)) > max_length:
+                            max_length = len(str(cell.value))
+                    except:
+                        pass
+                ws.column_dimensions[col[0].column_letter].width = max_length + 2
+
+        return wb 

@@ -12,7 +12,7 @@ from app.main.forms import (
     ExportProductionRecordForm, ExportBonusPenaltyForm, ExportTaskForm,
     CustomerForm, CustomerAddressForm, SalesOrderForm, SalesOrderItemForm,
     ProductionOrderForm, NotificationRuleForm, NotificationTemplateForm,
-    GlobalSearchForm, AdvancedSearchForm
+    GlobalSearchForm, AdvancedSearchForm, ExportProductForm, ProductImportForm
 )
 from sqlalchemy import desc, or_
 from app.utils.excel_generator import ExcelGenerator
@@ -7094,6 +7094,360 @@ def get_product_process(product_id, process_item_id):
         
     except Exception as e:
         return jsonify({'success': False, 'message': f'获取工序详情失败: {str(e)}'})
+
+# ================== 产品Excel导入导出功能 ==================
+
+@bp.route('/products/template')
+@login_required
+def download_product_template():
+    """下载产品导入模板"""
+    if current_user.role not in ['admin']:
+        flash('权限不足', 'danger')
+        return redirect(url_for('main.manage_products'))
+    
+    temp_path = None
+    try:
+        wb = ExcelGenerator.create_product_template()
+        filename = 'product_template.xlsx'
+        temp_path = os.path.join(current_app.config['TEMP_FOLDER'], filename)
+        
+        # 保存并关闭工作簿
+        wb.save(temp_path)
+        wb.close()
+        
+        # 确保文件写入完成
+        time.sleep(0.1)
+        
+        return send_file(
+            temp_path,
+            as_attachment=True,
+            download_name=filename,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+    except Exception as e:
+        if temp_path and os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except:
+                pass
+        flash(f'下载模板失败：{str(e)}', 'danger')
+        return redirect(url_for('main.manage_products'))
+    finally:
+        # 确保在请求结束后删除临时文件
+        if temp_path and os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except:
+                pass
+
+@bp.route('/products/import', methods=['POST'])
+@login_required
+def import_products():
+    """批量导入产品（含BOM和工序）"""
+    try:
+        if current_user.role not in ['admin']:
+            return jsonify({'success': False, 'message': '权限不足，只有管理员可以导入数据'})
+        
+        form = ProductImportForm()
+        if not form.validate_on_submit():
+            return jsonify({'success': False, 'message': '表单验证失败'})
+        
+        file = form.file.data
+        if not file or not allowed_file(file.filename):
+            return jsonify({'success': False, 'message': '请选择有效的Excel文件（.xlsx或.xls）'})
+        
+        # 保存上传文件
+        temp_path = save_temp_file(file)
+        
+        try:
+            # 解析产品数据（含BOM和工序）
+            import_data = ExcelGenerator.parse_product_data(temp_path)
+            
+            # 检查解析错误
+            if import_data['errors']:
+                return jsonify({
+                    'success': False, 
+                    'message': f'Excel解析失败，发现 {len(import_data["errors"])} 个错误',
+                    'error_details': import_data['errors'][:10]  # 只返回前10个错误
+                })
+            
+            imported_count = 0
+            updated_count = 0
+            bom_count = 0
+            process_count = 0
+            error_details = []
+            
+            # 记录产品编码到ID的映射，用于处理BOM中的产品类型物料
+            product_code_to_id = {}
+            
+            # 第一阶段：导入产品
+            for i, product_data in enumerate(import_data['products'], 1):
+                try:
+                    # 检查产品编码是否已存在
+                    existing_product = Product.query.filter_by(
+                        product_code=product_data['product_code']
+                    ).first()
+                    
+                    if existing_product:
+                        # 更新现有产品
+                        if form.update_existing.data:
+                            existing_product.product_name = product_data['product_name']
+                            existing_product.drawing_number = product_data.get('drawing_number', '')
+                            existing_product.model = product_data.get('model', '')
+                            existing_product.specification = product_data.get('specification', '')
+                            existing_product.unit = product_data.get('unit', '件')
+                            existing_product.category = product_data.get('category', '')
+                            existing_product.version = product_data.get('version', '1.0')
+                            existing_product.status = product_data.get('status', 'active')
+                            existing_product.notes = product_data.get('notes', '')
+                            existing_product.updated_at = datetime.utcnow()
+                            
+                            # 如果更新现有产品，先清除其BOM和工序
+                            ProductBOM.query.filter_by(product_id=existing_product.id).delete()
+                            ProductProcess.query.filter_by(product_id=existing_product.id).delete()
+                            
+                            product_code_to_id[existing_product.product_code] = existing_product.id
+                            
+                            # 记录审计日志
+                            log = AuditLog(
+                                user_id=current_user.id,
+                                action='批量更新产品',
+                                details=f'更新产品：{existing_product.product_name}（编码：{existing_product.product_code}）',
+                                can_rollback=True,
+                                rollback_type='update',
+                                target_model='Product',
+                                target_id=existing_product.id,
+                                new_data=product_data
+                            )
+                            db.session.add(log)
+                            updated_count += 1
+                        else:
+                            error_details.append(f'产品第{i}行：产品编码 {product_data["product_code"]} 已存在')
+                            continue
+                    else:
+                        # 创建新产品
+                        new_product = Product(
+                            global_sn=SerialNumber.get_next_number(),
+                            product_code=product_data['product_code'],
+                            product_name=product_data['product_name'],
+                            drawing_number=product_data.get('drawing_number', ''),
+                            model=product_data.get('model', ''),
+                            specification=product_data.get('specification', ''),
+                            unit=product_data.get('unit', '件'),
+                            category=product_data.get('category', ''),
+                            version=product_data.get('version', '1.0'),
+                            status=product_data.get('status', 'active'),
+                            notes=product_data.get('notes', ''),
+                            created_by=current_user.id
+                        )
+                        
+                        db.session.add(new_product)
+                        db.session.flush()  # 获取产品ID
+                        
+                        product_code_to_id[new_product.product_code] = new_product.id
+                        
+                        # 记录审计日志
+                        log = AuditLog(
+                            user_id=current_user.id,
+                            action='批量添加产品',
+                            details=f'添加产品：{new_product.product_name}（编码：{new_product.product_code}）',
+                            can_rollback=True,
+                            rollback_type='add',
+                            target_model='Product',
+                            new_data=product_data
+                        )
+                        db.session.add(log)
+                        imported_count += 1
+                        
+                except Exception as row_error:
+                    error_details.append(f'产品第{i}行处理失败：{str(row_error)}')
+                    continue
+            
+            # 第二阶段：导入BOM
+            for i, bom_data in enumerate(import_data['bom_items'], 1):
+                try:
+                    product_id = product_code_to_id.get(bom_data['product_code'])
+                    if not product_id:
+                        error_details.append(f'BOM第{i}行：找不到对应的产品 {bom_data["product_code"]}')
+                        continue
+                    
+                    # 处理产品类型的物料ID
+                    material_id = bom_data['material_id']
+                    if bom_data['material_type'] == 'product':
+                        # 查找产品ID
+                        material_product = Product.query.filter_by(product_code=bom_data['material_code']).first()
+                        if material_product:
+                            material_id = material_product.id
+                        else:
+                            error_details.append(f'BOM第{i}行：找不到产品编码为 {bom_data["material_code"]} 的产品')
+                            continue
+                    
+                    # 创建BOM项
+                    bom_item = ProductBOM(
+                        product_id=product_id,
+                        material_type=bom_data['material_type'], 
+                        material_id=material_id,
+                        quantity=bom_data['quantity'],
+                        unit=bom_data['unit'],
+                        unit_cost=bom_data['unit_cost'],
+                        waste_rate=bom_data['waste_rate'],
+                        notes=bom_data['notes'],
+                        sequence=bom_data['sequence']
+                    )
+                    db.session.add(bom_item)
+                    bom_count += 1
+                    
+                except Exception as row_error:
+                    error_details.append(f'BOM第{i}行处理失败：{str(row_error)}')
+                    continue
+            
+            # 第三阶段：导入工序
+            for i, process_data in enumerate(import_data['process_items'], 1):
+                try:
+                    product_id = product_code_to_id.get(process_data['product_code'])
+                    if not product_id:
+                        error_details.append(f'工序第{i}行：找不到对应的产品 {process_data["product_code"]}')
+                        continue
+                    
+                    # 创建工序项
+                    process_item = ProductProcess(
+                        product_id=product_id,
+                        process_id=process_data['process_id'],
+                        sequence=process_data['sequence'],
+                        quantity=process_data['quantity'],
+                        unit_price=process_data['unit_price'],
+                        setup_time=process_data['setup_time'],
+                        process_time=process_data['process_time'],
+                        is_required=process_data['is_required'],
+                        notes=process_data['notes']
+                    )
+                    db.session.add(process_item)
+                    process_count += 1
+                    
+                except Exception as row_error:
+                    error_details.append(f'工序第{i}行处理失败：{str(row_error)}')
+                    continue
+            
+            # 提交数据库变更
+            db.session.commit()
+            
+            # 构建返回消息
+            messages = []
+            if imported_count > 0:
+                messages.append(f'成功导入 {imported_count} 个产品')
+            if updated_count > 0:
+                messages.append(f'成功更新 {updated_count} 个产品')
+            if bom_count > 0:
+                messages.append(f'{bom_count} 个BOM项')
+            if process_count > 0:
+                messages.append(f'{process_count} 个工序项')
+            if error_details:
+                messages.append(f'失败 {len(error_details)} 条')
+            
+            result_data = {
+                'success': True,
+                'message': '；'.join(messages),
+                'imported_count': imported_count,
+                'updated_count': updated_count,
+                'bom_count': bom_count,
+                'process_count': process_count,
+                'error_count': len(error_details),
+                'error_details': error_details[:10]  # 只显示前10个错误
+            }
+            
+            return jsonify(result_data)
+            
+        finally:
+            # 清理临时文件
+            cleanup_temp_files()
+            
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f'产品导入失败: {str(e)}')
+        return jsonify({'success': False, 'message': f'导入失败: {str(e)}'})
+
+@bp.route('/products/export', methods=['GET', 'POST'])
+@login_required  
+def export_products():
+    """导出产品数据"""
+    try:
+        if current_user.role not in ['admin', 'manager']:
+            flash('权限不足，只有管理员和经理可以导出数据', 'danger')
+            return redirect(url_for('main.manage_products'))
+        
+        form = ExportProductForm()
+        
+        if request.method == 'GET':
+            # 渲染导出表单页面（如果需要）
+            return render_template('main/export_form.html', form=form, export_type='products')
+        
+        if form.validate_on_submit():
+            # 构建查询
+            query = Product.query
+            
+            # 应用筛选条件
+            if form.category.data:
+                query = query.filter(Product.category == form.category.data)
+            
+            if form.status.data:
+                query = query.filter(Product.status == form.status.data)
+            
+            if form.start_date.data:
+                query = query.filter(Product.created_at >= form.start_date.data)
+            
+            if form.end_date.data:
+                end_date = datetime.combine(form.end_date.data, datetime.max.time())
+                query = query.filter(Product.created_at <= end_date)
+            
+            # 获取数据
+            products = query.order_by(Product.created_at.desc()).all()
+            
+            if not products:
+                return jsonify({'success': False, 'message': '没有找到符合条件的产品数据'})
+            
+            # 创建Excel生成器
+            wb = ExcelGenerator.export_products(products)
+            filename = f'产品信息导出_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
+            temp_path = os.path.join(current_app.config['TEMP_FOLDER'], filename)
+            
+            # 保存工作簿到临时文件
+            wb.save(temp_path)
+            wb.close()
+            
+            @after_this_request
+            def remove_file(response):
+                try:
+                    if temp_path and os.path.exists(temp_path):
+                        os.remove(temp_path)
+                except Exception as e:
+                    current_app.logger.error(f'删除导出文件失败: {str(e)}')
+                return response
+            
+            # 记录审计日志
+            log = AuditLog(
+                user_id=current_user.id,
+                action='导出产品数据',
+                details=f'导出了 {len(products)} 条产品数据',
+                can_rollback=False
+            )
+            db.session.add(log)
+            db.session.commit()
+            
+            return send_file(
+                temp_path,
+                as_attachment=True,
+                download_name=filename,
+                mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            )
+        else:
+            errors = []
+            for field, field_errors in form.errors.items():
+                errors.extend(field_errors)
+            return jsonify({'success': False, 'message': '表单验证失败：' + '；'.join(errors)})
+            
+    except Exception as e:
+        current_app.logger.error(f'产品导出失败: {str(e)}')
+        return jsonify({'success': False, 'message': f'导出失败: {str(e)}'})
 
 @bp.route('/api/products/search')
 @login_required

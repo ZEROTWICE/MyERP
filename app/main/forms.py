@@ -200,6 +200,24 @@ class ExportTaskForm(FlaskForm):
     end_date = DateField('分配日期至', validators=[Optional()])
     submit = SubmitField('导出')
 
+class ExportProductForm(FlaskForm):
+    """产品数据导出表单"""
+    category = StringField('产品类别', validators=[Optional()])
+    status = SelectField('状态', choices=[
+        ('', '全部'),
+        ('active', '启用'),
+        ('inactive', '停用'),
+        ('obsolete', '淘汰')
+    ], validators=[Optional()])
+    start_date = DateField('创建日期从', validators=[Optional()])
+    end_date = DateField('创建日期至', validators=[Optional()])
+    submit = SubmitField('导出')
+
+class ProductImportForm(FlaskForm):
+    """产品导入表单"""
+    file = MultipleFileField('Excel文件', validators=[DataRequired('请选择文件')])
+    submit = SubmitField('导入')
+
 class CustomerForm(FlaskForm):
     """客户表单"""
     customer_code = StringField('客户编码', validators=[DataRequired(), Length(1, 50)])

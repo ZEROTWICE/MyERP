@@ -6,7 +6,28 @@
 <div class="container mt-4">
     <h2>产品管理</h2>
 
-    <!-- 搜索和操作按钮 -->
+    <!-- 操作按钮 -->
+    {% if current_user.role in ['admin', 'manager'] %}
+    <div class="mb-3">
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addProductModal">
+            <i class="fas fa-plus"></i> 添加产品
+        </button>
+        {% if current_user.role in ['admin'] %}
+        <a href="{{ url_for('main.download_product_template') }}" class="btn btn-info">
+            <i class="fas fa-download"></i> 下载导入模板
+        </a>
+        <button type="button" class="btn btn-success" onclick="document.getElementById('importFile').click()">
+            <i class="fas fa-file-import"></i> 导入产品
+        </button>
+        {% endif %}
+        <button type="button" class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#exportProductModal">
+            <i class="fas fa-file-export"></i> 导出产品
+        </button>
+        <input type="file" id="importFile" style="display: none" accept=".xlsx,.xls" onchange="importProducts(this)">
+    </div>
+    {% endif %}
+
+    <!-- 搜索表单 -->
     <div class="mobile-filters mb-4">
         <form method="get" class="row g-3">
             <div class="col-md-3 col-12">
@@ -34,13 +55,6 @@
                     <option value="{{ category }}" {% if request.args.get('category') == category %}selected{% endif %}>{{ category }}</option>
                     {% endfor %}
                 </select>
-            </div>
-            <div class="col-md-5 col-12 text-end">
-                {% if current_user.role in ['admin', 'manager'] %}
-                <button type="button" class="btn btn-primary w-100" data-bs-toggle="modal" data-bs-target="#addProductModal">
-                    <i class="fas fa-plus"></i> 添加产品
-                </button>
-                {% endif %}
             </div>
         </form>
     </div>
@@ -606,6 +620,287 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+
+// 处理文件选择导入（类似工序价格管理）
+function importProducts(input) {
+    if (input.files && input.files[0]) {
+        const file = input.files[0];
+        
+        // 验证文件类型
+        const allowedTypes = ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.ms-excel'];
+        if (!allowedTypes.includes(file.type) && !file.name.match(/\.(xlsx|xls)$/i)) {
+            alert('请选择有效的Excel文件（.xlsx或.xls）');
+            input.value = '';
+            return;
+        }
+        
+        // 确认导入
+        if (confirm('确定要导入这个文件吗？这将会批量添加产品数据。')) {
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('update_existing', '1'); // 默认允许更新已存在的产品
+            formData.append('csrf_token', '{{ csrf_token() }}');
+            
+            // 显示导入进度提示
+            const loadingAlert = document.createElement('div');
+            loadingAlert.className = 'alert alert-info';
+            loadingAlert.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 正在导入产品数据，请稍候...';
+            document.body.appendChild(loadingAlert);
+            loadingAlert.style.position = 'fixed';
+            loadingAlert.style.top = '20px';
+            loadingAlert.style.right = '20px';
+            loadingAlert.style.zIndex = '9999';
+            
+            fetch('/products/import', {
+                method: 'POST',
+                body: formData,
+                credentials: 'same-origin'
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.body.removeChild(loadingAlert);
+                
+                if (data.success) {
+                    alert(data.message);
+                    location.reload();
+                } else {
+                    alert('导入失败：' + data.message);
+                }
+            })
+            .catch(error => {
+                document.body.removeChild(loadingAlert);
+                console.error('Import error:', error);
+                alert('导入失败，请重试');
+            });
+        }
+        
+        // 清空文件输入
+        input.value = '';
+    }
+}
+
+// 导入产品数据（模态框方式）
+function submitImportProducts() {
+    const form = document.getElementById('importProductForm');
+    const formData = new FormData(form);
+    const progressBar = document.getElementById('importProgress');
+    const resultDiv = document.getElementById('importResult');
+    
+    // 显示进度条
+    progressBar.style.display = 'block';
+    resultDiv.style.display = 'none';
+    
+    // 模拟进度条动画
+    let progress = 0;
+    const progressInterval = setInterval(() => {
+        progress += 10;
+        progressBar.querySelector('.progress-bar').style.width = progress + '%';
+        if (progress >= 90) {
+            clearInterval(progressInterval);
+        }
+    }, 100);
+    
+    fetch('/products/import', {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': '{{ csrf_token() }}'
+        },
+        credentials: 'same-origin'
+    })
+    .then(response => response.json())
+    .then(data => {
+        clearInterval(progressInterval);
+        progressBar.querySelector('.progress-bar').style.width = '100%';
+        
+        setTimeout(() => {
+            progressBar.style.display = 'none';
+            resultDiv.style.display = 'block';
+            
+            if (data.success) {
+                resultDiv.innerHTML = `
+                    <div class="alert alert-success">
+                        <h6>导入成功！</h6>
+                        <p>${data.message}</p>
+                        ${data.error_details && data.error_details.length > 0 ? 
+                          '<details><summary>错误详情</summary><ul>' + 
+                          data.error_details.map(err => '<li>' + err + '</li>').join('') + 
+                          '</ul></details>' : ''}
+                    </div>
+                `;
+                
+                // 3秒后自动刷新页面
+                setTimeout(() => {
+                    location.reload();
+                }, 3000);
+            } else {
+                resultDiv.innerHTML = `
+                    <div class="alert alert-danger">
+                        <h6>导入失败！</h6>
+                        <p>${data.message}</p>
+                    </div>
+                `;
+            }
+        }, 500);
+    })
+    .catch(error => {
+        clearInterval(progressInterval);
+        progressBar.style.display = 'none';
+        resultDiv.style.display = 'block';
+        resultDiv.innerHTML = `
+            <div class="alert alert-danger">
+                <h6>导入失败！</h6>
+                <p>网络错误，请重试。</p>
+            </div>
+        `;
+        console.error('Error:', error);
+    });
+}
+
+// 导出产品数据
+function submitExportProducts() {
+    const form = document.getElementById('exportProductForm');
+    const formData = new FormData(form);
+    
+    // 创建隐藏的表单来提交POST请求
+    const hiddenForm = document.createElement('form');
+    hiddenForm.method = 'POST';
+    hiddenForm.action = '/products/export';
+    hiddenForm.style.display = 'none';
+    
+    // 添加CSRF令牌
+    const csrfInput = document.createElement('input');
+    csrfInput.type = 'hidden';
+    csrfInput.name = 'csrf_token';
+    csrfInput.value = '{{ csrf_token() }}';
+    hiddenForm.appendChild(csrfInput);
+    
+    // 添加表单数据
+    for (let [key, value] of formData.entries()) {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = key;
+        input.value = value;
+        hiddenForm.appendChild(input);
+    }
+    
+    document.body.appendChild(hiddenForm);
+    hiddenForm.submit();
+    document.body.removeChild(hiddenForm);
+    
+    // 关闭模态框
+    const modal = bootstrap.Modal.getInstance(document.getElementById('exportProductModal'));
+    modal.hide();
+}
+
+// 重置导入表单
+document.getElementById('importProductModal').addEventListener('hidden.bs.modal', function() {
+    document.getElementById('importProductForm').reset();
+    document.getElementById('importProgress').style.display = 'none';
+    document.getElementById('importResult').style.display = 'none';
+});
 </script>
+
+<!-- 导入产品模态框 -->
+<div class="modal fade" id="importProductModal" tabindex="-1" aria-labelledby="importProductModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="importProductModalLabel">导入产品数据</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="importProductForm" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="importFile" class="form-label">选择Excel文件</label>
+                        <input type="file" class="form-control" id="importFile" name="file" accept=".xlsx,.xls" required>
+                        <div class="form-text">
+                            支持格式：.xlsx, .xls<br>
+                            请先下载模板文件以确保格式正确。
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="updateExisting" name="update_existing" value="1">
+                            <label class="form-check-label" for="updateExisting">
+                                更新已存在的产品
+                            </label>
+                            <div class="form-text">
+                                如果选中，将更新已存在的产品数据；否则跳过已存在的产品。
+                            </div>
+                        </div>
+                    </div>
+                </form>
+                <div id="importProgress" class="progress" style="display: none;">
+                    <div class="progress-bar" role="progressbar" style="width: 0%"></div>
+                </div>
+                <div id="importResult" class="mt-3" style="display: none;"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="submitImportProducts()">
+                    <i class="fas fa-upload"></i> 开始导入
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 导出产品模态框 -->
+<div class="modal fade" id="exportProductModal" tabindex="-1" aria-labelledby="exportProductModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="exportProductModalLabel">导出产品数据</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="exportProductForm">
+                    <div class="mb-3">
+                        <label for="exportCategory" class="form-label">产品类别</label>
+                        <select class="form-control" id="exportCategory" name="category">
+                            <option value="">所有类别</option>
+                            {% for category in categories %}
+                            <option value="{{ category }}">{{ category }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="exportStatus" class="form-label">产品状态</label>
+                        <select class="form-control" id="exportStatus" name="status">
+                            <option value="">所有状态</option>
+                            <option value="active">启用</option>
+                            <option value="inactive">停用</option>
+                            <option value="obsolete">淘汰</option>
+                        </select>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="exportStartDate" class="form-label">开始日期</label>
+                                <input type="date" class="form-control" id="exportStartDate" name="start_date">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="exportEndDate" class="form-label">结束日期</label>
+                                <input type="date" class="form-control" id="exportEndDate" name="end_date">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-text">
+                        选择筛选条件来导出特定的产品数据。如果不选择任何条件，将导出所有产品数据。
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-success" onclick="submitExportProducts()">
+                    <i class="fas fa-file-excel"></i> 导出Excel
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 
 {% endblock %} 
