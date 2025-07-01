@@ -6828,8 +6828,8 @@ def add_product_bom(product_id):
         
         for i, bom_data in enumerate(bom_items):
             row_num = i + 1
-            
-            # 验证必填字段
+        
+        # 验证必填字段
             if not bom_data.get('material_type'):
                 errors.append(f'第{row_num}行：物料类型是必填字段')
                 continue
@@ -6841,8 +6841,8 @@ def add_product_bom(product_id):
             if not bom_data.get('quantity'):
                 errors.append(f'第{row_num}行：用量是必填字段')
                 continue
-            
-            # 检查产品类型时避免循环引用
+        
+        # 检查产品类型时避免循环引用
             if bom_data['material_type'] == 'product' and int(bom_data['material_id']) == product_id:
                 errors.append(f'第{row_num}行：不能将产品自身添加到BOM中')
                 continue
@@ -6855,15 +6855,15 @@ def add_product_bom(product_id):
                 errors.append(f'第{row_num}行：物料在本次提交中重复')
             else:
                 material_keys.append(material_key)
-            
+        
             # 检查是否与数据库中已存在的物料冲突
-            existing = ProductBOM.query.filter_by(
-                product_id=product_id,
+        existing = ProductBOM.query.filter_by(
+            product_id=product_id,
                 material_type=bom_data['material_type'],
                 material_id=bom_data['material_id']
-            ).first()
-            
-            if existing:
+        ).first()
+        
+        if existing:
                 errors.append(f'第{row_num}行：该物料已存在于BOM中')
         
         if errors:
@@ -7033,8 +7033,8 @@ def add_product_process(product_id):
         
         for i, process_data in enumerate(processes):
             row_num = i + 1
-            
-            # 验证必填字段
+        
+        # 验证必填字段
             if not process_data.get('process_id'):
                 errors.append(f'第{row_num}行：工序是必填字段')
                 continue
@@ -7050,14 +7050,14 @@ def add_product_process(product_id):
                 errors.append(f'第{row_num}行：序号{sequence}重复')
             else:
                 sequence_list.append(sequence)
-            
+        
             # 检查序号是否与数据库中已存在的冲突
-            existing = ProductProcess.query.filter_by(
-                product_id=product_id,
+        existing = ProductProcess.query.filter_by(
+            product_id=product_id,
                 sequence=sequence
-            ).first()
-            
-            if existing:
+        ).first()
+        
+        if existing:
                 errors.append(f'第{row_num}行：序号{sequence}已存在')
         
         if errors:

@@ -135,7 +135,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <div class="mb-3">
+                            <div class="mb-3">
                     <div class="d-flex justify-content-between align-items-center">
                         <p class="text-muted mb-0">您可以一次添加多个工序，系统会自动检查序号冲突</p>
                         <div>
@@ -147,7 +147,7 @@
                             </button>
                         </div>
                     </div>
-                </div>
+                            </div>
                 
                 <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
                     <table class="table table-bordered table-sm" id="processTable">
@@ -168,7 +168,7 @@
                             <!-- 工序行将通过JavaScript动态添加 -->
                         </tbody>
                     </table>
-                </div>
+                        </div>
                 
                 <div class="mt-3">
                     <div class="alert alert-info">
@@ -181,7 +181,7 @@
                             <li>点击"自动序号"可自动填充连续的序号</li>
                         </ul>
                     </div>
-                </div>
+                    </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
@@ -355,10 +355,10 @@ function addProcessRow() {
     $(`select[name="process_id_${rowId}"]`).on('change', function() {
         const selectedOption = $(this).find('option:selected');
         const price = selectedOption.data('price');
-        if (price) {
+    if (price) {
             $(`input[name="unit_price_${rowId}"]`).attr('placeholder', `默认: ¥${price.toFixed(2)}`);
-        }
-    });
+    }
+});
 }
 
 // 删除工序行

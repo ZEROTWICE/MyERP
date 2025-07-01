@@ -140,7 +140,7 @@
                 <div class="alert alert-info" role="alert">
                     <i class="fas fa-info-circle me-2"></i>
                     <strong>批量添加说明：</strong>可以一次性添加多个物料，支持原材料、成品和产品搜索。
-                </div>
+                            </div>
                 
                 <!-- 操作按钮区域 -->
                 <div class="d-flex justify-content-between align-items-center mb-3">
@@ -155,7 +155,7 @@
                     <div class="text-muted">
                         已添加 <span id="bomRowCount">1</span> 行
                     </div>
-                </div>
+                            </div>
                 
                 <!-- BOM项表格 -->
                 <div class="table-responsive">
@@ -177,7 +177,7 @@
                             <!-- 初始行会通过JS添加 -->
                         </tbody>
                     </table>
-                </div>
+                        </div>
                 
                 <div class="alert alert-warning mt-3" role="alert">
                     <i class="fas fa-exclamation-triangle me-2"></i>
@@ -188,7 +188,7 @@
                         <li>同一物料不能重复添加</li>
                         <li>产品物料不能选择自身</li>
                     </ul>
-                </div>
+                    </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
@@ -462,7 +462,7 @@ function loadMaterialOptions(rowId) {
                 optionElement.value = option.id;
                 optionElement.textContent = option.text;
                 materialSelect.appendChild(optionElement);
-            });
+                });
             
             // 销毁现有的Select2实例（如果存在）
             if ($materialSelect.hasClass('select2-hidden-accessible')) {
