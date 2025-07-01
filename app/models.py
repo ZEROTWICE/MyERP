@@ -1505,6 +1505,8 @@ class SalesOrder(db.Model):
         super(SalesOrder, self).__init__(**kwargs)
         if not self.global_sn:
             self.global_sn = SerialNumber.get_next_number()
+        if not self.order_number:
+            self.order_number = f"SO{SerialNumber.get_next_number()}"
     
     def calculate_total_quantity(self):
         """计算合计数量"""

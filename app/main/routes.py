@@ -6807,51 +6807,105 @@ def product_bom(id):
 @bp.route('/products/<int:product_id>/bom/add', methods=['POST'])
 @login_required
 def add_product_bom(product_id):
-    """添加产品BOM项"""
+    """批量添加产品BOM项"""
     try:
         product = Product.query.get_or_404(product_id)
         data = request.get_json()
         
-        # 验证必填字段
-        required_fields = ['material_type', 'material_id', 'quantity']
-        for field in required_fields:
-            if not data.get(field):
-                return jsonify({'success': False, 'message': f'{field} 是必填字段'})
+        # 支持单个添加（向后兼容）
+        if 'material_type' in data:
+            bom_items = [data]
+        else:
+            # 批量添加
+            bom_items = data.get('bom_items', [])
         
-        # 检查产品类型时避免循环引用
-        if data['material_type'] == 'product' and int(data['material_id']) == product_id:
-            return jsonify({'success': False, 'message': '不能将产品自身添加到BOM中'})
+        if not bom_items:
+            return jsonify({'success': False, 'message': '没有BOM数据'})
         
-        # 检查是否已存在相同的物料
-        existing = ProductBOM.query.filter_by(
-            product_id=product_id,
-            material_type=data['material_type'],
-            material_id=data['material_id']
-        ).first()
+        # 验证所有BOM数据
+        errors = []
+        material_keys = []  # 用于检查重复的物料
         
-        if existing:
-            return jsonify({'success': False, 'message': '该物料已存在于BOM中'})
+        for i, bom_data in enumerate(bom_items):
+            row_num = i + 1
+            
+            # 验证必填字段
+            if not bom_data.get('material_type'):
+                errors.append(f'第{row_num}行：物料类型是必填字段')
+                continue
+                
+            if not bom_data.get('material_id'):
+                errors.append(f'第{row_num}行：物料是必填字段')
+                continue
+                
+            if not bom_data.get('quantity'):
+                errors.append(f'第{row_num}行：用量是必填字段')
+                continue
+            
+            # 检查产品类型时避免循环引用
+            if bom_data['material_type'] == 'product' and int(bom_data['material_id']) == product_id:
+                errors.append(f'第{row_num}行：不能将产品自身添加到BOM中')
+                continue
+            
+            # 生成物料唯一键
+            material_key = (bom_data['material_type'], int(bom_data['material_id']))
+            
+            # 检查在提交数据中是否重复
+            if material_key in material_keys:
+                errors.append(f'第{row_num}行：物料在本次提交中重复')
+            else:
+                material_keys.append(material_key)
+            
+            # 检查是否与数据库中已存在的物料冲突
+            existing = ProductBOM.query.filter_by(
+                product_id=product_id,
+                material_type=bom_data['material_type'],
+                material_id=bom_data['material_id']
+            ).first()
+            
+            if existing:
+                errors.append(f'第{row_num}行：该物料已存在于BOM中')
         
-        # 获取下一个序号
+        if errors:
+            return jsonify({'success': False, 'message': '数据验证失败:\n' + '\n'.join(errors)})
+        
+        # 获取当前最大序号
         max_sequence = db.session.query(db.func.max(ProductBOM.sequence)).filter_by(product_id=product_id).scalar() or 0
         
-        # 创建BOM项
-        bom_item = ProductBOM(
-            product_id=product_id,
-            material_type=data['material_type'],
-            material_id=data['material_id'],
-            quantity=float(data['quantity']),
-            unit=data.get('unit', '件'),
-            unit_cost=float(data.get('unit_cost', 0)),
-            waste_rate=float(data.get('waste_rate', 0)),
-            notes=data.get('notes', ''),
-            sequence=max_sequence + 1
-        )
+        # 批量创建BOM项
+        created_count = 0
+        for bom_data in bom_items:
+            bom_item = ProductBOM(
+                product_id=product_id,
+                material_type=bom_data['material_type'],
+                material_id=int(bom_data['material_id']),
+                quantity=float(bom_data['quantity']),
+                unit=bom_data.get('unit', '件'),
+                unit_cost=float(bom_data.get('unit_cost', 0)),
+                waste_rate=float(bom_data.get('waste_rate', 0)),
+                notes=bom_data.get('notes', ''),
+                sequence=max_sequence + created_count + 1
+            )
+            
+            db.session.add(bom_item)
+            created_count += 1
         
-        db.session.add(bom_item)
         db.session.commit()
         
-        return jsonify({'success': True, 'message': 'BOM项添加成功'})
+        # 记录审计日志
+        audit_log = AuditLog(
+            user_id=current_user.id,
+            action='批量添加产品BOM',
+            details=f'为产品{product.product_name}批量添加{created_count}个BOM项'
+        )
+        db.session.add(audit_log)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True, 
+            'message': f'成功添加{created_count}个BOM项',
+            'created_count': created_count
+        })
         
     except Exception as e:
         db.session.rollback()

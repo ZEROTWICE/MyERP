@@ -43,13 +43,17 @@
     <div class="card mb-4">
         <div class="card-body">
             <div class="row align-items-center">
-                <div class="col-md-8">
+                <div class="col-md-6">
                     <h5 class="mb-0">物料清单 (BOM)</h5>
+                    <p class="text-muted mb-0">配置产品的物料组成</p>
                 </div>
-                <div class="col-md-4 text-end">
+                <div class="col-md-6 text-end">
+                    <a href="{{ url_for('main.manage_inventory') }}" class="btn btn-outline-info me-2">
+                        <i class="fas fa-boxes"></i> 库存管理
+                    </a>
                     {% if current_user.role in ['admin', 'manager'] %}
                     <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addBomModal">
-                        <i class="fas fa-plus"></i> 添加物料
+                        <i class="fas fa-plus"></i> 批量添加物料
                     </button>
                     {% endif %}
                 </div>
@@ -122,74 +126,77 @@
     </div>
 </div>
 
-<!-- 添加BOM项模态框 -->
+<!-- 批量添加BOM项模态框 -->
 <div class="modal fade" id="addBomModal" tabindex="-1" aria-labelledby="addBomModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
+    <div class="modal-dialog modal-xl">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="addBomModalLabel">添加物料</h5>
+                <h5 class="modal-title" id="addBomModalLabel">
+                    <i class="fas fa-plus-circle text-primary"></i> 批量添加物料
+                </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body">
-                <form id="addBomForm">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="materialType" class="form-label">物料类型 *</label>
-                                <select class="form-control" id="materialType" name="material_type" required onchange="loadMaterials()">
-                                    <option value="">请选择</option>
-                                    <option value="raw">原材料</option>
-                                    <option value="finished">成品</option>
-                                    <option value="product">产品</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="materialId" class="form-label">物料 *</label>
-                                <select class="form-control" id="materialId" name="material_id" required>
-                                    <option value="">请先选择物料类型</option>
-                                </select>
-                            </div>
-                        </div>
+            <div class="modal-body p-4">
+                <div class="alert alert-info" role="alert">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>批量添加说明：</strong>可以一次性添加多个物料，支持原材料、成品和产品搜索。
+                </div>
+                
+                <!-- 操作按钮区域 -->
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div>
+                        <button type="button" class="btn btn-sm btn-success" onclick="addBomRow()">
+                            <i class="fas fa-plus"></i> 添加物料
+                        </button>
+                        <button type="button" class="btn btn-sm btn-info" onclick="autoFillSequence()">
+                            <i class="fas fa-sort-numeric-down"></i> 自动排序
+                        </button>
                     </div>
-                    <div class="row">
-                        <div class="col-md-4">
-                            <div class="mb-3">
-                                <label for="quantity" class="form-label">用量 *</label>
-                                <input type="number" class="form-control" id="quantity" name="quantity" step="0.01" min="0.01" required>
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="mb-3">
-                                <label for="unit" class="form-label">单位</label>
-                                <input type="text" class="form-control" id="unit" name="unit" value="件">
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="mb-3">
-                                <label for="unitCost" class="form-label">单价</label>
-                                <input type="number" class="form-control" id="unitCost" name="unit_cost" step="0.01" min="0" value="0">
-                            </div>
-                        </div>
+                    <div class="text-muted">
+                        已添加 <span id="bomRowCount">1</span> 行
                     </div>
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="wasteRate" class="form-label">损耗率(%)</label>
-                                <input type="number" class="form-control" id="wasteRate" name="waste_rate" step="0.1" min="0" max="100" value="0">
-                            </div>
-                        </div>
-                    </div>
-                    <div class="mb-3">
-                        <label for="bomNotes" class="form-label">备注</label>
-                        <textarea class="form-control" id="bomNotes" name="notes" rows="2"></textarea>
-                    </div>
-                </form>
+                </div>
+                
+                <!-- BOM项表格 -->
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th width="5%">序号</th>
+                                <th width="12%">物料类型 <span class="text-danger">*</span></th>
+                                <th width="25%">物料 <span class="text-danger">*</span></th>
+                                <th width="10%">用量 <span class="text-danger">*</span></th>
+                                <th width="8%">单位</th>
+                                <th width="10%">单价</th>
+                                <th width="8%">损耗率(%)</th>
+                                <th width="15%">备注</th>
+                                <th width="7%">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="bomTableBody">
+                            <!-- 初始行会通过JS添加 -->
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="alert alert-warning mt-3" role="alert">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>注意：</strong>
+                    <ul class="mb-0 mt-2">
+                        <li>物料类型和物料为必填项</li>
+                        <li>用量必须大于0</li>
+                        <li>同一物料不能重复添加</li>
+                        <li>产品物料不能选择自身</li>
+                    </ul>
+                </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                <button type="button" class="btn btn-primary" onclick="submitBomItem()">保存</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times"></i> 取消
+                </button>
+                <button type="button" class="btn btn-primary" onclick="submitBatchBomItems()">
+                    <i class="fas fa-save"></i> 批量保存
+                </button>
             </div>
         </div>
     </div>
@@ -268,47 +275,217 @@
 </div>
 
 <script>
-// 加载物料列表
-function loadMaterials() {
-    const materialType = document.getElementById('materialType').value;
-    const materialSelect = document.getElementById('materialId');
+let bomRowCounter = 0;
+
+// 页面加载完成后初始化
+document.addEventListener('DOMContentLoaded', function() {
+    // 监听模态框显示事件
+    const addBomModal = document.getElementById('addBomModal');
+    addBomModal.addEventListener('shown.bs.modal', function () {
+        // 清空表格并添加第一行
+        document.getElementById('bomTableBody').innerHTML = '';
+        bomRowCounter = 0;
+        addBomRow();
+    });
+});
+
+// 添加BOM行
+function addBomRow() {
+    bomRowCounter++;
+    const tbody = document.getElementById('bomTableBody');
     
-    // 清空选项
-    materialSelect.innerHTML = '<option value="">加载中...</option>';
+    const row = document.createElement('tr');
+    row.setAttribute('data-row-id', bomRowCounter);
+    
+    row.innerHTML = `
+        <td>
+            <input type="number" class="form-control form-control-sm text-center" 
+                   id="sequence_${bomRowCounter}" value="${bomRowCounter}" min="1" style="width: 60px;">
+        </td>
+        <td>
+            <select class="form-select form-select-sm" id="materialType_${bomRowCounter}" 
+                    onchange="loadMaterialOptions(${bomRowCounter})" required>
+                <option value="">选择类型</option>
+                <option value="raw">原材料</option>
+                <option value="finished">成品</option>
+                <option value="product">产品</option>
+            </select>
+        </td>
+        <td>
+            <select class="form-select form-select-sm" id="materialId_${bomRowCounter}" required style="width: 100%;">
+                <option value="">先选择类型</option>
+            </select>
+        </td>
+        <td>
+            <input type="number" class="form-control form-control-sm" 
+                   id="quantity_${bomRowCounter}" step="0.01" min="0.01" required>
+        </td>
+        <td>
+            <input type="text" class="form-control form-control-sm" 
+                   id="unit_${bomRowCounter}" value="件">
+        </td>
+        <td>
+            <input type="number" class="form-control form-control-sm" 
+                   id="unitCost_${bomRowCounter}" step="0.01" min="0" value="0">
+        </td>
+        <td>
+            <input type="number" class="form-control form-control-sm" 
+                   id="wasteRate_${bomRowCounter}" step="0.1" min="0" max="100" value="0">
+        </td>
+        <td>
+            <input type="text" class="form-control form-control-sm" 
+                   id="notes_${bomRowCounter}" placeholder="备注">
+        </td>
+        <td>
+            <button type="button" class="btn btn-sm btn-danger" onclick="removeBomRow(${bomRowCounter})">
+                <i class="fas fa-trash"></i>
+            </button>
+        </td>
+    `;
+    
+    tbody.appendChild(row);
+    updateBomRowCount();
+    
+    // 先不初始化Select2，等有数据后再初始化
+    console.log(`BOM行 ${bomRowCounter} 已创建，等待用户选择物料类型`);
+}
+
+// 删除BOM行
+function removeBomRow(rowId) {
+    const row = document.querySelector(`tr[data-row-id="${rowId}"]`);
+    if (row) {
+        // 销毁Select2实例
+        const materialSelect = $(`#materialId_${rowId}`);
+        if (materialSelect.hasClass('select2-hidden-accessible')) {
+            materialSelect.select2('destroy');
+        }
+        
+        row.remove();
+        updateBomRowCount();
+    }
+}
+
+// 更新行数统计
+function updateBomRowCount() {
+    const rowCount = document.getElementById('bomTableBody').children.length;
+    document.getElementById('bomRowCount').textContent = rowCount;
+}
+
+// 自动填充序号
+function autoFillSequence() {
+    const rows = document.querySelectorAll('#bomTableBody tr');
+    rows.forEach((row, index) => {
+        const sequenceInput = row.querySelector('input[id^="sequence_"]');
+        if (sequenceInput) {
+            sequenceInput.value = index + 1;
+        }
+    });
+}
+
+// 根据物料类型加载物料选项
+function loadMaterialOptions(rowId) {
+    const materialType = document.getElementById(`materialType_${rowId}`).value;
+    const materialSelect = document.getElementById(`materialId_${rowId}`);
+    const $materialSelect = $(`#materialId_${rowId}`);
+    
+    // 清空现有选项
+    if ($materialSelect.hasClass('select2-hidden-accessible')) {
+        $materialSelect.empty().trigger('change');
+    } else {
+        materialSelect.innerHTML = '';
+    }
     
     if (!materialType) {
         materialSelect.innerHTML = '<option value="">请先选择物料类型</option>';
         return;
     }
     
+    // 添加加载选项
+    materialSelect.innerHTML = '<option value="">加载中...</option>';
+    
     let url = '';
     if (materialType === 'raw') {
         url = "{{ url_for('main.get_available_raw_materials') }}?only_available=true";
     } else if (materialType === 'finished') {
-        url = '/api/inventory/finished-products?only_available=true';
+        url = "{{ url_for('main.get_available_finished_products') }}?only_available=true";
     } else if (materialType === 'product') {
         url = "{{ url_for('main.search_products') }}?exclude_current={{ product.id }}";
     }
     
-    fetch(url)
+    fetch(url, {
+        method: 'GET',
+        credentials: 'same-origin'
+    })
         .then(response => response.json())
         .then(data => {
-            materialSelect.innerHTML = '<option value="">请选择物料</option>';
+            console.log(`加载${materialType}类型物料:`, data); // 调试信息
             
-            if (data.success && data.data) {
+            const options = [{ id: '', text: '请选择物料' }];
+            
+            if (data.success && data.data && data.data.length > 0) {
                 data.data.forEach(material => {
-                    const option = document.createElement('option');
-                    option.value = material.id;
+                    let text = '';
                     if (materialType === 'raw') {
-                        option.textContent = `${material.material_name} (${material.internal_number})`;
+                        text = `${material.material_name} (${material.internal_number})`;
                     } else if (materialType === 'finished') {
-                        option.textContent = `${material.product_number}`;
+                        text = `${material.product_number}`;
                     } else if (materialType === 'product') {
-                        option.textContent = `${material.product_name} (${material.product_code})`;
+                        text = `${material.product_name} (${material.product_code})`;
                     }
-                    materialSelect.appendChild(option);
+                    options.push({
+                        id: material.id,
+                        text: text,
+                        data: material
+                    });
                 });
+            } else {
+                // 没有数据时的处理
+                if (data.success && (!data.data || data.data.length === 0)) {
+                    options.push({
+                        id: '',
+                        text: materialType === 'raw' ? '暂无可用原材料' : 
+                             materialType === 'finished' ? '暂无可用成品' : 
+                             '暂无可用产品'
+                    });
+                } else {
+                    options.push({
+                        id: '',
+                        text: '加载失败，请重试'
+                    });
+                }
             }
+            
+            // 先更新普通select的选项
+            materialSelect.innerHTML = '';
+            options.forEach(option => {
+                const optionElement = document.createElement('option');
+                optionElement.value = option.id;
+                optionElement.textContent = option.text;
+                materialSelect.appendChild(optionElement);
+            });
+            
+            // 销毁现有的Select2实例（如果存在）
+            if ($materialSelect.hasClass('select2-hidden-accessible')) {
+                $materialSelect.select2('destroy');
+            }
+            
+                         // 重新初始化Select2，设置dropdownParent到模态框
+             $materialSelect.select2({
+                 placeholder: '搜索并选择物料',
+                 allowClear: true,
+                 width: '100%',
+                 dropdownParent: $('#addBomModal'),
+                 language: {
+                     noResults: function() {
+                         return '未找到匹配的物料';
+                     },
+                     searching: function() {
+                         return '搜索中...';
+                     }
+                 }
+             });
+            
+            console.log(`${materialType}类型物料加载完成，共${options.length-1}个选项`);
         })
         .catch(error => {
             console.error('Error:', error);
@@ -316,16 +493,62 @@ function loadMaterials() {
         });
 }
 
-// 添加BOM项
-function submitBomItem() {
-    const formData = {
-        material_type: document.getElementById('materialType').value,
-        material_id: document.getElementById('materialId').value,
-        quantity: document.getElementById('quantity').value,
-        unit: document.getElementById('unit').value,
-        unit_cost: document.getElementById('unitCost').value,
-        waste_rate: document.getElementById('wasteRate').value,
-        notes: document.getElementById('bomNotes').value
+// 批量提交BOM项
+function submitBatchBomItems() {
+    const rows = document.querySelectorAll('#bomTableBody tr');
+    const bomItems = [];
+    const errors = [];
+    
+    // 收集所有行的数据
+    rows.forEach((row, index) => {
+        const rowNum = index + 1;
+        const rowId = row.getAttribute('data-row-id');
+        
+        const materialType = document.getElementById(`materialType_${rowId}`).value;
+        const materialId = document.getElementById(`materialId_${rowId}`).value;
+        const quantity = document.getElementById(`quantity_${rowId}`).value;
+        const unit = document.getElementById(`unit_${rowId}`).value;
+        const unitCost = document.getElementById(`unitCost_${rowId}`).value;
+        const wasteRate = document.getElementById(`wasteRate_${rowId}`).value;
+        const notes = document.getElementById(`notes_${rowId}`).value;
+        
+        // 验证必填字段
+        if (!materialType) {
+            errors.push(`第${rowNum}行：请选择物料类型`);
+        }
+        if (!materialId) {
+            errors.push(`第${rowNum}行：请选择物料`);
+        }
+        if (!quantity || parseFloat(quantity) <= 0) {
+            errors.push(`第${rowNum}行：用量必须大于0`);
+        }
+        
+        if (materialType && materialId && quantity && parseFloat(quantity) > 0) {
+            bomItems.push({
+                material_type: materialType,
+                material_id: materialId,
+                quantity: quantity,
+                unit: unit || '件',
+                unit_cost: unitCost || 0,
+                waste_rate: wasteRate || 0,
+                notes: notes || ''
+            });
+        }
+    });
+    
+    if (errors.length > 0) {
+        alert('请修正以下错误：\n' + errors.join('\n'));
+        return;
+    }
+    
+    if (bomItems.length === 0) {
+        alert('请至少添加一个有效的BOM项');
+        return;
+    }
+    
+    // 提交数据
+    const submitData = {
+        bom_items: bomItems
     };
     
     fetch(`{{ url_for('main.add_product_bom', product_id=product.id) }}`, {
@@ -335,22 +558,22 @@ function submitBomItem() {
             'X-CSRFToken': '{{ csrf_token() }}'
         },
         credentials: 'same-origin',
-        body: JSON.stringify(formData)
+        body: JSON.stringify(submitData)
     })
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            alert('BOM项添加成功！');
+            alert(`成功！${data.message}`);
             const modal = bootstrap.Modal.getInstance(document.getElementById('addBomModal'));
             modal.hide();
             location.reload();
         } else {
-            alert('添加失败：' + data.message);
+            alert('保存失败：\n' + data.message);
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('添加失败，请重试');
+        alert('保存失败，请重试');
     });
 }
 
@@ -452,5 +675,52 @@ function deleteBomItem(id) {
     }
 }
 </script>
+
+<style>
+/* 修复Select2在模态框中的显示问题 */
+.modal .select2-container {
+    z-index: 9999 !important;
+}
+
+.modal .select2-dropdown {
+    z-index: 10060 !important;
+}
+
+.select2-container--default .select2-selection--single {
+    height: 31px !important;
+    border: 1px solid #ced4da !important;
+    border-radius: 0.375rem !important;
+}
+
+.select2-container--default .select2-selection--single .select2-selection__rendered {
+    line-height: 29px !important;
+    padding-left: 8px !important;
+}
+
+.select2-container--default .select2-selection--single .select2-selection__arrow {
+    height: 29px !important;
+}
+
+/* 确保下拉菜单在模态框中可见 */
+.modal .select2-container--open .select2-dropdown {
+    z-index: 10060 !important;
+}
+
+/* 修复Bootstrap 5与Select2的兼容性 */
+.select2-container--default.select2-container--focus .select2-selection--single {
+    border-color: #86b7fe !important;
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25) !important;
+}
+
+/* 确保下拉菜单显示在表格上方 */
+.modal .select2-dropdown {
+    position: absolute !important;
+}
+
+/* 调试用：让Select2容器有边框便于查看 */
+.select2-container {
+    display: block !important;
+}
+</style>
 
 {% endblock %} 
