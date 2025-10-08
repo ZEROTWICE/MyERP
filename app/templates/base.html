@@ -280,9 +280,12 @@
                             </a>
                             <ul class="dropdown-menu" aria-labelledby="productionDropdown">
                                 <li><a class="dropdown-item" href="{{ url_for('main.process_prices') }}">工序管理</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('main.process_assignment_page') }}">工序分配</a></li>
                                 <li><a class="dropdown-item" href="{{ url_for('main.manage_production_records') }}">生产记录</a></li>
                                 <li><a class="dropdown-item" href="{{ url_for('main.manage_tasks') }}">任务管理</a></li>
                                 <li><a class="dropdown-item" href="{{ url_for('main.manage_production_orders') }}">生产订单</a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="{{ url_for('main.production_center') }}">生产中心（产品）</a></li>
                             </ul>
                         </li>
                         <li class="nav-item dropdown">

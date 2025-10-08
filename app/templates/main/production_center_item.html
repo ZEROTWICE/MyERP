@@ -1,0 +1,217 @@
+{% extends 'base.html' %}
+{% block title %}实例详情{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h5 class="mb-0">产品实例：<span class="text-monospace">{{ item.product_code }}</span></h5>
+  <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('main.production_center') }}">返回</a>
+</div>
+
+<div class="row g-3">
+  <div class="col-12 col-lg-6">
+    <div class="card h-100">
+      <div class="card-body">
+        <h6 class="card-title">基本信息</h6>
+        <div class="row">
+          <div class="col-6">批次号：{{ item.batch.batch_number }}</div>
+          <div class="col-6">状态：{{ item.status }}</div>
+          <div class="col-6">质量：{{ item.quality_status or '-' }}</div>
+          <div class="col-12">备注：{{ item.notes or '-' }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-lg-6">
+    <div class="card h-100">
+      <div class="card-body">
+        <h6 class="card-title">技术拆解（自由编辑）</h6>
+        <textarea id="decoInput" class="form-control" rows="8" placeholder="以JSON对象形式粘贴/编辑技术拆解..."></textarea>
+        <div class="text-end mt-2">
+          <button class="btn btn-sm btn-primary" onclick="saveDecomposition()">保存</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12">
+    <div class="card">
+      <div class="card-body">
+        <h6 class="card-title">任务与进度</h6>
+        <div class="table-responsive">
+          <table class="table table-sm table-striped">
+            <thead>
+              <tr>
+                <th>工序</th>
+                <th>数量</th>
+                <th>完成</th>
+                <th style="width: 220px;">进度</th>
+                <th>状态</th>
+                <th>目标日期</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for t in tasks %}
+              <tr>
+                <td>{{ t.process.process_name if t.process else '-' }}</td>
+                <td>{{ t.quantity }}</td>
+                <td>{{ t.completed_quantity }}</td>
+                <td>
+                  {% set pct = (0 if (t.quantity or 0) == 0 else ( (t.completed_quantity or 0) * 100 // (t.quantity or 1) )) %}
+                  <div class="progress" style="height: 10px;">
+                    <div class="progress-bar bg-success" role="progressbar" style="width: {{ pct }}%" aria-valuenow="{{ pct }}" aria-valuemin="0" aria-valuemax="100"></div>
+                  </div>
+                </td>
+                <td>{{ t.status }}</td>
+                <td>{{ t.target_date.strftime('%Y-%m-%d') if t.target_date else '-' }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12">
+    <div class="card">
+      <div class="card-body">
+        <h6 class="card-title">执行工序（记录操作者与物料消耗）</h6>
+        <div class="row g-2 align-items-end">
+          <div class="col-6 col-md-3">
+            <label class="form-label form-label-sm">员工ID</label>
+            <input id="execEmployeeId" type="number" class="form-control form-control-sm" placeholder="例如：12">
+          </div>
+          <div class="col-6 col-md-3">
+            <label class="form-label form-label-sm">工序ID</label>
+            <input id="execProcessId" type="number" class="form-control form-control-sm" placeholder="例如：101">
+          </div>
+          <div class="col-6 col-md-2">
+            <label class="form-label form-label-sm">数量</label>
+            <input id="execQuantity" type="number" class="form-control form-control-sm" placeholder="例如：10">
+          </div>
+          <div class="col-6 col-md-2">
+            <label class="form-label form-label-sm">日期</label>
+            <input id="execDate" type="date" class="form-control form-control-sm">
+          </div>
+          <div class="col-12 col-md-10">
+            <label class="form-label form-label-sm">物料JSON（数组）</label>
+            <textarea id="execMaterials" class="form-control form-control-sm" rows="3" placeholder='例如：[{"raw_material_id":1,"quantity":2.5}]'></textarea>
+          </div>
+          <div class="col-12 col-md-2 d-grid">
+            <button class="btn btn-sm btn-success" onclick="executeOperation()">提交记录</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12">
+    <div class="card">
+      <div class="card-body">
+        <h6 class="card-title">执行记录与物料</h6>
+        <div class="table-responsive">
+          <table class="table table-sm table-striped">
+            <thead>
+              <tr>
+                <th>记录号</th>
+                <th>操作者</th>
+                <th>工序</th>
+                <th>数量</th>
+                <th>日期</th>
+                <th>物料消耗</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in records %}
+              <tr>
+                <td class="text-monospace">{{ r.global_sn }}</td>
+                <td>{{ r.employee.name }}</td>
+                <td>{{ r.process.process_name }}</td>
+                <td>{{ r.quantity }}</td>
+                <td>{{ r.date.strftime('%Y-%m-%d') }}</td>
+                <td>
+                  {% if r.materials %}
+                    {% for m in r.materials %}
+                      <span class="badge bg-light text-dark me-1">{{ m.raw_material.material_name }} × {{ m.quantity }}</span>
+                    {% endfor %}
+                  {% else %}-{% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function loadDecomposition() {
+  try {
+    const res = await fetch("{{ url_for('main.api_item_detail', item_id=item.id) }}");
+    const json = await res.json();
+    if (json.success) {
+      const pretty = JSON.stringify(json.data.tech_decomposition || {}, null, 2);
+      document.getElementById('decoInput').value = pretty;
+    }
+  } catch (e) { /* ignore */ }
+}
+
+async function saveDecomposition() {
+  let payload;
+  try {
+    payload = JSON.parse(document.getElementById('decoInput').value || '{}');
+  } catch (e) {
+    toastr.warning('请输入合法的JSON对象');
+    return;
+  }
+  try {
+    const res = await fetch("{{ url_for('main.api_save_tech_decomposition', item_id=item.id) }}", {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const json = await res.json();
+    if (json.success) {
+      toastr.success('保存成功');
+    } else {
+      toastr.error(json.message || '保存失败');
+    }
+  } catch (e) {
+    toastr.error('请求失败');
+  }
+}
+
+document.addEventListener('DOMContentLoaded', loadDecomposition);
+
+async function executeOperation() {
+  let mats = [];
+  const matsText = document.getElementById('execMaterials').value.trim();
+  if (matsText) {
+    try { mats = JSON.parse(matsText); } catch(e) { toastr.warning('物料JSON格式不正确'); return; }
+    if (!Array.isArray(mats)) { toastr.warning('物料JSON必须为数组'); return; }
+  }
+  const payload = {
+    employee_id: parseInt(document.getElementById('execEmployeeId').value || '0'),
+    process_id: parseInt(document.getElementById('execProcessId').value || '0'),
+    quantity: parseInt(document.getElementById('execQuantity').value || '0'),
+    date: document.getElementById('execDate').value || null,
+    materials: mats
+  };
+  try {
+    const res = await fetch("{{ url_for('main.api_execute_operation', item_id=item.id) }}", {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const json = await res.json();
+    if (json.success) { toastr.success('记录成功'); setTimeout(()=>location.reload(), 600); }
+    else { toastr.error(json.message || '记录失败'); }
+  } catch(e) { toastr.error('请求失败'); }
+}
+</script>
+{% endblock %}
+
+

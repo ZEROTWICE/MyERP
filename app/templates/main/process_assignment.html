@@ -1,0 +1,145 @@
+{% extends 'base.html' %}
+{% block title %}工序分配{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h5 class="mb-0">工序分配管理</h5>
+  <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('main.process_prices') }}">返回工序列表</a>
+  </div>
+
+<div class="row g-3">
+  <div class="col-12 col-lg-4">
+    <div class="card h-100">
+      <div class="card-body">
+        <label class="form-label">选择工序</label>
+        <select id="processSelect" class="form-select form-select-sm">
+          <option value="">请选择工序...</option>
+          {% for p in processes %}
+            <option value="{{ p.id }}">{{ p.process_code }} - {{ p.process_name }}</option>
+          {% endfor %}
+        </select>
+        <div class="mt-3">
+          <label class="form-label">分配策略</label>
+          <select id="strategy" class="form-select form-select-sm">
+            <option value="round_robin">轮询</option>
+            <option value="weighted">加权</option>
+            <option value="fixed">固定</option>
+          </select>
+          <div class="form-check mt-2">
+            <input class="form-check-input" type="checkbox" id="isActive" checked>
+            <label class="form-check-label" for="isActive">启用该规则</label>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-8">
+    <div class="card h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h6 class="mb-0">分配成员</h6>
+          <button class="btn btn-sm btn-outline-primary" onclick="addMember()">添加成员</button>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle">
+            <thead>
+              <tr>
+                <th style="width: 45%">员工</th>
+                <th style="width: 20%">顺序</th>
+                <th style="width: 20%">权重</th>
+                <th style="width: 15%">操作</th>
+              </tr>
+            </thead>
+            <tbody id="membersBody"></tbody>
+          </table>
+        </div>
+        <div class="text-end">
+          <button class="btn btn-sm btn-success" onclick="saveRule()">保存规则</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const employees = {{ employees_json|tojson }};
+
+function renderMembers(members) {
+  const body = document.getElementById('membersBody');
+  body.innerHTML = '';
+  (members || []).forEach((m, idx) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>
+        <select class="form-select form-select-sm member-emp">
+          ${employees.map(e => `<option value="${e.id}" ${m.employee_id==e.id?'selected':''}>${e.name} (${e.employee_id})</option>`).join('')}
+        </select>
+      </td>
+      <td><input type="number" class="form-control form-control-sm member-seq" value="${m.sequence ?? idx}" min="0"></td>
+      <td><input type="number" class="form-control form-control-sm member-wt" value="${m.weight ?? 1}" min="1"></td>
+      <td><button class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove()">删除</button></td>
+    `;
+    body.appendChild(tr);
+  });
+}
+
+function addMember() {
+  const body = document.getElementById('membersBody');
+  const idx = body.querySelectorAll('tr').length;
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td>
+      <select class="form-select form-select-sm member-emp">
+        ${employees.map(e => `<option value="${e.id}">${e.name} (${e.employee_id})</option>`).join('')}
+      </select>
+    </td>
+    <td><input type="number" class="form-control form-control-sm member-seq" value="${idx}" min="0"></td>
+    <td><input type="number" class="form-control form-control-sm member-wt" value="1" min="1"></td>
+    <td><button class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove()">删除</button></td>
+  `;
+  body.appendChild(tr);
+}
+
+async function loadRule(processId) {
+  if (!processId) { renderMembers([]); return; }
+  const res = await fetch(`{{ url_for('main.get_process_assignment', process_id=0) }}`.replace('0', processId));
+  const json = await res.json();
+  if (json.success && json.data) {
+    document.getElementById('strategy').value = json.data.strategy || 'round_robin';
+    document.getElementById('isActive').checked = !!json.data.is_active;
+    renderMembers(json.data.members || []);
+  } else {
+    document.getElementById('strategy').value = 'round_robin';
+    document.getElementById('isActive').checked = true;
+    renderMembers([]);
+  }
+}
+
+async function saveRule() {
+  const pid = document.getElementById('processSelect').value;
+  if (!pid) { toastr.warning('请选择工序'); return; }
+  const strategy = document.getElementById('strategy').value;
+  const isActive = document.getElementById('isActive').checked;
+  const rows = Array.from(document.querySelectorAll('#membersBody tr'));
+  const members = rows.map(r => ({
+    employee_id: parseInt(r.querySelector('.member-emp').value),
+    sequence: parseInt(r.querySelector('.member-seq').value || '0'),
+    weight: parseInt(r.querySelector('.member-wt').value || '1')
+  })).filter(m => m.employee_id);
+  const res = await fetch(`{{ url_for('main.save_process_assignment', process_id=0) }}`.replace('0', pid), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ strategy, is_active: isActive, members })
+  });
+  const json = await res.json();
+  if (json.success) { toastr.success('保存成功'); }
+  else { toastr.error(json.message || '保存失败'); }
+}
+
+document.getElementById('processSelect').addEventListener('change', (e) => loadRule(e.target.value));
+</script>
+{% endblock %}
+
+

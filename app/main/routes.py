@@ -1,7 +1,7 @@
 from sqlalchemy.exc import SQLAlchemyError
 from flask_login import login_required, current_user
 from app import db, csrf
-from app.models import Employee, ProcessPrice, ProductionRecord, BonusPenalty, AuditLog, ProcessPrice, User, TaskAssignment, SerialNumber, SalaryChange, CoefficientChange, EmployeeSalaryHistory, EmployeeCoefficientHistory, ProcessPriceGroup, FinishedProduct, RawMaterial, CodeRule, CodeGenerationLog, ProductionRecordMaterial, InspectionTemplate, InspectionBaseItem, InspectionItem, InspectionTask, InspectionRecord, Product, ProductBOM, ProductProcess, ProductionOrder, MaterialAllocation, ProductionBatch, ProductionBatchItem, Customer, CustomerAddress, SalesOrder, SalesOrderItem, SalesOrder, SalesOrderItem
+from app.models import Employee, ProcessPrice, ProductionRecord, BonusPenalty, AuditLog, ProcessPrice, User, TaskAssignment, SerialNumber, SalaryChange, CoefficientChange, EmployeeSalaryHistory, EmployeeCoefficientHistory, ProcessPriceGroup, FinishedProduct, RawMaterial, CodeRule, CodeGenerationLog, ProductionRecordMaterial, InspectionTemplate, InspectionBaseItem, InspectionItem, InspectionTask, InspectionRecord, Product, ProductBOM, ProductProcess, ProductionOrder, MaterialAllocation, ProductionBatch, ProductionBatchItem, Customer, CustomerAddress, SalesOrder, SalesOrderItem, SalesOrder, SalesOrderItem, ProcessAssignmentRule, ProcessAssignmentMember
 from datetime import datetime, timedelta, date
 from . import bp
 from app.main.forms import (
@@ -38,8 +38,169 @@ from openpyxl import load_workbook
 
 # 导入质量管理路由
 from .quality import *
+from .production_center import *
 
 from app.services.search_service import SearchService
+
+@bp.route('/process_assignment', methods=['GET'])
+@login_required
+def process_assignment_page():
+    if current_user.role not in ['admin', 'manager']:
+        flash('权限不足', 'danger')
+        return redirect(url_for('main.index'))
+    processes = ProcessPrice.query.order_by(ProcessPrice.process_code).all()
+    employees = Employee.query.filter_by(is_active=True).order_by(Employee.name).all()
+    employees_data = [{'id': e.id, 'employee_id': e.employee_id, 'name': e.name} for e in employees]
+    return render_template('main/process_assignment_bulk.html', processes=processes, employees=employees_data, employees_json=employees_data)
+
+@bp.route('/api/process_assignment/<int:process_id>', methods=['GET'])
+@login_required
+def get_process_assignment(process_id):
+    try:
+        rule = ProcessAssignmentRule.query.filter_by(process_id=process_id).first()
+        if not rule:
+            return jsonify({'success': True, 'data': None})
+        members = rule.members.filter_by(is_active=True).order_by(ProcessAssignmentMember.sequence).all()
+        return jsonify({'success': True, 'data': {
+            'id': rule.id,
+            'strategy': rule.strategy,
+            'is_active': rule.is_active,
+            'members': [{'employee_id': m.employee_id, 'sequence': m.sequence, 'weight': m.weight, 'employee_name': m.employee.name} for m in members]
+        }})
+    except Exception as e:
+        # 兼容：当迁移未执行导致表不存在时返回空配置，避免500
+        if 'no such table' in str(e).lower():
+            return jsonify({'success': True, 'data': None, 'message': '规则表未初始化，请先执行数据库迁移'}), 200
+        current_app.logger.error(f'读取工序分配规则失败: {str(e)}')
+        return jsonify({'success': False, 'message': f'读取失败：{str(e)}'}), 500
+
+@bp.route('/api/process_assignment', methods=['GET'])
+@login_required
+def list_process_assignments():
+    try:
+        rules = ProcessAssignmentRule.query.all()
+        data = {}
+        for r in rules:
+            members = r.members.filter_by(is_active=True).order_by(ProcessAssignmentMember.sequence).all()
+            data[r.process_id] = {
+                'strategy': r.strategy,
+                'is_active': r.is_active,
+                'members': [{'employee_id': m.employee_id, 'sequence': m.sequence, 'weight': m.weight} for m in members]
+            }
+        return jsonify({'success': True, 'data': data})
+    except Exception as e:
+        if 'no such table' in str(e).lower():
+            return jsonify({'success': True, 'data': {}, 'message': '规则表未初始化，请先执行数据库迁移'}), 200
+        current_app.logger.error(f'列出工序分配规则失败: {str(e)}')
+        return jsonify({'success': False, 'message': f'读取失败：{str(e)}'}), 500
+
+@bp.route('/api/process_assignment/<int:process_id>', methods=['POST'])
+@login_required
+@csrf.exempt
+def save_process_assignment(process_id):
+    if current_user.role not in ['admin', 'manager']:
+        return jsonify({'success': False, 'message': '权限不足'}), 403
+    try:
+        data = request.get_json() or {}
+        strategy = (data.get('strategy') or 'round_robin').strip()
+        is_active = bool(data.get('is_active', True))
+        members = data.get('members') or []
+
+        rule = ProcessAssignmentRule.query.filter_by(process_id=process_id).first()
+        if not rule:
+            rule = ProcessAssignmentRule(process_id=process_id, strategy=strategy, is_active=is_active)
+            db.session.add(rule)
+            db.session.flush()
+        else:
+            rule.strategy = strategy
+            rule.is_active = is_active
+
+        ProcessAssignmentMember.query.filter_by(rule_id=rule.id).delete()
+        for i, m in enumerate(members):
+            try:
+                emp_id = int(m.get('employee_id'))
+            except Exception:
+                continue
+            member = ProcessAssignmentMember(
+                rule_id=rule.id,
+                employee_id=emp_id,
+                sequence=int(m.get('sequence') or i),
+                weight=int(m.get('weight') or 1),
+                is_active=True
+            )
+            db.session.add(member)
+
+        log = AuditLog(
+            user_id=current_user.id,
+            action='保存工序分配规则',
+            details=f'工序ID {process_id} 策略 {strategy}，成员 {len(members)}',
+            can_rollback=True,
+            rollback_type='edit',
+            target_model='ProcessAssignmentRule',
+            target_id=rule.id,
+            new_data=data
+        )
+        db.session.add(log)
+        db.session.commit()
+        return jsonify({'success': True, 'message': '保存成功'})
+    except Exception as e:
+        db.session.rollback()
+        # 兼容：当迁移未执行导致表不存在时，明确提示
+        if 'no such table' in str(e).lower():
+            return jsonify({'success': False, 'message': '规则表未初始化，请先执行数据库迁移（flask db upgrade）'}), 400
+        current_app.logger.error(f'保存工序分配规则失败: {str(e)}')
+        return jsonify({'success': False, 'message': f'保存失败：{str(e)}'}), 500
+
+@bp.route('/api/process_assignment/bulk', methods=['POST'])
+@login_required
+@csrf.exempt
+def save_process_assignment_bulk():
+    if current_user.role not in ['admin', 'manager']:
+        return jsonify({'success': False, 'message': '权限不足'}), 403
+    try:
+        payload = request.get_json() or {}
+        # payload: { process_id: {strategy, is_active, members: [{employee_id, sequence, weight}]}, ... }
+        for pid_str, cfg in payload.items():
+            try:
+                pid = int(pid_str)
+            except Exception:
+                continue
+            strategy = (cfg.get('strategy') or 'round_robin').strip()
+            is_active = bool(cfg.get('is_active', True))
+            members = cfg.get('members') or []
+
+            rule = ProcessAssignmentRule.query.filter_by(process_id=pid).first()
+            if not rule:
+                rule = ProcessAssignmentRule(process_id=pid, strategy=strategy, is_active=is_active)
+                db.session.add(rule)
+                db.session.flush()
+            else:
+                rule.strategy = strategy
+                rule.is_active = is_active
+
+            ProcessAssignmentMember.query.filter_by(rule_id=rule.id).delete()
+            for i, m in enumerate(members):
+                try:
+                    emp_id = int(m.get('employee_id'))
+                except Exception:
+                    continue
+                member = ProcessAssignmentMember(
+                    rule_id=rule.id,
+                    employee_id=emp_id,
+                    sequence=int(m.get('sequence') or i),
+                    weight=int(m.get('weight') or 1),
+                    is_active=True
+                )
+                db.session.add(member)
+
+        db.session.commit()
+        return jsonify({'success': True, 'message': '批量保存成功'})
+    except Exception as e:
+        db.session.rollback()
+        if 'no such table' in str(e).lower():
+            return jsonify({'success': False, 'message': '规则表未初始化，请先执行数据库迁移（flask db upgrade）'}), 400
+        current_app.logger.error(f'批量保存工序分配规则失败: {str(e)}')
+        return jsonify({'success': False, 'message': f'保存失败：{str(e)}'}), 500
 
 def handle_pagination_args(f):
     @wraps(f)
@@ -544,7 +705,6 @@ def process_prices():
                          current_direction=sort_direction,
                          latest_versions=latest_versions,
                          today=today)
-
 @bp.route('/add_process_price', methods=['GET', 'POST'])
 @login_required
 def add_process_price():
@@ -660,7 +820,6 @@ def add_process_price():
                          title='新增工序价格',
                          finished_rules_json=finished_rules_json,
                          raw_rules_json=raw_rules_json)
-
 @bp.route('/process_prices/<int:id>/edit', methods=['GET', 'POST'])
 @login_required
 def edit_process_price(id):
@@ -1249,7 +1408,6 @@ def delete_production_record(id):
         db.session.rollback()
         current_app.logger.error(f'删除生产记录失败: {str(e)}')
         return jsonify({'success': False, 'message': '删除失败，请重试'}), 500
-
 @bp.route('/bonus_penalties', methods=['GET', 'POST'])
 @login_required
 @handle_pagination_args
@@ -1452,7 +1610,6 @@ def edit_bonus_penalty(id):
             flash('修改失败，请重试', 'danger')
             return redirect(url_for('main.manage_bonus_penalties'))
     return render_template('main/edit_bonus_penalty.html', form=form, record=record)
-
 @bp.route('/bonus_penalties/add', methods=['POST'])
 @login_required
 def add_bonus_penalty():
@@ -2048,7 +2205,6 @@ def download_process_price_template():
                 os.remove(temp_path)
             except:
                 pass
-
 @bp.route('/process_prices/import', methods=['POST'])
 @login_required
 def import_process_prices():
@@ -2812,7 +2968,6 @@ def search_suggestions():
     
     suggestions = SearchService.get_search_suggestions(query, limit)
     return jsonify({'suggestions': suggestions})
-
 @bp.route('/search/quick', methods=['POST'])
 @login_required
 def quick_search():
@@ -3273,6 +3428,23 @@ def update_task_status(id):
                 current_app.logger.error(f'同步更新生产批次状态失败: {str(e)}')
                 # 不影响主流程，继续执行
         
+        # 同步生产中心：若任务关联实例/批次则更新实例或批次下各实例的可视状态
+        try:
+            from app.models import ProductionBatchItem
+            if task.batch_item_id:
+                bi = ProductionBatchItem.query.get(task.batch_item_id)
+                if bi:
+                    if task.status == 'completed' and bi.status != 'completed':
+                        bi.status = 'completed'
+                    elif task.status in ['in_progress', 'pending'] and bi.status == 'pending':
+                        bi.status = 'in_progress'
+            elif task.production_batch_id:
+                # 批次级任务：当有任务进行中或完成，推进该批次下所有 pending 实例为 in_progress（轻量同步）
+                if task.status in ['in_progress', 'completed']:
+                    ProductionBatchItem.query.filter_by(batch_id=task.production_batch_id, status='pending').update({'status': 'in_progress'})
+        except Exception as sync_err:
+            current_app.logger.warning(f'同步生产中心状态失败: {str(sync_err)}')
+
         db.session.commit()
         return jsonify({'success': True, 'message': '更新成功'})
     except Exception as e:
@@ -3585,14 +3757,79 @@ def import_tasks():
         
     except Exception as e:
         return jsonify({'success': False, 'message': f'导入失败：{str(e)}'})
-
-@bp.route('/export_tasks', methods=['POST'])
+@bp.route('/export_tasks', methods=['GET', 'POST'])
 @login_required
 def export_tasks():
     if current_user.role not in ['admin', 'hr']:
         flash('权限不足', 'danger')
         return redirect(url_for('main.index'))
-    
+
+    # 新增：支持 GET 导出以兼容前端直接链接
+    if request.method == 'GET':
+        try:
+            # 构建查询（与 manage_tasks 保持一致的筛选维度）
+            query = TaskAssignment.query.join(Employee).join(ProcessPrice)
+
+            # 处理搜索条件
+            if request.args.get('search'):
+                search_term = f"%{request.args.get('search')}%"
+                query = query.filter(db.or_(
+                    Employee.name.like(search_term),
+                    Employee.employee_id.like(search_term),
+                    ProcessPrice.process_code.like(search_term),
+                    ProcessPrice.process_name.like(search_term),
+                    TaskAssignment.notes.like(search_term)
+                ))
+
+            # 状态筛选（与页面默认一致）
+            status_filter = request.args.get('status', '')
+            if status_filter:
+                query = query.filter(TaskAssignment.status == status_filter)
+
+            # 时间范围（可选）
+            if request.args.get('start_date'):
+                try:
+                    start_date = datetime.strptime(request.args.get('start_date'), '%Y-%m-%d')
+                    query = query.filter(TaskAssignment.target_date >= start_date)
+                except (ValueError, TypeError):
+                    pass
+            if request.args.get('end_date'):
+                try:
+                    end_date = datetime.strptime(request.args.get('end_date'), '%Y-%m-%d')
+                    query = query.filter(TaskAssignment.target_date <= end_date)
+                except (ValueError, TypeError):
+                    pass
+
+            tasks = query.all()
+
+            # 生成并返回 Excel
+            excel_generator = ExcelGenerator()
+            excel_file = excel_generator.generate_tasks_excel(tasks)
+
+            temp_dir = tempfile.mkdtemp()
+            temp_file = os.path.join(temp_dir, '生产任务数据.xlsx')
+            excel_file.save(temp_file)
+
+            @after_this_request
+            def remove_file(response):
+                try:
+                    os.remove(temp_file)
+                    os.rmdir(temp_dir)
+                except Exception as e:
+                    current_app.logger.error(f'删除临时文件失败: {str(e)}')
+                return response
+
+            return send_file(
+                temp_file,
+                as_attachment=True,
+                download_name='生产任务数据.xlsx',
+                mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            )
+        except Exception as e:
+            current_app.logger.error(f'导出任务数据失败(GET): {str(e)}')
+            flash('导出失败，请重试', 'danger')
+            return redirect(url_for('main.manage_tasks'))
+
     form = ExportTaskForm()
     if form.validate_on_submit():
         try:
@@ -4277,7 +4514,6 @@ def add_salary_change():
         db.session.rollback()
         current_app.logger.error(f"添加工资变更记录失败: {str(e)}")
         return jsonify({'success': False, 'message': str(e)})
-
 @bp.route('/delete_salary_change', methods=['POST'])
 @login_required
 def delete_salary_change():
@@ -5038,7 +5274,6 @@ def manage_code_rules():
     
     rules = CodeRule.query.order_by(CodeRule.created_at.desc()).all()
     return render_template('main/code_rules.html', rules=rules)
-
 @bp.route('/code_rules/add', methods=['GET', 'POST'])
 @login_required
 def add_code_rule():
@@ -5803,7 +6038,6 @@ def toggle_raw_material_archive(id):
             'success': False,
             'message': f'操作失败：{str(e)}'
         }), 500
-
 @bp.route('/inventory/finished/<int:id>/archive', methods=['POST'])
 @login_required
 def toggle_finished_product_archive(id):
@@ -6573,8 +6807,6 @@ def get_raw_material_categories_api():
         
     except Exception as e:
         return jsonify({'success': False, 'message': f'获取品类列表失败：{str(e)}'})
-
-
 # 产品管理路由
 @bp.route('/products')
 @login_required
@@ -7241,7 +7473,6 @@ def download_product_template():
                 os.remove(temp_path)
             except:
                 pass
-
 @bp.route('/products/import', methods=['POST'])
 @login_required
 def import_products():
@@ -7907,14 +8138,21 @@ def create_production_order_from_sales(order_id):
             if not data.get(field):
                 return jsonify({'success': False, 'message': f'{field} 是必填字段'})
         
-        # 获取销售订单的所有订单行
-        order_items = SalesOrderItem.query.filter_by(sales_order_id=order_id).all()
+        # 获取用户选择的订单行ID（可选）
+        selected_ids = data.get('selected_item_ids') or []
+        # 获取销售订单的订单行，若前端有选择则按选择过滤
+        base_query = SalesOrderItem.query.filter_by(sales_order_id=order_id)
+        if selected_ids:
+            order_items = base_query.filter(SalesOrderItem.id.in_(selected_ids)).all()
+        else:
+            order_items = base_query.all()
+        
         if not order_items:
-            return jsonify({'success': False, 'message': '销售订单没有订单行，无法创建生产订单'})
+            return jsonify({'success': False, 'message': '请选择至少一条订单行或该销售订单没有可用的订单行'})
         
         created_orders = []
         
-        # 为每个订单行创建生产订单
+        # 为每个订单行创建生产订单（跳过已有待处理/进行中的生产订单）
         for item in order_items:
             # 检查是否已经有生产订单
             existing_order = ProductionOrder.query.filter(
@@ -7960,7 +8198,7 @@ def create_production_order_from_sales(order_id):
             })
         
         if not created_orders:
-            return jsonify({'success': False, 'message': '所有订单行都已有对应的生产订单'})
+            return jsonify({'success': False, 'message': '没有可创建的生产订单（可能都已存在）'})
         
         # 更新销售订单状态为生产中
         if sales_order.status == 'confirmed':
@@ -7987,7 +8225,6 @@ def create_production_order_from_sales(order_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': f'创建失败: {str(e)}'})
-
 @bp.route('/sales_order_item/<int:item_id>/create_production_order', methods=['POST'])
 @login_required
 def create_production_order_from_item(item_id):
@@ -8159,9 +8396,10 @@ def add_production_batch(order_id):
         
         batch_quantity = int(data['batch_quantity'])
         
-        # 检查剩余数量
-        if batch_quantity > order.remaining_quantity:
-            return jsonify({'success': False, 'message': f'批次数量不能超过剩余数量({order.remaining_quantity})'})
+        # 检查剩余可下达数量（计划 - 已下达批次总和，不含取消）
+        remaining_schedulable = order.remaining_to_schedule if hasattr(order, 'remaining_to_schedule') else order.remaining_quantity
+        if batch_quantity > remaining_schedulable:
+            return jsonify({'success': False, 'message': f'批次数量不能超过剩余可下达数量({remaining_schedulable})'})
         
         # 检查物料需求并处理不足情况
         material_shortage_info = check_and_handle_material_shortage(order, batch_quantity)
@@ -8233,18 +8471,40 @@ def create_tasks_for_production_batch(batch):
             current_app.logger.warning(f'产品 {product.product_name} 没有配置工序，无法创建生产任务')
             return False
         
-        # 获取可用的员工（在职员工）
-        available_employees = Employee.query.filter_by(is_active=True).all()
-        if not available_employees:
-            current_app.logger.warning('没有可用的员工，无法创建生产任务')
-            return False
-        
-        # 为每个工序创建任务
+        # 为每个工序创建任务（按工序分配规则选择员工）
         created_tasks = []
         for process_item in process_items:
-            # 选择一个员工（这里可以根据业务逻辑优化分配策略）
-            # 暂时使用简单的轮询分配
-            employee = available_employees[len(created_tasks) % len(available_employees)]
+            # 1) 查找工序分配规则
+            # 为避免未迁移导致的异常，这里捕获并在异常时走兜底在职员工分配
+            employee = None
+            rule = None
+            try:
+                rule = ProcessAssignmentRule.query.filter_by(process_id=process_item.process_id, is_active=True).first()
+            except Exception as e:
+                if 'no such table' not in str(e).lower():
+                    current_app.logger.warning(f'查询工序分配规则异常: {str(e)}')
+            if rule:
+                members = rule.members.filter_by(is_active=True).order_by(ProcessAssignmentMember.sequence).all()
+                if members:
+                    if rule.strategy == 'fixed':
+                        # 固定：永远取 sequence 最小的第一个
+                        employee = members[0].employee
+                    elif rule.strategy == 'weighted':
+                        # 权重：按权重构造池并轮询选择（简单实现）
+                        pool = []
+                        for m in members:
+                            pool.extend([m.employee] * max(1, m.weight or 1))
+                        employee = pool[len(created_tasks) % len(pool)] if pool else None
+                    else:
+                        # round_robin（默认）：按 sequence 轮询
+                        employee = members[len(created_tasks) % len(members)].employee
+            # 2) 兜底：全局在职员工轮询
+            if not employee:
+                available_employees = Employee.query.filter_by(is_active=True).all()
+                if not available_employees:
+                    current_app.logger.warning('没有可用的员工，无法创建生产任务')
+                    return False
+                employee = available_employees[len(created_tasks) % len(available_employees)]
             
             # 计算目标完成日期（根据工序顺序递增）
             days_offset = process_item.sequence * 2  # 每个工序间隔2天
@@ -8395,6 +8655,14 @@ def update_batch_status(batch_id):
             ).update({
                 'status': 'in_progress'
             })
+            # 若尚未生成生产任务，则在开始生产时自动创建
+            try:
+                if batch.tasks.count() == 0:
+                    created = create_tasks_for_production_batch(batch)
+                    if not created:
+                        current_app.logger.warning(f'批次 {batch.batch_number} 开始生产时未能自动创建任务（可能无工序或无可用员工）')
+            except Exception as e:
+                current_app.logger.error(f'批次 {batch.batch_number} 自动创建任务失败: {str(e)}')
         elif new_status == 'completed':
             if not batch.end_date:
                 batch.end_date = datetime.now().date()
@@ -8722,7 +8990,6 @@ def delete_customer(customer_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': f'删除失败：{str(e)}'})
-
 @bp.route('/customer/<int:customer_id>/address/add', methods=['GET', 'POST'])
 @login_required
 def add_customer_address(customer_id):
@@ -8781,7 +9048,6 @@ def add_customer_address(customer_id):
                          form=form, 
                          customer=customer, 
                          title='新增地址')
-
 @bp.route('/customer/<int:customer_id>/address/<int:address_id>/edit', methods=['GET', 'POST'])
 @login_required
 def edit_customer_address(customer_id, address_id):
@@ -9478,7 +9744,6 @@ def manage_delivery_batches_page(item_id):
     return render_template('main/delivery_batches.html', 
                          order_item=order_item, 
                          batches=batches)
-
 @bp.route('/sales_order_item/<int:item_id>/delivery_batches', methods=['GET', 'POST'])
 @login_required
 @csrf.exempt  # 对分批到货API豁免CSRF保护
@@ -9573,7 +9838,6 @@ def api_search_sales_orders():
         
     except Exception as e:
         return jsonify({'success': False, 'message': f'搜索失败：{str(e)}'})
-
 @bp.route('/api/products/search')
 @login_required
 def api_search_products_for_sales():
@@ -10225,7 +10489,6 @@ def get_consumable(id):
         'days_to_expiry': consumable.days_to_expiry,
         'created_at': consumable.created_at.strftime('%Y-%m-%d %H:%M:%S')
     })
-
 @bp.route('/consumables/<int:id>', methods=['PUT'])
 @login_required
 def update_consumable(id):
@@ -10328,7 +10591,6 @@ def update_consumable(id):
         db.session.rollback()
         current_app.logger.error(f'更新易耗品失败: {str(e)}')
         return jsonify({'success': False, 'message': f'更新失败：{str(e)}'}), 500
-
 @bp.route('/consumables/<int:id>', methods=['DELETE'])
 @login_required
 @csrf.exempt
@@ -10995,9 +11257,7 @@ def manage_inventory_counts():
                          in_progress_count=in_progress_count,
                          completed_count=completed_count,
                          approved_count=approved_count)
-
 # ==================== API接口 ====================
-
 @bp.route('/api/materials/search')
 @login_required
 def api_search_materials():
@@ -11102,4 +11362,3 @@ def api_search_materials():
     except Exception as e:
         current_app.logger.error(f'搜索物料失败: {str(e)}')
         return jsonify({'success': False, 'message': f'搜索失败：{str(e)}'}), 500
-

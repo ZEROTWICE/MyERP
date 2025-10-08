@@ -15,14 +15,8 @@
                         </div>
                         <div class="col-md-3">
                             <p><strong>职位：</strong>{{ employee.position }}</p>
-                            <p><strong>基本工资：</strong>¥{{ "%.2f"|format(employee.base_salary) }}</p>
                         </div>
                         <div class="col-md-3">
-                            <p><strong>系数：</strong>{{ employee.coefficient }}</p>
-                            <p><strong>当日工资：</strong><span class="text-success fw-bold">¥{{ "%.2f"|format(daily_salary) }}</span></p>
-                        </div>
-                        <div class="col-md-3">
-                            <p><strong>当月工资：</strong><span class="text-primary fw-bold">¥{{ "%.2f"|format(monthly_salary) }}</span></p>
                             {% if is_inspector %}
                             <p><strong>待处理质检：</strong>
                                 <span class="badge {% if pending_inspections > 0 %}bg-warning{% else %}bg-success{% endif %}">
@@ -36,6 +30,8 @@
             </div>
         </div>
     </div>
+
+    
 
     {% if is_inspector %}
     <!-- 质检任务 -->
@@ -320,6 +316,32 @@
                                 {% endfor %}
                             </tbody>
                         </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- 工资信息（页面最底端独立一栏） -->
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">我的工资</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <p><strong>基本工资：</strong>¥{{ "%.2f"|format(employee.base_salary) }}</p>
+                        </div>
+                        <div class="col-md-3">
+                            <p><strong>系数：</strong>{{ employee.coefficient }}</p>
+                        </div>
+                        <div class="col-md-3">
+                            <p><strong>当日工资：</strong><span class="text-success fw-bold">¥{{ "%.2f"|format(daily_salary) }}</span></p>
+                        </div>
+                        <div class="col-md-3">
+                            <p><strong>当月工资：</strong><span class="text-primary fw-bold">¥{{ "%.2f"|format(monthly_salary) }}</span></p>
+                        </div>
                     </div>
                 </div>
             </div>

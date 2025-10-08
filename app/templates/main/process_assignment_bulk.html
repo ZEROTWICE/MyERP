@@ -1,0 +1,129 @@
+{% extends 'base.html' %}
+{% block title %}工序分配（批量）{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h5 class="mb-0">工序分配（批量管理）</h5>
+  <div class="d-flex gap-2">
+    <input id="filterInput" class="form-control form-control-sm" placeholder="过滤工序代码/名称" style="width: 220px;">
+    <button class="btn btn-sm btn-success" onclick="saveAll()">批量保存</button>
+  </div>
+  </div>
+
+<div class="table-responsive">
+  <table class="table table-sm align-middle" id="assignTable">
+    <thead>
+      <tr>
+        <th style="width: 140px;">工序代码</th>
+        <th>工序名称</th>
+        <th style="width: 140px;">策略</th>
+        <th style="width: 80px;">启用</th>
+        <th>成员（员工ID或姓名，逗号分隔）</th>
+        <th style="width: 200px;">成员顺序（逗号）</th>
+        <th style="width: 200px;">成员权重（逗号）</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in processes %}
+      <tr data-process-id="{{ p.id }}">
+        <td class="text-monospace">{{ p.process_code }}</td>
+        <td>{{ p.process_name }}</td>
+        <td>
+          <select class="form-select form-select-sm js-strategy">
+            <option value="round_robin">轮询</option>
+            <option value="weighted">加权</option>
+            <option value="fixed">固定</option>
+          </select>
+        </td>
+        <td><input type="checkbox" class="form-check-input js-active" checked></td>
+        <td><input type="text" class="form-control form-control-sm js-members" placeholder="示例：1001, 1002 或 张三, 李四"></td>
+        <td><input type="text" class="form-control form-control-sm js-seq" placeholder="示例：0,1"></td>
+        <td><input type="text" class="form-control form-control-sm js-wt" placeholder="示例：1,1"></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const employees = {{ employees_json|tojson }};
+
+function nameOrIdToEmployeeId(token) {
+  token = (token || '').trim();
+  if (!token) return null;
+  if (/^\d+$/.test(token)) { return parseInt(token); }
+  const e = employees.find(x => x.name === token || x.employee_id === token);
+  return e ? e.id : null;
+}
+
+function parseCsv(str) {
+  return (str || '').split(',').map(s => s.trim()).filter(Boolean);
+}
+
+async function loadExisting() {
+  try {
+    const res = await fetch("{{ url_for('main.list_process_assignments') }}");
+    const json = await res.json();
+    if (!json.success) return;
+    const data = json.data || {};
+    document.querySelectorAll('#assignTable tbody tr').forEach(tr => {
+      const pid = tr.getAttribute('data-process-id');
+      const cfg = data[pid];
+      if (!cfg) return;
+      tr.querySelector('.js-strategy').value = cfg.strategy || 'round_robin';
+      tr.querySelector('.js-active').checked = !!cfg.is_active;
+      const ids = (cfg.members || []).map(m => m.employee_id);
+      const names = ids.map(id => {
+        const e = employees.find(x => x.id === id); return e ? (e.employee_id) : id;
+      });
+      tr.querySelector('.js-members').value = names.join(', ');
+      tr.querySelector('.js-seq').value = (cfg.members || []).map(m => m.sequence ?? 0).join(', ');
+      tr.querySelector('.js-wt').value  = (cfg.members || []).map(m => m.weight ?? 1).join(', ');
+    });
+  } catch (e) {}
+}
+
+async function saveAll() {
+  const payload = {};
+  document.querySelectorAll('#assignTable tbody tr').forEach(tr => {
+    const pid = tr.getAttribute('data-process-id');
+    const strategy = tr.querySelector('.js-strategy').value;
+    const isActive = tr.querySelector('.js-active').checked;
+    const memberTokens = parseCsv(tr.querySelector('.js-members').value);
+    const seqTokens    = parseCsv(tr.querySelector('.js-seq').value);
+    const wtTokens     = parseCsv(tr.querySelector('.js-wt').value);
+    const members = [];
+    memberTokens.forEach((tok, idx) => {
+      const empId = nameOrIdToEmployeeId(tok);
+      if (!empId) return;
+      const seq = parseInt(seqTokens[idx] || idx);
+      const wt  = parseInt(wtTokens[idx]  || 1);
+      members.push({ employee_id: empId, sequence: isNaN(seq)? idx : seq, weight: isNaN(wt)? 1 : wt });
+    });
+    payload[pid] = { strategy, is_active: isActive, members };
+  });
+
+  const res = await fetch("{{ url_for('main.save_process_assignment_bulk') }}", {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+  });
+  const json = await res.json();
+  if (json.success) { toastr.success('批量保存成功'); }
+  else { toastr.error(json.message || '保存失败'); }
+}
+
+// 过滤
+document.getElementById('filterInput').addEventListener('input', function() {
+  const q = this.value.toLowerCase();
+  document.querySelectorAll('#assignTable tbody tr').forEach(tr => {
+    const code = tr.children[0].innerText.toLowerCase();
+    const name = tr.children[1].innerText.toLowerCase();
+    tr.style.display = (code.includes(q) || name.includes(q)) ? '' : 'none';
+  });
+});
+
+document.addEventListener('DOMContentLoaded', loadExisting);
+</script>
+{% endblock %}
+
+

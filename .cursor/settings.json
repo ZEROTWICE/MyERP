@@ -1,0 +1,10 @@
+{
+    "userContext": {
+      "retrievers": [
+        {
+          "id": "file",
+          "path": "AGENTS.md"
+        }
+      ]
+    }
+  }

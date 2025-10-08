@@ -267,8 +267,8 @@
                 <form id="addBatchForm">
                     <div class="mb-3">
                         <label for="batchQuantity" class="form-label">批次数量 *</label>
-                        <input type="number" class="form-control" id="batchQuantity" name="batch_quantity" min="1" max="{{ order.remaining_quantity }}" required>
-                        <small class="form-text text-muted">剩余数量：{{ order.remaining_quantity }}件</small>
+                        <input type="number" class="form-control" id="batchQuantity" name="batch_quantity" min="1" max="{{ order.remaining_to_schedule }}" required>
+                        <small class="form-text text-muted">剩余可下达：{{ order.remaining_to_schedule }} 件</small>
                     </div>
                     <div class="mb-3">
                         <label for="batchNotes" class="form-label">批次备注</label>

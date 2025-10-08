@@ -424,9 +424,11 @@
                             <table class="table table-sm">
                                 <thead>
                                     <tr>
+                                        <th style="width: 72px;">选择</th>
                                         <th>产品名称</th>
                                         <th>数量</th>
                                         <th>规格型号</th>
+                                        <th>已有生产订单</th>
                                     </tr>
                                 </thead>
                                 <tbody id="orderItemsPreviewBody">
@@ -777,11 +779,17 @@ function createProductionOrderFromSales() {
     const orderItems = {{ order_items_json | tojson }};
     let previewHtml = '';
     orderItems.forEach(item => {
+        const hasPO = (item.production_orders || []).length > 0;
         previewHtml += `
             <tr>
+                <td>
+                  <input type="checkbox" class="form-check-input so-item-checkbox" 
+                    data-item-id="${item.id}" ${hasPO ? 'checked disabled' : 'checked'}>
+                </td>
                 <td>${item.product_name}</td>
                 <td>${item.quantity}</td>
                 <td>${item.specifications_text || '无'}</td>
+                <td>${hasPO ? item.production_orders.map(po=>po.order_number).join('<br>') : '<span class="text-muted">无</span>'}</td>
             </tr>
         `;
     });
@@ -844,6 +852,11 @@ function submitCreateProductionOrder() {
     let url;
     if (currentCreateMode === 'sales') {
         url = `/sales_order/{{ order.id }}/create_production_order`;
+        // 收集勾选的订单行ID
+        const checkedIds = Array.from(document.querySelectorAll('.so-item-checkbox'))
+            .filter(cb => cb.checked)
+            .map(cb => parseInt(cb.getAttribute('data-item-id')));
+        formData.selected_item_ids = checkedIds;
     } else {
         url = `/sales_order_item/${currentItemId}/create_production_order`;
         if (document.getElementById('plannedQuantity').value) {

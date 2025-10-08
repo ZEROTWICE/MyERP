@@ -81,6 +81,14 @@
                         <div class="mb-3">
                             <select class="form-control" id="materialSelect">
                             </select>
+                            <div class="mt-2 d-flex gap-2">
+                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="openQrScan()">
+                                    <i class="fas fa-qrcode"></i> 扫码添加原材料
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="manualQrInput()">
+                                    手动输入二维码内容
+                                </button>
+                            </div>
                         </div>
                         <div id="selectedMaterials" class="mt-3">
                             <!-- 已选择的原材料将在这里显示 -->
@@ -97,6 +105,39 @@
         </div>
     </div>
 </div>
+
+<!-- 扫码识别模态框 -->
+<div class="modal fade" id="qrScanModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">扫码识别原材料</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" onclick="stopQrScan()"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-3">
+                    <div class="col-12 col-md-8">
+                        <div class="ratio ratio-16x9 bg-dark rounded position-relative">
+                            <video id="qrVideo" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover;"></video>
+                            <canvas id="qrCanvas" class="d-none"></canvas>
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <div class="small text-muted">将二维码对准取景框，自动识别后会尝试匹配原材料。</div>
+                        <div class="mt-3">
+                            <label class="form-label">识别结果</label>
+                            <input id="qrResult" class="form-control form-control-sm" readonly>
+                        </div>
+                        <div class="mt-3">
+                            <button class="btn btn-sm btn-outline-secondary" onclick="toggleCam()">切换摄像头</button>
+                            <button class="btn btn-sm btn-outline-danger" onclick="stopQrScan()">停止</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    </div>
 
 {% endblock %}
 
@@ -263,6 +304,110 @@ $(document).ready(function() {
         });
     });
 });
+
+// ====== 简易二维码识别（依赖现代浏览器） ======
+let qrStream = null;
+let currentDeviceIndex = 0;
+let videoTrackList = [];
+
+async function openQrScan() {
+    try {
+        await initCamera();
+        const modal = new bootstrap.Modal(document.getElementById('qrScanModal'));
+        modal.show();
+        startQrLoop();
+    } catch (e) {
+        toastr.error('打开摄像头失败：' + (e.message || e));
+    }
+}
+
+async function initCamera() {
+    stopQrScan();
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const cams = devices.filter(d => d.kind === 'videoinput');
+    if (cams.length === 0) throw new Error('未找到摄像头');
+    videoTrackList = cams;
+    const constraints = { video: { deviceId: { exact: cams[currentDeviceIndex].deviceId } } };
+    qrStream = await navigator.mediaDevices.getUserMedia(constraints);
+    const video = document.getElementById('qrVideo');
+    video.srcObject = qrStream;
+}
+
+function stopQrScan() {
+    try {
+        if (qrStream) {
+            qrStream.getTracks().forEach(t => t.stop());
+            qrStream = null;
+        }
+    } catch (e) {}
+}
+
+function toggleCam() {
+    if (!videoTrackList || videoTrackList.length < 2) return;
+    currentDeviceIndex = (currentDeviceIndex + 1) % videoTrackList.length;
+    initCamera();
+}
+
+function startQrLoop() {
+    const video = document.getElementById('qrVideo');
+    const canvas = document.getElementById('qrCanvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = 640; canvas.height = 360;
+    const loop = async () => {
+        if (!qrStream) return;
+        try {
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            // 轻量化：尝试调用浏览器原生 BarcodeDetector（如不支持则跳过）
+            if ('BarcodeDetector' in window) {
+                const detector = new BarcodeDetector({ formats: ['qr_code'] });
+                const barcodes = await detector.detect(canvas);
+                if (barcodes && barcodes.length > 0) {
+                    handleQrResult(barcodes[0].rawValue || barcodes[0].rawValue);
+                    return; // 识别后自动停止
+                }
+            }
+        } catch (e) {}
+        requestAnimationFrame(loop);
+    };
+    requestAnimationFrame(loop);
+}
+
+function handleQrResult(text) {
+    document.getElementById('qrResult').value = text || '';
+    stopQrScan();
+    // 解析二维码内容并尝试匹配原材料：约定内容可为原材料ID或编码
+    const token = (text || '').trim();
+    if (!token) return;
+    // 如果是纯数字，当作ID；否则当作名称关键字去加载并匹配
+    if (/^\d+$/.test(token)) {
+        // 直接把这个ID加入已选（延迟到下方Select2加载）
+        // 这里调用一次库存API查验并加入
+        $.get('/api/inventory/raw-materials?only_available=true&search=', function(resp) {
+            if (resp && resp.success && Array.isArray(resp.data)) {
+                const found = resp.data.find(x => String(x.id) === token);
+                if (found) addSelectedMaterial(found);
+                else toastr.warning('未找到该原材料ID：' + token);
+            }
+        });
+    } else {
+        $.get('/api/inventory/raw-materials?only_available=true&search=' + encodeURIComponent(token), function(resp) {
+            if (resp && resp.success && Array.isArray(resp.data)) {
+                if (resp.data.length > 0) addSelectedMaterial(resp.data[0]);
+                else toastr.warning('未找到匹配原材料：' + token);
+            }
+        });
+    }
+    // 关闭扫码弹窗
+    const modalEl = document.getElementById('qrScanModal');
+    const modal = bootstrap.Modal.getInstance(modalEl);
+    if (modal) modal.hide();
+}
+
+function manualQrInput() {
+    const val = prompt('请输入二维码内容');
+    if (val) handleQrResult(val);
+}
 
 // 格式化原材料显示
 function formatMaterial(material) {

@@ -1136,6 +1136,24 @@ class ProductionOrder(db.Model):
     def remaining_quantity(self):
         """剩余数量"""
         return max(0, self.planned_quantity - self.completed_quantity)
+
+    @property
+    def scheduled_quantity(self):
+        """已下达批次数量（不含已取消批次）"""
+        try:
+            from sqlalchemy import func
+            total = db.session.query(func.coalesce(func.sum(ProductionBatch.batch_quantity), 0)) \
+                .filter(ProductionBatch.production_order_id == self.id) \
+                .filter(ProductionBatch.status != 'cancelled') \
+                .scalar()
+            return int(total or 0)
+        except Exception:
+            return 0
+
+    @property
+    def remaining_to_schedule(self):
+        """剩余待下达数量（计划 - 已下达批次，不含取消）"""
+        return max(0, (self.planned_quantity or 0) - (self.scheduled_quantity or 0))
     
     @property
     def specifications(self):
@@ -2307,3 +2325,54 @@ class InventoryCountItem(db.Model):
     
     def __repr__(self):
         return f'<InventoryCountItem {self.material_name}: {self.system_quantity} -> {self.actual_quantity}>'
+
+class ProcessAssignmentRule(db.Model):
+    """工序分配规则：定义某个工序的分配策略与成员"""
+    __tablename__ = 'process_assignment_rules'
+
+    id = db.Column(db.Integer, primary_key=True)
+    global_sn = db.Column(db.String(8), unique=True, nullable=False)
+    process_id = db.Column(db.Integer, db.ForeignKey('process_price.id', ondelete='CASCADE'), nullable=False, index=True)
+    strategy = db.Column(db.String(20), nullable=False, default='round_robin')  # round_robin / weighted / fixed
+    is_active = db.Column(db.Boolean, default=True)
+    notes = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        db.UniqueConstraint('global_sn', name='uq_process_assign_rule_global_sn'),
+        db.UniqueConstraint('process_id', name='uq_process_assign_rule_process'),
+    )
+
+    process = db.relationship('ProcessPrice', backref=db.backref('assignment_rule', uselist=False))
+
+    def __init__(self, **kwargs):
+        super(ProcessAssignmentRule, self).__init__(**kwargs)
+        if not self.global_sn:
+            self.global_sn = SerialNumber.get_next_number()
+
+class ProcessAssignmentMember(db.Model):
+    """工序分配成员：某个工序下的默认员工与权重/顺序"""
+    __tablename__ = 'process_assignment_members'
+
+    id = db.Column(db.Integer, primary_key=True)
+    global_sn = db.Column(db.String(8), unique=True, nullable=False)
+    rule_id = db.Column(db.Integer, db.ForeignKey('process_assignment_rules.id', ondelete='CASCADE'), nullable=False, index=True)
+    employee_id = db.Column(db.Integer, db.ForeignKey('employee.id', ondelete='CASCADE'), nullable=False, index=True)
+    weight = db.Column(db.Integer, default=1)  # 权重（weighted策略使用）
+    sequence = db.Column(db.Integer, default=0)  # 顺序（round_robin/fixed 使用）
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        db.UniqueConstraint('global_sn', name='uq_process_assign_member_global_sn'),
+        db.UniqueConstraint('rule_id', 'employee_id', name='uq_process_assign_member_unique'),
+    )
+
+    rule = db.relationship('ProcessAssignmentRule', backref=db.backref('members', lazy='dynamic', cascade='all, delete-orphan'))
+    employee = db.relationship('Employee', backref=db.backref('process_assignments', lazy='dynamic'))
+
+    def __init__(self, **kwargs):
+        super(ProcessAssignmentMember, self).__init__(**kwargs)
+        if not self.global_sn:
+            self.global_sn = SerialNumber.get_next_number()
