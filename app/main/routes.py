@@ -7007,6 +7007,11 @@ def delete_product(id):
         # 检查是否有关联的BOM或工序
         if product.bom_items.count() > 0 or product.process_items.count() > 0:
             return jsonify({'success': False, 'message': '该产品存在BOM或工序信息，无法删除'})
+
+        # 检查是否被生产订单引用（避免将 product_id 置空导致外键/非空约束错误）
+        linked_orders = ProductionOrder.query.filter_by(product_id=id).count()
+        if linked_orders > 0:
+            return jsonify({'success': False, 'message': '该产品已被生产订单引用，无法删除。请先处理关联的生产订单'}), 400
         
         db.session.delete(product)
         db.session.commit()
