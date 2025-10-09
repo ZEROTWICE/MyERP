@@ -7,6 +7,7 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>综合管理系统 - {% block title %}{% endblock %}</title>
     {{ bootstrap.load_css() }}
+    <link rel="preload" href="{{ url_for('static', filename='vendor/webfonts/fa-solid-900.woff2') }}" as="font" type="font/woff2" crossorigin>
     <link href="{{ url_for('static', filename='vendor/fontawesome/all.min.css') }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='vendor/toastr/toastr.min.css') }}" rel="stylesheet">
@@ -455,12 +456,11 @@
     <script src="{{ url_for('static', filename='vendor/toastr/toastr.min.js') }}"></script>
     <script src="{{ url_for('static', filename='vendor/select2/select2.min.js') }}"></script>
     <script src="{{ url_for('static', filename='vendor/sweetalert2/sweetalert2.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='vendor/jsqr/jsQR.min.js') }}"></script>
     <script src="{{ url_for('static', filename='js/mobile-optimization.js') }}"></script>
     <script src="{{ url_for('static', filename='js/pagination.js') }}"></script>
     
-    <!-- Select2 (local) for searchable dropdowns -->
-    <link href="{{ url_for('static', filename='vendor/select2/select2.min.css') }}" rel="stylesheet" />
-    <script src="{{ url_for('static', filename='vendor/select2/select2.min.js') }}" defer></script>
+    
     <script>
         // 设置CSRF令牌
         $.ajaxSetup({
