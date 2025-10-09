@@ -3,7 +3,7 @@
 {% block head %}
 {{ super() }}
 <!-- 引入Font Awesome图标库 -->
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+<link rel="stylesheet" href="{{ url_for('static', filename='vendor/fontawesome/all.min.css') }}">
 {% endblock %}
 
 {% block content %}
@@ -437,8 +437,8 @@ canvas {
 {% endblock %}
 
 {% block scripts %}
-<!-- 引入Chart.js -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{# 可选：如需图表请将 chart.umd.js 放至 vendor/chart.js/ 并取消下行注释 #}
+{# <script src="{{ url_for('static', filename='vendor/chart.js/chart.umd.js') }}" defer></script> #}
 <script>
 function updateDateTime() {
     const now = new Date();

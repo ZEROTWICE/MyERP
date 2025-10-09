@@ -237,7 +237,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="{{ url_for('static', filename='vendor/jquery/jquery-3.6.0.min.js') }}" defer></script>
 <script>
 let processToDelete = null;
 
