@@ -494,49 +494,84 @@ function triggerImageInput() {
     input.click();
 }
 
+let isImageDecoding = false;
 async function handleImageSelect(evt) {
     const file = evt.target.files && evt.target.files[0];
-    if (!file) return;
+    if (!file || isImageDecoding) return;
+    isImageDecoding = true;
     try {
+        // 小提示，避免长时间无响应感知
+        toastr.info('正在识别二维码，请稍候…');
+
+        // 使用 createImageBitmap 更快的解码路径（若可用）
+        let bitmap = null;
+        try {
+            if (window.createImageBitmap) {
+                bitmap = await createImageBitmap(file);
+            }
+        } catch (e) { bitmap = null; }
+
         const img = new Image();
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            img.onload = async function() {
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d');
-                canvas.width = img.naturalWidth; canvas.height = img.naturalHeight;
-                ctx.drawImage(img, 0, 0);
-                if ('BarcodeDetector' in window) {
-                    try {
-                        const detector = new BarcodeDetector({ formats: ['qr_code'] });
-                        const barcodes = await detector.detect(canvas);
-                        if (barcodes && barcodes.length > 0) {
-                            handleQrResult(barcodes[0].rawValue);
-                            return;
-                        } else {
-                            toastr.warning('未识别到二维码');
-                        }
-                    } catch (e) {
-                        toastr.error('识别失败');
-                    }
-                } 
-                // Fallback: jsQR
-                if (window.jsQR || await ensureJsQR()) {
-                    const ctx2 = canvas.getContext('2d');
-                    const imgData = ctx2.getImageData(0,0,canvas.width,canvas.height);
-                    const code = jsQR(imgData.data, imgData.width, imgData.height);
-                    if (code && code.data) {
-                        handleQrResult(code.data);
-                        return;
-                    }
+        const loadImageFromFile = () => new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = e => { img.onload = () => resolve(); img.onerror = reject; img.src = e.target.result; };
+            reader.onerror = reject; reader.readAsDataURL(file);
+        });
+
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+        // 计算缩放，限制最长边不超过 800，避免大图导致主线程卡顿
+        let srcW, srcH;
+        if (bitmap) { srcW = bitmap.width; srcH = bitmap.height; }
+        else { await loadImageFromFile(); srcW = img.naturalWidth; srcH = img.naturalHeight; }
+        const maxDim = 800;
+        const scale = Math.min(1, maxDim / Math.max(srcW, srcH));
+        const dstW = Math.max(1, Math.floor(srcW * scale));
+        const dstH = Math.max(1, Math.floor(srcH * scale));
+        canvas.width = dstW; canvas.height = dstH;
+
+        // 分帧绘制，给主线程让步，避免页面“卡死”的观感
+        await new Promise(r => setTimeout(r, 0));
+        if (bitmap) ctx.drawImage(bitmap, 0, 0, dstW, dstH);
+        else ctx.drawImage(img, 0, 0, dstW, dstH);
+
+        // 优先原生 BarcodeDetector
+        if ('BarcodeDetector' in window) {
+            try {
+                const detector = new BarcodeDetector({ formats: ['qr_code'] });
+                const barcodes = await detector.detect(canvas);
+                if (barcodes && barcodes.length > 0) {
+                    handleQrResult(barcodes[0].rawValue);
+                    isImageDecoding = false;
+                    // 释放资源
+                    canvas.width = canvas.height = 0;
+                    return;
                 }
-                toastr.warning('浏览器不支持二维码识别');
-            };
-            img.src = e.target.result;
-        };
-        reader.readAsDataURL(file);
+            } catch (e) { /* 忽略，走后备 */ }
+        }
+
+        // 后备 jsQR（按需加载），同样限制尺寸并在下一帧执行
+        if (window.jsQR || await ensureJsQR()) {
+            await new Promise(r => requestAnimationFrame(r));
+            const imgData = ctx.getImageData(0, 0, dstW, dstH);
+            const code = jsQR(imgData.data, imgData.width, imgData.height);
+            if (code && code.data) {
+                handleQrResult(code.data);
+                isImageDecoding = false;
+                canvas.width = canvas.height = 0;
+                return;
+            }
+        }
+
+        toastr.warning('未识别到二维码，请更换更清晰的图片');
+        canvas.width = canvas.height = 0;
     } catch (e) {
-        toastr.error('读取图片失败');
+        toastr.error('读取/识别图片失败');
+    } finally {
+        isImageDecoding = false;
+        // 重置 input，允许再次选择同一文件
+        try { evt.target.value = ''; } catch (e) {}
     }
 }
 
