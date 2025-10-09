@@ -323,6 +323,13 @@ async function openQrScan() {
             triggerImageInput();
             return;
         }
+        // Chrome/Android 需要 HTTPS 或 localhost 才能启用摄像头
+        try {
+            const isSecure = location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+            if (!isSecure && /Chrome\//.test(navigator.userAgent)) {
+                toastr.info('提示：Chrome 需要 HTTPS 或 localhost 才能使用摄像头');
+            }
+        } catch (e) { /* ignore */ }
         // 先检查权限状态，尽量触发权限申请
         if (navigator.permissions && navigator.permissions.query) {
             try {
@@ -353,6 +360,17 @@ async function openQrScan() {
         toastr.error('打开摄像头失败：' + (e.message || e));
         triggerImageInput();
     }
+}
+
+function ensureJsQR() {
+    return new Promise(resolve => {
+        if (window.jsQR) { resolve(true); return; }
+        const s = document.createElement('script');
+        s.src = '{{ url_for('static', filename='vendor/jsqr/jsQR.min.js') }}';
+        s.onload = () => resolve(true);
+        s.onerror = () => resolve(false);
+        document.head.appendChild(s);
+    });
 }
 
 async function requestCameraPermission() {
@@ -421,7 +439,7 @@ function startQrLoop() {
                 }
             }
             // Fallback: 使用 jsQR 解析
-            if (window.jsQR) {
+            if (window.jsQR || await ensureJsQR()) {
                 const code = jsQR(imageData.data, imageData.width, imageData.height);
                 if (code && code.data) {
                     handleQrResult(code.data);
@@ -503,7 +521,7 @@ async function handleImageSelect(evt) {
                     }
                 } 
                 // Fallback: jsQR
-                if (window.jsQR) {
+                if (window.jsQR || await ensureJsQR()) {
                     const ctx2 = canvas.getContext('2d');
                     const imgData = ctx2.getImageData(0,0,canvas.width,canvas.height);
                     const code = jsQR(imgData.data, imgData.width, imgData.height);
