@@ -31,6 +31,7 @@ class NotificationService:
         'SYSTEM_MAINTENANCE': 'system_maintenance',  # 系统维护
         'USER_LOGIN': 'user_login',                  # 用户登录
         'DATA_BACKUP': 'data_backup',                # 数据备份
+        'RAW_SUBSTITUTION': 'raw_substitution',      # 原材料替用
     }
     
     # 预定义的接收者类型
@@ -522,3 +523,43 @@ def notify_task_assignment(employee_name: str, task_count: int, batch_number: st
             'batch_number': batch_number or '无'
         }
     ) 
+
+
+def notify_raw_substitution(task_id: int, order_number: str, substitutions: List[Dict], operator_name: str = None):
+    """原材料替用通知
+    substitutions: [{'raw_material_id': int, 'raw_material_name': str, 'quantity': float}]
+    """
+    operator_name = operator_name or (current_user.username if current_user.is_authenticated else '系统')
+
+    # 生成简要内容
+    try:
+        items_text = '；'.join([
+            f"{item.get('raw_material_name', '未知物料')}×{item.get('quantity', 0)}"
+            for item in substitutions
+        ]) or '无'
+    except Exception:
+        items_text = '无'
+
+    NotificationService.create_notification(
+        trigger_type=NotificationService.TRIGGER_TYPES['RAW_SUBSTITUTION'],
+        title=f'原材料替用 - 任务{task_id}',
+        content=f'生产订单 {order_number} 的任务 {task_id} 发生原材料替用：{items_text}。',
+        notification_type='warning',
+        priority='normal',
+        related_model='TaskAssignment',
+        related_id=task_id,
+        trigger_data={
+            'task_id': task_id,
+            'order_number': order_number,
+            'substitutions': substitutions,
+            'operator_name': operator_name,
+            'model': 'TaskAssignment'
+        },
+        template_code='raw_substitution',
+        template_variables={
+            'task_id': task_id,
+            'order_number': order_number,
+            'operator_name': operator_name,
+            'items': substitutions
+        }
+    )

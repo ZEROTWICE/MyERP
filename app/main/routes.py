@@ -3367,13 +3367,82 @@ def update_task_status(id):
             # 如果任务还未完成，但已经开始，更新状态为进行中
             task.status = 'in_progress'
         
-        # 记录审计日志
+        # 记录审计日志（含替用明细）
+        substitutions = []
+        try:
+            bom_ids = set()
+            order_ref = None
+            if task.production_batch_id:
+                _b = ProductionBatch.query.get(task.production_batch_id)
+                order_ref = _b.production_order if _b else None
+            elif task.batch_item_id:
+                _it = ProductionBatchItem.query.get(task.batch_item_id)
+                order_ref = _it.batch.production_order if _it and _it.batch else None
+            if order_ref and order_ref.product_id:
+                for _bom in ProductBOM.query.filter_by(product_id=order_ref.product_id, material_type='raw').all():
+                    bom_ids.add(_bom.material_id)
+            for m in materials_data:
+                try:
+                    mid = int(m.get('raw_material_id'))
+                    qty = float(m.get('quantity') or 0)
+                    if mid not in bom_ids:
+                        substitutions.append({'raw_material_id': mid, 'quantity': qty})
+                except Exception:
+                    continue
+        except Exception as se:
+            current_app.logger.warning(f'替用分析失败: {str(se)}')
+
         audit_log = AuditLog(
             user_id=current_user.id,
-            action='update_task',
-            details=f'更新任务 {task.id} 的完成数量为 {completed_quantity}'
+            action='更新任务完成与用料',
+            details=f'任务 {task.id} 完成数量 {completed_quantity}，记录用料 {len(materials_data)} 条',
+            can_rollback=True,
+            rollback_type='edit',
+            target_model='TaskAssignment',
+            target_id=task.id,
+            new_data={
+                'completed_quantity': completed_quantity,
+                'materials': materials_data,
+                'substitutions': substitutions
+            }
         )
         db.session.add(audit_log)
+        
+        # 触发“原材料替用”通知（如存在替用）
+        try:
+            if substitutions:
+                from app.services.notification_service import notify_raw_substitution
+                order_number = None
+                if task.production_batch_id:
+                    _b = ProductionBatch.query.get(task.production_batch_id)
+                    if _b and _b.production_order:
+                        order_number = _b.production_order.order_number
+                elif task.batch_item_id:
+                    _it = ProductionBatchItem.query.get(task.batch_item_id)
+                    if _it and _it.batch and _it.batch.production_order:
+                        order_number = _it.batch.production_order.order_number
+
+                # 尝试补全物料名称，便于通知阅读
+                enriched = []
+                for item in substitutions:
+                    try:
+                        rm = RawMaterial.query.get(item.get('raw_material_id'))
+                        enriched.append({
+                            'raw_material_id': item.get('raw_material_id'),
+                            'raw_material_name': rm.material_name if rm else str(item.get('raw_material_id')),
+                            'quantity': item.get('quantity')
+                        })
+                    except Exception:
+                        enriched.append(item)
+
+                notify_raw_substitution(
+                    task_id=task.id,
+                    order_number=order_number or '未知订单',
+                    substitutions=enriched,
+                    operator_name=current_user.username if hasattr(current_user, 'username') else None
+                )
+        except Exception as _ne:
+            current_app.logger.error(f'触发原材料替用通知失败: {str(_ne)}')
         
         # 如果任务关联了生产批次，同步更新批次状态
         if task.production_batch_id:
@@ -5903,6 +5972,25 @@ def get_task_details(id):
             if not employee or employee.id != task.employee_id:
                 return jsonify({'success': False, 'message': '权限不足'}), 403
         
+        # 附带返回该任务对应订单的BOM物料ID清单（用于前端校验但不强过滤）
+        bom_material_ids = []
+        try:
+            from app.models import ProductionBatch, ProductionBatchItem, ProductionOrder, ProductBOM
+            order = None
+            if task.production_batch_id:
+                batch = ProductionBatch.query.get(task.production_batch_id)
+                order = batch.production_order if batch else None
+            elif task.batch_item_id:
+                item = ProductionBatchItem.query.get(task.batch_item_id)
+                if item and item.batch:
+                    order = item.batch.production_order
+            if order and order.product_id:
+                # 取该产品的BOM（仅 raw 类型）
+                boms = ProductBOM.query.filter_by(product_id=order.product_id, material_type='raw').all()
+                bom_material_ids = [b.material_id for b in boms]
+        except Exception:
+            pass
+
         return jsonify({
             'success': True,
             'data': {
@@ -5914,7 +6002,8 @@ def get_task_details(id):
                 'completed_quantity': task.completed_quantity,
                 'status': task.status,
                 'target_date': task.target_date.strftime('%Y-%m-%d') if task.target_date else None,
-                'notes': task.notes
+                'notes': task.notes,
+                'bom_material_ids': bom_material_ids
             }
         })
     except Exception as e:

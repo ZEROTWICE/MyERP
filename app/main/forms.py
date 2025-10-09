@@ -354,6 +354,7 @@ class NotificationRuleForm(FlaskForm):
                                   ('task_assignment', '任务分配'),
                                   ('task_overdue', '任务逾期'),
                                   ('quality_issue', '质量问题'),
+                                  ('raw_substitution', '原材料替用'),
                                   ('system_maintenance', '系统维护'),
                               ])
     receiver_type = SelectField('接收者类型', validators=[DataRequired()],
@@ -383,6 +384,7 @@ class NotificationTemplateForm(FlaskForm):
                                   ('task_assignment', '任务分配'),
                                   ('task_overdue', '任务逾期'),
                                   ('quality_issue', '质量问题'),
+                                  ('raw_substitution', '原材料替用'),
                                   ('system_maintenance', '系统维护'),
                               ])
     title_template = StringField('标题模板', validators=[DataRequired(), Length(1, 200)])

@@ -259,13 +259,15 @@ $(document).ready(function() {
             success: function(result) {
                 if (result.success) {
                     $('#completedQuantity').val(result.data.completed_quantity);
+                    // 记录BOM物料清单用于校验
+                    window.currentTaskBomIds = (result.data.bom_material_ids || []).map(id => String(id));
                 }
             }
         });
     });
     
     // 保存完成数量
-    $('#saveQuantity').click(function() {
+    $('#saveQuantity').click(async function() {
         const taskId = $('#taskId').val();
         const quantity = $('#completedQuantity').val();
         
@@ -284,7 +286,34 @@ $(document).ready(function() {
             toastr.error('请至少添加一种原材料');
             return;
         }
-        
+
+        // 与BOM对比：若存在非BOM项，弹出替用确认
+        const bomIds = (window.currentTaskBomIds || []).map(String);
+        const nonBomIds = [];
+        materials.forEach(m => { if (!bomIds.includes(String(m.raw_material_id))) nonBomIds.push(String(m.raw_material_id)); });
+        if (nonBomIds.length > 0 && window.Swal) {
+            // 生成列表（用名称/工号等友好信息）
+            const rows = nonBomIds.map(id => {
+                const data = selectedMaterials.get(id) || {};
+                const label = data.name ? `${data.name} (${id})` : id;
+                return `<li>${label}</li>`;
+            }).join('');
+            const result = await Swal.fire({
+                icon: 'warning',
+                title: '替用确认',
+                html: `以下原材料不在BOM内，将按替用处理：<ul class="text-start">${rows}</ul><div class="small text-muted mt-2">继续提交将记录为替用消耗。</div>`,
+                showCancelButton: true,
+                confirmButtonText: '是，按替用提交',
+                cancelButtonText: '否，返回修改'
+            });
+            if (!result.isConfirmed) return; // 返回修改
+        }
+
+        // 提交
+        submitTaskUpdate(taskId, quantity, materials);
+    });
+
+    function submitTaskUpdate(taskId, quantity, materials) {
         $.ajax({
             url: `/tasks/${taskId}/update_status`,
             method: 'POST',
@@ -308,7 +337,7 @@ $(document).ready(function() {
                 toastr.error('更新进度失败');
             }
         });
-    });
+    }
 });
 
 // ====== 简易二维码识别（依赖现代浏览器） ======
