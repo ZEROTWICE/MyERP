@@ -88,6 +88,9 @@
                                 <button type="button" class="btn btn-sm btn-outline-secondary" onclick="manualQrInput()">
                                     手动输入二维码内容
                                 </button>
+                                <button type="button" class="btn btn-sm btn-outline-success" onclick="triggerImageInput()">
+                                    从相册/拍照识别
+                                </button>
                             </div>
                         </div>
                         <div id="selectedMaterials" class="mt-3">
@@ -138,6 +141,9 @@
         </div>
     </div>
     </div>
+
+<!-- 图片识别输入（移动端兼容） -->
+<input id="qrImageInput" type="file" accept="image/*" capture="environment" class="d-none" onchange="handleImageSelect(event)">
 
 {% endblock %}
 
@@ -312,17 +318,26 @@ let videoTrackList = [];
 
 async function openQrScan() {
     try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            toastr.warning('当前浏览器不支持直接调用摄像头，将启用图片识别方式');
+            triggerImageInput();
+            return;
+        }
         await initCamera();
         const modal = new bootstrap.Modal(document.getElementById('qrScanModal'));
         modal.show();
         startQrLoop();
     } catch (e) {
         toastr.error('打开摄像头失败：' + (e.message || e));
+        triggerImageInput();
     }
 }
 
 async function initCamera() {
     stopQrScan();
+    if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
+        throw new Error('enumerateDevices 不可用');
+    }
     const devices = await navigator.mediaDevices.enumerateDevices();
     const cams = devices.filter(d => d.kind === 'videoinput');
     if (cams.length === 0) throw new Error('未找到摄像头');
@@ -407,6 +422,49 @@ function handleQrResult(text) {
 function manualQrInput() {
     const val = prompt('请输入二维码内容');
     if (val) handleQrResult(val);
+}
+
+function triggerImageInput() {
+    const input = document.getElementById('qrImageInput');
+    input.value = '';
+    input.click();
+}
+
+async function handleImageSelect(evt) {
+    const file = evt.target.files && evt.target.files[0];
+    if (!file) return;
+    try {
+        const img = new Image();
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            img.onload = async function() {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                canvas.width = img.naturalWidth; canvas.height = img.naturalHeight;
+                ctx.drawImage(img, 0, 0);
+                if ('BarcodeDetector' in window) {
+                    try {
+                        const detector = new BarcodeDetector({ formats: ['qr_code'] });
+                        const barcodes = await detector.detect(canvas);
+                        if (barcodes && barcodes.length > 0) {
+                            handleQrResult(barcodes[0].rawValue);
+                            return;
+                        } else {
+                            toastr.warning('未识别到二维码');
+                        }
+                    } catch (e) {
+                        toastr.error('识别失败');
+                    }
+                } else {
+                    toastr.warning('浏览器不支持二维码识别');
+                }
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    } catch (e) {
+        toastr.error('读取图片失败');
+    }
 }
 
 // 格式化原材料显示
