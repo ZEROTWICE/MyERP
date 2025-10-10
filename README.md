@@ -65,14 +65,29 @@
 - 数据变更历史
 - 支持数据回滚
 
+### 10. 生产中心（以产品为中心）
+- 从销售订单选择性创建生产订单（支持勾选行，已关联的行默认勾选且不可修改）
+- 生产订单可分批，严格依据“剩余可下达数量”防止超发
+- 按产品工序路由自动创建生产任务，支持“工序分配规则”（轮询、加权、固定）
+- 技术拆解：在分解/创建任务时允许编辑规格参数并保留到记录
+- 生产可视化：批次/任务状态联动更新
+- 任务执行可记录操作者与实际使用原材料
+
+### 11. 通知系统（含原材料替用）
+- 支持触发类型规则、模板渲染、系统内通知投递
+- 新增触发类型：原材料替用（raw_substitution）
+- 任务更新提交材料时，自动识别非 BOM 材料并触发“原材料替用”通知
+- 通知规则可按用户/角色/部门投递，支持优先级与条件筛选
+
 ## 技术栈
 
 - 后端：Python Flask
 - 数据库：SQLite/MySQL
 - 前端：Bootstrap 5 + jQuery
-- UI组件：Select2, DataTables
+- UI组件：Select2, DataTables, SweetAlert2, Toastr
 - 文件处理：openpyxl
 - 移动端支持：响应式设计
+- 扫码兼容：BarcodeDetector（优先）+ jsQR（回退）+ getUserMedia
 
 ## 安装说明
 
@@ -101,7 +116,11 @@ flask db upgrade
 
 5. 运行项目
 ```bash
+# 方式一（Flask CLI）
 flask run
+
+# 方式二（直接运行）
+python main.py
 ```
 
 6. Docker部署（可选）
@@ -137,6 +156,26 @@ docker run -d -p 5000:5000 wage-system
 - 管理工资变更
 - 生成工资报表
 
+### 生产中心使用指南
+- 销售订单详情：点击“创建生产订单”，按需勾选销售行创建对应生产订单（已关联的行默认勾选且不可修改）
+- 生产订单详情：使用“新增批次”，上限为“剩余可下达数量”（自动计算）
+- 工序分配：在“工序分配”管理页为各工序配置分配策略与成员（轮询/加权/固定）
+- 开始生产：创建批次或任务后，系统按工序规则自动分配员工并创建任务
+- 我的任务：在“更新完成数量”弹窗中选择原材料，支持摄像头扫码与相册识别；提交前进行 BOM 校验
+- BOM 校验：若选择了非 BOM 原材料，前端弹出 SweetAlert2 警告，确认后按“替用”提交
+- 审计与联动：提交后记录审计日志（含 materials 与 substitutions），并联动更新批次/任务状态
+
+### 通知：原材料替用
+- 触发时机：在“我的任务/更新完成数量”提交时，系统自动识别非 BOM 原材料并触发通知
+- 规则配置：在“通知规则”中新增规则，触发类型选择“原材料替用（raw_substitution）”，设置接收者（用户/角色/部门）与优先级
+- 模板配置：在“通知模板”中新增模板，触发类型选择“原材料替用（raw_substitution）”，可使用变量：task_id, order_number, operator_name, items
+- 查看通知：顶部通知入口或“通知中心”页面可查看最新通知与未读统计
+
+### 移动端扫码与性能
+- 本地化静态资源（Font Awesome/Select2/SweetAlert2/Toastr/jQuery 等），避免外网依赖
+- <head> 预加载 Font Awesome woff2，移除重复 Select2 引用，保证加载顺序
+- 摄像头优先使用 getUserMedia，不可用时回退相册+jsQR；图片识别使用 createImageBitmap 与压缩处理避免卡顿
+
 ## 注意事项
 
 1. 数据安全
@@ -151,7 +190,38 @@ docker run -d -p 5000:5000 wage-system
 - 工资变更设置要提前规划生效日期
 - 定期核对库存信息
 
+### 数据迁移与故障排查
+- 初始化/升级迁移：
+```bash
+flask db upgrade
+```
+- 若出现“Multiple head revisions are present”：
+```bash
+flask db stamp heads
+flask db merge -m "merge heads"
+flask db upgrade
+```
+- 若出现“table ... already exists”且为历史表重复创建：
+```bash
+flask db stamp heads
+flask db upgrade
+```
+- 如需手动创建特定表（示例）：
+```python
+# 正确写法是 __table__
+ProcessAssignmentRule.__table__.create(db.engine, checkfirst=True)
+```
+
 ## 更新日志
+
+### v1.3.0
+- 新增“生产中心（以产品为中心）”模块：从销售创建生产订单、批次管控（剩余可下达），按工序规则自动建任务，技术拆解支持参数修改
+- 新增“工序分配”管理页：支持轮询、加权、固定策略与成员启用序列
+- 我的任务：新增扫码入料（摄像头/相册），BOM 校验并允许替用，前端弹窗确认
+- 审计增强：任务更新记录 materials 与 substitutions（替用明细）
+- 通知系统：新增触发类型“原材料替用（raw_substitution）”，提交替用时自动通知
+- 静态资源本地化与移动端优化：预加载字体、移除重复依赖、修复移动端 Chrome 加载缓慢与样式缺失
+- 迁移与容错：API/页面对“规则表未初始化”等场景友好提示；提供迁移冲突与已存在表的处理指引
 
 ### v1.2.0
 - 新增库存管理功能
@@ -293,3 +363,6 @@ last 创建docker file
 非常好，现在请帮我添加一个通知模块。
 对于这个模块，我有如下构想。
 首先，这个模块由触发端，服务端，和接收端三端构成。其中触发端可以插入目前已有的代码中，将某些信息，如工艺，规格信息变更
+
+wiki
+https://deepwiki.com/ZEROTWICE/MyERP
