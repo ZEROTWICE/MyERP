@@ -9646,6 +9646,38 @@ def add_sales_order_item(order_id):
                 address_text = f"{address.detailed_address} ({address.contact_person})"
                 form.customer_address_id.choices.append((address.id, address_text))
     
+    # 若存在 copy_from，进行回填（仅 GET 阶段）
+    try:
+        if request.method == 'GET':
+            copy_from_id = request.args.get('copy_from', type=int)
+            if copy_from_id:
+                src = SalesOrderItem.query.get(copy_from_id)
+                if src and src.sales_order_id == order_id:
+                    # 仅设置表单初值，仍需用户点击保存
+                    form.quantity.data = src.quantity
+                    form.direction.data = src.direction
+                    form.spec_extended.data = src.spec_extended
+                    form.spec_gasket.data = src.spec_gasket
+                    form.spec_joint.data = src.spec_joint
+                    form.spec_drilling.data = src.spec_drilling
+                    form.spec_other.data = src.spec_other
+                    form.spec_other_desc.data = src.spec_other_desc
+                    # 新增扩展字段
+                    if hasattr(form, 'spec_splice_hole'): form.spec_splice_hole.data = src.spec_splice_hole
+                    if hasattr(form, 'spec_gasket_hole'): form.spec_gasket_hole.data = src.spec_gasket_hole
+                    if hasattr(form, 'anti_corrosion'): form.anti_corrosion.data = src.anti_corrosion
+                    if hasattr(form, 'rubber_gasket_material'): form.rubber_gasket_material.data = src.rubber_gasket_material
+                    if hasattr(form, 'turnout_rail'): form.turnout_rail.data = src.turnout_rail
+                    if hasattr(form, 'using_unit'): form.using_unit.data = src.using_unit or (order.customer.customer_name if order and order.customer else None)
+                    # 产品选择（名称/图号）回填展示（提交仍由前端联动设置 product_id）
+                    form.product_name.choices.append((src.product.product_name, src.product.product_name))
+                    form.product_name.data = src.product.product_name
+                    form.drawing_number.choices.append((src.product.drawing_number, src.product.drawing_number))
+                    form.drawing_number.data = src.product.drawing_number
+                    form.product_id.data = src.product_id
+    except Exception as _e:
+        current_app.logger.error(f'复制订单行预填失败: {str(_e)}')
+
     if form.validate_on_submit():
         try:
             # 获取最大序号
@@ -9667,6 +9699,12 @@ def add_sales_order_item(order_id):
                 spec_drilling=form.spec_drilling.data,
                 spec_other=form.spec_other.data,
                 spec_other_desc=form.spec_other_desc.data,
+                spec_splice_hole=form.spec_splice_hole.data,
+                spec_gasket_hole=form.spec_gasket_hole.data,
+                anti_corrosion=form.anti_corrosion.data,
+                rubber_gasket_material=form.rubber_gasket_material.data,
+                turnout_rail=form.turnout_rail.data,
+                using_unit=(form.using_unit.data or (order.customer.customer_name if order and order.customer else None)),
 
                 order_time=form.order_time.data,
                 station_notes=form.station_notes.data,
@@ -9752,6 +9790,13 @@ def edit_sales_order_item(item_id):
             order_item.spec_drilling = form.spec_drilling.data
             order_item.spec_other = form.spec_other.data
             order_item.spec_other_desc = form.spec_other_desc.data
+            order_item.spec_splice_hole = form.spec_splice_hole.data
+            order_item.spec_gasket_hole = form.spec_gasket_hole.data
+            order_item.anti_corrosion = form.anti_corrosion.data
+            order_item.rubber_gasket_material = form.rubber_gasket_material.data
+            order_item.turnout_rail = form.turnout_rail.data
+            # 使用单位默认客户名，可修改
+            order_item.using_unit = form.using_unit.data or (order.customer.customer_name if order and order.customer else None)
             order_item.customer_address_id = form.customer_address_id.data if form.customer_address_id.data != 0 else None
             order_item.order_time = form.order_time.data
             order_item.station_notes = form.station_notes.data

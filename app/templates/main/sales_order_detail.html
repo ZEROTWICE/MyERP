@@ -225,6 +225,11 @@
                                                class="btn btn-sm btn-outline-primary">
                                                 <i class="fas fa-edit"></i>
                                             </a>
+                                            <button class="btn btn-sm btn-outline-secondary" 
+                                                    title="复制订单行"
+                                                    onclick="copyOrderItem({{ item.id }})">
+                                                <i class="fas fa-copy"></i>
+                                            </button>
                                             <button class="btn btn-sm btn-outline-danger" 
                                                     onclick="deleteOrderItem({{ item.id }}, '{{ item.product_name }}')">
                                                 <i class="fas fa-trash"></i>
@@ -447,6 +452,11 @@
 </div>
 
 <script>
+function copyOrderItem(itemId) {
+    const url = `{{ url_for('main.add_sales_order_item', order_id=order.id) }}`;
+    // 携带 copy_from 参数，新增页据此回填
+    window.location.href = url + `?copy_from=${itemId}`;
+}
 function deleteOrderItem(itemId, productName) {
     if (!confirm(`确定要删除订单行 "${productName}" 吗？此操作不可恢复。`)) {
         return;

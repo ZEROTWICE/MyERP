@@ -1544,13 +1544,21 @@ class SalesOrderItem(db.Model):
     quantity = db.Column(db.Integer, nullable=False)  # 数量
     direction = db.Column(db.String(50))  # 开向
     
-    # 规格型号（五个选项，可同时选择多个）
+    # 规格型号（可同时选择多个）
     spec_extended = db.Column(db.String(100))  # 加长（具体值）
     spec_gasket = db.Column(db.String(100))  # 垫板（具体值）
     spec_joint = db.Column(db.String(100))  # 接头（具体值）
     spec_drilling = db.Column(db.String(100))  # 钻孔（具体值）
     spec_other = db.Column(db.String(100))  # 其他（具体值）
     spec_other_desc = db.Column(db.String(200))  # 其他规格描述
+
+    # 新增：孔型/配置信息等
+    spec_splice_hole = db.Column(db.String(100))  # 接续线孔
+    spec_gasket_hole = db.Column(db.String(100))  # 垫板孔型
+    anti_corrosion = db.Column(db.String(100))  # 辙叉防腐
+    rubber_gasket_material = db.Column(db.String(100))  # 橡胶垫板材质
+    turnout_rail = db.Column(db.String(100))  # 道岔配轨
+    using_unit = db.Column(db.String(100))  # 使用单位（默认客户名，可修改）
     
     customer_address_id = db.Column(db.Integer, db.ForeignKey('customer_addresses.id'), nullable=True)  # 客户地址ID
     order_time = db.Column(db.DateTime, default=datetime.utcnow)  # 下单时间

@@ -7,6 +7,7 @@ from flask_bootstrap import Bootstrap5
 import os
 import click
 from config import Config
+from sqlalchemy import inspect, text
 
 db = SQLAlchemy()
 login = LoginManager()
@@ -38,6 +39,27 @@ def create_app():
     with app.app_context():
         # 首先导入并创建所有模型
         from app import models
+
+        # SQLite 兼容保障：确保新增的销售订单行扩展列存在（避免老库报错）
+        try:
+            engine = db.engine
+            if engine.dialect.name == 'sqlite':
+                inspector = inspect(engine)
+                cols = {c['name'] for c in inspector.get_columns('sales_order_items')}
+                ensures = [
+                    ('spec_splice_hole', 'VARCHAR(100)'),
+                    ('spec_gasket_hole', 'VARCHAR(100)'),
+                    ('anti_corrosion', 'VARCHAR(100)'),
+                    ('rubber_gasket_material', 'VARCHAR(100)'),
+                    ('turnout_rail', 'VARCHAR(100)'),
+                    ('using_unit', 'VARCHAR(100)')
+                ]
+                for col, coltype in ensures:
+                    if col not in cols:
+                        engine.execute(text(f"ALTER TABLE sales_order_items ADD COLUMN {col} {coltype}"))
+                        app.logger.info(f'已为 sales_order_items 添加缺失列：{col}')
+        except Exception as e:
+            app.logger.error(f'检查/添加销售订单行扩展列失败: {e}')
 
         # 然后注册蓝图
         from app.auth import bp as auth_bp
