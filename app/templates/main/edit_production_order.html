@@ -218,6 +218,85 @@
                                 </div>
                             {% endif %}
                         </div>
+                        
+                        <!-- 新增规格字段 -->
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    {{ form.spec_splice_hole.label(class="form-label") }}
+                                    {{ form.spec_splice_hole(class="form-control" + (" is-invalid" if form.spec_splice_hole.errors else "")) }}
+                                    {% if form.spec_splice_hole.errors %}
+                                        <div class="invalid-feedback">
+                                            {% for error in form.spec_splice_hole.errors %}{{ error }}{% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    {{ form.spec_gasket_hole.label(class="form-label") }}
+                                    {{ form.spec_gasket_hole(class="form-control" + (" is-invalid" if form.spec_gasket_hole.errors else "")) }}
+                                    {% if form.spec_gasket_hole.errors %}
+                                        <div class="invalid-feedback">
+                                            {% for error in form.spec_gasket_hole.errors %}{{ error }}{% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    {{ form.anti_corrosion.label(class="form-label") }}
+                                    {{ form.anti_corrosion(class="form-control" + (" is-invalid" if form.anti_corrosion.errors else "")) }}
+                                    {% if form.anti_corrosion.errors %}
+                                        <div class="invalid-feedback">
+                                            {% for error in form.anti_corrosion.errors %}{{ error }}{% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    {{ form.rubber_gasket_material.label(class="form-label") }}
+                                    {{ form.rubber_gasket_material(class="form-control" + (" is-invalid" if form.rubber_gasket_material.errors else "")) }}
+                                    {% if form.rubber_gasket_material.errors %}
+                                        <div class="invalid-feedback">
+                                            {% for error in form.rubber_gasket_material.errors %}{{ error }}{% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    {{ form.turnout_rail.label(class="form-label") }}
+                                    {{ form.turnout_rail(class="form-control" + (" is-invalid" if form.turnout_rail.errors else "")) }}
+                                    {% if form.turnout_rail.errors %}
+                                        <div class="invalid-feedback">
+                                            {% for error in form.turnout_rail.errors %}{{ error }}{% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    {{ form.using_unit.label(class="form-label") }}
+                                    {{ form.using_unit(class="form-control" + (" is-invalid" if form.using_unit.errors else "")) }}
+                                    {% if form.using_unit.errors %}
+                                        <div class="invalid-feedback">
+                                            {% for error in form.using_unit.errors %}{{ error }}{% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 

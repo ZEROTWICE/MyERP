@@ -284,6 +284,14 @@ class TaskAssignment(db.Model):
     spec_other_desc = db.Column(db.String(200))  # 其他规格描述
     direction = db.Column(db.String(50))  # 开向
     
+    # 新增规格型号字段（与销售订单行保持一致）
+    spec_splice_hole = db.Column(db.String(100))  # 接续线孔
+    spec_gasket_hole = db.Column(db.String(100))  # 垫板孔型
+    anti_corrosion = db.Column(db.String(100))  # 辙叉防腐
+    rubber_gasket_material = db.Column(db.String(100))  # 橡胶垫板材质
+    turnout_rail = db.Column(db.String(100))  # 道岔配轨
+    using_unit = db.Column(db.String(100))  # 使用单位
+    
     __table_args__ = (
         db.UniqueConstraint('global_sn', name='uq_task_assignment_global_sn'),
     )
@@ -314,13 +322,25 @@ class TaskAssignment(db.Model):
         """获取规格型号列表"""
         specs = []
         if self.spec_extended:
-            specs.append(f'加长({self.spec_extended})')
+            specs.append(f'加长型式({self.spec_extended})')
         if self.spec_gasket:
             specs.append(f'垫板({self.spec_gasket})')
         if self.spec_joint:
-            specs.append(f'接头({self.spec_joint})')
+            specs.append(f'接头型式({self.spec_joint})')
         if self.spec_drilling:
-            specs.append(f'钻孔({self.spec_drilling})')
+            specs.append(f'跳线孔({self.spec_drilling})')
+        if self.spec_splice_hole:
+            specs.append(f'接续线孔({self.spec_splice_hole})')
+        if self.spec_gasket_hole:
+            specs.append(f'垫板孔型({self.spec_gasket_hole})')
+        if self.anti_corrosion:
+            specs.append(f'辙叉防腐({self.anti_corrosion})')
+        if self.rubber_gasket_material:
+            specs.append(f'橡胶垫板材质({self.rubber_gasket_material})')
+        if self.turnout_rail:
+            specs.append(f'道岔配轨({self.turnout_rail})')
+        if self.using_unit:
+            specs.append(f'使用单位({self.using_unit})')
         if self.spec_other:
             specs.append(f'其他({self.spec_other})')
         return specs
@@ -1106,6 +1126,14 @@ class ProductionOrder(db.Model):
     spec_other_desc = db.Column(db.String(200))  # 其他规格描述
     direction = db.Column(db.String(50))  # 开向
     
+    # 新增规格型号字段（与销售订单行保持一致）
+    spec_splice_hole = db.Column(db.String(100))  # 接续线孔
+    spec_gasket_hole = db.Column(db.String(100))  # 垫板孔型
+    anti_corrosion = db.Column(db.String(100))  # 辙叉防腐
+    rubber_gasket_material = db.Column(db.String(100))  # 橡胶垫板材质
+    turnout_rail = db.Column(db.String(100))  # 道岔配轨
+    using_unit = db.Column(db.String(100))  # 使用单位
+    
     __table_args__ = (
         db.UniqueConstraint('global_sn', name='uq_production_order_global_sn'),
         db.UniqueConstraint('order_number', name='uq_production_order_number'),
@@ -1160,13 +1188,25 @@ class ProductionOrder(db.Model):
         """获取规格型号列表"""
         specs = []
         if self.spec_extended:
-            specs.append(f'加长({self.spec_extended})')
+            specs.append(f'加长型式({self.spec_extended})')
         if self.spec_gasket:
             specs.append(f'垫板({self.spec_gasket})')
         if self.spec_joint:
-            specs.append(f'接头({self.spec_joint})')
+            specs.append(f'接头型式({self.spec_joint})')
         if self.spec_drilling:
-            specs.append(f'钻孔({self.spec_drilling})')
+            specs.append(f'跳线孔({self.spec_drilling})')
+        if self.spec_splice_hole:
+            specs.append(f'接续线孔({self.spec_splice_hole})')
+        if self.spec_gasket_hole:
+            specs.append(f'垫板孔型({self.spec_gasket_hole})')
+        if self.anti_corrosion:
+            specs.append(f'辙叉防腐({self.anti_corrosion})')
+        if self.rubber_gasket_material:
+            specs.append(f'橡胶垫板材质({self.rubber_gasket_material})')
+        if self.turnout_rail:
+            specs.append(f'道岔配轨({self.turnout_rail})')
+        if self.using_unit:
+            specs.append(f'使用单位({self.using_unit})')
         if self.spec_other:
             specs.append(f'其他({self.spec_other})')
         return specs
@@ -1230,6 +1270,14 @@ class ProductionBatch(db.Model):
     spec_other_desc = db.Column(db.String(200))  # 其他规格描述
     direction = db.Column(db.String(50))  # 开向
     
+    # 新增规格型号字段（与销售订单行保持一致）
+    spec_splice_hole = db.Column(db.String(100))  # 接续线孔
+    spec_gasket_hole = db.Column(db.String(100))  # 垫板孔型
+    anti_corrosion = db.Column(db.String(100))  # 辙叉防腐
+    rubber_gasket_material = db.Column(db.String(100))  # 橡胶垫板材质
+    turnout_rail = db.Column(db.String(100))  # 道岔配轨
+    using_unit = db.Column(db.String(100))  # 使用单位
+    
     __table_args__ = (
         db.UniqueConstraint('global_sn', name='uq_production_batch_global_sn'),
         db.UniqueConstraint('batch_number', name='uq_production_batch_number'),
@@ -1243,11 +1291,32 @@ class ProductionBatch(db.Model):
         if not self.global_sn:
             self.global_sn = SerialNumber.get_next_number()
         if not self.batch_number:
-            # 生成批次号：订单号 + 批次序号
+            # 生成批次号：订单号 + 批次序号（健壮：基于已存在最大序号递增，避免并发/取消造成重复）
             order = ProductionOrder.query.get(kwargs.get('production_order_id'))
             if order:
-                batch_count = ProductionBatch.query.filter_by(production_order_id=order.id).count()
-                self.batch_number = f"{order.order_number}-B{batch_count + 1:03d}"
+                try:
+                    # 取该订单已存在批次号中的最大序号
+                    existing_numbers = []
+                    for (bn,) in db.session.query(ProductionBatch.batch_number)\
+                            .filter(ProductionBatch.production_order_id == order.id).all():
+                        if bn and '-B' in bn:
+                            try:
+                                existing_numbers.append(int(bn.split('-B')[-1]))
+                            except Exception:
+                                # 非预期格式时忽略该条
+                                pass
+                    next_index = (max(existing_numbers) if existing_numbers else 0) + 1
+                    candidate = f"{order.order_number}-B{next_index:03d}"
+                    # 兜底：若偶发并发导致冲突，则继续递增直到唯一
+                    while db.session.query(ProductionBatch.id)\
+                            .filter(ProductionBatch.batch_number == candidate).first():
+                        next_index += 1
+                        candidate = f"{order.order_number}-B{next_index:03d}"
+                    self.batch_number = candidate
+                except Exception:
+                    # 回退到简单计数法（极端情况下可能重复，但已尽力规避）
+                    batch_count = ProductionBatch.query.filter_by(production_order_id=order.id).count()
+                    self.batch_number = f"{order.order_number}-B{batch_count + 1:03d}"
     
     def generate_product_codes(self):
         """为批次中的产品生成编码"""
@@ -1286,13 +1355,25 @@ class ProductionBatch(db.Model):
         """获取规格型号列表"""
         specs = []
         if self.spec_extended:
-            specs.append(f'加长({self.spec_extended})')
+            specs.append(f'加长型式({self.spec_extended})')
         if self.spec_gasket:
             specs.append(f'垫板({self.spec_gasket})')
         if self.spec_joint:
-            specs.append(f'接头({self.spec_joint})')
+            specs.append(f'接头型式({self.spec_joint})')
         if self.spec_drilling:
-            specs.append(f'钻孔({self.spec_drilling})')
+            specs.append(f'跳线孔({self.spec_drilling})')
+        if self.spec_splice_hole:
+            specs.append(f'接续线孔({self.spec_splice_hole})')
+        if self.spec_gasket_hole:
+            specs.append(f'垫板孔型({self.spec_gasket_hole})')
+        if self.anti_corrosion:
+            specs.append(f'辙叉防腐({self.anti_corrosion})')
+        if self.rubber_gasket_material:
+            specs.append(f'橡胶垫板材质({self.rubber_gasket_material})')
+        if self.turnout_rail:
+            specs.append(f'道岔配轨({self.turnout_rail})')
+        if self.using_unit:
+            specs.append(f'使用单位({self.using_unit})')
         if self.spec_other:
             specs.append(f'其他({self.spec_other})')
         return specs
@@ -1603,13 +1684,25 @@ class SalesOrderItem(db.Model):
         """获取规格型号列表"""
         specs = []
         if self.spec_extended:
-            specs.append(f'加长({self.spec_extended})')
+            specs.append(f'加长型式({self.spec_extended})')
         if self.spec_gasket:
             specs.append(f'垫板({self.spec_gasket})')
         if self.spec_joint:
-            specs.append(f'接头({self.spec_joint})')
+            specs.append(f'接头型式({self.spec_joint})')
         if self.spec_drilling:
-            specs.append(f'钻孔({self.spec_drilling})')
+            specs.append(f'跳线孔({self.spec_drilling})')
+        if self.spec_splice_hole:
+            specs.append(f'接续线孔({self.spec_splice_hole})')
+        if self.spec_gasket_hole:
+            specs.append(f'垫板孔型({self.spec_gasket_hole})')
+        if self.anti_corrosion:
+            specs.append(f'辙叉防腐({self.anti_corrosion})')
+        if self.rubber_gasket_material:
+            specs.append(f'橡胶垫板材质({self.rubber_gasket_material})')
+        if self.turnout_rail:
+            specs.append(f'道岔配轨({self.turnout_rail})')
+        if self.using_unit:
+            specs.append(f'使用单位({self.using_unit})')
         if self.spec_other:
             specs.append(f'其他({self.spec_other})')
         return specs

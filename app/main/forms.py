@@ -330,15 +330,24 @@ class ProductionOrderForm(FlaskForm):
                           default='normal')
     
     # 规格型号（多选）
-    spec_extended = StringField('加长', validators=[Length(0, 100)])
+    spec_extended = StringField('加长型式', validators=[Length(0, 100)])
     spec_gasket = StringField('垫板', validators=[Length(0, 100)])
-    spec_joint = StringField('接头', validators=[Length(0, 100)])
-    spec_drilling = StringField('钻孔', validators=[Length(0, 100)])
+    spec_joint = StringField('接头型式', validators=[Length(0, 100)])
+    spec_drilling = StringField('跳线孔', validators=[Length(0, 100)])
     spec_other = StringField('其他', validators=[Length(0, 100)])
     spec_other_desc = StringField('其他规格描述', validators=[Length(0, 200)])
     direction = StringField('开向', validators=[Length(0, 50)])
     
+    # 新增规格字段（与销售订单行保持一致）
+    spec_splice_hole = StringField('接续线孔', validators=[Length(0, 100)])
+    spec_gasket_hole = StringField('垫板孔型', validators=[Length(0, 100)])
+    anti_corrosion = StringField('辙叉防腐', validators=[Length(0, 100)])
+    rubber_gasket_material = StringField('橡胶垫板材质', validators=[Length(0, 100)])
+    turnout_rail = StringField('道岔配轨', validators=[Length(0, 100)])
+    using_unit = StringField('使用单位', validators=[Length(0, 100)])
+    
     notes = TextAreaField('备注', validators=[Length(0, 500)])
+    submit = SubmitField('保存')
     
     def validate_planned_end_date(self, field):
         if field.data and self.planned_start_date.data:

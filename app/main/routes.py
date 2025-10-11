@@ -8127,6 +8127,12 @@ def edit_production_order(order_id):
             order.spec_other = form.spec_other.data
             order.spec_other_desc = form.spec_other_desc.data
             order.direction = form.direction.data
+            order.spec_splice_hole = form.spec_splice_hole.data
+            order.spec_gasket_hole = form.spec_gasket_hole.data
+            order.anti_corrosion = form.anti_corrosion.data
+            order.rubber_gasket_material = form.rubber_gasket_material.data
+            order.turnout_rail = form.turnout_rail.data
+            order.using_unit = form.using_unit.data
             order.notes = form.notes.data
             
             # 记录审计日志
@@ -8149,7 +8155,7 @@ def edit_production_order(order_id):
                 'notes': order.notes
             }
             
-            # 级联更新相关的生产批次
+            # 级联更新相关的生产批次（所有12个规格字段）
             batches = ProductionBatch.query.filter_by(production_order_id=order.id).all()
             for batch in batches:
                 batch.spec_extended = order.spec_extended
@@ -8159,8 +8165,14 @@ def edit_production_order(order_id):
                 batch.spec_other = order.spec_other
                 batch.spec_other_desc = order.spec_other_desc
                 batch.direction = order.direction
+                batch.spec_splice_hole = order.spec_splice_hole
+                batch.spec_gasket_hole = order.spec_gasket_hole
+                batch.anti_corrosion = order.anti_corrosion
+                batch.rubber_gasket_material = order.rubber_gasket_material
+                batch.turnout_rail = order.turnout_rail
+                batch.using_unit = order.using_unit
             
-            # 级联更新相关的生产任务
+            # 级联更新相关的生产任务（所有12个规格字段）
             tasks = TaskAssignment.query.filter_by(production_batch_id=ProductionBatch.id)\
                                        .join(ProductionBatch)\
                                        .filter(ProductionBatch.production_order_id == order.id)\
@@ -8173,6 +8185,12 @@ def edit_production_order(order_id):
                 task.spec_other = order.spec_other
                 task.spec_other_desc = order.spec_other_desc
                 task.direction = order.direction
+                task.spec_splice_hole = order.spec_splice_hole
+                task.spec_gasket_hole = order.spec_gasket_hole
+                task.anti_corrosion = order.anti_corrosion
+                task.rubber_gasket_material = order.rubber_gasket_material
+                task.turnout_rail = order.turnout_rail
+                task.using_unit = order.using_unit
             
             log = AuditLog(
                 user_id=current_user.id,
@@ -8194,7 +8212,7 @@ def edit_production_order(order_id):
             flash(f'修改失败: {str(e)}', 'error')
     
     elif request.method == 'GET':
-        # 填充表单数据
+        # 填充表单数据（所有12个规格字段）
         form.product_id.data = order.product_id
         form.planned_quantity.data = order.planned_quantity
         form.status.data = order.status
@@ -8210,6 +8228,12 @@ def edit_production_order(order_id):
         form.spec_other.data = order.spec_other
         form.spec_other_desc.data = order.spec_other_desc
         form.direction.data = order.direction
+        form.spec_splice_hole.data = order.spec_splice_hole
+        form.spec_gasket_hole.data = order.spec_gasket_hole
+        form.anti_corrosion.data = order.anti_corrosion
+        form.rubber_gasket_material.data = order.rubber_gasket_material
+        form.turnout_rail.data = order.turnout_rail
+        form.using_unit.data = order.using_unit
         form.notes.data = order.notes
     
     return render_template('main/edit_production_order.html', form=form, order=order)
@@ -8269,14 +8293,20 @@ def create_production_order_from_sales(order_id):
                 sales_order_id=sales_order.id,
                 sales_order_item_id=item.id,
                 source_type='sales_item',
-                # 继承规格型号信息
+                # 继承所有规格型号信息（12个字段）
                 spec_extended=item.spec_extended,
                 spec_gasket=item.spec_gasket,
                 spec_joint=item.spec_joint,
                 spec_drilling=item.spec_drilling,
                 spec_other=item.spec_other,
                 spec_other_desc=item.spec_other_desc,
-                direction=item.direction
+                direction=item.direction,
+                spec_splice_hole=item.spec_splice_hole,
+                spec_gasket_hole=item.spec_gasket_hole,
+                anti_corrosion=item.anti_corrosion,
+                rubber_gasket_material=item.rubber_gasket_material,
+                turnout_rail=item.turnout_rail,
+                using_unit=item.using_unit
             )
             
             db.session.add(production_order)
@@ -8337,19 +8367,35 @@ def create_production_order_from_item(item_id):
             if not data.get(field):
                 return jsonify({'success': False, 'message': f'{field} 是必填字段'})
         
-        # 检查是否已经有生产订单
-        existing_order = ProductionOrder.query.filter(
-            ProductionOrder.sales_order_item_id == item_id,
-            ProductionOrder.status.in_(['pending', 'in_progress'])
-        ).first()
+        # 计算该订单行已创建的生产订单总计划数量（不计已取消）
+        from sqlalchemy import func
+        total_planned = db.session.query(func.coalesce(func.sum(ProductionOrder.planned_quantity), 0)) \
+            .filter(ProductionOrder.sales_order_item_id == item_id) \
+            .filter(ProductionOrder.status != 'cancelled') \
+            .scalar() or 0
+        remaining_to_create = max(0, (order_item.quantity or 0) - int(total_planned))
         
-        if existing_order:
-            return jsonify({'success': False, 'message': f'该订单行已有生产订单: {existing_order.order_number}'})
+        if remaining_to_create <= 0:
+            return jsonify({'success': False, 'message': '该订单行已全部创建生产订单，无剩余数量可创建'})
+        
+        # 计划数量：未传则默认使用剩余数量；传入则校验不超过剩余数量
+        requested_qty = data.get('planned_quantity')
+        if requested_qty is None or str(requested_qty).strip() == '':
+            planned_qty = int(remaining_to_create)
+        else:
+            try:
+                planned_qty = int(requested_qty)
+            except (ValueError, TypeError):
+                return jsonify({'success': False, 'message': '计划数量无效'})
+            if planned_qty <= 0:
+                return jsonify({'success': False, 'message': '计划数量必须大于0'})
+            if planned_qty > remaining_to_create:
+                return jsonify({'success': False, 'message': f'计划数量不能超过剩余未创建数量({remaining_to_create})'})
         
         # 创建生产订单
         production_order = ProductionOrder(
             product_id=order_item.product_id,
-            planned_quantity=int(data.get('planned_quantity', order_item.quantity)),
+            planned_quantity=planned_qty,
             planned_start_date=datetime.strptime(data['planned_start_date'], '%Y-%m-%d').date(),
             planned_end_date=datetime.strptime(data['planned_end_date'], '%Y-%m-%d').date(),
             priority=int(data.get('priority', 0)),
@@ -8358,14 +8404,20 @@ def create_production_order_from_item(item_id):
             sales_order_id=order_item.sales_order_id,
             sales_order_item_id=item_id,
             source_type='sales_item',
-            # 继承规格型号信息
+            # 继承所有规格型号信息（12个字段）
             spec_extended=order_item.spec_extended,
             spec_gasket=order_item.spec_gasket,
             spec_joint=order_item.spec_joint,
             spec_drilling=order_item.spec_drilling,
             spec_other=order_item.spec_other,
             spec_other_desc=order_item.spec_other_desc,
-            direction=order_item.direction
+            direction=order_item.direction,
+            spec_splice_hole=order_item.spec_splice_hole,
+            spec_gasket_hole=order_item.spec_gasket_hole,
+            anti_corrosion=order_item.anti_corrosion,
+            rubber_gasket_material=order_item.rubber_gasket_material,
+            turnout_rail=order_item.turnout_rail,
+            using_unit=order_item.using_unit
         )
         
         db.session.add(production_order)
@@ -8395,11 +8447,16 @@ def create_production_order_from_item(item_id):
         
         db.session.commit()
         
+        # 计算剩余数量（创建后）
+        new_total_planned = total_planned + planned_qty
+        new_remaining = max(0, (order_item.quantity or 0) - int(new_total_planned))
+        
         return jsonify({
             'success': True, 
-            'message': f'生产订单 {production_order.order_number} 创建成功{material_message}',
+            'message': f'生产订单 {production_order.order_number} 创建成功{material_message}，剩余可创建数量：{new_remaining}',
             'order_number': production_order.order_number,
-            'order_id': production_order.id
+            'order_id': production_order.id,
+            'remaining_to_create': new_remaining
         })
         
     except Exception as e:
@@ -8498,19 +8555,25 @@ def add_production_batch(order_id):
         # 检查物料需求并处理不足情况
         material_shortage_info = check_and_handle_material_shortage(order, batch_quantity)
         
-        # 创建生产批次，继承生产订单的规格型号信息
+        # 创建生产批次，继承生产订单的所有规格型号信息
         batch = ProductionBatch(
             production_order_id=order_id,
             batch_quantity=batch_quantity,
             notes=data.get('notes', ''),
-            # 继承生产订单的规格型号信息
+            # 继承生产订单的所有规格型号信息（12个字段）
             spec_extended=order.spec_extended,
             spec_gasket=order.spec_gasket,
             spec_joint=order.spec_joint,
             spec_drilling=order.spec_drilling,
             spec_other=order.spec_other,
             spec_other_desc=order.spec_other_desc,
-            direction=order.direction
+            direction=order.direction,
+            spec_splice_hole=order.spec_splice_hole,
+            spec_gasket_hole=order.spec_gasket_hole,
+            anti_corrosion=order.anti_corrosion,
+            rubber_gasket_material=order.rubber_gasket_material,
+            turnout_rail=order.turnout_rail,
+            using_unit=order.using_unit
         )
         
         db.session.add(batch)
@@ -8604,7 +8667,7 @@ def create_tasks_for_production_batch(batch):
             days_offset = process_item.sequence * 2  # 每个工序间隔2天
             target_date = batch.production_order.planned_end_date + timedelta(days=days_offset)
             
-            # 创建任务，并继承生产批次的规格型号信息
+            # 创建任务，并继承生产批次的所有规格型号信息
             task = TaskAssignment(
                 employee_id=employee.id,
                 process_id=process_item.process_id,
@@ -8613,14 +8676,20 @@ def create_tasks_for_production_batch(batch):
                 production_batch_id=batch.id,
                 task_type='auto',
                 notes=f'自动创建 - 生产批次: {batch.batch_number}, 工序序号: {process_item.sequence}',
-                # 继承生产批次的规格型号信息
+                # 继承生产批次的所有规格型号信息（12个字段）
                 spec_extended=batch.spec_extended,
                 spec_gasket=batch.spec_gasket,
                 spec_joint=batch.spec_joint,
                 spec_drilling=batch.spec_drilling,
                 spec_other=batch.spec_other,
                 spec_other_desc=batch.spec_other_desc,
-                direction=batch.direction
+                direction=batch.direction,
+                spec_splice_hole=batch.spec_splice_hole,
+                spec_gasket_hole=batch.spec_gasket_hole,
+                anti_corrosion=batch.anti_corrosion,
+                rubber_gasket_material=batch.rubber_gasket_material,
+                turnout_rail=batch.turnout_rail,
+                using_unit=batch.using_unit
             )
             
             db.session.add(task)
@@ -9491,6 +9560,14 @@ def sales_order_detail(order_id):
         # 获取该订单行关联的生产订单
         production_orders = ProductionOrder.query.filter_by(sales_order_item_id=item.id).all()
         
+        # 计算剩余可创建数量
+        from sqlalchemy import func
+        total_planned = db.session.query(func.coalesce(func.sum(ProductionOrder.planned_quantity), 0)) \
+            .filter(ProductionOrder.sales_order_item_id == item.id) \
+            .filter(ProductionOrder.status != 'cancelled') \
+            .scalar() or 0
+        remaining_to_create = max(0, (item.quantity or 0) - int(total_planned))
+        
         order_items_json.append({
             'id': item.id,
             'product_id': item.product_id,
@@ -9508,6 +9585,7 @@ def sales_order_detail(order_id):
             'order_time': item.order_time.isoformat() if item.order_time else None,
             'station_notes': item.station_notes,
             'sequence': item.sequence,
+            'remaining_to_create': remaining_to_create,
             'production_orders': [{
                 'id': po.id,
                 'order_number': po.order_number,

@@ -4,13 +4,14 @@ Flask-SQLAlchemy>=3.0.0
 Flask-Login>=0.6.0
 Flask-Migrate>=4.0.0
 Flask-WTF>=1.1.0
-Flask-Bootstrap5>=2.0.0
+Bootstrap-Flask>=2.0.0
 
 # 数据库
 SQLAlchemy>=2.0.0
 
 # 表单和验证
 WTForms>=3.0.0
+email-validator>=2.1.0
 
 # 密码加密
 Werkzeug>=2.3.0
@@ -43,3 +44,6 @@ python-dateutil>=2.8.0
 
 # 类型提示支持
 typing-extensions>=4.5.0 
+
+# Windows 服务（可选，仅 Windows）
+pywin32>=305; sys_platform == "win32"
