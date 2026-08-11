@@ -1,6 +1,7 @@
 from flask import render_template, request, jsonify, redirect, url_for, flash, current_app
 from flask_login import login_required, current_user
 from app import db, csrf
+from app.permissions import can
 from . import bp
 from sqlalchemy import or_, and_
 from datetime import datetime, date
@@ -12,15 +13,16 @@ from app.models import (
 )
 
 
-def _require_roles(roles):
-    return current_user.role in roles
+def _can_use_production_center():
+    """生产中心的可用角色统一由 app/permissions.py 的 production_center.use 决定"""
+    return can('production_center.use')
 
 
 @bp.route('/production_center', methods=['GET'])
 @login_required
 def production_center():
     """生产中心首页（以产品实例为中心的视图）"""
-    if not _require_roles(['admin', 'manager']):
+    if not _can_use_production_center():
         flash('权限不足', 'danger')
         return redirect(url_for('main.index'))
 
@@ -62,7 +64,7 @@ def production_center():
 @login_required
 def production_center_item_detail(item_id: int):
     """实例详情页：展示该成品实例的工序、进度与执行记录"""
-    if not _require_roles(['admin', 'manager']):
+    if not _can_use_production_center():
         flash('权限不足', 'danger')
         return redirect(url_for('main.index'))
 
@@ -97,7 +99,7 @@ def production_center_item_detail(item_id: int):
 @csrf.exempt
 def api_create_instances():
     """使用生产订单数据创建成品实例（生成批次与批次项）"""
-    if not _require_roles(['admin', 'manager']):
+    if not _can_use_production_center():
         return jsonify({'success': False, 'message': '权限不足'}), 403
 
     try:
@@ -180,7 +182,7 @@ def api_create_instances():
 @csrf.exempt
 def api_save_tech_decomposition(item_id: int):
     """保存实例级技术拆解（存入 notes JSON，不改动表结构）"""
-    if not _require_roles(['admin', 'manager']):
+    if not _can_use_production_center():
         return jsonify({'success': False, 'message': '权限不足'}), 403
 
     try:
@@ -228,7 +230,7 @@ def api_save_tech_decomposition(item_id: int):
 @login_required
 def api_item_detail(item_id: int):
     """实例级详情（用于前端可视化）：基本信息、任务、执行记录与物料消耗"""
-    if not _require_roles(['admin', 'manager']):
+    if not _can_use_production_center():
         return jsonify({'success': False, 'message': '权限不足'}), 403
 
     try:
@@ -308,7 +310,7 @@ def api_item_detail(item_id: int):
 @csrf.exempt
 def api_execute_operation(item_id: int):
     """记录工序执行（操作者与物料消耗），并更新相关任务进度"""
-    if not _require_roles(['admin', 'manager']):
+    if not _can_use_production_center():
         return jsonify({'success': False, 'message': '权限不足'}), 403
 
     try:

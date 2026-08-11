@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block title %}系统配置{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>系统配置</h2>
+    <p class="text-muted">业务开关的统一入口。修改后立即生效，并会记录到审计日志。</p>
+
+    <form method="POST" action="{{ url_for('main.manage_system_configs') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        {% for category, configs in grouped_configs.items() %}
+        <div class="card mb-4">
+            <div class="card-header">
+                <strong>{{ category_labels.get(category, category) }}</strong>
+            </div>
+            <div class="card-body">
+                {% for config in configs %}
+                <div class="mb-4 {% if not loop.last %}border-bottom pb-3{% endif %}">
+                    {% if config.value_type == 'bool' %}
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox"
+                               id="cfg__{{ config.key }}" name="cfg__{{ config.key }}"
+                               {% if config.parsed_value %}checked{% endif %}>
+                        <label class="form-check-label" for="cfg__{{ config.key }}">
+                            {{ config.label }}
+                        </label>
+                    </div>
+
+                    {% elif config.value_type == 'json' %}
+                    <label class="form-label" for="cfg__{{ config.key }}">{{ config.label }}</label>
+                    <select class="form-select" id="cfg__{{ config.key }}"
+                            name="cfg__{{ config.key }}" multiple size="{{ roles|length }}">
+                        {% set selected = config.parsed_value or [] %}
+                        {% for role_key, role_label in roles %}
+                        <option value="{{ role_key }}" {% if role_key in selected %}selected{% endif %}>
+                            {{ role_label }}（{{ role_key }}）
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <div class="form-text">按住 Ctrl / Cmd 可多选</div>
+
+                    {% else %}
+                    <label class="form-label" for="cfg__{{ config.key }}">{{ config.label }}</label>
+                    <input type="text" class="form-control" id="cfg__{{ config.key }}"
+                           name="cfg__{{ config.key }}" value="{{ config.value or '' }}">
+                    {% endif %}
+
+                    {% if config.description %}
+                    <div class="form-text">{{ config.description }}</div>
+                    {% endif %}
+                    <div class="form-text text-muted">
+                        <code>{{ config.key }}</code>
+                        {% if config.updated_at %}
+                        · 最近修改 {{ config.updated_at.strftime('%Y-%m-%d %H:%M') }}
+                        {% if config.updater %} by {{ config.updater.username }}{% endif %}
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% else %}
+        <div class="alert alert-info">暂无配置项。</div>
+        {% endfor %}
+
+        {% if grouped_configs %}
+        <div class="mb-5">
+            <button type="submit" class="btn btn-primary">保存配置</button>
+            <a href="{{ url_for('main.index') }}" class="btn btn-secondary">返回</a>
+        </div>
+        {% endif %}
+    </form>
+</div>
+{% endblock %}

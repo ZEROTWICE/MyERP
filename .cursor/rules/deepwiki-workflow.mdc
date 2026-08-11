@@ -1,0 +1,39 @@
+---
+description: DeepWiki 查询与交叉验证协议，用于降低改动 MyERP 时的幻觉
+alwaysApply: true
+---
+
+# DeepWiki 使用协议
+
+本仓库对应 DeepWiki 仓库名固定为 `ZEROTWICE/MyERP`（remote: `git@github.com:ZEROTWICE/MyERP.git`）。
+
+## 何时必须查
+
+以下改动动手前必须先查 DeepWiki，再用本地源码验证：
+
+- 新增或修改路由端点、API 契约、返回结构
+- 新增或修改 `app/models.py` 的模型/字段，或涉及数据库迁移
+- 跨模块改动（如 `routes.py` 与 `quality.py` 联动、服务层调用）
+- 首次改动某个不熟悉的模块
+
+以下可跳过：改文案/样式、单个函数内部逻辑、已定位根因的 bug 修复。
+
+## 怎么问
+
+- 用 `ask_question`，一次只问一个章节或模块，可并行发多个问题。
+- 不要用 `read_wiki_contents` 全量拉取（实测超时）。定位章节用 `read_wiki_structure`。
+- 提问模板：「请说明 <模块> 的业务流程、涉及的模型字段、关键路由（HTTP 方法+URL）、状态流转、对应源码文件路径。请用中文回答。」明确索要**字段名、端点、源码路径**。
+
+## 如何验证（强制）
+
+DeepWiki 的叙述性描述会失真，引用坐标（文件路径 + 行号）可信。写代码前：
+
+1. DeepWiki 给出的文件路径/行号 → 用 Read 打开确认。
+2. DeepWiki 提到的字段名、端点 URL、函数名 → 必须 Grep 本地确认存在，确认前不得写进代码。
+3. 冲突时**一律以本地源码为准**，并在回复中指出 DeepWiki 与实际不符之处。
+
+反例：DeepWiki 称 `app/main/routes.py` 约 2300 行，实际 11243 行。统计性、概括性数字一律不要直接引用。
+
+## 时效性
+
+DeepWiki 索引的是 GitHub 远端。本地未推送的改动 DeepWiki 一定不知道。涉及近期改动的模块，优先读本地源码，DeepWiki 仅用于理解历史设计意图。

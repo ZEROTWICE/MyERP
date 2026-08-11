@@ -265,39 +265,64 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
                     {% if current_user.is_authenticated %}
-                        {% if current_user.role in ['admin'] %}
+                        {% if can_any('employee.view', 'bonus.manage', 'salary.view') %}
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="employeeDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                                 员工管理
                             </a>
                             <ul class="dropdown-menu" aria-labelledby="employeeDropdown">
+                                {% if can('employee.view') %}
                                 <li><a class="dropdown-item" href="{{ url_for('main.manage_employees') }}">员工管理</a></li>
+                                {% endif %}
+                                {% if can('bonus.manage') %}
                                 <li><a class="dropdown-item" href="{{ url_for('main.manage_bonus_penalties') }}">奖惩管理</a></li>
+                                {% endif %}
+                                {% if can('salary.view') %}
                                 <li><a class="dropdown-item" href="{{ url_for('main.salary_calculation') }}">工资管理</a></li>
+                                {% endif %}
                             </ul>
                         </li>
+                        {% endif %}
+                        {% if can_any('process.view', 'process_assignment.manage', 'production_record.view', 'task.manage', 'production_order.view', 'production_center.use') %}
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="productionDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                                 生产管理
                             </a>
                             <ul class="dropdown-menu" aria-labelledby="productionDropdown">
+                                {% if can('process.view') %}
                                 <li><a class="dropdown-item" href="{{ url_for('main.process_prices') }}">工序管理</a></li>
+                                {% endif %}
+                                {% if can('process_assignment.manage') %}
                                 <li><a class="dropdown-item" href="{{ url_for('main.process_assignment_page') }}">工序分配</a></li>
+                                {% endif %}
+                                {% if can('production_record.view') %}
                                 <li><a class="dropdown-item" href="{{ url_for('main.manage_production_records') }}">生产记录</a></li>
+                                {% endif %}
+                                {% if can('task.manage') %}
                                 <li><a class="dropdown-item" href="{{ url_for('main.manage_tasks') }}">任务管理</a></li>
+                                {% endif %}
+                                {% if can('production_order.view') %}
                                 <li><a class="dropdown-item" href="{{ url_for('main.manage_production_orders') }}">生产订单</a></li>
+                                {% endif %}
+                                {% if can('production_center.use') %}
                                 <li><hr class="dropdown-divider"></li>
                                 <li><a class="dropdown-item" href="{{ url_for('main.production_center') }}">生产中心（产品）</a></li>
+                                {% endif %}
                             </ul>
                         </li>
+                        {% endif %}
+                        {% if can_any('inventory.view', 'inventory.manage') %}
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="inventoryDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                                 库存管理
                             </a>
                             <ul class="dropdown-menu" aria-labelledby="inventoryDropdown">
+                                {% if can('inventory.view') %}
                                 <li><a class="dropdown-item" href="{{ url_for('main.manage_inventory') }}">
                                     库存查询
                                 </a></li>
+                                {% endif %}
+                                {% if can('inventory.manage') %}
                                 <li><hr class="dropdown-divider"></li>
                                 <li><h6 class="dropdown-header">原材料管理</h6></li>
                                 <li><a class="dropdown-item" href="{{ url_for('main.raw_material_inbound') }}">
@@ -333,45 +358,65 @@
                                 <li><a class="dropdown-item" href="{{ url_for('main.manage_inventory_counts') }}">
                                     库存盘点
                                 </a></li>
+                                {% endif %}
                             </ul>
                         </li>
+                        {% endif %}
+                        {% if can('product.view') %}
                         <li class="nav-item">
                             <a class="nav-link" href="{{ url_for('main.manage_products') }}">产品管理</a>
                         </li>
+                        {% endif %}
+                        {% if can_any('customer.manage', 'sales_order.manage') %}
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="salesDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                                 销售管理
                             </a>
                             <ul class="dropdown-menu" aria-labelledby="salesDropdown">
+                                {% if can('customer.manage') %}
                                 <li><a class="dropdown-item" href="{{ url_for('main.manage_customers') }}">客户管理</a></li>
+                                {% endif %}
+                                {% if can('sales_order.manage') %}
                                 <li><a class="dropdown-item" href="{{ url_for('main.manage_sales_orders') }}">销售订单</a></li>
+                                {% endif %}
                             </ul>
                         </li>
-                        {% if current_user.role in ['admin', 'manager', 'inspector'] %}
+                        {% endif %}
+                        {% if can('quality.view') %}
                         <li class="nav-item">
                             <a class="nav-link" href="{{ url_for('main.quality_management') }}">质量管理</a>
                         </li>
                         {% endif %}
+                        {% if can_any('code_rule.manage', 'audit.view', 'notification_rule.manage', 'system_config.manage') %}
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="systemDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                                 系统管理
                             </a>
                             <ul class="dropdown-menu" aria-labelledby="systemDropdown">
+                                {% if can('code_rule.manage') %}
                                 <li><a class="dropdown-item" href="{{ url_for('main.manage_code_rules') }}">
                                     编码管理
                                 </a></li>
+                                {% endif %}
+                                {% if can('audit.view') %}
                                 <li><a class="dropdown-item" href="{{ url_for('main.view_audit_logs') }}">
                                     审计日志
                                 </a></li>
-                                {% if current_user.role in ['admin', 'manager'] %}
+                                {% endif %}
+                                {% if can('notification_rule.manage') %}
                                 <li><a class="dropdown-item" href="{{ url_for('main.manage_notification_rules') }}">
                                     通知规则
+                                </a></li>
+                                {% endif %}
+                                {% if can('system_config.manage') %}
+                                <li><a class="dropdown-item" href="{{ url_for('main.manage_system_configs') }}">
+                                    系统配置
                                 </a></li>
                                 {% endif %}
                             </ul>
                         </li>
                         {% endif %}
-                        {% if current_user.role == 'user' %}
+                        {% if can('my_tasks.use') %}
                         <li class="nav-item">
                             <a class="nav-link" href="{{ url_for('main.my_tasks') }}">我的任务</a>
                         </li>
