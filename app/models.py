@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -268,6 +269,7 @@ class TaskAssignment(db.Model):
     quantity = db.Column(db.Integer, nullable=False)  # 分配数量
     completed_quantity = db.Column(db.Integer, default=0)  # 已完成数量
     status = db.Column(db.String(20), default='pending')  # pending, in_progress, completed, cancelled
+    completed_at = db.Column(db.DateTime, index=True)  # 完成时间
     notes = db.Column(db.Text)  # 备注
     
     # 新增字段：关联生产批次
@@ -2384,3 +2386,185 @@ class ProcessAssignmentMember(db.Model):
         super(ProcessAssignmentMember, self).__init__(**kwargs)
         if not self.global_sn:
             self.global_sn = SerialNumber.get_next_number()
+
+
+# 配置项缓存：避免每次读取开关都查库；SystemConfig.set/invalidate_cache 负责失效
+_system_config_cache = {}
+
+
+class SystemConfig(db.Model):
+    """系统配置项：业务开关的统一存取入口
+
+    值一律以字符串落库，由 value_type 决定读取时如何解析。
+    """
+    __tablename__ = 'system_configs'
+
+    id = db.Column(db.Integer, primary_key=True)
+    key = db.Column(db.String(100), unique=True, nullable=False, index=True)
+    value = db.Column(db.Text)
+    value_type = db.Column(db.String(20), nullable=False, default='string')  # bool/int/float/string/json
+    category = db.Column(db.String(50), index=True)  # purchase/quality/material/general
+    label = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text)
+    updated_by = db.Column(db.Integer, db.ForeignKey('user.id'))
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    updater = db.relationship('User', backref=db.backref('updated_configs', lazy='dynamic'))
+
+    # 种子配置项：消费方在后续批次接入，此处仅定义默认值
+    DEFAULTS = [
+        {
+            'key': 'purchase.full_workflow_enabled',
+            'value': 'false',
+            'value_type': 'bool',
+            'category': 'purchase',
+            'label': '启用完整采购流程（请购与审批）',
+            'description': '关闭时仅使用简化采购单，跳过请购单与审批环节。',
+        },
+        {
+            'key': 'purchase.settlement_enabled',
+            'value': 'false',
+            'value_type': 'bool',
+            'category': 'purchase',
+            'label': '启用采购对账付款',
+            'description': '开启后采购收货完成可进入对账与付款环节。',
+        },
+        {
+            'key': 'purchase.incoming_inspection_required',
+            'value': 'true',
+            'value_type': 'bool',
+            'category': 'purchase',
+            'label': '到货强制来料检验',
+            'description': '开启后采购到货需通过来料检验才能入库。',
+        },
+        {
+            'key': 'quality.rework_counts_piecework',
+            'value': 'false',
+            'value_type': 'bool',
+            'category': 'quality',
+            'label': '返工工时重复计件',
+            'description': '开启后返工任务产生的生产记录同样计入计件工资。',
+        },
+        {
+            'key': 'quality.concession_approver_roles',
+            'value': '["admin", "manager"]',
+            'value_type': 'json',
+            'category': 'quality',
+            'label': '让步接收审批角色',
+            'description': '有权审批让步接收的角色列表。',
+        },
+    ]
+
+    @staticmethod
+    def parse_value(raw, value_type):
+        """按 value_type 把存储的字符串解析成 Python 值"""
+        if raw is None:
+            return None
+        if value_type == 'bool':
+            return str(raw).strip().lower() in ('true', '1', 'yes', 'on')
+        if value_type == 'int':
+            try:
+                return int(raw)
+            except (TypeError, ValueError):
+                return None
+        if value_type == 'float':
+            try:
+                return float(raw)
+            except (TypeError, ValueError):
+                return None
+        if value_type == 'json':
+            try:
+                return json.loads(raw)
+            except (TypeError, ValueError):
+                return None
+        return raw
+
+    @staticmethod
+    def serialize_value(value, value_type):
+        """把 Python 值转成落库用的字符串"""
+        if value_type == 'bool':
+            if isinstance(value, str):
+                return 'true' if value.strip().lower() in ('true', '1', 'yes', 'on') else 'false'
+            return 'true' if value else 'false'
+        if value_type == 'json':
+            if isinstance(value, str):
+                return value
+            return json.dumps(value, ensure_ascii=False)
+        return '' if value is None else str(value)
+
+    @property
+    def parsed_value(self):
+        return self.parse_value(self.value, self.value_type)
+
+    @classmethod
+    def invalidate_cache(cls, key=None):
+        if key is None:
+            _system_config_cache.clear()
+        else:
+            _system_config_cache.pop(key, None)
+
+    @classmethod
+    def get(cls, key, default=None):
+        """读取配置项。未配置时返回 default，不抛异常。"""
+        if key in _system_config_cache:
+            return _system_config_cache[key]
+        try:
+            row = cls.query.filter_by(key=key).first()
+        except SQLAlchemyError:
+            return default
+        if row is None:
+            return default
+        parsed = cls.parse_value(row.value, row.value_type)
+        _system_config_cache[key] = parsed
+        return parsed
+
+    @classmethod
+    def set(cls, key, value, user_id=None):
+        """写入配置项并记录审计日志。
+
+        只写 session 不提交，由调用方统一 commit，便于配置页一次保存多项。
+        返回 True 表示值发生了变化。
+        """
+        row = cls.query.filter_by(key=key).first()
+        if row is None:
+            return False
+
+        new_raw = cls.serialize_value(value, row.value_type)
+        old_raw = row.value
+        if old_raw == new_raw:
+            return False
+
+        row.value = new_raw
+        row.updated_by = user_id
+        row.updated_at = datetime.utcnow()
+
+        db.session.add(AuditLog(
+            user_id=user_id,
+            action=f'修改系统配置：{row.label}',
+            details=f'{key}: {old_raw} -> {new_raw}',
+            can_rollback=True,
+            rollback_type='edit',
+            target_model='SystemConfig',
+            target_id=row.id,
+            old_data={'value': old_raw},
+            new_data={'value': new_raw},
+        ))
+
+        cls.invalidate_cache(key)
+        return True
+
+    @classmethod
+    def seed_defaults(cls):
+        """补齐缺失的种子配置项，已存在的不覆盖。返回新增数量。"""
+        created = 0
+        for item in cls.DEFAULTS:
+            if cls.query.filter_by(key=item['key']).first() is None:
+                db.session.add(cls(**item))
+                created += 1
+        if created:
+            db.session.commit()
+            cls.invalidate_cache()
+        return created
+
+    def __repr__(self):
+        return f'<SystemConfig {self.key}={self.value}>'

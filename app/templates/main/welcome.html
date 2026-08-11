@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block title %}欢迎{% endblock %}
+
+{#
+  通用落地页。作为重定向链的终点存在：任何角色走到这里都必须能停下来，
+  因此本页不做任何权限判断，也不重定向到其他端点。
+#}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-body text-center py-5">
+                    <h3 class="card-title mb-3">欢迎，{{ current_user.username }}</h3>
+
+                    {% if message %}
+                    <p class="text-muted mb-4">{{ message }}</p>
+                    {% else %}
+                    <p class="text-muted mb-4">请从顶部导航栏选择要使用的功能。</p>
+                    {% endif %}
+
+                    <p class="text-muted small mb-0">
+                        当前角色：<code>{{ current_user.role }}</code>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

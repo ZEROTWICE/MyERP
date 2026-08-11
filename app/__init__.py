@@ -15,6 +15,63 @@ migrate = Migrate()
 csrf = CSRFProtect()
 bootstrap = Bootstrap5()
 
+# 启动时需要保证存在的列：表名 -> [(列名, SQLite 列类型)]
+# 迁移链存在多个 head 且历史表多由 db.create_all() 建出，这里做幂等兜底。
+_ENSURED_COLUMNS = {
+    'sales_order_items': [
+        ('spec_splice_hole', 'VARCHAR(100)'),
+        ('spec_gasket_hole', 'VARCHAR(100)'),
+        ('anti_corrosion', 'VARCHAR(100)'),
+        ('rubber_gasket_material', 'VARCHAR(100)'),
+        ('turnout_rail', 'VARCHAR(100)'),
+        ('using_unit', 'VARCHAR(100)'),
+    ],
+    'task_assignment': [
+        ('completed_at', 'DATETIME'),
+    ],
+}
+
+
+def _ensure_schema(app):
+    """补齐缺失的表与列，保证老库可直接启动。"""
+    try:
+        engine = db.engine
+
+        from app.models import SystemConfig
+        SystemConfig.__table__.create(bind=engine, checkfirst=True)
+
+        if engine.dialect.name != 'sqlite':
+            return
+
+        inspector = inspect(engine)
+        existing_tables = set(inspector.get_table_names())
+        for table, columns in _ENSURED_COLUMNS.items():
+            if table not in existing_tables:
+                continue
+            present = {c['name'] for c in inspector.get_columns(table)}
+            missing = [(name, coltype) for name, coltype in columns if name not in present]
+            if not missing:
+                continue
+            with engine.begin() as conn:
+                for name, coltype in missing:
+                    conn.execute(text(f'ALTER TABLE {table} ADD COLUMN {name} {coltype}'))
+                    app.logger.info(f'已为 {table} 添加缺失列：{name}')
+    except Exception as e:
+        app.logger.error(f'检查/补齐数据库结构失败: {e}')
+
+
+def _seed_system_configs(app):
+    """补齐缺失的系统配置项（已存在的不覆盖）。"""
+    try:
+        from app.models import SystemConfig
+        created = SystemConfig.seed_defaults()
+        if created:
+            app.logger.info(f'已补齐 {created} 个系统配置项')
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f'初始化系统配置项失败: {e}')
+
+
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
@@ -36,30 +93,15 @@ def create_app():
     login.login_message = '请先登录'
     login.login_message_category = 'info'
 
+    from app import permissions
+    permissions.init_app(app)
+
     with app.app_context():
         # 首先导入并创建所有模型
         from app import models
 
-        # SQLite 兼容保障：确保新增的销售订单行扩展列存在（避免老库报错）
-        try:
-            engine = db.engine
-            if engine.dialect.name == 'sqlite':
-                inspector = inspect(engine)
-                cols = {c['name'] for c in inspector.get_columns('sales_order_items')}
-                ensures = [
-                    ('spec_splice_hole', 'VARCHAR(100)'),
-                    ('spec_gasket_hole', 'VARCHAR(100)'),
-                    ('anti_corrosion', 'VARCHAR(100)'),
-                    ('rubber_gasket_material', 'VARCHAR(100)'),
-                    ('turnout_rail', 'VARCHAR(100)'),
-                    ('using_unit', 'VARCHAR(100)')
-                ]
-                for col, coltype in ensures:
-                    if col not in cols:
-                        engine.execute(text(f"ALTER TABLE sales_order_items ADD COLUMN {col} {coltype}"))
-                        app.logger.info(f'已为 sales_order_items 添加缺失列：{col}')
-        except Exception as e:
-            app.logger.error(f'检查/添加销售订单行扩展列失败: {e}')
+        _ensure_schema(app)
+        _seed_system_configs(app)
 
         # 然后注册蓝图
         from app.auth import bp as auth_bp

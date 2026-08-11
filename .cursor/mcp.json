@@ -9,8 +9,8 @@
         "tavily-mcp@0.1.3"
       ]
     },
-    "deepwiki-sse": {
-      "url": "https://mcp.deepwiki.com/sse"
+    "deepwiki": {
+      "url": "https://mcp.deepwiki.com/mcp"
     }
   }
 }

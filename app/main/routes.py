@@ -1,7 +1,9 @@
 from sqlalchemy.exc import SQLAlchemyError
+from flask import render_template, redirect, url_for, flash, request, jsonify, current_app, send_file
 from flask_login import login_required, current_user
 from app import db, csrf
-from app.models import Employee, ProcessPrice, ProductionRecord, BonusPenalty, AuditLog, ProcessPrice, User, TaskAssignment, SerialNumber, SalaryChange, CoefficientChange, EmployeeSalaryHistory, EmployeeCoefficientHistory, ProcessPriceGroup, FinishedProduct, RawMaterial, CodeRule, CodeGenerationLog, ProductionRecordMaterial, InspectionTemplate, InspectionBaseItem, InspectionItem, InspectionTask, InspectionRecord, Product, ProductBOM, ProductProcess, ProductionOrder, MaterialAllocation, ProductionBatch, ProductionBatchItem, Customer, CustomerAddress, SalesOrder, SalesOrderItem, SalesOrder, SalesOrderItem, ProcessAssignmentRule, ProcessAssignmentMember
+from app.permissions import require_capability, can
+from app.models import Employee, ProcessPrice, ProductionRecord, BonusPenalty, AuditLog, ProcessPrice, User, TaskAssignment, SerialNumber, SalaryChange, CoefficientChange, EmployeeSalaryHistory, EmployeeCoefficientHistory, ProcessPriceGroup, FinishedProduct, RawMaterial, CodeRule, CodeGenerationLog, ProductionRecordMaterial, InspectionTemplate, InspectionBaseItem, InspectionItem, InspectionTask, InspectionRecord, Product, ProductBOM, ProductProcess, ProductionOrder, MaterialAllocation, ProductionBatch, ProductionBatchItem, Customer, CustomerAddress, SalesOrder, SalesOrderItem, SalesOrder, SalesOrderItem, ProcessAssignmentRule, ProcessAssignmentMember, SystemConfig
 from datetime import datetime, timedelta, date
 from . import bp
 from app.main.forms import (
@@ -228,33 +230,55 @@ def handle_pagination_args(f):
             return f(*args, **kwargs)
     return decorated_function
 
+# 角色 -> 登录后的默认落地端点；未列出的角色落到通用欢迎页
+ROLE_LANDING_ENDPOINTS = {
+    'user': 'main.user_dashboard',
+    'inspector': 'main.quality_management',
+    'hr': 'main.manage_employees',
+    'accountant': 'main.salary_calculation',
+    'sales': 'main.manage_sales_orders',
+}
+
+
 @bp.route('/')
 @login_required
 def index():
-    if current_user.role == 'user':
-        return redirect(url_for('main.user_dashboard'))
-    elif current_user.role == 'admin':
+    """按角色分流到各自的落地页。
+
+    这里不能重定向到任何可能再跳回 index 的端点，否则会形成重定向死循环
+    （hr/accountant/sales 曾因此完全无法登录）。
+    """
+    if current_user.role in ('admin', 'manager'):
         return render_template('main/admin_dashboard.html')
-    else:
-        flash('权限不足', 'danger')
-        return redirect(url_for('main.user_dashboard'))
+
+    endpoint = ROLE_LANDING_ENDPOINTS.get(current_user.role)
+    if endpoint:
+        return redirect(url_for(endpoint))
+
+    return render_template('main/welcome.html')
 
 @bp.route('/user_dashboard')
 @login_required
 def user_dashboard():
-    print(f"DEBUG: user_dashboard accessed by user {current_user.id} ({current_user.username}) with role {current_user.role}")
-    
+    current_app.logger.debug(
+        f'user_dashboard accessed by user {current_user.id} ({current_user.username}) role={current_user.role}'
+    )
+
+    # 以下两处直接渲染欢迎页而不是重定向回 index，避免与 index 互相跳转
     if current_user.role not in ['user', 'inspector', 'admin', 'manager']:
-        print(f"DEBUG: Role check failed for user {current_user.username} with role {current_user.role}")
-        flash('权限不足：您的角色无法访问此页面', 'danger')
-        return redirect(url_for('main.index'))
+        return render_template(
+            'main/welcome.html',
+            message='当前角色没有员工工作台，请从导航栏进入所需功能。'
+        )
     
     # 获取当前用户的员工信息
     employee = Employee.query.filter_by(user_id=current_user.id).first()
     if not employee:
-        print(f"DEBUG: Employee record not found for user {current_user.username}")
-        flash('未找到员工信息', 'error')
-        return redirect(url_for('main.index'))
+        current_app.logger.debug(f'未找到用户 {current_user.username} 对应的员工信息')
+        return render_template(
+            'main/welcome.html',
+            message='您的账号尚未关联员工信息，请联系管理员完成关联后再使用工作台。'
+        )
 
     # 获取待完成任务（最多5个）
     pending_tasks = TaskAssignment.query.filter_by(employee_id=employee.id)\
@@ -623,6 +647,8 @@ def edit_employee(id):
     return render_template('main/employee_form.html', form=form, title='编辑员工信息', employee=employee)
 
 @bp.route('/process_prices', methods=['GET'])
+@login_required
+@require_capability('process.view')
 @handle_pagination_args
 def process_prices():
     search_form = ProcessPriceSearchForm()
@@ -1047,6 +1073,7 @@ def salary_details(employee_id):
 
 @bp.route('/production_records', methods=['GET', 'POST'])
 @login_required
+@require_capability('production_record.view')
 @handle_pagination_args
 def manage_production_records():
     """管理生产记录"""
@@ -4654,6 +4681,7 @@ def delete_salary_change():
 
 @bp.route('/inventory')
 @login_required
+@require_capability('inventory.view')
 @handle_pagination_args
 def manage_inventory():
     page = request.args.get('page', 1, type=int)
@@ -5333,14 +5361,67 @@ def add_raw_material():
         db.session.rollback()
         return jsonify({'success': False, 'message': f'添加失败：{str(e)}'})
 
+# ==================== 系统配置 ====================
+
+SYSTEM_CONFIG_CATEGORY_LABELS = {
+    'purchase': '采购',
+    'quality': '质量',
+    'material': '物料',
+    'general': '通用',
+}
+
+
+@bp.route('/system_configs', methods=['GET', 'POST'])
+@login_required
+@require_capability('system_config.manage')
+def manage_system_configs():
+    """系统配置管理：业务开关的统一入口"""
+    from app.permissions import ROLES
+
+    if request.method == 'POST':
+        try:
+            configs = SystemConfig.query.all()
+            changed = 0
+            for config in configs:
+                field = f'cfg__{config.key}'
+                if config.value_type == 'bool':
+                    value = field in request.form
+                elif config.value_type == 'json':
+                    value = request.form.getlist(field)
+                else:
+                    if field not in request.form:
+                        continue
+                    value = request.form.get(field)
+
+                if SystemConfig.set(config.key, value, current_user.id):
+                    changed += 1
+
+            db.session.commit()
+            flash(f'已保存 {changed} 项配置' if changed else '配置未发生变化', 'success')
+        except Exception as e:
+            db.session.rollback()
+            current_app.logger.error(f'保存系统配置失败: {str(e)}')
+            flash('保存失败，请重试', 'danger')
+        return redirect(url_for('main.manage_system_configs'))
+
+    configs = SystemConfig.query.order_by(SystemConfig.category, SystemConfig.key).all()
+    grouped = {}
+    for config in configs:
+        grouped.setdefault(config.category or 'general', []).append(config)
+
+    return render_template(
+        'main/system_configs.html',
+        grouped_configs=grouped,
+        category_labels=SYSTEM_CONFIG_CATEGORY_LABELS,
+        roles=ROLES
+    )
+
+
 @bp.route('/code_rules')
 @login_required
+@require_capability('code_rule.manage')
 def manage_code_rules():
     """编码规则管理"""
-    if current_user.role != 'admin':
-        flash('权限不足')
-        return redirect(url_for('main.index'))
-    
     rules = CodeRule.query.order_by(CodeRule.created_at.desc()).all()
     return render_template('main/code_rules.html', rules=rules)
 @bp.route('/code_rules/add', methods=['GET', 'POST'])
@@ -6401,6 +6482,7 @@ def inventory_inbound():
 
 @bp.route('/inventory/raw-material/inbound', methods=['GET', 'POST'])
 @login_required
+@require_capability('inventory.manage')
 def raw_material_inbound():
     """原材料批量入库管理"""
     from app.main.forms import RawMaterialInboundForm
@@ -6476,14 +6558,14 @@ def raw_material_inbound():
                     
                     # 验证品类ID
                     if not category_id:
-                        errors.append(f'第{row_index+1}行：请选择原材料品类')
+                        error_messages.append(f'第{row_index+1}行：请选择原材料品类')
                         continue
                     
                     # 验证品类是否存在
                     from app.models import RawMaterialCategory
                     category = RawMaterialCategory.query.get(category_id)
                     if not category or not category.is_active:
-                        errors.append(f'第{row_index+1}行：选择的原材料品类无效')
+                        error_messages.append(f'第{row_index+1}行：选择的原材料品类无效')
                         continue
                     
                     raw_material = RawMaterial(
@@ -6547,6 +6629,7 @@ def raw_material_inbound():
 
 @bp.route('/inventory/finished-product/inbound', methods=['GET', 'POST'])
 @login_required
+@require_capability('inventory.manage')
 def finished_product_inbound():
     """成品批量入库管理"""
     from app.main.forms import FinishedProductInboundForm
@@ -6666,6 +6749,7 @@ def finished_product_inbound():
 
 @bp.route('/inventory/raw-material/categories')
 @login_required
+@require_capability('inventory.manage')
 def raw_material_categories():
     """原材料品类管理"""
     from app.models import RawMaterialCategory
@@ -6899,6 +6983,7 @@ def get_raw_material_categories_api():
 # 产品管理路由
 @bp.route('/products')
 @login_required
+@require_capability('product.view')
 @handle_pagination_args
 def manage_products():
     """产品管理页面"""
@@ -7920,6 +8005,7 @@ def search_products():
 # 生产订单管理路由
 @bp.route('/production_orders')
 @login_required
+@require_capability('production_order.view')
 @handle_pagination_args
 def manage_production_orders():
     """生产订单管理页面"""
@@ -9332,34 +9418,8 @@ def api_search_customers():
     except Exception as e:
         return jsonify({'success': False, 'message': f'搜索失败：{str(e)}'})
 
-@bp.route('/api/customers/<int:customer_id>/addresses')
-@login_required
-def api_customer_addresses(customer_id):
-    """获取客户地址列表API"""
-    try:
-        customer = Customer.query.get_or_404(customer_id)
-        addresses = CustomerAddress.query.filter_by(
-            customer_id=customer_id,
-            is_active=True
-        ).order_by(
-            CustomerAddress.is_primary.desc(),
-            CustomerAddress.created_at.desc()
-        ).all()
-        
-        return jsonify({
-            'success': True,
-            'data': [{
-                'id': addr.id,
-                'address_type': addr.address_type,
-                'contact_person': addr.contact_person,
-                'contact_phone': addr.contact_phone,
-                'full_address': addr.full_address,
-                'is_primary': addr.is_primary
-            } for addr in addresses]
-        })
-        
-    except Exception as e:
-        return jsonify({'success': False, 'message': f'获取地址失败：{str(e)}'})
+# 客户地址列表 API 见下方 api_get_customer_addresses（同一 URL 曾重复注册两次，
+# 此处的旧实现已删除，保留支持 only_active 参数的那一个）
 
 # ==================== 销售订单管理 ====================
 
@@ -9705,7 +9765,7 @@ def add_sales_order_item(order_id):
                 rubber_gasket_material=form.rubber_gasket_material.data,
                 turnout_rail=form.turnout_rail.data,
                 using_unit=(form.using_unit.data or (order.customer.customer_name if order and order.customer else None)),
-
+                customer_address_id=(form.customer_address_id.data if form.customer_address_id.data else None),
                 order_time=form.order_time.data,
                 station_notes=form.station_notes.data,
                 sequence=max_sequence + 1
@@ -10404,6 +10464,7 @@ def api_chart_data_task():
 
 @bp.route('/consumables')
 @login_required
+@require_capability('inventory.manage')
 @handle_pagination_args
 def manage_consumables():
     """易耗品管理"""
@@ -10531,6 +10592,7 @@ def manage_consumables():
 
 @bp.route('/consumables/inbound', methods=['GET', 'POST'])
 @login_required
+@require_capability('inventory.manage')
 def consumable_inbound():
     """易耗品入库"""
     from app.main.forms import ConsumableInboundForm
@@ -10852,6 +10914,7 @@ def use_consumable(id):
 
 @bp.route('/consumables/categories')
 @login_required
+@require_capability('inventory.manage')
 def consumable_categories():
     """易耗品品类管理"""
     from app.models import ConsumableCategory
@@ -11087,6 +11150,7 @@ def get_consumable_categories_api():
 
 @bp.route('/material_requisitions')
 @login_required
+@require_capability('inventory.manage')
 @handle_pagination_args
 def manage_material_requisitions():
     """物料领用记录管理"""
@@ -11271,6 +11335,7 @@ def material_requisition_detail(id):
 
 @bp.route('/material_returns')
 @login_required
+@require_capability('inventory.manage')
 @handle_pagination_args
 def manage_material_returns():
     """物料归还管理"""
@@ -11336,6 +11401,7 @@ def manage_material_returns():
 
 @bp.route('/inventory_counts')
 @login_required
+@require_capability('inventory.manage')
 @handle_pagination_args
 def manage_inventory_counts():
     """库存盘点管理"""
