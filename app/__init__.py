@@ -93,6 +93,19 @@ def _ensure_schema(app):
                         f'ALTER TABLE {table} ADD COLUMN {name} {_sql_type(coltype, dialect)}'
                     ))
                     app.logger.info(f'已为 {table} 添加缺失列：{name}')
+
+        # 早期建库时 password_hash 是 VARCHAR(128)，装不下 scrypt 哈希。
+        # 只有 Postgres 会因此拒写，SQLite 不校验长度也不支持改列类型。
+        if dialect == 'postgresql' and 'user' in existing_tables:
+            column = next((c for c in inspector.get_columns('user')
+                           if c['name'] == 'password_hash'), None)
+            width = getattr(column['type'], 'length', None) if column else None
+            if width is not None and width < 255:
+                with engine.begin() as conn:
+                    conn.execute(text(
+                        'ALTER TABLE "user" ALTER COLUMN password_hash TYPE VARCHAR(255)'
+                    ))
+                app.logger.info('已将 user.password_hash 放宽到 VARCHAR(255)')
     except Exception as e:
         app.logger.error(f'检查/补齐数据库结构失败: {e}')
 
@@ -160,6 +173,9 @@ def create_app():
         from app import models
 
         _ensure_schema(app)
+        # 空库首次启动时从 SQLite 种子库导入；库里已有账号则是空操作
+        from app.db_bootstrap import bootstrap_if_empty
+        bootstrap_if_empty(app)
         _seed_system_configs(app)
 
         # 然后注册蓝图

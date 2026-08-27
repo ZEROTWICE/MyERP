@@ -13,7 +13,9 @@ def load_user(id):
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(64), index=True, unique=True)
-    password_hash = db.Column(db.String(128))
+    # Werkzeug 3 默认 scrypt，哈希约 162 字符。SQLite 不校验长度，
+    # Postgres 上 VARCHAR(128) 会在改密码时直接拒写。
+    password_hash = db.Column(db.String(255))
     role = db.Column(db.String(20), default='user')  # admin/hr/accountant
 
     def set_password(self, password):

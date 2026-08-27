@@ -12,6 +12,9 @@ services:
       FLASK_ENV: production
     volumes:
       - ./uploads:/app/uploads
+      # 首次上线要从 SQLite 带初始数据时，把 app.db 放到本目录再放开这行。
+      # 宿主机文件不存在会被 Docker 建成目录，那样自举会被跳过。
+      # - ./app.db:/app/seed.db:ro
     restart: unless-stopped
     networks:
       - erp-network

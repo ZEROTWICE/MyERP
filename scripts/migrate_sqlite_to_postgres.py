@@ -28,52 +28,20 @@ def main():
 
     os.environ['DATABASE_URL'] = args.postgres
     os.environ['SITE_CODE'] = os.environ.get('SITE_CODE', '')
+    # 拷贝由本脚本负责，别让 create_app() 里的空库自举同时再导一遍
+    os.environ['SEED_SQLITE_PATH'] = os.path.join(str(ROOT), '.no-seed')
 
     for name in [m for m in list(sys.modules) if m == 'config' or m == 'app' or m.startswith('app.')]:
         del sys.modules[name]
 
-    from sqlalchemy import create_engine, inspect, text, MetaData, Table
     from app import create_app, db
+    from app.db_bootstrap import copy_sqlite_into, reset_sequences
 
     app = create_app()
-    src = create_engine(f'sqlite:///{sqlite_path.replace(os.sep, "/")}')
     with app.app_context():
         db.create_all()
-        dest = db.engine
-        src_insp = inspect(src)
-        dst_insp = inspect(dest)
-        src_tables = set(src_insp.get_table_names())
-        dst_tables = set(dst_insp.get_table_names())
-        # 按目标库 FK 拓扑尽量靠前：无依赖的先拷
-        md = MetaData()
-        md.reflect(bind=dest)
-        ordered = list(md.sorted_tables)
-
-        copied = 0
-        skipped = []
-        with src.connect() as sconn, dest.begin() as dconn:
-            for table in ordered:
-                name = table.name
-                if name not in src_tables or name not in dst_tables:
-                    continue
-                src_cols = {c['name'] for c in src_insp.get_columns(name)}
-                dst_cols = [c['name'] for c in dst_insp.get_columns(name)]
-                common = [c for c in dst_cols if c in src_cols]
-                if not common:
-                    continue
-                rows = sconn.execute(text(f'SELECT {", ".join(common)} FROM {name}')).mappings().all()
-                if not rows:
-                    continue
-                dest_table = Table(name, md, autoload_with=dest)
-                insert_cols = [c for c in common if c in dest_table.c]
-                payload = [{k: row[k] for k in insert_cols} for row in rows]
-                try:
-                    dconn.execute(dest_table.insert(), payload)
-                    copied += len(payload)
-                    print(f'  {name}: {len(payload)} 行')
-                except Exception as e:
-                    skipped.append((name, str(e)))
-                    print(f'  SKIP {name}: {e}')
+        copied, skipped = copy_sqlite_into(db.engine, sqlite_path)
+        reset_sequences(db.engine)
 
         print(f'完成，约 {copied} 行。跳过 {len(skipped)} 张表。')
         if skipped:

@@ -49,6 +49,9 @@ services:
       SECRET_KEY: ${SECRET_KEY:-change-me}
     volumes:
       - ./uploads:/app/uploads
+      # 空库首次启动时的初始数据来源。镜像不含 *.db（见 .dockerignore），
+      # 所以走挂载；宿主机文件不存在会被 Docker 建成目录，那样自举直接跳过。
+      - ./app.db:/app/seed.db:ro
     depends_on:
       db:
         condition: service_healthy
