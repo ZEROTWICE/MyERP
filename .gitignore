@@ -1,2 +1,7 @@
 # Private individual user cursor rules
 .cursor/rules/_*.mdc
+
+.env
+.env.*
+!.env.example
+!.env.production.example

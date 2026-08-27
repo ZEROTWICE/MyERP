@@ -1,0 +1,22 @@
+# 生产：只跑 Web，复用已有 Postgres（容器名 postgres，网络 erp-network）。
+# 服务器目录建议 /opt/myerp，同目录放 .env（含 SECRET_KEY / DATABASE_URL）。
+services:
+  web:
+    image: zerotwice/myerp:${IMAGE_TAG:-latest}
+    container_name: myerp-web
+    ports:
+      - "5000:5000"
+    env_file:
+      - .env
+    environment:
+      FLASK_ENV: production
+    volumes:
+      - ./uploads:/app/uploads
+    restart: unless-stopped
+    networks:
+      - erp-network
+
+networks:
+  erp-network:
+    external: true
+    name: erp-network

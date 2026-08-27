@@ -1,0 +1,85 @@
+name: Docker build and deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  IMAGE_NAME: zerotwice/myerp
+  DEPLOY_DIR: /opt/myerp
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.IMAGE_NAME }}:latest
+            ${{ env.IMAGE_NAME }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Ensure deploy directory
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          script: |
+            mkdir -p /opt/myerp/uploads
+            if [ ! -f /opt/myerp/.env ]; then
+              echo "缺少 /opt/myerp/.env，请先在服务器按 .env.production.example 创建后再部署"
+              exit 1
+            fi
+
+      - name: Copy compose file
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          source: docker-compose.prod.yml
+          target: /opt/myerp
+          overwrite: true
+
+      - name: Pull image and restart web
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          envs: IMAGE_TAG,DOCKERHUB_USERNAME,DOCKERHUB_TOKEN
+          script: |
+            set -e
+            cd /opt/myerp
+            echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+            export IMAGE_TAG
+            docker compose -f docker-compose.prod.yml pull web
+            docker compose -f docker-compose.prod.yml up -d web
+            docker image prune -f
