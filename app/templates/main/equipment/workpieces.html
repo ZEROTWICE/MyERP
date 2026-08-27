@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}工件溯源{% endblock %}
+{% block content %}
+<div class="container mt-4">
+    <h2>工件溯源</h2>
+    <form method="get" class="row g-3 mb-3">
+        <div class="col-md-4"><input class="form-control" name="search" value="{{ search }}" placeholder="工件编码"></div>
+        <div class="col-md-2"><button class="btn btn-outline-primary">搜索</button></div>
+    </form>
+    <table class="table table-hover">
+        <thead><tr><th>编码</th><th>状态</th><th>产品</th><th>母号</th><th>创建</th></tr></thead>
+        <tbody>
+        {% for wp in items %}
+            <tr>
+                <td><a href="{{ url_for('main.workpiece_detail', id=wp.id) }}"><code>{{ wp.code }}</code></a></td>
+                <td>{{ wp.status }}</td>
+                <td>{{ wp.product.product_name if wp.product else '-' }}</td>
+                <td>{{ wp.parent_code or '-' }}</td>
+                <td>{{ wp.created_at.strftime('%Y-%m-%d %H:%M') if wp.created_at else '-' }}</td>
+            </tr>
+        {% else %}
+            <tr><td colspan="5" class="text-muted">暂无工件</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

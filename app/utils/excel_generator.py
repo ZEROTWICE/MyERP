@@ -445,17 +445,15 @@ class ExcelGenerator:
             ws.cell(row=row, column=4, value=process.drawing_no)
             ws.cell(row=row, column=5, value=process.model_no)
             ws.cell(row=row, column=6, value=process.price)
-            ws.cell(row=row, column=7, value=process.effective_date.strftime('%Y-%m-%d'))
+            ws.cell(row=row, column=7, value=process.effective_date.strftime('%Y-%m-%d') if process.effective_date else '')
             ws.cell(row=row, column=8, value=process.notes)
             ws.cell(row=row, column=9, value=process.price_type)
-            
+
             # 如果是小计，添加包含的工序
             if process.price_type == 'subtotal':
-                included_process_codes = []
-                for group in ProcessPriceGroup.query.filter_by(subtotal_id=process.id).all():
-                    included_process = ProcessPrice.query.get(group.process_id)
-                    if included_process:
-                        included_process_codes.append(included_process.process_code)
+                included_process_codes = [group.process.process_code
+                                          for group in process.included_processes
+                                          if group.process]
                 ws.cell(row=row, column=10, value=','.join(included_process_codes))
 
         # 调整列宽
@@ -566,10 +564,10 @@ class ExcelGenerator:
             ws.cell(row=row, column=4, value=task.process.process_code)
             ws.cell(row=row, column=5, value=task.process.process_name)
             ws.cell(row=row, column=6, value=task.quantity)
-            ws.cell(row=row, column=7, value=task.target_date.strftime('%Y-%m-%d'))
+            ws.cell(row=row, column=7, value=task.target_date.strftime('%Y-%m-%d') if task.target_date else '')
             ws.cell(row=row, column=8, value=task.status)
-            ws.cell(row=row, column=9, value=task.assignment_date.strftime('%Y-%m-%d'))
-            ws.cell(row=row, column=10, value=task.completion_date.strftime('%Y-%m-%d') if task.completion_date else '')
+            ws.cell(row=row, column=9, value=task.assigned_date.strftime('%Y-%m-%d') if task.assigned_date else '')
+            ws.cell(row=row, column=10, value=task.completed_at.strftime('%Y-%m-%d') if task.completed_at else '')
             ws.cell(row=row, column=11, value=task.notes)
 
         # 调整列宽

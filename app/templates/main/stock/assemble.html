@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}组装{% endblock %}
+{% block content %}
+<div class="container mt-4">
+    <h2>组装扣料</h2>
+    {% if not product %}
+    <p>选择要组装的成品：</p>
+    <table class="table table-hover">
+        <thead><tr><th>编码</th><th>名称</th><th>零件可售</th><th></th></tr></thead>
+        <tbody>
+        {% for p in products %}
+            <tr>
+                <td>{{ p.product_code }}</td>
+                <td>{{ p.product_name }}</td>
+                <td>{% if p.sellable_as_part %}是{% else %}否{% endif %}</td>
+                <td><a class="btn btn-sm btn-primary" href="{{ url_for('main.assemble_product', product_id=p.id) }}">组装</a></td>
+            </tr>
+        {% else %}
+            <tr><td colspan="4" class="text-muted">暂无产品</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p>{{ product.product_code }} {{ product.product_name }}</p>
+    <form method="post" class="card card-body">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="mb-3">
+            <label class="form-label">组装数量</label>
+            <input class="form-control" type="number" name="quantity" value="1" min="1">
+        </div>
+        <div class="mb-3">
+            <label class="form-label">自制件工件编码（逗号分隔，扫码出库）</label>
+            <input class="form-control" name="workpiece_codes" placeholder="WP001,WP002">
+        </div>
+        <p class="text-muted">标准件/原材料按 BOM 定额扣减；自制件必须扫半成品库中的工件码。</p>
+        <button class="btn btn-primary">提交组装</button>
+        <a class="btn btn-secondary" href="{{ url_for('main.assemble_index') }}">返回</a>
+    </form>
+    {% endif %}
+</div>
+{% endblock %}

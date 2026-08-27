@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}发货出库{% endblock %}
+{% block content %}
+<div class="container mt-4">
+    <h2>发货出库</h2>
+    <form method="post" action="{{ url_for('main.create_shipment') }}" class="card card-body mb-4">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="row g-2">
+            <div class="col-md-6">
+                <select class="form-select" name="sales_order_id" required>
+                    <option value="">选择销售订单</option>
+                    {% for o in orders %}
+                    <option value="{{ o.id }}">{{ o.order_number }} {{ o.customer.customer_name if o.customer else '' }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-check-label"><input type="checkbox" name="whole" value="1"> 整单按库存自动配货</label>
+            </div>
+            <div class="col-md-3"><button class="btn btn-primary">创建发货单</button></div>
+        </div>
+    </form>
+    <table class="table table-hover">
+        <thead><tr><th>发货单</th><th>订单</th><th>状态</th><th>发货时间</th></tr></thead>
+        <tbody>
+        {% for s in items %}
+            <tr>
+                <td><a href="{{ url_for('main.shipment_detail', id=s.id) }}"><code>{{ s.shipment_no }}</code></a></td>
+                <td>{{ s.sales_order.order_number if s.sales_order else '-' }}</td>
+                <td>{{ s.status }}</td>
+                <td>{{ s.shipped_at.strftime('%Y-%m-%d %H:%M') if s.shipped_at else '-' }}</td>
+            </tr>
+        {% else %}
+            <tr><td colspan="4" class="text-muted">暂无发货单</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

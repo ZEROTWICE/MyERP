@@ -506,6 +506,7 @@ class RawMaterialCategoryForm(FlaskForm):
     code = StringField('品类编码', validators=[DataRequired('请输入品类编码'), Length(max=20)])
     description = TextAreaField('品类描述', validators=[Optional(), Length(max=500)])
     is_active = BooleanField('是否启用', default=True)
+    requires_approval = BooleanField('领用需审批', default=True)
     submit = SubmitField('保存')
 
 class RawMaterialInboundForm(FlaskForm):
@@ -609,6 +610,7 @@ class ConsumableCategoryForm(FlaskForm):
     code = StringField('品类编码', validators=[DataRequired('请输入品类编码'), Length(max=20)])
     description = TextAreaField('品类描述', validators=[Optional(), Length(max=500)])
     is_active = BooleanField('是否启用', default=True)
+    requires_approval = BooleanField('领用需审批', default=False)
     submit = SubmitField('保存')
 
 class ConsumableInboundForm(FlaskForm):
@@ -700,6 +702,7 @@ class MaterialRequisitionRecordForm(FlaskForm):
     employee_id = SelectField('领用人', coerce=int, validators=[DataRequired('请选择领用人')])
     purpose = StringField('领用用途', validators=[DataRequired('请输入领用用途'), Length(max=200)])
     requisition_date = DateField('领用日期', validators=[DataRequired('请选择领用日期')])
+    production_order_id = SelectField('关联生产订单', coerce=int, validators=[Optional()], default=0)
     notes = TextAreaField('备注', validators=[Optional(), Length(max=500)])
     
     # 物料明细字段（动态添加）
@@ -709,11 +712,18 @@ class MaterialRequisitionRecordForm(FlaskForm):
     
     def __init__(self, *args, **kwargs):
         super(MaterialRequisitionRecordForm, self).__init__(*args, **kwargs)
-        from app.models import Employee
+        from app.models import Employee, ProductionOrder
         
         # 加载员工选项
         employees = Employee.query.filter_by(is_active=True).all()
         self.employee_id.choices = [(e.id, f"{e.name} ({e.employee_id})") for e in employees]
+        orders = ProductionOrder.query.filter(
+            ProductionOrder.status.in_(['pending', 'in_progress'])
+        ).order_by(ProductionOrder.created_at.desc()).limit(50).all()
+        self.production_order_id.choices = [(0, '不关联生产订单')] + [
+            (o.id, f"{o.order_number} - {o.product.product_name if o.product else o.id}")
+            for o in orders
+        ]
 
 class MaterialRequisitionItemForm(FlaskForm):
     """物料领用明细表单（用于表格行添加）"""
@@ -752,6 +762,7 @@ class MaterialReturnForm(FlaskForm):
     original_requisition_id = SelectField('原领用单', coerce=int, validators=[Optional()])
     returned_date = DateTimeField('归还时间', validators=[DataRequired('请选择归还时间')], default=datetime.utcnow)
     notes = TextAreaField('备注', validators=[Optional(), Length(max=500)])
+    materials_data = HiddenField('归还明细')
     submit = SubmitField('提交归还')
     
     def __init__(self, *args, **kwargs):
@@ -846,10 +857,9 @@ class InventoryCountSearchForm(FlaskForm):
     search = StringField('搜索', render_kw={"placeholder": "输入盘点单号或盘点名称进行搜索"})
     status = SelectField('状态', choices=[
         ('', '全部'),
-        ('draft', '草稿'),
-        ('in_progress', '进行中'),
+        ('planning', '计划中'),
+        ('counting', '盘点中'),
         ('completed', '已完成'),
-        ('approved', '已审批'),
         ('cancelled', '已取消')
     ], default='')
     count_type = SelectField('盘点类型', choices=[

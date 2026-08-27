@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}采购单{% endblock %}
+{% block content %}
+<div class="container mt-4">
+    <h2>采购单</h2>
+    {% if full_workflow %}
+    <p><a href="{{ url_for('main.manage_purchase_requisitions') }}">请购单</a> 已启用。</p>
+    {% else %}
+    <p class="text-muted">完整请购流程未启用，可直接建采购单（配置项 purchase.full_workflow_enabled）。</p>
+    {% endif %}
+    <form method="post" action="{{ url_for('main.save_purchase_order') }}" class="card card-body mb-4">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="row g-2 mb-2">
+            <div class="col-md-4">
+                <select class="form-select" name="supplier_id" required>
+                    <option value="">选择供应商</option>
+                    {% for s in suppliers %}
+                    <option value="{{ s.id }}">{{ s.code }} {{ s.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-8"><input class="form-control" name="notes" placeholder="备注"></div>
+            <div class="col-md-4"><input class="form-control" name="item_name" placeholder="物料名称" required></div>
+            <div class="col-md-2"><input class="form-control" name="item_qty" type="number" step="0.01" value="1"></div>
+            <div class="col-md-2"><input class="form-control" name="item_price" type="number" step="0.01" value="0"></div>
+            <div class="col-md-2">
+                <select class="form-select" name="item_type">
+                    <option value="raw">原材料</option>
+                    <option value="consumable">易耗品</option>
+                </select>
+            </div>
+            <div class="col-md-2"><button class="btn btn-primary">保存采购单</button></div>
+        </div>
+    </form>
+    <table class="table table-hover">
+        <thead><tr><th>单号</th><th>供应商</th><th>状态</th><th></th></tr></thead>
+        <tbody>
+        {% for po in items %}
+            <tr>
+                <td><a href="{{ url_for('main.purchase_order_detail', id=po.id) }}"><code>{{ po.po_no }}</code></a></td>
+                <td>{{ po.supplier.name if po.supplier else '-' }}</td>
+                <td>{{ po.status }}</td>
+                <td><a class="btn btn-sm btn-outline-primary" href="{{ url_for('main.purchase_order_detail', id=po.id) }}">到货</a></td>
+            </tr>
+        {% else %}
+            <tr><td colspan="4" class="text-muted">暂无采购单</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

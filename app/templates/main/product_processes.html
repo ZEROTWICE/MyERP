@@ -76,6 +76,8 @@
                     <th>总时间</th>
                     <th>总成本</th>
                     <th>必需</th>
+                    <th>阶段</th>
+                    <th>工作中心</th>
                     <th>备注</th>
                     <th>操作</th>
                 </tr>
@@ -99,6 +101,8 @@
                             <span class="badge bg-secondary">否</span>
                         {% endif %}
                     </td>
+                    <td>{{ {'calcine':'煅烧','machine':'机加工','assemble':'组装'}.get(item.process_stage, item.process_stage or '机加工') }}</td>
+                    <td>{{ item.work_center.code if item.work_center else '-' }}</td>
                     <td>{{ item.notes or '-' }}</td>
                     <td>
                         {% if current_user.role in ['admin', 'manager'] %}
@@ -117,7 +121,7 @@
             </tbody>
             <tfoot>
                 <tr class="table-info">
-                    <td colspan="8"><strong>总工序成本</strong></td>
+                    <td colspan="10"><strong>总工序成本</strong></td>
                     <td><strong>¥{{ "%.2f"|format(product.total_process_cost) }}</strong></td>
                     <td colspan="3"></td>
                 </tr>
@@ -160,7 +164,9 @@
                                 <th style="width: 10%;">准备时间(分钟)</th>
                                 <th style="width: 10%;">加工时间(分钟)</th>
                                 <th style="width: 8%;">必需</th>
-                                <th style="width: 15%;">备注</th>
+                                <th style="width: 10%;">阶段</th>
+                                <th style="width: 10%;">工作中心</th>
+                                <th style="width: 12%;">备注</th>
                                 <th style="width: 4%;">操作</th>
                             </tr>
                         </thead>
@@ -263,6 +269,25 @@
                         <label for="editProcessNotes" class="form-label">备注</label>
                         <textarea class="form-control" id="editProcessNotes" name="notes" rows="2"></textarea>
                     </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <label class="form-label">阶段</label>
+                            <select class="form-select" id="editProcessStage">
+                                <option value="machine">机加工</option>
+                                <option value="calcine">煅烧</option>
+                                <option value="assemble">组装</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">工作中心</label>
+                            <select class="form-select" id="editWorkCenterId">
+                                <option value="">-</option>
+                                {% for wc in work_centers %}
+                                <option value="{{ wc.id }}">{{ wc.code }} {{ wc.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
                 </form>
             </div>
             <div class="modal-footer">
@@ -330,6 +355,21 @@ function addProcessRow() {
             <div class="form-check">
                 <input type="checkbox" class="form-check-input" name="is_required_${rowId}" checked>
             </div>
+        </td>
+        <td>
+            <select class="form-select form-select-sm" name="process_stage_${rowId}">
+                <option value="machine">机加工</option>
+                <option value="calcine">煅烧</option>
+                <option value="assemble">组装</option>
+            </select>
+        </td>
+        <td>
+            <select class="form-select form-select-sm" name="work_center_id_${rowId}">
+                <option value="">-</option>
+                {% for wc in work_centers %}
+                <option value="{{ wc.id }}">{{ wc.code }}</option>
+                {% endfor %}
+            </select>
         </td>
         <td>
             <input type="text" class="form-control form-control-sm" name="notes_${rowId}" placeholder="备注">
@@ -427,6 +467,8 @@ function submitBatchProcesses() {
             setup_time: row.querySelector('input[name^="setup_time_"]').value || 0,
             process_time: row.querySelector('input[name^="process_time_"]').value || 0,
             is_required: row.querySelector('input[name^="is_required_"]').checked,
+            process_stage: row.querySelector('select[name^="process_stage_"]').value || 'machine',
+            work_center_id: row.querySelector('select[name^="work_center_id_"]').value || null,
             notes: row.querySelector('input[name^="notes_"]').value || ''
         };
         
@@ -482,6 +524,8 @@ function editProcessItem(id) {
             document.getElementById('editProcessTime').value = processData.process_time;
             document.getElementById('editIsRequired').checked = processData.is_required;
             document.getElementById('editProcessNotes').value = processData.notes;
+            document.getElementById('editProcessStage').value = processData.process_stage || 'machine';
+            document.getElementById('editWorkCenterId').value = processData.work_center_id || '';
             
             // 设置当前编辑的工序ID
             document.getElementById('editProcessForm').setAttribute('data-process-id', id);
@@ -509,7 +553,9 @@ function submitEditProcessItem() {
         setup_time: document.getElementById('editSetupTime').value,
         process_time: document.getElementById('editProcessTime').value,
         is_required: document.getElementById('editIsRequired').checked,
-        notes: document.getElementById('editProcessNotes').value
+        notes: document.getElementById('editProcessNotes').value,
+        process_stage: document.getElementById('editProcessStage').value,
+        work_center_id: document.getElementById('editWorkCenterId').value || null
     };
     
     fetch(`{{ url_for('main.update_product_process', product_id=product.id, process_item_id=0) }}`.replace('0', processId), {

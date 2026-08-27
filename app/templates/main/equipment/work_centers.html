@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}工作中心{% endblock %}
+{% block content %}
+<div class="container mt-4">
+    <h2 class="mb-4">工作中心</h2>
+    <div class="card mb-4">
+        <div class="card-header">新增工作中心</div>
+        <div class="card-body">
+            <form method="post" action="{{ url_for('main.save_work_center') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="row g-3">
+                    <div class="col-md-3"><input class="form-control" name="code" placeholder="编码 *" required></div>
+                    <div class="col-md-3"><input class="form-control" name="name" placeholder="名称 *" required></div>
+                    <div class="col-md-6"><input class="form-control" name="notes" placeholder="备注"></div>
+                    <div class="col-12">
+                        {% for eq in equipment %}
+                        <label class="me-3"><input type="checkbox" name="equipment_ids" value="{{ eq.id }}"> {{ eq.code }} {{ eq.name }}</label>
+                        {% endfor %}
+                    </div>
+                    <div class="col-12"><button class="btn btn-primary" type="submit">保存</button></div>
+                </div>
+            </form>
+        </div>
+    </div>
+    <table class="table table-hover">
+        <thead><tr><th>编码</th><th>名称</th><th>设备</th></tr></thead>
+        <tbody>
+        {% for c in centers %}
+            <tr>
+                <td><code>{{ c.code }}</code></td>
+                <td>{{ c.name }}</td>
+                <td>{% for m in c.members %}{{ m.equipment.code }}{% if not loop.last %}、{% endif %}{% else %}-{% endfor %}</td>
+            </tr>
+        {% else %}
+            <tr><td colspan="3" class="text-muted">暂无工作中心</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

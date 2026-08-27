@@ -106,11 +106,11 @@
                                     <th width="15%">领用单号</th>
                                     <th width="12%">领用人</th>
                                     <th width="12%">部门</th>
-                                    <th width="20%">用途</th>
+                                    <th width="18%">用途</th>
                                     <th width="10%">领用日期</th>
                                     <th width="8%">物料数量</th>
-                                    <th width="12%">创建时间</th>
-                                    <th width="11%">操作</th>
+                                    <th width="10%">状态</th>
+                                    <th width="15%">操作</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -141,12 +141,22 @@
                                         {{ requisition.required_date.strftime('%Y-%m-%d') }}
                                     </td>
                                     <td class="text-center">
-                                        <span class="badge bg-info">{{ requisition.items|length }} 项</span>
+                                        <span class="badge bg-info">{{ requisition.items.count() }} 项</span>
                                     </td>
                                     <td>
-                                        <small class="text-muted">
-                                            {{ requisition.requested_date.strftime('%m-%d %H:%M') }}
-                                        </small>
+                                        {% if requisition.status == 'pending' %}
+                                            <span class="badge bg-warning text-dark">待审批</span>
+                                        {% elif requisition.status == 'approved' %}
+                                            <span class="badge bg-info">待发料</span>
+                                        {% elif requisition.status == 'completed' %}
+                                            <span class="badge bg-success">已发料</span>
+                                        {% elif requisition.status == 'rejected' %}
+                                            <span class="badge bg-danger">已拒绝</span>
+                                        {% elif requisition.status == 'cancelled' %}
+                                            <span class="badge bg-secondary">已取消</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">{{ requisition.status }}</span>
+                                        {% endif %}
                                     </td>
                                     <td>
                                         <div class="btn-group btn-group-sm">

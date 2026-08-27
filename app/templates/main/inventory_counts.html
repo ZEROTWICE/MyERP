@@ -23,7 +23,7 @@
                     <div class="small-box bg-warning">
                         <div class="inner">
                             <h3>{{ in_progress_count }}</h3>
-                            <p>进行中</p>
+                            <p>盘点中</p>
                         </div>
                         <div class="icon">
                             <i class="fas fa-clock"></i>
@@ -44,11 +44,11 @@
                 <div class="col-lg-3 col-6">
                     <div class="small-box bg-primary">
                         <div class="inner">
-                            <h3>{{ approved_count }}</h3>
-                            <p>已审批</p>
+                            <h3>{{ planning_count }}</h3>
+                            <p>计划中</p>
                         </div>
                         <div class="icon">
-                            <i class="fas fa-check-double"></i>
+                            <i class="fas fa-clipboard-list"></i>
                         </div>
                     </div>
                 </div>
@@ -61,9 +61,9 @@
                         <i class="fas fa-clipboard-check"></i> 库存盘点管理
                     </h3>
                     <div class="card-tools">
-                        <button class="btn btn-primary btn-sm" onclick="alert('新建盘点功能开发中...')">
+                        <a class="btn btn-primary btn-sm" href="{{ url_for('main.add_inventory_count') }}">
                             <i class="fas fa-plus"></i> 新建盘点
-                        </button>
+                        </a>
                     </div>
                 </div>
                 
@@ -117,9 +117,9 @@
                                 {% for count in counts.items %}
                                 <tr>
                                     <td>
-                                        <span class="text-primary" style="cursor: pointer;" onclick="alert('查看详情功能开发中...')">
+                                        <a href="{{ url_for('main.inventory_count_detail', id=count.id) }}" class="text-primary">
                                             {{ count.count_number }}
-                                        </span>
+                                        </a>
                                     </td>
                                     <td>{{ count.creator.username }}</td>
                                     <td>
@@ -133,16 +133,16 @@
                                     </td>
                                     <td>{{ count.count_scope }}</td>
                                     <td>
-                                        {% if count.status == 'draft' %}
-                                            <span class="badge badge-secondary">草稿</span>
-                                        {% elif count.status == 'in_progress' %}
-                                            <span class="badge badge-warning">进行中</span>
+                                        {% if count.status == 'planning' %}
+                                            <span class="badge bg-secondary">计划中</span>
+                                        {% elif count.status == 'counting' %}
+                                            <span class="badge bg-warning text-dark">盘点中</span>
                                         {% elif count.status == 'completed' %}
-                                            <span class="badge badge-success">已完成</span>
-                                        {% elif count.status == 'approved' %}
-                                            <span class="badge badge-primary">已审批</span>
+                                            <span class="badge bg-success">已完成</span>
                                         {% elif count.status == 'cancelled' %}
-                                            <span class="badge badge-danger">已取消</span>
+                                            <span class="badge bg-danger">已取消</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">{{ count.status }}</span>
                                         {% endif %}
                                     </td>
                                     <td>{{ count.planned_date.strftime('%Y-%m-%d') }}</td>
@@ -155,14 +155,9 @@
                                     </td>
                                     <td>
                                         <div class="btn-group btn-group-sm">
-                                            <button class="btn btn-info btn-sm" title="查看详情" onclick="alert('查看详情功能开发中...')">
+                                            <a class="btn btn-info btn-sm" title="查看详情" href="{{ url_for('main.inventory_count_detail', id=count.id) }}">
                                                 <i class="fas fa-eye"></i>
-                                            </button>
-                                            {% if count.status == 'draft' %}
-                                            <button class="btn btn-warning btn-sm" title="编辑" onclick="alert('编辑功能开发中...')">
-                                                <i class="fas fa-edit"></i>
-                                            </button>
-                                            {% endif %}
+                                            </a>
                                         </div>
                                     </td>
                                 </tr>

@@ -31,6 +31,7 @@
                                     <th>描述</th>
                                     <th>易耗品数量</th>
                                     <th>状态</th>
+                                    <th>领用审批</th>
                                     <th>创建时间</th>
                                     <th>操作</th>
                                 </tr>
@@ -51,6 +52,13 @@
                                         <span class="badge bg-success">启用</span>
                                         {% else %}
                                         <span class="badge bg-secondary">禁用</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if category.requires_approval %}
+                                        <span class="badge bg-warning text-dark">需审批</span>
+                                        {% else %}
+                                        <span class="badge bg-secondary">免审</span>
                                         {% endif %}
                                     </td>
                                     <td>{{ category.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
@@ -106,6 +114,12 @@
                             <label class="form-check-label">启用</label>
                         </div>
                     </div>
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="requires_approval">
+                            <label class="form-check-label">领用需审批</label>
+                        </div>
+                    </div>
                 </form>
             </div>
             <div class="modal-footer">
@@ -145,6 +159,12 @@
                             <label class="form-check-label">启用</label>
                         </div>
                     </div>
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="requires_approval">
+                            <label class="form-check-label">领用需审批</label>
+                        </div>
+                    </div>
                 </form>
             </div>
             <div class="modal-footer">
@@ -171,6 +191,7 @@ function saveCategory() {
     
     // 处理复选框
     formData.set('is_active', form.is_active.checked);
+    formData.set('requires_approval', form.requires_approval.checked);
     
     fetch('/consumables/categories/add', {
         method: 'POST',
@@ -203,6 +224,7 @@ function editCategory(id) {
             form.code.value = data.code;
             form.description.value = data.description || '';
             form.is_active.checked = data.is_active;
+            form.requires_approval.checked = !!data.requires_approval;
             
             new bootstrap.Modal(document.getElementById('editCategoryModal')).show();
         })
@@ -220,6 +242,7 @@ function updateCategory() {
     
     // 处理复选框
     data.is_active = form.is_active.checked;
+    data.requires_approval = form.requires_approval.checked;
     
     fetch(`/consumables/categories/${currentCategoryId}`, {
         method: 'PUT',

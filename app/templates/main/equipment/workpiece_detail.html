@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}工件 {{ wp.code }}{% endblock %}
+{% block content %}
+<div class="container mt-4">
+    <h2>工件 <code>{{ wp.code }}</code> <span class="badge bg-secondary">{{ wp.status }}</span></h2>
+    <p>流水号 {{ wp.global_sn }}　母号 {{ wp.parent_code or '-' }}　产品 {{ wp.product.product_name if wp.product else '-' }}</p>
+    <h5>履历</h5>
+    <table class="table table-sm">
+        <thead><tr><th>时间</th><th>事件</th><th>设备</th><th>炉次</th><th>详情</th></tr></thead>
+        <tbody>
+        {% for ev in events %}
+            <tr>
+                <td>{{ ev.at.strftime('%Y-%m-%d %H:%M') if ev.at else '-' }}</td>
+                <td>{{ ev.event_type }}</td>
+                <td>{{ ev.equipment_id or '-' }}</td>
+                <td>{{ ev.heat_lot_id or '-' }}</td>
+                <td><small>{{ ev.payload }}</small></td>
+            </tr>
+        {% else %}
+            <tr><td colspan="5" class="text-muted">暂无履历</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    <a href="{{ url_for('main.manage_workpieces') }}" class="btn btn-secondary">返回</a>
+</div>
+{% endblock %}

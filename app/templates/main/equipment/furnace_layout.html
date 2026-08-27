@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}装炉图 - {{ equipment.code }}{% endblock %}
+{% block content %}
+<div class="container mt-4">
+    <h2>装炉图：{{ equipment.code }} {{ equipment.name }}</h2>
+    <form method="post" class="card card-body mb-4">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="row g-3">
+            <div class="col-md-4"><input class="form-control" name="name" value="{{ layout.name if layout else '' }}" placeholder="布局名称"></div>
+            <div class="col-md-2"><input class="form-control" type="number" name="layers" value="1" min="1" placeholder="层"></div>
+            <div class="col-md-2"><input class="form-control" type="number" name="rows" value="3" min="1" placeholder="行"></div>
+            <div class="col-md-2"><input class="form-control" type="number" name="cols" value="3" min="1" placeholder="列"></div>
+            <div class="col-md-2"><button class="btn btn-primary">生成格子</button></div>
+        </div>
+    </form>
+    {% if cells %}
+    <p>共 {{ cells|length }} 格（层/行/列）</p>
+    <div class="table-responsive">
+        <table class="table table-sm table-bordered">
+            <thead><tr><th>层</th><th>行</th><th>列</th><th>最大件数</th></tr></thead>
+            <tbody>
+            {% for cell in cells %}
+                <tr><td>{{ cell.layer }}</td><td>{{ cell.row }}</td><td>{{ cell.col }}</td><td>{{ cell.max_pieces }}</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+    <a href="{{ url_for('main.manage_equipment') }}" class="btn btn-secondary">返回设备</a>
+</div>
+{% endblock %}

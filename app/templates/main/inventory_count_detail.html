@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+
+{% block title %}盘点详情{% endblock %}
+
+{% block content %}
+{% set count_items = count.items.all() %}
+<div class="container-fluid">
+    <div class="card shadow-sm mb-3">
+        <div class="card-header bg-primary text-white d-flex justify-content-between">
+            <h4 class="mb-0">{{ count.count_number }} · {{ count.count_name }}</h4>
+            <span>
+                {% if count.status == 'planning' %}<span class="badge bg-secondary">计划中</span>
+                {% elif count.status == 'counting' %}<span class="badge bg-warning text-dark">盘点中</span>
+                {% elif count.status == 'completed' %}<span class="badge bg-success">已完成</span>
+                {% elif count.status == 'cancelled' %}<span class="badge bg-danger">已取消</span>
+                {% else %}<span class="badge bg-secondary">{{ count.status }}</span>{% endif %}
+            </span>
+        </div>
+        <div class="card-body">
+            <p>范围：{{ count.count_scope }}　类型：{{ count.count_type }}　计划日期：{{ count.planned_date }}</p>
+            <p>进度：{{ count.completed_items }} / {{ count.total_items }}（{{ count.progress_percentage }}%）　差异行：{{ count.variance_items }}</p>
+        </div>
+    </div>
+    <form method="POST" action="{{ url_for('main.record_inventory_count', id=count.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="card shadow-sm mb-3">
+            <div class="card-header">盘点明细</div>
+            <div class="table-responsive">
+                <table class="table mb-0">
+                    <thead>
+                        <tr>
+                            <th>物料</th>
+                            <th>类型</th>
+                            <th>账面</th>
+                            <th>实盘</th>
+                            <th>差异</th>
+                            <th>原因</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in count_items %}
+                        <tr>
+                            <td>{{ item.material_name }}</td>
+                            <td>{{ item.material_type }}</td>
+                            <td>{{ item.system_quantity }}</td>
+                            <td>
+                                {% if count.status == 'counting' %}
+                                <input type="number" class="form-control form-control-sm" name="actual_{{ item.id }}" step="0.01"
+                                       value="{{ item.actual_quantity if item.actual_quantity is not none else '' }}">
+                                {% else %}
+                                {{ item.actual_quantity if item.actual_quantity is not none else '-' }}
+                                {% endif %}
+                            </td>
+                            <td>{{ item.variance_quantity if item.variance_quantity is not none else '-' }}</td>
+                            <td>
+                                {% if count.status == 'counting' %}
+                                <input type="text" class="form-control form-control-sm" name="reason_{{ item.id }}" value="{{ item.variance_reason or '' }}">
+                                {% else %}
+                                {{ item.variance_reason or '-' }}
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="6" class="text-muted text-center">快照为空</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="d-flex justify-content-between">
+            <a href="{{ url_for('main.manage_inventory_counts') }}" class="btn btn-secondary">返回列表</a>
+            <div>
+                {% if can('inventory.manage') %}
+                {% if count.status == 'counting' %}
+                <button type="submit" class="btn btn-outline-primary">保存实盘</button>
+                {% endif %}
+                {% endif %}
+            </div>
+        </div>
+    </form>
+    <div class="mt-3 text-end">
+        {% if can('inventory.manage') %}
+        {% if count.can_start %}
+        <form method="POST" action="{{ url_for('main.start_inventory_count', id=count.id) }}" class="d-inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn-primary">开始盘点</button>
+        </form>
+        {% endif %}
+        {% if count.can_complete %}
+        <form method="POST" action="{{ url_for('main.complete_inventory_count', id=count.id) }}" class="d-inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn-success">完成并调账</button>
+        </form>
+        {% endif %}
+        {% if count.can_cancel %}
+        <form method="POST" action="{{ url_for('main.cancel_inventory_count', id=count.id) }}" class="d-inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn-outline-danger">取消</button>
+        </form>
+        {% endif %}
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

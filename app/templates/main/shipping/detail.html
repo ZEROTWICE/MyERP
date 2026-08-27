@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}发货单 {{ ship.shipment_no }}{% endblock %}
+{% block content %}
+<div class="container mt-4">
+    <h2>发货单 {{ ship.shipment_no }} <span class="badge bg-secondary">{{ ship.status }}</span></h2>
+    <p>订单：{{ ship.sales_order.order_number if ship.sales_order else '-' }}</p>
+    <h6>已选明细</h6>
+    <table class="table table-sm">
+        <thead><tr><th>库存编号</th><th>工件</th><th>数量</th></tr></thead>
+        <tbody>
+        {% for it in ship.items %}
+            <tr>
+                <td>{{ it.finished_product.serial_number if it.finished_product else '-' }}</td>
+                <td>{{ it.workpiece.code if it.workpiece else '-' }}</td>
+                <td>{{ it.quantity }}</td>
+            </tr>
+        {% else %}
+            <tr><td colspan="3" class="text-muted">尚未加入库存，可从下方在库件添加，或创建时勾选整单配货。</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% if ship.status == 'draft' %}
+    <form method="post" action="{{ url_for('main.shipment_add_item', id=ship.id) }}" class="card card-body mb-3">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <select class="form-select mb-2" name="finished_product_id" required>
+            <option value="">选择在库成品/零件</option>
+            {% for fp in available %}
+            <option value="{{ fp.id }}">{{ fp.serial_number }} {{ fp.product_number }} ({{ fp.stock_kind }})</option>
+            {% endfor %}
+        </select>
+        <button class="btn btn-outline-primary">加入发货单</button>
+    </form>
+    <form method="post" action="{{ url_for('main.confirm_shipment', id=ship.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="btn btn-primary">确认出库发货</button>
+    </form>
+    {% elif ship.status == 'shipped' %}
+    <form method="post" action="{{ url_for('main.sign_shipment', id=ship.id) }}" class="card card-body">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input class="form-control mb-2" name="signed_by_name" placeholder="签收人姓名" required>
+        <input class="form-control mb-2" name="notes" placeholder="签收备注">
+        <button class="btn btn-success">登记签收</button>
+    </form>
+    {% elif ship.receipt %}
+    <p>已签收：{{ ship.receipt.signed_by_name }}　{{ ship.receipt.signed_at }}</p>
+    {% endif %}
+    <a class="btn btn-secondary mt-3" href="{{ url_for('main.manage_shipments') }}">返回</a>
+</div>
+{% endblock %}

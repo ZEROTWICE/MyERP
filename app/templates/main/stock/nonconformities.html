@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}不合格处置{% endblock %}
+{% block content %}
+<div class="container mt-4">
+    <h2>不合格处置</h2>
+    <table class="table table-hover">
+        <thead><tr><th>ID</th><th>类型</th><th>状态</th><th>工件</th><th>结果</th><th>操作</th></tr></thead>
+        <tbody>
+        {% for nc in items %}
+            <tr>
+                <td>{{ nc.id }}</td>
+                <td>{{ nc.type }}</td>
+                <td>{{ nc.status }}</td>
+                <td>{% if nc.workpiece_id %}<a href="{{ url_for('main.workpiece_detail', id=nc.workpiece_id) }}">{{ nc.workpiece_id }}</a>{% else %}-{% endif %}</td>
+                <td>{{ nc.handling_result }}</td>
+                <td>
+                    {% if nc.status in ('open', 'pending_approval') %}
+                    <form class="d-inline" method="post" action="{{ url_for('main.dispose_nonconformity_api', id=nc.id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button class="btn btn-sm btn-outline-primary" name="action" value="rework">返工</button>
+                        <button class="btn btn-sm btn-outline-danger" name="action" value="scrap">报废</button>
+                        <button class="btn btn-sm btn-outline-success" name="action" value="accept">让步</button>
+                    </form>
+                    {% endif %}
+                </td>
+            </tr>
+        {% else %}
+            <tr><td colspan="6" class="text-muted">暂无不合格记录</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

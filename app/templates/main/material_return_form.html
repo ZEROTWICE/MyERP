@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white">
+            <h4 class="mb-0">{{ title }}</h4>
+        </div>
+        <div class="card-body">
+            <form method="POST" id="returnForm">
+                {{ form.hidden_tag() }}
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        {{ form.employee_id.label(class="form-label") }}
+                        {{ form.employee_id(class="form-select") }}
+                    </div>
+                    <div class="col-md-4">
+                        {{ form.department.label(class="form-label") }}
+                        {{ form.department(class="form-control") }}
+                    </div>
+                    <div class="col-md-4">
+                        {{ form.returned_date.label(class="form-label") }}
+                        {{ form.returned_date(class="form-control") }}
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        {{ form.original_requisition_id.label(class="form-label") }}
+                        {{ form.original_requisition_id(class="form-select", id="originalRequisition") }}
+                        <div class="form-text">必须选择已发料完成的领用单</div>
+                    </div>
+                    <div class="col-md-6">
+                        {{ form.return_reason.label(class="form-label") }}
+                        {{ form.return_reason(class="form-control") }}
+                    </div>
+                </div>
+                <div class="mb-3">
+                    {{ form.notes.label(class="form-label") }}
+                    {{ form.notes(class="form-control", rows="2") }}
+                </div>
+                {{ form.materials_data() }}
+                <div class="card mb-3">
+                    <div class="card-header">归还明细（数量不得超过原领用已发数量）</div>
+                    <div class="card-body p-0">
+                        <table class="table mb-0" id="returnItemsTable">
+                            <thead>
+                                <tr>
+                                    <th>物料</th>
+                                    <th>已发数量</th>
+                                    <th>归还数量</th>
+                                    <th>状态</th>
+                                    <th>备注</th>
+                                </tr>
+                            </thead>
+                            <tbody id="returnItemsBody">
+                                <tr><td colspan="5" class="text-muted text-center">请先选择原领用单</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <a href="{{ url_for('main.manage_material_returns') }}" class="btn btn-secondary">返回列表</a>
+                    {{ form.submit(class="btn btn-primary") }}
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<script>
+const issuedItemsUrlTpl = "{{ url_for('main.api_requisition_issued_items', id=0) }}";
+let issuedItems = [];
+function loadIssuedItems(reqId) {
+    const tbody = document.getElementById('returnItemsBody');
+    if (!reqId || reqId === '0') {
+        issuedItems = [];
+        tbody.innerHTML = '<tr><td colspan="5" class="text-muted text-center">请先选择原领用单</td></tr>';
+        document.getElementById('materials_data').value = '[]';
+        return;
+    }
+    fetch(issuedItemsUrlTpl.replace(/0$/, reqId))
+        .then(r => r.json())
+        .then(body => {
+            if (!body.success) {
+                alert(body.message || '加载领用明细失败');
+                return;
+            }
+            issuedItems = body.data || [];
+            if (body.employee_id) document.getElementById('employee_id').value = body.employee_id;
+            if (body.department) document.getElementById('department').value = body.department;
+            if (!issuedItems.length) {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-muted text-center">该领用单没有已发明细</td></tr>';
+                return;
+            }
+            tbody.innerHTML = issuedItems.map(function(it, idx) {
+                return `<tr>
+                    <td>${it.material_name}<input type="hidden" data-idx="${idx}"></td>
+                    <td>${it.issued_quantity} ${it.unit || ''}</td>
+                    <td><input type="number" class="form-control form-control-sm ret-qty" data-idx="${idx}" min="0" max="${it.issued_quantity}" step="0.01" value="0"></td>
+                    <td>
+                        <select class="form-select form-select-sm ret-cond" data-idx="${idx}">
+                            <option value="good">完好</option>
+                            <option value="damaged">损坏</option>
+                            <option value="expired">过期</option>
+                        </select>
+                    </td>
+                    <td><input type="text" class="form-control form-control-sm ret-notes" data-idx="${idx}"></td>
+                </tr>`;
+            }).join('');
+        });
+}
+document.getElementById('originalRequisition').addEventListener('change', function() {
+    loadIssuedItems(this.value);
+});
+document.getElementById('returnForm').addEventListener('submit', function(e) {
+    const lines = [];
+    issuedItems.forEach(function(it, idx) {
+        const qtyEl = document.querySelector('.ret-qty[data-idx="'+idx+'"]');
+        const qty = parseFloat(qtyEl && qtyEl.value ? qtyEl.value : 0);
+        if (qty > 0) {
+            lines.push({
+                material_type: it.material_type,
+                material_id: it.material_id,
+                material_name: it.material_name,
+                quantity: qty,
+                unit: it.unit,
+                condition: document.querySelector('.ret-cond[data-idx="'+idx+'"]').value,
+                notes: document.querySelector('.ret-notes[data-idx="'+idx+'"]').value
+            });
+        }
+    });
+    if (!lines.length) {
+        e.preventDefault();
+        alert('请至少填写一项归还数量');
+        return;
+    }
+    document.getElementById('materials_data').value = JSON.stringify(lines);
+});
+if (document.getElementById('originalRequisition').value && document.getElementById('originalRequisition').value !== '0') {
+    loadIssuedItems(document.getElementById('originalRequisition').value);
+}
+</script>
+{% endblock %}

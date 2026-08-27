@@ -7,6 +7,7 @@ from app.models import (
     InspectionItemRecord, NonconformityRecord, AuditLog, User, Employee,
     SerialNumber, ProcessPrice, FinishedProduct, RawMaterial, ProductionRecord
 )
+from app.permissions import require_capability
 from datetime import datetime, timedelta
 from . import bp
 
@@ -113,6 +114,7 @@ def quality_inspection(record_id):
 # API路由
 @bp.route('/api/quality/templates', methods=['GET'])
 @login_required
+@require_capability('quality.view')
 def get_templates():
     """获取质检模板列表"""
     page = request.args.get('page', 1, type=int)
@@ -167,6 +169,7 @@ def get_templates():
 
 @bp.route('/api/quality/templates/<int:template_id>', methods=['GET'])
 @login_required
+@require_capability('quality.template.manage')
 def get_template_detail(template_id):
     """获取质检模板详情"""
     template = InspectionTemplate.query.get_or_404(template_id)
@@ -483,6 +486,7 @@ def manage_template(template_id):
 
 @bp.route('/api/quality/tasks', methods=['GET'])
 @login_required
+@require_capability('quality.view')
 def get_tasks():
     """获取质检任务列表"""
     page = request.args.get('page', 1, type=int)
@@ -540,6 +544,7 @@ def get_tasks():
 
 @bp.route('/api/quality/tasks/<int:task_id>', methods=['GET'])
 @login_required
+@require_capability('quality.view')
 def get_task_detail(task_id):
     """获取质检任务详情"""
     task = InspectionTask.query.get_or_404(task_id)
@@ -631,6 +636,7 @@ def manage_task(task_id):
 
 @bp.route('/api/quality/inspectors', methods=['GET'])
 @login_required
+@require_capability('quality.view')
 def get_inspectors():
     """获取质检员列表"""
     try:
@@ -657,6 +663,7 @@ def get_inspectors():
 
 @bp.route('/api/quality/processes', methods=['GET'])
 @login_required
+@require_capability('quality.view')
 def get_processes():
     """获取工序列表"""
     try:
@@ -699,6 +706,7 @@ def get_processes():
 
 @bp.route('/api/quality/finished-products', methods=['GET'])
 @login_required
+@require_capability('quality.view')
 def get_finished_products():
     """获取成品列表"""
     try:
@@ -726,6 +734,7 @@ def get_finished_products():
 
 @bp.route('/api/quality/production-records', methods=['GET'])
 @login_required
+@require_capability('quality.view')
 def get_production_records():
     """获取生产记录列表"""
     try:
@@ -941,6 +950,17 @@ def submit_inspection_record(record_id):
         
         db.session.commit()
         
+        from app.services import mes_service
+        mes_service.apply_inspection_result(record)
+        if task and task.target_type == 'goods_receipt' and record.result == 'pass':
+            from app.models import GoodsReceipt
+            from app.main.purchase import _putaway_receipt
+            receipt = GoodsReceipt.query.get(task.target_id)
+            if receipt:
+                receipt.status = 'accepted'
+                _putaway_receipt(receipt)
+        db.session.commit()
+
         return jsonify({
             'success': True,
             'message': '质检记录提交成功'
@@ -1100,6 +1120,7 @@ def update_task(task_id):
 
 @bp.route('/api/quality/records', methods=['GET'])
 @login_required
+@require_capability('quality.view')
 def get_inspection_records():
     """获取质检记录列表API"""
     try:
@@ -1207,6 +1228,7 @@ def get_inspection_records():
 
 @bp.route('/api/quality/records/<int:record_id>', methods=['GET'])
 @login_required
+@require_capability('quality.view')
 def get_inspection_record_detail(record_id):
     """获取质检记录详情API"""
     try:
@@ -1285,50 +1307,16 @@ def print_inspection_record(record_id):
         if current_user.role == 'inspector' and record.inspector_id != current_user.id:
             return jsonify({'success': False, 'message': '权限不足'}), 403
         
-        # 获取检验对象名称
-        target_name = '未知'
-        if record.task:
-            target_name = get_inspection_target_name(record.task)
-        
-        # 获取检验员名称
+        # 模板直接读取 ORM 关系，这里只补两个模板取不到的派生名称
+        target_name = get_inspection_target_name(record.task) if record.task else '未知'
         inspector_name = record.inspector.employee.name if record.inspector and record.inspector.employee else (record.inspector.username if record.inspector else '未知')
-        
-        # 获取检验项目记录
-        items = []
-        for item_record in record.item_records:
-            item = item_record.item
-            items.append({
-                'item_name': item.item_name,
-                'unit': item.unit or '',
-                'standard_value': item.standard_value or '',
-                'tolerance': item.tolerance or '',
-                'measured_value': item_record.measured_value,
-                'is_qualified': '合格' if item_record.is_qualified else '不合格',
-                'notes': item_record.notes or ''
-            })
-        
-        # 获取基本信息项目记录
-        base_items = []
-        for base_record in record.base_item_records:
-            base_item = base_record.base_item
-            base_items.append({
-                'item_name': base_item.item_name,
-                'value': base_record.value
-            })
-        
-        print_data = {
-            'record_code': record.global_sn,
-            'type': record.task.target_type if record.task else 'unknown',
-            'inspection_target': target_name,
-            'inspector_name': inspector_name,
-            'inspection_time': record.created_at.strftime('%Y-%m-%d %H:%M:%S'),
-            'result': '合格' if record.result == 'pass' else '不合格',
-            'notes': record.notes or '',
-            'items': items,
-            'base_items': base_items
-        }
-        
-        return render_template('main/quality/print_record.html', record=print_data)
+
+        return render_template(
+            'main/quality/print_record.html',
+            record=record,
+            target_name=target_name,
+            inspector_name=inspector_name
+        )
         
     except Exception as e:
         current_app.logger.error(f'打印质检记录失败: {str(e)}')

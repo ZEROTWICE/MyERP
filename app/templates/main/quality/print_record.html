@@ -71,11 +71,11 @@
                 </div>
                 <div class="col-md-3">
                     <span class="info-label">检验对象：</span>
-                    {{ get_inspection_target_name(record.task) }}
+                    {{ target_name }}
                 </div>
                 <div class="col-md-3">
                     <span class="info-label">检验员：</span>
-                    {{ record.inspector.name }}
+                    {{ inspector_name }}
                 </div>
                 <div class="col-md-3">
                     <span class="info-label">检验日期：</span>
@@ -164,7 +164,9 @@
     </div>
 
     <!-- 不合格处理记录 -->
-    {% if record.nonconformity_records %}
+    {# nonconformity_records 是 lazy='dynamic' 关系，直接做真值判断恒为真、[0] 在空集上会抛 IndexError #}
+    {% set nonconformity = record.nonconformity_records.first() %}
+    {% if nonconformity %}
     <div class="card mb-4">
         <div class="card-header">
             <h5 class="mb-0">不合格处理记录</h5>
@@ -173,25 +175,25 @@
             <div class="row info-row">
                 <div class="col-md-3">
                     <span class="info-label">处理方式：</span>
-                    {{ record.nonconformity_records[0].type }}
+                    {{ nonconformity.type }}
                 </div>
                 <div class="col-md-3">
                     <span class="info-label">处理人：</span>
-                    {{ record.nonconformity_records[0].handler.name }}
+                    {{ nonconformity.handler.username if nonconformity.handler else '未知' }}
                 </div>
                 <div class="col-md-3">
                     <span class="info-label">处理日期：</span>
-                    {{ record.nonconformity_records[0].handling_date.strftime('%Y-%m-%d') }}
+                    {{ nonconformity.handling_date.strftime('%Y-%m-%d') }}
                 </div>
             </div>
             <div class="row info-row">
                 <div class="col-12">
                     <span class="info-label">处理结果：</span>
-                    {{ record.nonconformity_records[0].handling_result }}
+                    {{ nonconformity.handling_result }}
                 </div>
                 <div class="col-12">
                     <span class="info-label">处理说明：</span>
-                    {{ record.nonconformity_records[0].notes or '无' }}
+                    {{ nonconformity.notes or '无' }}
                 </div>
             </div>
         </div>

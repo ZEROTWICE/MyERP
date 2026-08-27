@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% block title %}物料归还详情{% endblock %}
+
+{% block content %}
+{% set return_items = ret.items.all() %}
+<div class="container-fluid">
+    <div class="card shadow-sm mb-3">
+        <div class="card-header bg-primary text-white">
+            <h4 class="mb-0">归还单 {{ ret.return_number }}</h4>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <p>归还人：{{ ret.employee.name }}</p>
+                    <p>部门：{{ ret.department }}</p>
+                    <p>原因：{{ ret.return_reason }}</p>
+                </div>
+                <div class="col-md-6">
+                    <p>状态：
+                        {% if ret.status == 'pending' %}<span class="badge bg-warning text-dark">待确认</span>
+                        {% elif ret.status == 'confirmed' %}<span class="badge bg-success">已确认</span>
+                        {% elif ret.status == 'rejected' %}<span class="badge bg-danger">已拒绝</span>
+                        {% else %}<span class="badge bg-secondary">{{ ret.status }}</span>{% endif %}
+                    </p>
+                    <p>原领用单：
+                        {% if ret.original_requisition %}
+                        <a href="{{ url_for('main.material_requisition_detail', id=ret.original_requisition_id) }}">{{ ret.original_requisition.requisition_number }}</a>
+                        {% else %}无{% endif %}
+                    </p>
+                    <p>备注：{{ ret.notes or '无' }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="card shadow-sm mb-3">
+        <div class="card-header">归还明细</div>
+        <div class="card-body p-0">
+            <table class="table mb-0">
+                <thead><tr><th>物料</th><th>数量</th><th>状态</th><th>备注</th></tr></thead>
+                <tbody>
+                    {% for item in return_items %}
+                    <tr>
+                        <td>{{ item.material_name }}</td>
+                        <td>{{ item.quantity }} {{ item.unit }}</td>
+                        <td>
+                            {% if item.condition == 'good' %}<span class="badge bg-success">完好</span>
+                            {% elif item.condition == 'damaged' %}<span class="badge bg-danger">损坏</span>
+                            {% elif item.condition == 'expired' %}<span class="badge bg-warning text-dark">过期</span>
+                            {% else %}{{ item.condition }}{% endif %}
+                        </td>
+                        <td>{{ item.notes or '-' }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="4" class="text-muted text-center">无明细</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="d-flex justify-content-between">
+        <a href="{{ url_for('main.manage_material_returns') }}" class="btn btn-secondary">返回列表</a>
+        <div>
+            {% if can('inventory.manage') and ret.can_confirm %}
+            <form method="POST" action="{{ url_for('main.confirm_material_return', id=ret.id) }}" class="d-inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-success">确认回库（完好入账）</button>
+            </form>
+            <form method="POST" action="{{ url_for('main.reject_material_return', id=ret.id) }}" class="d-inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-outline-danger">拒绝</button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

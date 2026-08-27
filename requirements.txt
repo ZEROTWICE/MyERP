@@ -8,6 +8,7 @@ Bootstrap-Flask>=2.0.0
 
 # 数据库
 SQLAlchemy>=2.0.0
+psycopg2-binary>=2.9.9
 
 # 表单和验证
 WTForms>=3.0.0

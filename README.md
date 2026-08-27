@@ -123,7 +123,26 @@ flask run
 python main.py
 ```
 
-6. Docker部署（可选）
+6. Docker 部署（PostgreSQL 主从 + 无状态 Web）
+
+本地 SQLite 仍可用于单机开发（不设 `DATABASE_URL`）。两地/生产请用 Compose，**不要**在 SQLite 上做双向写。
+
+```bash
+# 复制环境变量后启动：主库 5432、从库映射 5433、应用 5000
+copy .env.example .env
+docker compose up -d --build
+```
+
+- Web 容器通过 `DATABASE_URL=postgresql://myerp:myerp@db:5432/myerp` 连接**当前主库**。
+- `SITE_CODE`（如工厂 `F1`、云端 `C1`）作为流水号前缀，避免切主后撞号。
+- 从已有 SQLite 迁数据：
+
+```bash
+python scripts/migrate_sqlite_to_postgres.py --sqlite app.db --postgres postgresql://myerp:myerp@127.0.0.1:5432/myerp
+```
+
+单容器（无数据库，仅兼容旧文档）仍可用：
+
 ```bash
 docker build -t wage-system .
 docker run -d -p 5000:5000 wage-system
@@ -132,8 +151,9 @@ docker run -d -p 5000:5000 wage-system
 ## 配置说明
 
 1. 数据库配置
-- 在 `config.py` 中配置数据库连接信息
-- 默认使用SQLite，可切换至MySQL
+- 在 `config.py` 中配置数据库连接信息；`DATABASE_URL` 优先。
+- 默认使用 SQLite；生产/两地使用 PostgreSQL（见上文 Docker Compose）。
+- 流水号站点前缀：环境变量 `SITE_CODE`（最多 2 位）。
 
 2. 系统配置
 - 在 `config.py` 中配置系统参数

@@ -220,6 +220,10 @@
                         <label for="notes" class="form-label">备注</label>
                         <textarea class="form-control" id="notes" name="notes" rows="2"></textarea>
                     </div>
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" id="sellableAsPart" name="sellable_as_part">
+                        <label class="form-check-label" for="sellableAsPart">零件可单独销售（半成品可出销售订单行）</label>
+                    </div>
                 </form>
             </div>
             <div class="modal-footer">
@@ -318,6 +322,10 @@
                         <label for="editNotes" class="form-label">备注</label>
                         <textarea class="form-control" id="editNotes" name="notes" rows="2"></textarea>
                     </div>
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" id="editSellableAsPart">
+                        <label class="form-check-label" for="editSellableAsPart">零件可单独销售</label>
+                    </div>
                 </form>
             </div>
             <div class="modal-footer">
@@ -395,7 +403,8 @@ function submitProduct() {
         version: document.getElementById('version').value,
         specification: document.getElementById('specification').value,
         notes: document.getElementById('notes').value,
-        code_rule_id: document.getElementById('codeRule').value || null
+        code_rule_id: document.getElementById('codeRule').value || null,
+        sellable_as_part: document.getElementById('sellableAsPart').checked
     };
     
     fetch("{{ url_for('main.add_product') }}", {
@@ -460,6 +469,7 @@ function editProduct(id) {
                 document.getElementById('editStatus').value = product.status;
                 document.getElementById('editSpecification').value = product.specification;
                 document.getElementById('editNotes').value = product.notes;
+                document.getElementById('editSellableAsPart').checked = !!product.sellable_as_part;
                 
                 // 设置编码规则
                 if (product.code_rule_id) {
@@ -491,7 +501,8 @@ function submitEditProduct() {
         status: document.getElementById('editStatus').value,
         specification: document.getElementById('editSpecification').value,
         notes: document.getElementById('editNotes').value,
-        code_rule_id: document.getElementById('editCodeRule').value || null
+        code_rule_id: document.getElementById('editCodeRule').value || null,
+        sellable_as_part: document.getElementById('editSellableAsPart').checked
     };
     
     fetch(`/products/${id}`, {

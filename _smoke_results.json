@@ -1,0 +1,7410 @@
+{
+ "anonymous": {
+  "/ [main.index]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/"
+  ],
+  "/add_process_price [main.add_process_price]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/add_process_price"
+  ],
+  "/api/chart-data/department [main.api_chart_data_department]": [
+   401,
+   401,
+   0,
+   false,
+   ""
+  ],
+  "/api/chart-data/production [main.api_chart_data_production]": [
+   401,
+   401,
+   0,
+   false,
+   ""
+  ],
+  "/api/chart-data/salary [main.api_chart_data_salary]": [
+   401,
+   401,
+   0,
+   false,
+   ""
+  ],
+  "/api/chart-data/task [main.api_chart_data_task]": [
+   401,
+   401,
+   0,
+   false,
+   ""
+  ],
+  "/api/consumable-categories [main.get_consumable_categories_api]": [
+   401,
+   401,
+   0,
+   false,
+   ""
+  ],
+  "/api/customers/<int:customer_id>/addresses [main.api_get_customer_addresses]": [
+   401,
+   401,
+   0,
+   false,
+   ""
+  ],
+  "/api/customers/search [main.api_search_customers]": [
+   401,
+   401,
+   0,
+   false,
+   ""
+  ],
+  "/api/inventory/finished-products [main.get_available_finished_products]": [
+   401,
+   401,
+   0,
+   false,
+   ""
+  ],
+  "/api/inventory/raw-materials [main.get_available_raw_materials]": [
+   401,
+   401,
+   0,
+   false,
+   ""
+  ],
+  "/api/materials/search [main.api_search_materials]": [
+   401,
+   401,
+   0,
+   false,
+   ""
+  ],
+  "/api/notifications/recent [main.api_recent_notifications]": [
+   401,
+   401,
+   0,
+   false,
+   ""
+  ],
+  "/api/notifications/stats [main.api_notification_stats]": [
+   401,
+   401,
+   0,
+   false,
+   ""
+  ],
+  "/api/process_assignment [main.list_process_assignments]": [
+   401,
+   401,
+   0,
+   false,
+   ""
+  ],
+  "/api/process_assignment/<int:process_id> [main.get_process_assignment]": [
+   401,
+   401,
+   0,
+   false,
+   ""
+  ],
+  "/api/production_center/items/<int:item_id>/detail [main.api_item_detail]": [
+   401,
+   401,
+   0,
+   false,
+   ""
+  ],
+  "/api/products/drawings-by-name [main.api_get_drawings_by_product_name]": [
+   401,
+   401,
+   0,
+   false,
+   ""
+  ],
+  "/api/products/names [main.api_get_product_names]": [
+   401,
+   401,
+   0,
+   false,
+   ""
+  ],
+  "/api/products/search [main.search_products]": [
+   401,
+   401,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/finished-products [main.get_finished_products]": [
+   401,
+   401,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/inspectors [main.get_inspectors]": [
+   401,
+   401,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/processes [main.get_processes]": [
+   401,
+   401,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/production-records [main.get_production_records]": [
+   401,
+   401,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/records [main.get_inspection_records]": [
+   401,
+   401,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/records/<int:record_id> [main.get_inspection_record_detail]": [
+   401,
+   401,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/records/<int:record_id>/print [main.print_inspection_record]": [
+   401,
+   401,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/records/export [main.export_inspection_records]": [
+   401,
+   401,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/tasks [main.get_tasks]": [
+   401,
+   401,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/tasks/<int:task_id> [main.get_task_detail]": [
+   401,
+   401,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/templates [main.get_templates]": [
+   401,
+   401,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/templates/<int:template_id> [main.get_template_detail]": [
+   401,
+   401,
+   0,
+   false,
+   ""
+  ],
+  "/api/raw-material-categories [main.get_raw_material_categories_api]": [
+   401,
+   401,
+   0,
+   false,
+   ""
+  ],
+  "/api/sales_orders/<int:order_id>/customer_addresses [main.api_get_sales_order_customer_addresses]": [
+   401,
+   401,
+   0,
+   false,
+   ""
+  ],
+  "/api/sales_orders/search [main.api_search_sales_orders]": [
+   401,
+   401,
+   0,
+   false,
+   ""
+  ],
+  "/api/search/suggestions [main.search_suggestions]": [
+   401,
+   401,
+   0,
+   false,
+   ""
+  ],
+  "/audit_logs [main.view_audit_logs]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/audit_logs"
+  ],
+  "/auth/ [auth.login]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/auth/login [auth.login]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/bonus_penalties [main.manage_bonus_penalties]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/bonus_penalties"
+  ],
+  "/bonus_penalties/<int:id> [main.get_bonus_penalty]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/bonus_penalties/1"
+  ],
+  "/bonus_penalties/export [main.export_bonus_penalties]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/bonus_penalties/export"
+  ],
+  "/bonus_penalties/template [main.download_bonus_penalty_template]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/bonus_penalties/template"
+  ],
+  "/code_rules [main.manage_code_rules]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/code_rules"
+  ],
+  "/code_rules/<int:rule_id>/edit [main.edit_code_rule]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/code_rules/1/edit"
+  ],
+  "/code_rules/add [main.add_code_rule]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/code_rules/add"
+  ],
+  "/code_rules/available/material [main.get_available_material_rules]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/code_rules/available/material"
+  ],
+  "/code_rules/available/product [main.get_available_product_rules]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/code_rules/available/product"
+  ],
+  "/consumables [main.manage_consumables]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/consumables"
+  ],
+  "/consumables/<int:id> [main.get_consumable]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/consumables/1"
+  ],
+  "/consumables/categories [main.consumable_categories]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/consumables/categories"
+  ],
+  "/consumables/categories/<int:category_id> [main.get_consumable_category]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/consumables/categories/1"
+  ],
+  "/consumables/inbound [main.consumable_inbound]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/consumables/inbound"
+  ],
+  "/customer/<int:customer_id> [main.customer_detail]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/customer/1"
+  ],
+  "/customer/<int:customer_id>/address/<int:address_id>/edit [main.edit_customer_address]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/customer/1/address/1/edit"
+  ],
+  "/customer/<int:customer_id>/address/add [main.add_customer_address]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/customer/1/address/add"
+  ],
+  "/customer/<int:customer_id>/edit [main.edit_customer]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/customer/1/edit"
+  ],
+  "/customer/add [main.add_customer]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/customer/add"
+  ],
+  "/customers [main.manage_customers]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/customers"
+  ],
+  "/employee/add [main.add_employee]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/employee/add"
+  ],
+  "/employee_salary_changes/<int:employee_id> [main.employee_salary_changes]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/employee_salary_changes/1"
+  ],
+  "/employees [main.manage_employees]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/employees"
+  ],
+  "/employees/<int:id>/edit [main.edit_employee]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/employees/1/edit"
+  ],
+  "/employees/export [main.export_employees]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/employees/export"
+  ],
+  "/employees/template [main.download_employee_template]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/employees/template"
+  ],
+  "/export_tasks [main.export_tasks]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/export_tasks"
+  ],
+  "/inventory [main.manage_inventory]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/inventory"
+  ],
+  "/inventory/finished-product/inbound [main.finished_product_inbound]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/inventory/finished-product/inbound"
+  ],
+  "/inventory/finished/<int:id> [main.get_finished_product]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/inventory/finished/1"
+  ],
+  "/inventory/inbound [main.inventory_inbound]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/inventory/inbound"
+  ],
+  "/inventory/raw-material/categories [main.raw_material_categories]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/inventory/raw-material/categories"
+  ],
+  "/inventory/raw-material/categories/<int:category_id> [main.get_raw_material_category]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/inventory/raw-material/categories/1"
+  ],
+  "/inventory/raw-material/inbound [main.raw_material_inbound]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/inventory/raw-material/inbound"
+  ],
+  "/inventory/raw/<int:id> [main.get_raw_material]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/inventory/raw/1"
+  ],
+  "/inventory/template [main.download_inventory_template]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/inventory/template"
+  ],
+  "/inventory_counts [main.manage_inventory_counts]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/inventory_counts"
+  ],
+  "/material_requisitions [main.manage_material_requisitions]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/material_requisitions"
+  ],
+  "/material_requisitions/<int:id> [main.material_requisition_detail]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/material_requisitions/1"
+  ],
+  "/material_requisitions/add [main.add_material_requisition]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/material_requisitions/add"
+  ],
+  "/material_returns [main.manage_material_returns]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/material_returns"
+  ],
+  "/my_tasks [main.my_tasks]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/my_tasks"
+  ],
+  "/notification_rules [main.manage_notification_rules]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/notification_rules"
+  ],
+  "/notification_rules/add [main.add_notification_rule]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/notification_rules/add"
+  ],
+  "/notifications [main.manage_notifications]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/notifications"
+  ],
+  "/process_assignment [main.process_assignment_page]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/process_assignment"
+  ],
+  "/process_prices [main.process_prices]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/process_prices"
+  ],
+  "/process_prices/<int:id> [main.get_process_price]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/process_prices/1"
+  ],
+  "/process_prices/<int:id>/edit [main.edit_process_price]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/process_prices/1/edit"
+  ],
+  "/process_prices/export [main.export_process_prices]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/process_prices/export"
+  ],
+  "/process_prices/template [main.download_process_price_template]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/process_prices/template"
+  ],
+  "/production_batches/<int:batch_id> [main.production_batch_detail]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/production_batches/1"
+  ],
+  "/production_center [main.production_center]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/production_center"
+  ],
+  "/production_center/items/<int:item_id> [main.production_center_item_detail]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/production_center/items/1"
+  ],
+  "/production_orders [main.manage_production_orders]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/production_orders"
+  ],
+  "/production_orders/<int:order_id> [main.production_order_detail]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/production_orders/1"
+  ],
+  "/production_orders/<int:order_id>/edit [main.edit_production_order]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/production_orders/1/edit"
+  ],
+  "/production_records [main.manage_production_records]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/production_records"
+  ],
+  "/production_records/export [main.export_production_records]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/production_records/export"
+  ],
+  "/production_records/template [main.download_production_record_template]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/production_records/template"
+  ],
+  "/products [main.manage_products]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/products"
+  ],
+  "/products/<int:id> [main.get_product]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/products/1"
+  ],
+  "/products/<int:id>/bom [main.product_bom]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/products/1/bom"
+  ],
+  "/products/<int:product_id>/bom/<int:bom_item_id> [main.get_product_bom_item]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/products/1/bom/1"
+  ],
+  "/products/<int:product_id>/processes [main.product_processes]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/products/1/processes"
+  ],
+  "/products/<int:product_id>/processes/<int:process_item_id> [main.get_product_process]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/products/1/processes/1"
+  ],
+  "/products/export [main.export_products]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/products/export"
+  ],
+  "/products/template [main.download_product_template]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/products/template"
+  ],
+  "/quality [main.quality_management]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/quality"
+  ],
+  "/quality/inspection/<int:record_id> [main.quality_inspection]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/quality/inspection/1"
+  ],
+  "/quality/records [main.quality_records]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/quality/records"
+  ],
+  "/quality/tasks [main.quality_tasks]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/quality/tasks"
+  ],
+  "/quality/tasks/<int:task_id> [main.quality_task_detail]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/quality/tasks/1"
+  ],
+  "/quality/templates [main.quality_templates]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/quality/templates"
+  ],
+  "/salary/<int:employee_id> [main.salary_details]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/salary/1"
+  ],
+  "/salary_calculation [main.salary_calculation]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/salary_calculation"
+  ],
+  "/sales_order/<int:order_id> [main.sales_order_detail]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/sales_order/1"
+  ],
+  "/sales_order/<int:order_id>/edit [main.edit_sales_order]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/sales_order/1/edit"
+  ],
+  "/sales_order/<int:order_id>/item/add [main.add_sales_order_item]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/sales_order/1/item/add"
+  ],
+  "/sales_order/add [main.add_sales_order]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/sales_order/add"
+  ],
+  "/sales_order_item/<int:item_id>/delivery_batches [main.manage_delivery_batches]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/sales_order_item/1/delivery_batches"
+  ],
+  "/sales_order_item/<int:item_id>/delivery_batches/manage [main.manage_delivery_batches_page]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/sales_order_item/1/delivery_batches/manage"
+  ],
+  "/sales_order_item/<int:item_id>/edit [main.edit_sales_order_item]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/sales_order_item/1/edit"
+  ],
+  "/sales_orders [main.manage_sales_orders]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/sales_orders"
+  ],
+  "/search [main.global_search]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/search"
+  ],
+  "/search/advanced [main.advanced_search]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/search/advanced"
+  ],
+  "/system_configs [main.manage_system_configs]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/system_configs"
+  ],
+  "/tasks [main.manage_tasks]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/tasks"
+  ],
+  "/tasks/<int:id> [main.get_task]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/tasks/1"
+  ],
+  "/tasks/<int:id>/get [main.get_task_details]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/tasks/1/get"
+  ],
+  "/tasks/assignment/<int:id> [main.get_task_assignment]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/tasks/assignment/1"
+  ],
+  "/tasks/template [main.download_task_template]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/tasks/template"
+  ],
+  "/user_dashboard [main.user_dashboard]": [
+   302,
+   200,
+   1,
+   false,
+   "/auth/?next=http://localhost/user_dashboard"
+  ]
+ },
+ "admin": {
+  "/ [main.index]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/add_process_price [main.add_process_price]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/chart-data/department [main.api_chart_data_department]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/chart-data/production [main.api_chart_data_production]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/chart-data/salary [main.api_chart_data_salary]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/chart-data/task [main.api_chart_data_task]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/consumable-categories [main.get_consumable_categories_api]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/customers/<int:customer_id>/addresses [main.api_get_customer_addresses]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/customers/search [main.api_search_customers]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/inventory/finished-products [main.get_available_finished_products]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/inventory/raw-materials [main.get_available_raw_materials]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/materials/search [main.api_search_materials]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/notifications/recent [main.api_recent_notifications]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/notifications/stats [main.api_notification_stats]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/process_assignment [main.list_process_assignments]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/process_assignment/<int:process_id> [main.get_process_assignment]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/production_center/items/<int:item_id>/detail [main.api_item_detail]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/products/drawings-by-name [main.api_get_drawings_by_product_name]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/products/names [main.api_get_product_names]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/products/search [main.search_products]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/finished-products [main.get_finished_products]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/inspectors [main.get_inspectors]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/processes [main.get_processes]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/production-records [main.get_production_records]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/records [main.get_inspection_records]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/records/<int:record_id> [main.get_inspection_record_detail]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/records/<int:record_id>/print [main.print_inspection_record]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/records/export [main.export_inspection_records]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/tasks [main.get_tasks]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/tasks/<int:task_id> [main.get_task_detail]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/templates [main.get_templates]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/templates/<int:template_id> [main.get_template_detail]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/raw-material-categories [main.get_raw_material_categories_api]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/sales_orders/<int:order_id>/customer_addresses [main.api_get_sales_order_customer_addresses]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/sales_orders/search [main.api_search_sales_orders]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/search/suggestions [main.search_suggestions]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/audit_logs [main.view_audit_logs]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/auth/ [auth.login]": [
+   302,
+   200,
+   1,
+   false,
+   "/"
+  ],
+  "/auth/login [auth.login]": [
+   302,
+   200,
+   1,
+   false,
+   "/"
+  ],
+  "/bonus_penalties [main.manage_bonus_penalties]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/bonus_penalties/<int:id> [main.get_bonus_penalty]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/bonus_penalties/export [main.export_bonus_penalties]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/bonus_penalties/template [main.download_bonus_penalty_template]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/code_rules [main.manage_code_rules]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/code_rules/<int:rule_id>/edit [main.edit_code_rule]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/code_rules/add [main.add_code_rule]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/code_rules/available/material [main.get_available_material_rules]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/code_rules/available/product [main.get_available_product_rules]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/consumables [main.manage_consumables]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/consumables/<int:id> [main.get_consumable]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/consumables/categories [main.consumable_categories]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/consumables/categories/<int:category_id> [main.get_consumable_category]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/consumables/inbound [main.consumable_inbound]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/customer/<int:customer_id> [main.customer_detail]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/customer/<int:customer_id>/address/<int:address_id>/edit [main.edit_customer_address]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/customer/<int:customer_id>/address/add [main.add_customer_address]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/customer/<int:customer_id>/edit [main.edit_customer]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/customer/add [main.add_customer]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/customers [main.manage_customers]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/employee/add [main.add_employee]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/employee_salary_changes/<int:employee_id> [main.employee_salary_changes]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/employees [main.manage_employees]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/employees/<int:id>/edit [main.edit_employee]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/employees/export [main.export_employees]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/employees/template [main.download_employee_template]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/export_tasks [main.export_tasks]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/inventory [main.manage_inventory]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/inventory/finished-product/inbound [main.finished_product_inbound]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/inventory/finished/<int:id> [main.get_finished_product]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/inventory/inbound [main.inventory_inbound]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/inventory/raw-material/categories [main.raw_material_categories]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/inventory/raw-material/categories/<int:category_id> [main.get_raw_material_category]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/inventory/raw-material/inbound [main.raw_material_inbound]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/inventory/raw/<int:id> [main.get_raw_material]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/inventory/template [main.download_inventory_template]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/inventory_counts [main.manage_inventory_counts]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/material_requisitions [main.manage_material_requisitions]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/material_requisitions/<int:id> [main.material_requisition_detail]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/material_requisitions/add [main.add_material_requisition]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/material_returns [main.manage_material_returns]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/my_tasks [main.my_tasks]": [
+   302,
+   200,
+   1,
+   false,
+   "/"
+  ],
+  "/notification_rules [main.manage_notification_rules]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/notification_rules/add [main.add_notification_rule]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/notifications [main.manage_notifications]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/process_assignment [main.process_assignment_page]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/process_prices [main.process_prices]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/process_prices/<int:id> [main.get_process_price]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/process_prices/<int:id>/edit [main.edit_process_price]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/process_prices/export [main.export_process_prices]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/process_prices/template [main.download_process_price_template]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/production_batches/<int:batch_id> [main.production_batch_detail]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/production_center [main.production_center]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/production_center/items/<int:item_id> [main.production_center_item_detail]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/production_orders [main.manage_production_orders]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/production_orders/<int:order_id> [main.production_order_detail]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/production_orders/<int:order_id>/edit [main.edit_production_order]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/production_records [main.manage_production_records]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/production_records/export [main.export_production_records]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/production_records/template [main.download_production_record_template]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/products [main.manage_products]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/products/<int:id> [main.get_product]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/products/<int:id>/bom [main.product_bom]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/products/<int:product_id>/bom/<int:bom_item_id> [main.get_product_bom_item]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/products/<int:product_id>/processes [main.product_processes]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/products/<int:product_id>/processes/<int:process_item_id> [main.get_product_process]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/products/export [main.export_products]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/products/template [main.download_product_template]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/quality [main.quality_management]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/quality/inspection/<int:record_id> [main.quality_inspection]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/quality/records [main.quality_records]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/quality/tasks [main.quality_tasks]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/quality/tasks/<int:task_id> [main.quality_task_detail]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/quality/templates [main.quality_templates]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/salary/<int:employee_id> [main.salary_details]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/salary_calculation [main.salary_calculation]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/sales_order/<int:order_id> [main.sales_order_detail]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/sales_order/<int:order_id>/edit [main.edit_sales_order]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/sales_order/<int:order_id>/item/add [main.add_sales_order_item]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/sales_order/add [main.add_sales_order]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/sales_order_item/<int:item_id>/delivery_batches [main.manage_delivery_batches]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/sales_order_item/<int:item_id>/delivery_batches/manage [main.manage_delivery_batches_page]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/sales_order_item/<int:item_id>/edit [main.edit_sales_order_item]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/sales_orders [main.manage_sales_orders]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/search [main.global_search]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/search/advanced [main.advanced_search]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/system_configs [main.manage_system_configs]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/tasks [main.manage_tasks]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/tasks/<int:id> [main.get_task]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/tasks/<int:id>/get [main.get_task_details]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/tasks/assignment/<int:id> [main.get_task_assignment]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/tasks/template [main.download_task_template]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/user_dashboard [main.user_dashboard]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ]
+ },
+ "manager": {
+  "/ [main.index]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/add_process_price [main.add_process_price]": [
+   302,
+   200,
+   1,
+   false,
+   "/"
+  ],
+  "/api/chart-data/department [main.api_chart_data_department]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/chart-data/production [main.api_chart_data_production]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/chart-data/salary [main.api_chart_data_salary]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/chart-data/task [main.api_chart_data_task]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/consumable-categories [main.get_consumable_categories_api]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/customers/<int:customer_id>/addresses [main.api_get_customer_addresses]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/customers/search [main.api_search_customers]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/inventory/finished-products [main.get_available_finished_products]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/inventory/raw-materials [main.get_available_raw_materials]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/materials/search [main.api_search_materials]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/notifications/recent [main.api_recent_notifications]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/notifications/stats [main.api_notification_stats]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/process_assignment [main.list_process_assignments]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/process_assignment/<int:process_id> [main.get_process_assignment]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/production_center/items/<int:item_id>/detail [main.api_item_detail]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/products/drawings-by-name [main.api_get_drawings_by_product_name]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/products/names [main.api_get_product_names]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/products/search [main.search_products]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/finished-products [main.get_finished_products]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/inspectors [main.get_inspectors]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/processes [main.get_processes]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/production-records [main.get_production_records]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/records [main.get_inspection_records]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/records/<int:record_id> [main.get_inspection_record_detail]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/records/<int:record_id>/print [main.print_inspection_record]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/records/export [main.export_inspection_records]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/tasks [main.get_tasks]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/tasks/<int:task_id> [main.get_task_detail]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/templates [main.get_templates]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/templates/<int:template_id> [main.get_template_detail]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/raw-material-categories [main.get_raw_material_categories_api]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/sales_orders/<int:order_id>/customer_addresses [main.api_get_sales_order_customer_addresses]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/sales_orders/search [main.api_search_sales_orders]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/search/suggestions [main.search_suggestions]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/audit_logs [main.view_audit_logs]": [
+   302,
+   200,
+   1,
+   false,
+   "/"
+  ],
+  "/auth/ [auth.login]": [
+   302,
+   200,
+   1,
+   false,
+   "/"
+  ],
+  "/auth/login [auth.login]": [
+   302,
+   200,
+   1,
+   false,
+   "/"
+  ],
+  "/bonus_penalties [main.manage_bonus_penalties]": [
+   302,
+   200,
+   1,
+   false,
+   "/"
+  ],
+  "/bonus_penalties/<int:id> [main.get_bonus_penalty]": [
+   302,
+   200,
+   1,
+   false,
+   "/"
+  ],
+  "/bonus_penalties/export [main.export_bonus_penalties]": [
+   302,
+   200,
+   1,
+   false,
+   "/"
+  ],
+  "/bonus_penalties/template [main.download_bonus_penalty_template]": [
+   302,
+   200,
+   2,
+   false,
+   "/bonus_penalties"
+  ],
+  "/code_rules [main.manage_code_rules]": [
+   302,
+   200,
+   1,
+   false,
+   "/"
+  ],
+  "/code_rules/<int:rule_id>/edit [main.edit_code_rule]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/code_rules/add [main.add_code_rule]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/code_rules/available/material [main.get_available_material_rules]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/code_rules/available/product [main.get_available_product_rules]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/consumables [main.manage_consumables]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/consumables/<int:id> [main.get_consumable]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/consumables/categories [main.consumable_categories]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/consumables/categories/<int:category_id> [main.get_consumable_category]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/consumables/inbound [main.consumable_inbound]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/customer/<int:customer_id> [main.customer_detail]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/customer/<int:customer_id>/address/<int:address_id>/edit [main.edit_customer_address]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/customer/<int:customer_id>/address/add [main.add_customer_address]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/customer/<int:customer_id>/edit [main.edit_customer]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/customer/add [main.add_customer]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/customers [main.manage_customers]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/employee/add [main.add_employee]": [
+   302,
+   200,
+   1,
+   false,
+   "/"
+  ],
+  "/employee_salary_changes/<int:employee_id> [main.employee_salary_changes]": [
+   302,
+   200,
+   1,
+   false,
+   "/"
+  ],
+  "/employees [main.manage_employees]": [
+   302,
+   200,
+   1,
+   false,
+   "/"
+  ],
+  "/employees/<int:id>/edit [main.edit_employee]": [
+   302,
+   200,
+   1,
+   false,
+   "/"
+  ],
+  "/employees/export [main.export_employees]": [
+   302,
+   200,
+   1,
+   false,
+   "/"
+  ],
+  "/employees/template [main.download_employee_template]": [
+   302,
+   200,
+   1,
+   false,
+   "/"
+  ],
+  "/export_tasks [main.export_tasks]": [
+   302,
+   200,
+   1,
+   false,
+   "/"
+  ],
+  "/inventory [main.manage_inventory]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/inventory/finished-product/inbound [main.finished_product_inbound]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/inventory/finished/<int:id> [main.get_finished_product]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/inventory/inbound [main.inventory_inbound]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/inventory/raw-material/categories [main.raw_material_categories]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/inventory/raw-material/categories/<int:category_id> [main.get_raw_material_category]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/inventory/raw-material/inbound [main.raw_material_inbound]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/inventory/raw/<int:id> [main.get_raw_material]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/inventory/template [main.download_inventory_template]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/inventory_counts [main.manage_inventory_counts]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/material_requisitions [main.manage_material_requisitions]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/material_requisitions/<int:id> [main.material_requisition_detail]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/material_requisitions/add [main.add_material_requisition]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/material_returns [main.manage_material_returns]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/my_tasks [main.my_tasks]": [
+   302,
+   200,
+   1,
+   false,
+   "/"
+  ],
+  "/notification_rules [main.manage_notification_rules]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/notification_rules/add [main.add_notification_rule]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/notifications [main.manage_notifications]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/process_assignment [main.process_assignment_page]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/process_prices [main.process_prices]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/process_prices/<int:id> [main.get_process_price]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/process_prices/<int:id>/edit [main.edit_process_price]": [
+   302,
+   200,
+   1,
+   false,
+   "/"
+  ],
+  "/process_prices/export [main.export_process_prices]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/process_prices/template [main.download_process_price_template]": [
+   302,
+   200,
+   1,
+   false,
+   "/"
+  ],
+  "/production_batches/<int:batch_id> [main.production_batch_detail]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/production_center [main.production_center]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/production_center/items/<int:item_id> [main.production_center_item_detail]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/production_orders [main.manage_production_orders]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/production_orders/<int:order_id> [main.production_order_detail]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/production_orders/<int:order_id>/edit [main.edit_production_order]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/production_records [main.manage_production_records]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/production_records/export [main.export_production_records]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/production_records/template [main.download_production_record_template]": [
+   302,
+   200,
+   1,
+   false,
+   "/"
+  ],
+  "/products [main.manage_products]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/products/<int:id> [main.get_product]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/products/<int:id>/bom [main.product_bom]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/products/<int:product_id>/bom/<int:bom_item_id> [main.get_product_bom_item]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/products/<int:product_id>/processes [main.product_processes]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/products/<int:product_id>/processes/<int:process_item_id> [main.get_product_process]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/products/export [main.export_products]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/products/template [main.download_product_template]": [
+   302,
+   200,
+   1,
+   false,
+   "/products"
+  ],
+  "/quality [main.quality_management]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/quality/inspection/<int:record_id> [main.quality_inspection]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/quality/records [main.quality_records]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/quality/tasks [main.quality_tasks]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/quality/tasks/<int:task_id> [main.quality_task_detail]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/quality/templates [main.quality_templates]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/salary/<int:employee_id> [main.salary_details]": [
+   302,
+   200,
+   1,
+   false,
+   "/"
+  ],
+  "/salary_calculation [main.salary_calculation]": [
+   302,
+   200,
+   1,
+   false,
+   "/"
+  ],
+  "/sales_order/<int:order_id> [main.sales_order_detail]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/sales_order/<int:order_id>/edit [main.edit_sales_order]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/sales_order/<int:order_id>/item/add [main.add_sales_order_item]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/sales_order/add [main.add_sales_order]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/sales_order_item/<int:item_id>/delivery_batches [main.manage_delivery_batches]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/sales_order_item/<int:item_id>/delivery_batches/manage [main.manage_delivery_batches_page]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/sales_order_item/<int:item_id>/edit [main.edit_sales_order_item]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/sales_orders [main.manage_sales_orders]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/search [main.global_search]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/search/advanced [main.advanced_search]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/system_configs [main.manage_system_configs]": [
+   302,
+   200,
+   1,
+   false,
+   "/"
+  ],
+  "/tasks [main.manage_tasks]": [
+   302,
+   200,
+   1,
+   false,
+   "/"
+  ],
+  "/tasks/<int:id> [main.get_task]": [
+   302,
+   200,
+   1,
+   false,
+   "/"
+  ],
+  "/tasks/<int:id>/get [main.get_task_details]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/tasks/assignment/<int:id> [main.get_task_assignment]": [
+   302,
+   200,
+   1,
+   false,
+   "/"
+  ],
+  "/tasks/template [main.download_task_template]": [
+   302,
+   200,
+   2,
+   false,
+   "/tasks"
+  ],
+  "/user_dashboard [main.user_dashboard]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ]
+ },
+ "hr": {
+  "/ [main.index]": [
+   302,
+   200,
+   1,
+   false,
+   "/employees"
+  ],
+  "/add_process_price [main.add_process_price]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/chart-data/department [main.api_chart_data_department]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/chart-data/production [main.api_chart_data_production]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/chart-data/salary [main.api_chart_data_salary]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/chart-data/task [main.api_chart_data_task]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/consumable-categories [main.get_consumable_categories_api]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/customers/<int:customer_id>/addresses [main.api_get_customer_addresses]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/customers/search [main.api_search_customers]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/inventory/finished-products [main.get_available_finished_products]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/inventory/raw-materials [main.get_available_raw_materials]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/materials/search [main.api_search_materials]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/notifications/recent [main.api_recent_notifications]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/notifications/stats [main.api_notification_stats]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/process_assignment [main.list_process_assignments]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/process_assignment/<int:process_id> [main.get_process_assignment]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/production_center/items/<int:item_id>/detail [main.api_item_detail]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/products/drawings-by-name [main.api_get_drawings_by_product_name]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/products/names [main.api_get_product_names]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/products/search [main.search_products]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/finished-products [main.get_finished_products]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/inspectors [main.get_inspectors]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/processes [main.get_processes]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/production-records [main.get_production_records]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/records [main.get_inspection_records]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/records/<int:record_id> [main.get_inspection_record_detail]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/records/<int:record_id>/print [main.print_inspection_record]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/records/export [main.export_inspection_records]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/tasks [main.get_tasks]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/tasks/<int:task_id> [main.get_task_detail]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/templates [main.get_templates]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/templates/<int:template_id> [main.get_template_detail]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/raw-material-categories [main.get_raw_material_categories_api]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/sales_orders/<int:order_id>/customer_addresses [main.api_get_sales_order_customer_addresses]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/sales_orders/search [main.api_search_sales_orders]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/search/suggestions [main.search_suggestions]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/audit_logs [main.view_audit_logs]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/auth/ [auth.login]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/auth/login [auth.login]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/bonus_penalties [main.manage_bonus_penalties]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/bonus_penalties/<int:id> [main.get_bonus_penalty]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/bonus_penalties/export [main.export_bonus_penalties]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/bonus_penalties/template [main.download_bonus_penalty_template]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/code_rules [main.manage_code_rules]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/code_rules/<int:rule_id>/edit [main.edit_code_rule]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/code_rules/add [main.add_code_rule]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/code_rules/available/material [main.get_available_material_rules]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/code_rules/available/product [main.get_available_product_rules]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/consumables [main.manage_consumables]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/consumables/<int:id> [main.get_consumable]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/consumables/categories [main.consumable_categories]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/consumables/categories/<int:category_id> [main.get_consumable_category]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/consumables/inbound [main.consumable_inbound]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/customer/<int:customer_id> [main.customer_detail]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/customer/<int:customer_id>/address/<int:address_id>/edit [main.edit_customer_address]": [
+   302,
+   200,
+   3,
+   false,
+   "/customer/1"
+  ],
+  "/customer/<int:customer_id>/address/add [main.add_customer_address]": [
+   302,
+   200,
+   3,
+   false,
+   "/customer/1"
+  ],
+  "/customer/<int:customer_id>/edit [main.edit_customer]": [
+   302,
+   200,
+   3,
+   false,
+   "/customer/1"
+  ],
+  "/customer/add [main.add_customer]": [
+   302,
+   200,
+   3,
+   false,
+   "/customers"
+  ],
+  "/customers [main.manage_customers]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/employee/add [main.add_employee]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/employee_salary_changes/<int:employee_id> [main.employee_salary_changes]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/employees [main.manage_employees]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/employees/<int:id>/edit [main.edit_employee]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/employees/export [main.export_employees]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/employees/template [main.download_employee_template]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/export_tasks [main.export_tasks]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/inventory [main.manage_inventory]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/inventory/finished-product/inbound [main.finished_product_inbound]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/inventory/finished/<int:id> [main.get_finished_product]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/inventory/inbound [main.inventory_inbound]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/inventory/raw-material/categories [main.raw_material_categories]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/inventory/raw-material/categories/<int:category_id> [main.get_raw_material_category]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/inventory/raw-material/inbound [main.raw_material_inbound]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/inventory/raw/<int:id> [main.get_raw_material]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/inventory/template [main.download_inventory_template]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/inventory_counts [main.manage_inventory_counts]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/material_requisitions [main.manage_material_requisitions]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/material_requisitions/<int:id> [main.material_requisition_detail]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/material_requisitions/add [main.add_material_requisition]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/material_returns [main.manage_material_returns]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/my_tasks [main.my_tasks]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/notification_rules [main.manage_notification_rules]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/notification_rules/add [main.add_notification_rule]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/notifications [main.manage_notifications]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/process_assignment [main.process_assignment_page]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/process_prices [main.process_prices]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/process_prices/<int:id> [main.get_process_price]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/process_prices/<int:id>/edit [main.edit_process_price]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/process_prices/export [main.export_process_prices]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/process_prices/template [main.download_process_price_template]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/production_batches/<int:batch_id> [main.production_batch_detail]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/production_center [main.production_center]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/production_center/items/<int:item_id> [main.production_center_item_detail]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/production_orders [main.manage_production_orders]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/production_orders/<int:order_id> [main.production_order_detail]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/production_orders/<int:order_id>/edit [main.edit_production_order]": [
+   302,
+   200,
+   3,
+   false,
+   "/production_orders/1"
+  ],
+  "/production_records [main.manage_production_records]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/production_records/export [main.export_production_records]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/production_records/template [main.download_production_record_template]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/products [main.manage_products]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/products/<int:id> [main.get_product]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/products/<int:id>/bom [main.product_bom]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/products/<int:product_id>/bom/<int:bom_item_id> [main.get_product_bom_item]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/products/<int:product_id>/processes [main.product_processes]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/products/<int:product_id>/processes/<int:process_item_id> [main.get_product_process]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/products/export [main.export_products]": [
+   302,
+   200,
+   3,
+   false,
+   "/products"
+  ],
+  "/products/template [main.download_product_template]": [
+   302,
+   200,
+   3,
+   false,
+   "/products"
+  ],
+  "/quality [main.quality_management]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/quality/inspection/<int:record_id> [main.quality_inspection]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/quality/records [main.quality_records]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/quality/tasks [main.quality_tasks]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/quality/tasks/<int:task_id> [main.quality_task_detail]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/quality/templates [main.quality_templates]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/salary/<int:employee_id> [main.salary_details]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/salary_calculation [main.salary_calculation]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/sales_order/<int:order_id> [main.sales_order_detail]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/sales_order/<int:order_id>/edit [main.edit_sales_order]": [
+   302,
+   200,
+   3,
+   false,
+   "/sales_order/1"
+  ],
+  "/sales_order/<int:order_id>/item/add [main.add_sales_order_item]": [
+   302,
+   200,
+   3,
+   false,
+   "/sales_order/1"
+  ],
+  "/sales_order/add [main.add_sales_order]": [
+   302,
+   200,
+   3,
+   false,
+   "/sales_orders"
+  ],
+  "/sales_order_item/<int:item_id>/delivery_batches [main.manage_delivery_batches]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/sales_order_item/<int:item_id>/delivery_batches/manage [main.manage_delivery_batches_page]": [
+   302,
+   200,
+   3,
+   false,
+   "/sales_orders"
+  ],
+  "/sales_order_item/<int:item_id>/edit [main.edit_sales_order_item]": [
+   302,
+   200,
+   3,
+   false,
+   "/sales_orders"
+  ],
+  "/sales_orders [main.manage_sales_orders]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/search [main.global_search]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/search/advanced [main.advanced_search]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/system_configs [main.manage_system_configs]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/tasks [main.manage_tasks]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/tasks/<int:id> [main.get_task]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/tasks/<int:id>/get [main.get_task_details]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/tasks/assignment/<int:id> [main.get_task_assignment]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/tasks/template [main.download_task_template]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/user_dashboard [main.user_dashboard]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ]
+ },
+ "accountant": {
+  "/ [main.index]": [
+   302,
+   200,
+   1,
+   false,
+   "/salary_calculation"
+  ],
+  "/add_process_price [main.add_process_price]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/api/chart-data/department [main.api_chart_data_department]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/chart-data/production [main.api_chart_data_production]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/chart-data/salary [main.api_chart_data_salary]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/chart-data/task [main.api_chart_data_task]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/consumable-categories [main.get_consumable_categories_api]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/customers/<int:customer_id>/addresses [main.api_get_customer_addresses]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/customers/search [main.api_search_customers]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/inventory/finished-products [main.get_available_finished_products]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/inventory/raw-materials [main.get_available_raw_materials]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/materials/search [main.api_search_materials]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/notifications/recent [main.api_recent_notifications]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/notifications/stats [main.api_notification_stats]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/process_assignment [main.list_process_assignments]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/process_assignment/<int:process_id> [main.get_process_assignment]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/production_center/items/<int:item_id>/detail [main.api_item_detail]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/products/drawings-by-name [main.api_get_drawings_by_product_name]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/products/names [main.api_get_product_names]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/products/search [main.search_products]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/finished-products [main.get_finished_products]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/inspectors [main.get_inspectors]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/processes [main.get_processes]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/production-records [main.get_production_records]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/records [main.get_inspection_records]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/records/<int:record_id> [main.get_inspection_record_detail]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/records/<int:record_id>/print [main.print_inspection_record]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/records/export [main.export_inspection_records]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/tasks [main.get_tasks]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/tasks/<int:task_id> [main.get_task_detail]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/templates [main.get_templates]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/templates/<int:template_id> [main.get_template_detail]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/raw-material-categories [main.get_raw_material_categories_api]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/sales_orders/<int:order_id>/customer_addresses [main.api_get_sales_order_customer_addresses]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/sales_orders/search [main.api_search_sales_orders]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/search/suggestions [main.search_suggestions]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/audit_logs [main.view_audit_logs]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/auth/ [auth.login]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/auth/login [auth.login]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/bonus_penalties [main.manage_bonus_penalties]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/bonus_penalties/<int:id> [main.get_bonus_penalty]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/bonus_penalties/export [main.export_bonus_penalties]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/bonus_penalties/template [main.download_bonus_penalty_template]": [
+   302,
+   200,
+   3,
+   false,
+   "/bonus_penalties"
+  ],
+  "/code_rules [main.manage_code_rules]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/code_rules/<int:rule_id>/edit [main.edit_code_rule]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/code_rules/add [main.add_code_rule]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/code_rules/available/material [main.get_available_material_rules]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/code_rules/available/product [main.get_available_product_rules]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/consumables [main.manage_consumables]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/consumables/<int:id> [main.get_consumable]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/consumables/categories [main.consumable_categories]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/consumables/categories/<int:category_id> [main.get_consumable_category]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/consumables/inbound [main.consumable_inbound]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/customer/<int:customer_id> [main.customer_detail]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/customer/<int:customer_id>/address/<int:address_id>/edit [main.edit_customer_address]": [
+   302,
+   200,
+   3,
+   false,
+   "/customer/1"
+  ],
+  "/customer/<int:customer_id>/address/add [main.add_customer_address]": [
+   302,
+   200,
+   3,
+   false,
+   "/customer/1"
+  ],
+  "/customer/<int:customer_id>/edit [main.edit_customer]": [
+   302,
+   200,
+   3,
+   false,
+   "/customer/1"
+  ],
+  "/customer/add [main.add_customer]": [
+   302,
+   200,
+   3,
+   false,
+   "/customers"
+  ],
+  "/customers [main.manage_customers]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/employee/add [main.add_employee]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/employee_salary_changes/<int:employee_id> [main.employee_salary_changes]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/employees [main.manage_employees]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/employees/<int:id>/edit [main.edit_employee]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/employees/export [main.export_employees]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/employees/template [main.download_employee_template]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/export_tasks [main.export_tasks]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/inventory [main.manage_inventory]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/inventory/finished-product/inbound [main.finished_product_inbound]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/inventory/finished/<int:id> [main.get_finished_product]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/inventory/inbound [main.inventory_inbound]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/inventory/raw-material/categories [main.raw_material_categories]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/inventory/raw-material/categories/<int:category_id> [main.get_raw_material_category]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/inventory/raw-material/inbound [main.raw_material_inbound]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/inventory/raw/<int:id> [main.get_raw_material]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/inventory/template [main.download_inventory_template]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/inventory_counts [main.manage_inventory_counts]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/material_requisitions [main.manage_material_requisitions]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/material_requisitions/<int:id> [main.material_requisition_detail]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/material_requisitions/add [main.add_material_requisition]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/material_returns [main.manage_material_returns]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/my_tasks [main.my_tasks]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/notification_rules [main.manage_notification_rules]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/notification_rules/add [main.add_notification_rule]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/notifications [main.manage_notifications]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/process_assignment [main.process_assignment_page]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/process_prices [main.process_prices]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/process_prices/<int:id> [main.get_process_price]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/process_prices/<int:id>/edit [main.edit_process_price]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/process_prices/export [main.export_process_prices]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/process_prices/template [main.download_process_price_template]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/production_batches/<int:batch_id> [main.production_batch_detail]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/production_center [main.production_center]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/production_center/items/<int:item_id> [main.production_center_item_detail]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/production_orders [main.manage_production_orders]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/production_orders/<int:order_id> [main.production_order_detail]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/production_orders/<int:order_id>/edit [main.edit_production_order]": [
+   302,
+   200,
+   3,
+   false,
+   "/production_orders/1"
+  ],
+  "/production_records [main.manage_production_records]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/production_records/export [main.export_production_records]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/production_records/template [main.download_production_record_template]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/products [main.manage_products]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/products/<int:id> [main.get_product]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/products/<int:id>/bom [main.product_bom]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/products/<int:product_id>/bom/<int:bom_item_id> [main.get_product_bom_item]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/products/<int:product_id>/processes [main.product_processes]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/products/<int:product_id>/processes/<int:process_item_id> [main.get_product_process]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/products/export [main.export_products]": [
+   302,
+   200,
+   3,
+   false,
+   "/products"
+  ],
+  "/products/template [main.download_product_template]": [
+   302,
+   200,
+   3,
+   false,
+   "/products"
+  ],
+  "/quality [main.quality_management]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/quality/inspection/<int:record_id> [main.quality_inspection]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/quality/records [main.quality_records]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/quality/tasks [main.quality_tasks]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/quality/tasks/<int:task_id> [main.quality_task_detail]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/quality/templates [main.quality_templates]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/salary/<int:employee_id> [main.salary_details]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/salary_calculation [main.salary_calculation]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/sales_order/<int:order_id> [main.sales_order_detail]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/sales_order/<int:order_id>/edit [main.edit_sales_order]": [
+   302,
+   200,
+   3,
+   false,
+   "/sales_order/1"
+  ],
+  "/sales_order/<int:order_id>/item/add [main.add_sales_order_item]": [
+   302,
+   200,
+   3,
+   false,
+   "/sales_order/1"
+  ],
+  "/sales_order/add [main.add_sales_order]": [
+   302,
+   200,
+   3,
+   false,
+   "/sales_orders"
+  ],
+  "/sales_order_item/<int:item_id>/delivery_batches [main.manage_delivery_batches]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/sales_order_item/<int:item_id>/delivery_batches/manage [main.manage_delivery_batches_page]": [
+   302,
+   200,
+   3,
+   false,
+   "/sales_orders"
+  ],
+  "/sales_order_item/<int:item_id>/edit [main.edit_sales_order_item]": [
+   302,
+   200,
+   3,
+   false,
+   "/sales_orders"
+  ],
+  "/sales_orders [main.manage_sales_orders]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/search [main.global_search]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/search/advanced [main.advanced_search]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/system_configs [main.manage_system_configs]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/tasks [main.manage_tasks]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/tasks/<int:id> [main.get_task]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/tasks/<int:id>/get [main.get_task_details]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/tasks/assignment/<int:id> [main.get_task_assignment]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/tasks/template [main.download_task_template]": [
+   302,
+   200,
+   3,
+   false,
+   "/tasks"
+  ],
+  "/user_dashboard [main.user_dashboard]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ]
+ },
+ "inspector": {
+  "/ [main.index]": [
+   302,
+   200,
+   1,
+   false,
+   "/quality"
+  ],
+  "/add_process_price [main.add_process_price]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/api/chart-data/department [main.api_chart_data_department]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/chart-data/production [main.api_chart_data_production]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/chart-data/salary [main.api_chart_data_salary]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/chart-data/task [main.api_chart_data_task]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/consumable-categories [main.get_consumable_categories_api]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/customers/<int:customer_id>/addresses [main.api_get_customer_addresses]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/customers/search [main.api_search_customers]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/inventory/finished-products [main.get_available_finished_products]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/inventory/raw-materials [main.get_available_raw_materials]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/materials/search [main.api_search_materials]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/notifications/recent [main.api_recent_notifications]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/notifications/stats [main.api_notification_stats]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/process_assignment [main.list_process_assignments]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/process_assignment/<int:process_id> [main.get_process_assignment]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/production_center/items/<int:item_id>/detail [main.api_item_detail]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/products/drawings-by-name [main.api_get_drawings_by_product_name]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/products/names [main.api_get_product_names]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/products/search [main.search_products]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/finished-products [main.get_finished_products]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/inspectors [main.get_inspectors]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/processes [main.get_processes]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/production-records [main.get_production_records]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/records [main.get_inspection_records]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/records/<int:record_id> [main.get_inspection_record_detail]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/records/<int:record_id>/print [main.print_inspection_record]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/records/export [main.export_inspection_records]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/tasks [main.get_tasks]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/tasks/<int:task_id> [main.get_task_detail]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/templates [main.get_templates]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/templates/<int:template_id> [main.get_template_detail]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/raw-material-categories [main.get_raw_material_categories_api]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/sales_orders/<int:order_id>/customer_addresses [main.api_get_sales_order_customer_addresses]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/sales_orders/search [main.api_search_sales_orders]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/search/suggestions [main.search_suggestions]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/audit_logs [main.view_audit_logs]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/auth/ [auth.login]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/auth/login [auth.login]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/bonus_penalties [main.manage_bonus_penalties]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/bonus_penalties/<int:id> [main.get_bonus_penalty]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/bonus_penalties/export [main.export_bonus_penalties]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/bonus_penalties/template [main.download_bonus_penalty_template]": [
+   302,
+   200,
+   3,
+   false,
+   "/bonus_penalties"
+  ],
+  "/code_rules [main.manage_code_rules]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/code_rules/<int:rule_id>/edit [main.edit_code_rule]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/code_rules/add [main.add_code_rule]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/code_rules/available/material [main.get_available_material_rules]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/code_rules/available/product [main.get_available_product_rules]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/consumables [main.manage_consumables]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/consumables/<int:id> [main.get_consumable]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/consumables/categories [main.consumable_categories]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/consumables/categories/<int:category_id> [main.get_consumable_category]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/consumables/inbound [main.consumable_inbound]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/customer/<int:customer_id> [main.customer_detail]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/customer/<int:customer_id>/address/<int:address_id>/edit [main.edit_customer_address]": [
+   302,
+   200,
+   3,
+   false,
+   "/customer/1"
+  ],
+  "/customer/<int:customer_id>/address/add [main.add_customer_address]": [
+   302,
+   200,
+   3,
+   false,
+   "/customer/1"
+  ],
+  "/customer/<int:customer_id>/edit [main.edit_customer]": [
+   302,
+   200,
+   3,
+   false,
+   "/customer/1"
+  ],
+  "/customer/add [main.add_customer]": [
+   302,
+   200,
+   3,
+   false,
+   "/customers"
+  ],
+  "/customers [main.manage_customers]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/employee/add [main.add_employee]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/employee_salary_changes/<int:employee_id> [main.employee_salary_changes]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/employees [main.manage_employees]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/employees/<int:id>/edit [main.edit_employee]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/employees/export [main.export_employees]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/employees/template [main.download_employee_template]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/export_tasks [main.export_tasks]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/inventory [main.manage_inventory]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/inventory/finished-product/inbound [main.finished_product_inbound]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/inventory/finished/<int:id> [main.get_finished_product]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/inventory/inbound [main.inventory_inbound]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/inventory/raw-material/categories [main.raw_material_categories]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/inventory/raw-material/categories/<int:category_id> [main.get_raw_material_category]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/inventory/raw-material/inbound [main.raw_material_inbound]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/inventory/raw/<int:id> [main.get_raw_material]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/inventory/template [main.download_inventory_template]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/inventory_counts [main.manage_inventory_counts]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/material_requisitions [main.manage_material_requisitions]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/material_requisitions/<int:id> [main.material_requisition_detail]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/material_requisitions/add [main.add_material_requisition]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/material_returns [main.manage_material_returns]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/my_tasks [main.my_tasks]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/notification_rules [main.manage_notification_rules]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/notification_rules/add [main.add_notification_rule]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/notifications [main.manage_notifications]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/process_assignment [main.process_assignment_page]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/process_prices [main.process_prices]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/process_prices/<int:id> [main.get_process_price]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/process_prices/<int:id>/edit [main.edit_process_price]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/process_prices/export [main.export_process_prices]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/process_prices/template [main.download_process_price_template]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/production_batches/<int:batch_id> [main.production_batch_detail]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/production_center [main.production_center]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/production_center/items/<int:item_id> [main.production_center_item_detail]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/production_orders [main.manage_production_orders]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/production_orders/<int:order_id> [main.production_order_detail]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/production_orders/<int:order_id>/edit [main.edit_production_order]": [
+   302,
+   200,
+   3,
+   false,
+   "/production_orders/1"
+  ],
+  "/production_records [main.manage_production_records]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/production_records/export [main.export_production_records]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/production_records/template [main.download_production_record_template]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/products [main.manage_products]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/products/<int:id> [main.get_product]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/products/<int:id>/bom [main.product_bom]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/products/<int:product_id>/bom/<int:bom_item_id> [main.get_product_bom_item]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/products/<int:product_id>/processes [main.product_processes]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/products/<int:product_id>/processes/<int:process_item_id> [main.get_product_process]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/products/export [main.export_products]": [
+   302,
+   200,
+   3,
+   false,
+   "/products"
+  ],
+  "/products/template [main.download_product_template]": [
+   302,
+   200,
+   3,
+   false,
+   "/products"
+  ],
+  "/quality [main.quality_management]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/quality/inspection/<int:record_id> [main.quality_inspection]": [
+   302,
+   200,
+   1,
+   false,
+   "/quality/tasks"
+  ],
+  "/quality/records [main.quality_records]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/quality/tasks [main.quality_tasks]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/quality/tasks/<int:task_id> [main.quality_task_detail]": [
+   302,
+   200,
+   1,
+   false,
+   "/quality/tasks"
+  ],
+  "/quality/templates [main.quality_templates]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/salary/<int:employee_id> [main.salary_details]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/salary_calculation [main.salary_calculation]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/sales_order/<int:order_id> [main.sales_order_detail]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/sales_order/<int:order_id>/edit [main.edit_sales_order]": [
+   302,
+   200,
+   3,
+   false,
+   "/sales_order/1"
+  ],
+  "/sales_order/<int:order_id>/item/add [main.add_sales_order_item]": [
+   302,
+   200,
+   3,
+   false,
+   "/sales_order/1"
+  ],
+  "/sales_order/add [main.add_sales_order]": [
+   302,
+   200,
+   3,
+   false,
+   "/sales_orders"
+  ],
+  "/sales_order_item/<int:item_id>/delivery_batches [main.manage_delivery_batches]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/sales_order_item/<int:item_id>/delivery_batches/manage [main.manage_delivery_batches_page]": [
+   302,
+   200,
+   3,
+   false,
+   "/sales_orders"
+  ],
+  "/sales_order_item/<int:item_id>/edit [main.edit_sales_order_item]": [
+   302,
+   200,
+   3,
+   false,
+   "/sales_orders"
+  ],
+  "/sales_orders [main.manage_sales_orders]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/search [main.global_search]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/search/advanced [main.advanced_search]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/system_configs [main.manage_system_configs]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/tasks [main.manage_tasks]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/tasks/<int:id> [main.get_task]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/tasks/<int:id>/get [main.get_task_details]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/tasks/assignment/<int:id> [main.get_task_assignment]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/tasks/template [main.download_task_template]": [
+   302,
+   200,
+   3,
+   false,
+   "/tasks"
+  ],
+  "/user_dashboard [main.user_dashboard]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ]
+ },
+ "sales": {
+  "/ [main.index]": [
+   302,
+   200,
+   1,
+   false,
+   "/sales_orders"
+  ],
+  "/add_process_price [main.add_process_price]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/api/chart-data/department [main.api_chart_data_department]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/chart-data/production [main.api_chart_data_production]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/chart-data/salary [main.api_chart_data_salary]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/chart-data/task [main.api_chart_data_task]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/consumable-categories [main.get_consumable_categories_api]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/customers/<int:customer_id>/addresses [main.api_get_customer_addresses]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/customers/search [main.api_search_customers]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/inventory/finished-products [main.get_available_finished_products]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/inventory/raw-materials [main.get_available_raw_materials]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/materials/search [main.api_search_materials]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/notifications/recent [main.api_recent_notifications]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/notifications/stats [main.api_notification_stats]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/process_assignment [main.list_process_assignments]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/process_assignment/<int:process_id> [main.get_process_assignment]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/production_center/items/<int:item_id>/detail [main.api_item_detail]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/products/drawings-by-name [main.api_get_drawings_by_product_name]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/products/names [main.api_get_product_names]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/products/search [main.search_products]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/finished-products [main.get_finished_products]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/inspectors [main.get_inspectors]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/processes [main.get_processes]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/production-records [main.get_production_records]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/records [main.get_inspection_records]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/records/<int:record_id> [main.get_inspection_record_detail]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/records/<int:record_id>/print [main.print_inspection_record]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/records/export [main.export_inspection_records]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/tasks [main.get_tasks]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/tasks/<int:task_id> [main.get_task_detail]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/templates [main.get_templates]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/templates/<int:template_id> [main.get_template_detail]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/raw-material-categories [main.get_raw_material_categories_api]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/sales_orders/<int:order_id>/customer_addresses [main.api_get_sales_order_customer_addresses]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/sales_orders/search [main.api_search_sales_orders]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/search/suggestions [main.search_suggestions]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/audit_logs [main.view_audit_logs]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/auth/ [auth.login]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/auth/login [auth.login]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/bonus_penalties [main.manage_bonus_penalties]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/bonus_penalties/<int:id> [main.get_bonus_penalty]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/bonus_penalties/export [main.export_bonus_penalties]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/bonus_penalties/template [main.download_bonus_penalty_template]": [
+   302,
+   200,
+   3,
+   false,
+   "/bonus_penalties"
+  ],
+  "/code_rules [main.manage_code_rules]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/code_rules/<int:rule_id>/edit [main.edit_code_rule]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/code_rules/add [main.add_code_rule]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/code_rules/available/material [main.get_available_material_rules]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/code_rules/available/product [main.get_available_product_rules]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/consumables [main.manage_consumables]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/consumables/<int:id> [main.get_consumable]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/consumables/categories [main.consumable_categories]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/consumables/categories/<int:category_id> [main.get_consumable_category]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/consumables/inbound [main.consumable_inbound]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/customer/<int:customer_id> [main.customer_detail]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/customer/<int:customer_id>/address/<int:address_id>/edit [main.edit_customer_address]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/customer/<int:customer_id>/address/add [main.add_customer_address]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/customer/<int:customer_id>/edit [main.edit_customer]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/customer/add [main.add_customer]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/customers [main.manage_customers]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/employee/add [main.add_employee]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/employee_salary_changes/<int:employee_id> [main.employee_salary_changes]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/employees [main.manage_employees]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/employees/<int:id>/edit [main.edit_employee]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/employees/export [main.export_employees]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/employees/template [main.download_employee_template]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/export_tasks [main.export_tasks]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/inventory [main.manage_inventory]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/inventory/finished-product/inbound [main.finished_product_inbound]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/inventory/finished/<int:id> [main.get_finished_product]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/inventory/inbound [main.inventory_inbound]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/inventory/raw-material/categories [main.raw_material_categories]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/inventory/raw-material/categories/<int:category_id> [main.get_raw_material_category]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/inventory/raw-material/inbound [main.raw_material_inbound]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/inventory/raw/<int:id> [main.get_raw_material]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/inventory/template [main.download_inventory_template]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/inventory_counts [main.manage_inventory_counts]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/material_requisitions [main.manage_material_requisitions]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/material_requisitions/<int:id> [main.material_requisition_detail]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/material_requisitions/add [main.add_material_requisition]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/material_returns [main.manage_material_returns]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/my_tasks [main.my_tasks]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/notification_rules [main.manage_notification_rules]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/notification_rules/add [main.add_notification_rule]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/notifications [main.manage_notifications]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/process_assignment [main.process_assignment_page]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/process_prices [main.process_prices]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/process_prices/<int:id> [main.get_process_price]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/process_prices/<int:id>/edit [main.edit_process_price]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/process_prices/export [main.export_process_prices]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/process_prices/template [main.download_process_price_template]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/production_batches/<int:batch_id> [main.production_batch_detail]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/production_center [main.production_center]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/production_center/items/<int:item_id> [main.production_center_item_detail]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/production_orders [main.manage_production_orders]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/production_orders/<int:order_id> [main.production_order_detail]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/production_orders/<int:order_id>/edit [main.edit_production_order]": [
+   302,
+   200,
+   1,
+   false,
+   "/production_orders/1"
+  ],
+  "/production_records [main.manage_production_records]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/production_records/export [main.export_production_records]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/production_records/template [main.download_production_record_template]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/products [main.manage_products]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/products/<int:id> [main.get_product]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/products/<int:id>/bom [main.product_bom]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/products/<int:product_id>/bom/<int:bom_item_id> [main.get_product_bom_item]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/products/<int:product_id>/processes [main.product_processes]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/products/<int:product_id>/processes/<int:process_item_id> [main.get_product_process]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/products/export [main.export_products]": [
+   302,
+   200,
+   3,
+   false,
+   "/products"
+  ],
+  "/products/template [main.download_product_template]": [
+   302,
+   200,
+   3,
+   false,
+   "/products"
+  ],
+  "/quality [main.quality_management]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/quality/inspection/<int:record_id> [main.quality_inspection]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/quality/records [main.quality_records]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/quality/tasks [main.quality_tasks]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/quality/tasks/<int:task_id> [main.quality_task_detail]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/quality/templates [main.quality_templates]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/salary/<int:employee_id> [main.salary_details]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/salary_calculation [main.salary_calculation]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/sales_order/<int:order_id> [main.sales_order_detail]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/sales_order/<int:order_id>/edit [main.edit_sales_order]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/sales_order/<int:order_id>/item/add [main.add_sales_order_item]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/sales_order/add [main.add_sales_order]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/sales_order_item/<int:item_id>/delivery_batches [main.manage_delivery_batches]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/sales_order_item/<int:item_id>/delivery_batches/manage [main.manage_delivery_batches_page]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/sales_order_item/<int:item_id>/edit [main.edit_sales_order_item]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/sales_orders [main.manage_sales_orders]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/search [main.global_search]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/search/advanced [main.advanced_search]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/system_configs [main.manage_system_configs]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/tasks [main.manage_tasks]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/tasks/<int:id> [main.get_task]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/tasks/<int:id>/get [main.get_task_details]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/tasks/assignment/<int:id> [main.get_task_assignment]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/tasks/template [main.download_task_template]": [
+   302,
+   200,
+   3,
+   false,
+   "/tasks"
+  ],
+  "/user_dashboard [main.user_dashboard]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ]
+ },
+ "user": {
+  "/ [main.index]": [
+   302,
+   200,
+   1,
+   false,
+   "/user_dashboard"
+  ],
+  "/add_process_price [main.add_process_price]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/api/chart-data/department [main.api_chart_data_department]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/chart-data/production [main.api_chart_data_production]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/chart-data/salary [main.api_chart_data_salary]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/chart-data/task [main.api_chart_data_task]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/consumable-categories [main.get_consumable_categories_api]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/customers/<int:customer_id>/addresses [main.api_get_customer_addresses]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/customers/search [main.api_search_customers]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/inventory/finished-products [main.get_available_finished_products]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/inventory/raw-materials [main.get_available_raw_materials]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/materials/search [main.api_search_materials]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/notifications/recent [main.api_recent_notifications]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/notifications/stats [main.api_notification_stats]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/api/process_assignment [main.list_process_assignments]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/process_assignment/<int:process_id> [main.get_process_assignment]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/production_center/items/<int:item_id>/detail [main.api_item_detail]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/products/drawings-by-name [main.api_get_drawings_by_product_name]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/products/names [main.api_get_product_names]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/products/search [main.search_products]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/finished-products [main.get_finished_products]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/inspectors [main.get_inspectors]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/processes [main.get_processes]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/production-records [main.get_production_records]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/records [main.get_inspection_records]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/records/<int:record_id> [main.get_inspection_record_detail]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/records/<int:record_id>/print [main.print_inspection_record]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/records/export [main.export_inspection_records]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/tasks [main.get_tasks]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/tasks/<int:task_id> [main.get_task_detail]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/templates [main.get_templates]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/quality/templates/<int:template_id> [main.get_template_detail]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/raw-material-categories [main.get_raw_material_categories_api]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/sales_orders/<int:order_id>/customer_addresses [main.api_get_sales_order_customer_addresses]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/sales_orders/search [main.api_search_sales_orders]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/api/search/suggestions [main.search_suggestions]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/audit_logs [main.view_audit_logs]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/auth/ [auth.login]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/auth/login [auth.login]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/bonus_penalties [main.manage_bonus_penalties]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/bonus_penalties/<int:id> [main.get_bonus_penalty]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/bonus_penalties/export [main.export_bonus_penalties]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/bonus_penalties/template [main.download_bonus_penalty_template]": [
+   302,
+   200,
+   3,
+   false,
+   "/bonus_penalties"
+  ],
+  "/code_rules [main.manage_code_rules]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/code_rules/<int:rule_id>/edit [main.edit_code_rule]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/code_rules/add [main.add_code_rule]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/code_rules/available/material [main.get_available_material_rules]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/code_rules/available/product [main.get_available_product_rules]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/consumables [main.manage_consumables]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/consumables/<int:id> [main.get_consumable]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/consumables/categories [main.consumable_categories]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/consumables/categories/<int:category_id> [main.get_consumable_category]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/consumables/inbound [main.consumable_inbound]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/customer/<int:customer_id> [main.customer_detail]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/customer/<int:customer_id>/address/<int:address_id>/edit [main.edit_customer_address]": [
+   302,
+   200,
+   3,
+   false,
+   "/customer/1"
+  ],
+  "/customer/<int:customer_id>/address/add [main.add_customer_address]": [
+   302,
+   200,
+   3,
+   false,
+   "/customer/1"
+  ],
+  "/customer/<int:customer_id>/edit [main.edit_customer]": [
+   302,
+   200,
+   3,
+   false,
+   "/customer/1"
+  ],
+  "/customer/add [main.add_customer]": [
+   302,
+   200,
+   3,
+   false,
+   "/customers"
+  ],
+  "/customers [main.manage_customers]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/employee/add [main.add_employee]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/employee_salary_changes/<int:employee_id> [main.employee_salary_changes]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/employees [main.manage_employees]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/employees/<int:id>/edit [main.edit_employee]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/employees/export [main.export_employees]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/employees/template [main.download_employee_template]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/export_tasks [main.export_tasks]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/inventory [main.manage_inventory]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/inventory/finished-product/inbound [main.finished_product_inbound]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/inventory/finished/<int:id> [main.get_finished_product]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/inventory/inbound [main.inventory_inbound]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/inventory/raw-material/categories [main.raw_material_categories]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/inventory/raw-material/categories/<int:category_id> [main.get_raw_material_category]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/inventory/raw-material/inbound [main.raw_material_inbound]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/inventory/raw/<int:id> [main.get_raw_material]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/inventory/template [main.download_inventory_template]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/inventory_counts [main.manage_inventory_counts]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/material_requisitions [main.manage_material_requisitions]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/material_requisitions/<int:id> [main.material_requisition_detail]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/material_requisitions/add [main.add_material_requisition]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/material_returns [main.manage_material_returns]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/my_tasks [main.my_tasks]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/notification_rules [main.manage_notification_rules]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/notification_rules/add [main.add_notification_rule]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/notifications [main.manage_notifications]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ],
+  "/process_assignment [main.process_assignment_page]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/process_prices [main.process_prices]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/process_prices/<int:id> [main.get_process_price]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/process_prices/<int:id>/edit [main.edit_process_price]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/process_prices/export [main.export_process_prices]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/process_prices/template [main.download_process_price_template]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/production_batches/<int:batch_id> [main.production_batch_detail]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/production_center [main.production_center]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/production_center/items/<int:item_id> [main.production_center_item_detail]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/production_orders [main.manage_production_orders]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/production_orders/<int:order_id> [main.production_order_detail]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/production_orders/<int:order_id>/edit [main.edit_production_order]": [
+   302,
+   200,
+   3,
+   false,
+   "/production_orders/1"
+  ],
+  "/production_records [main.manage_production_records]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/production_records/export [main.export_production_records]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/production_records/template [main.download_production_record_template]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/products [main.manage_products]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/products/<int:id> [main.get_product]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/products/<int:id>/bom [main.product_bom]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/products/<int:product_id>/bom/<int:bom_item_id> [main.get_product_bom_item]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/products/<int:product_id>/processes [main.product_processes]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/products/<int:product_id>/processes/<int:process_item_id> [main.get_product_process]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/products/export [main.export_products]": [
+   302,
+   200,
+   3,
+   false,
+   "/products"
+  ],
+  "/products/template [main.download_product_template]": [
+   302,
+   200,
+   3,
+   false,
+   "/products"
+  ],
+  "/quality [main.quality_management]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/quality/inspection/<int:record_id> [main.quality_inspection]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/quality/records [main.quality_records]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/quality/tasks [main.quality_tasks]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/quality/tasks/<int:task_id> [main.quality_task_detail]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/quality/templates [main.quality_templates]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/salary/<int:employee_id> [main.salary_details]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/salary_calculation [main.salary_calculation]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/sales_order/<int:order_id> [main.sales_order_detail]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/sales_order/<int:order_id>/edit [main.edit_sales_order]": [
+   302,
+   200,
+   3,
+   false,
+   "/sales_order/1"
+  ],
+  "/sales_order/<int:order_id>/item/add [main.add_sales_order_item]": [
+   302,
+   200,
+   3,
+   false,
+   "/sales_order/1"
+  ],
+  "/sales_order/add [main.add_sales_order]": [
+   302,
+   200,
+   3,
+   false,
+   "/sales_orders"
+  ],
+  "/sales_order_item/<int:item_id>/delivery_batches [main.manage_delivery_batches]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/sales_order_item/<int:item_id>/delivery_batches/manage [main.manage_delivery_batches_page]": [
+   302,
+   200,
+   3,
+   false,
+   "/sales_orders"
+  ],
+  "/sales_order_item/<int:item_id>/edit [main.edit_sales_order_item]": [
+   302,
+   200,
+   3,
+   false,
+   "/sales_orders"
+  ],
+  "/sales_orders [main.manage_sales_orders]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/search [main.global_search]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/search/advanced [main.advanced_search]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/system_configs [main.manage_system_configs]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/tasks [main.manage_tasks]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/tasks/<int:id> [main.get_task]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/tasks/<int:id>/get [main.get_task_details]": [
+   403,
+   403,
+   0,
+   false,
+   ""
+  ],
+  "/tasks/assignment/<int:id> [main.get_task_assignment]": [
+   302,
+   200,
+   2,
+   false,
+   "/"
+  ],
+  "/tasks/template [main.download_task_template]": [
+   302,
+   200,
+   3,
+   false,
+   "/tasks"
+  ],
+  "/user_dashboard [main.user_dashboard]": [
+   200,
+   200,
+   0,
+   false,
+   ""
+  ]
+ }
+}

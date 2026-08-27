@@ -1,5 +1,6 @@
 import json
 from datetime import datetime
+from flask import current_app, has_app_context
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 from app import db, login
@@ -49,14 +50,18 @@ class SerialNumber(db.Model):
                         serial.last_updated = datetime.now()
                     db.session.flush()
                     number = f"{serial.current_number:08d}"
-                    return f"{prefix}{number}" if prefix else number
+                    site = prefix
+                    if site is None and has_app_context():
+                        site = current_app.config.get('SITE_CODE') or ''
+                    site = site or ''
+                    return f"{site}{number}" if site else number
             except SQLAlchemyError:
                 db.session.rollback()
                 continue
 
 class ProcessPrice(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    global_sn = db.Column(db.String(8), unique=True, nullable=False)  # 全局流水号
+    global_sn = db.Column(db.String(16), unique=True, nullable=False)  # 全局流水号
     process_code = db.Column(db.String(50), nullable=False, index=True)  # 工序编号
     process_name = db.Column(db.String(100), nullable=False)
     component = db.Column(db.String(100))  # 部件
@@ -94,7 +99,7 @@ class ProcessPriceGroup(db.Model):
     __tablename__ = 'process_price_group'
     
     id = db.Column(db.Integer, primary_key=True)
-    global_sn = db.Column(db.String(8), unique=True, nullable=False)  # 全局流水号
+    global_sn = db.Column(db.String(16), unique=True, nullable=False)  # 全局流水号
     subtotal_id = db.Column(db.Integer, db.ForeignKey('process_price.id', ondelete='CASCADE'), nullable=False)
     process_id = db.Column(db.Integer, db.ForeignKey('process_price.id', ondelete='CASCADE'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -104,11 +109,15 @@ class ProcessPriceGroup(db.Model):
         db.UniqueConstraint('subtotal_id', 'process_id', name='uq_subtotal_process'),
     )
     
-    # 关系
-    subtotal = db.relationship('ProcessPrice', foreign_keys=[subtotal_id], 
-                             backref=db.backref('included_processes', lazy='dynamic'))
+    # 关系。subtotal_id/process_id 都是 NOT NULL，删除父工序时默认的置 NULL 行为会违反约束。
+    # SQLite 默认不开外键，DB 层的 ondelete='CASCADE' 不会生效，所以不能用 passive_deletes，
+    # 必须让 ORM 自己把关联行查出来删掉，否则会留下孤儿记录
+    subtotal = db.relationship('ProcessPrice', foreign_keys=[subtotal_id],
+                             backref=db.backref('included_processes', lazy='dynamic',
+                                                cascade='all, delete-orphan'))
     process = db.relationship('ProcessPrice', foreign_keys=[process_id],
-                            backref=db.backref('belongs_to_subtotals', lazy='dynamic'))
+                            backref=db.backref('belongs_to_subtotals', lazy='dynamic',
+                                               cascade='all, delete-orphan'))
     
     def __init__(self, **kwargs):
         super(ProcessPriceGroup, self).__init__(**kwargs)
@@ -117,7 +126,7 @@ class ProcessPriceGroup(db.Model):
 
 class Employee(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    global_sn = db.Column(db.String(8), unique=True, nullable=False)  # 全局流水号
+    global_sn = db.Column(db.String(16), unique=True, nullable=False)  # 全局流水号
     employee_id = db.Column(db.String(50), unique=True, nullable=False, index=True)  # 工号
     name = db.Column(db.String(100), nullable=False)
     position = db.Column(db.String(50), nullable=False, default='普通员工')
@@ -170,7 +179,7 @@ class Employee(db.Model):
 class ProductionRecord(db.Model):
     """生产记录"""
     id = db.Column(db.Integer, primary_key=True)
-    global_sn = db.Column(db.String(8), unique=True, nullable=False)  # 全局流水号
+    global_sn = db.Column(db.String(16), unique=True, nullable=False)  # 全局流水号
     employee_id = db.Column(db.Integer, db.ForeignKey('employee.id'), nullable=False)
     process_id = db.Column(db.Integer, db.ForeignKey('process_price.id'), nullable=False)
     quantity = db.Column(db.Integer, nullable=False)  # 生产数量
@@ -215,7 +224,7 @@ class ProductionRecordMaterial(db.Model):
 
 class BonusPenalty(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    global_sn = db.Column(db.String(8), unique=True, nullable=False)  # 全局流水号
+    global_sn = db.Column(db.String(16), unique=True, nullable=False)  # 全局流水号
     employee_id = db.Column(db.Integer, db.ForeignKey('employee.id'))
     amount = db.Column(db.Float)
     reason = db.Column(db.Text)
@@ -261,7 +270,7 @@ class AuditLog(db.Model):
 class TaskAssignment(db.Model):
     """生产任务分配"""
     id = db.Column(db.Integer, primary_key=True)
-    global_sn = db.Column(db.String(8), unique=True, nullable=False)  # 全局流水号
+    global_sn = db.Column(db.String(16), unique=True, nullable=False)  # 全局流水号
     employee_id = db.Column(db.Integer, db.ForeignKey('employee.id'), nullable=False)
     process_id = db.Column(db.Integer, db.ForeignKey('process_price.id'), nullable=False)
     assigned_date = db.Column(db.DateTime, default=datetime.utcnow)  # 分配时间
@@ -276,6 +285,8 @@ class TaskAssignment(db.Model):
     production_batch_id = db.Column(db.Integer, db.ForeignKey('production_batches.id', ondelete='SET NULL'), nullable=True)
     batch_item_id = db.Column(db.Integer, db.ForeignKey('production_batch_items.id', ondelete='SET NULL'), nullable=True)
     task_type = db.Column(db.String(20), default='manual')  # manual: 手动创建, auto: 自动创建
+    equipment_id = db.Column(db.Integer, db.ForeignKey('equipment.id', ondelete='SET NULL'), nullable=True)
+    work_center_id = db.Column(db.Integer, db.ForeignKey('work_centers.id', ondelete='SET NULL'), nullable=True)
     
     # 从生产订单继承的规格型号信息
     spec_extended = db.Column(db.String(100))  # 加长（具体值）
@@ -303,6 +314,8 @@ class TaskAssignment(db.Model):
     process = db.relationship('ProcessPrice', backref='task_assignments')
     production_batch = db.relationship('ProductionBatch', backref=db.backref('tasks', lazy='dynamic'))
     batch_item = db.relationship('ProductionBatchItem', backref=db.backref('tasks', lazy='dynamic'))
+    equipment = db.relationship('Equipment', foreign_keys='TaskAssignment.equipment_id', backref=db.backref('tasks', lazy='dynamic'))
+    work_center = db.relationship('WorkCenter', foreign_keys='TaskAssignment.work_center_id', backref=db.backref('tasks', lazy='dynamic'))
     
     def __repr__(self):
         return f'<TaskAssignment {self.id}: {self.employee.name} - {self.process.process_name}>'
@@ -363,7 +376,7 @@ class EmployeeSalaryHistory(db.Model):
     __tablename__ = 'employee_salary_history'
     
     id = db.Column(db.Integer, primary_key=True)
-    global_sn = db.Column(db.String(8), unique=True, nullable=False)  # 全局流水号
+    global_sn = db.Column(db.String(16), unique=True, nullable=False)  # 全局流水号
     employee_id = db.Column(db.Integer, db.ForeignKey('employee.id', ondelete='CASCADE', name='fk_salary_history_employee_id'), nullable=False)
     old_salary = db.Column(db.Float, nullable=False)
     new_salary = db.Column(db.Float, nullable=False)
@@ -393,7 +406,7 @@ class EmployeeCoefficientHistory(db.Model):
     __tablename__ = 'employee_coefficient_history'
     
     id = db.Column(db.Integer, primary_key=True)
-    global_sn = db.Column(db.String(8), unique=True, nullable=False)  # 全局流水号
+    global_sn = db.Column(db.String(16), unique=True, nullable=False)  # 全局流水号
     employee_id = db.Column(db.Integer, db.ForeignKey('employee.id', ondelete='CASCADE', name='fk_coefficient_history_employee_id'), nullable=False)
     old_coefficient = db.Column(db.Float, nullable=False)
     new_coefficient = db.Column(db.Float, nullable=False)
@@ -425,8 +438,8 @@ CoefficientChange = EmployeeCoefficientHistory
 class FinishedProduct(db.Model):
     """成品库存管理"""
     id = db.Column(db.Integer, primary_key=True)
-    global_sn = db.Column(db.String(8), unique=True, nullable=False)  # 全局流水号
-    serial_number = db.Column(db.String(8), unique=True, nullable=False)
+    global_sn = db.Column(db.String(16), unique=True, nullable=False)  # 全局流水号
+    serial_number = db.Column(db.String(16), unique=True, nullable=False)
     product_number = db.Column(db.String(50), nullable=False, index=True)  # 产品编号
     production_date = db.Column(db.Date, nullable=False)  # 生产日期
     drawing_number = db.Column(db.String(100), nullable=False)  # 图号
@@ -437,6 +450,12 @@ class FinishedProduct(db.Model):
     status = db.Column(db.String(20), default='in_stock')  # in_stock: 在库, shipped: 已发货, scrapped: 报废, used: 已使用
     notes = db.Column(db.Text)  # 备注
     is_archived = db.Column(db.Boolean, default=False)  # 是否已存档
+    # fg=成品 wip_part=自制半成品 failed=未通过 scrap=报废
+    stock_kind = db.Column(db.String(20), default='fg', index=True)
+    workpiece_id = db.Column(db.Integer, db.ForeignKey('workpieces.id', ondelete='SET NULL'), nullable=True)
+    product_id = db.Column(db.Integer, db.ForeignKey('products.id', ondelete='SET NULL'), nullable=True)
+    workpiece = db.relationship('Workpiece', foreign_keys=[workpiece_id], backref=db.backref('stock_items', lazy='dynamic'))
+    product = db.relationship('Product', foreign_keys=[product_id])
     
     __table_args__ = (
         db.UniqueConstraint('serial_number', name='uq_finished_product_serial_number'),
@@ -459,6 +478,8 @@ class RawMaterialCategory(db.Model):
     code = db.Column(db.String(20), nullable=False, unique=True)  # 品类编码
     description = db.Column(db.Text)  # 品类描述
     is_active = db.Column(db.Boolean, default=True)  # 是否启用
+    # 领用是否走审批。NULL 视为 True（原材料带内部编号，默认要审批+溯源）
+    requires_approval = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     created_by = db.Column(db.Integer, db.ForeignKey('user.id'))  # 创建人
@@ -477,14 +498,15 @@ class RawMaterialCategory(db.Model):
             'code': self.code,
             'description': self.description,
             'is_active': self.is_active,
-            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+            'requires_approval': True if self.requires_approval is None else bool(self.requires_approval),
+            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S') if self.created_at else '',
             'material_count': self.raw_materials.count()
         }
 
 class RawMaterial(db.Model):
     """原材料管理"""
     id = db.Column(db.Integer, primary_key=True)
-    global_sn = db.Column(db.String(8), unique=True, nullable=False)  # 全局流水号
+    global_sn = db.Column(db.String(16), unique=True, nullable=False)  # 全局流水号
     supplier = db.Column(db.String(100), nullable=False)  # 供应商
     category_id = db.Column(db.Integer, db.ForeignKey('raw_material_categories.id'), nullable=False)  # 品类ID
     melt_number = db.Column(db.String(100), nullable=False)  # 原料冶炼炉号
@@ -533,6 +555,8 @@ class ConsumableCategory(db.Model):
     code = db.Column(db.String(20), nullable=False, unique=True)  # 品类编码
     description = db.Column(db.Text)  # 品类描述
     is_active = db.Column(db.Boolean, default=True)  # 是否启用
+    # 领用是否走审批。NULL 视为 False（易耗品默认免审）
+    requires_approval = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     created_by = db.Column(db.Integer, db.ForeignKey('user.id'))  # 创建人
@@ -551,7 +575,8 @@ class ConsumableCategory(db.Model):
             'code': self.code,
             'description': self.description,
             'is_active': self.is_active,
-            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+            'requires_approval': False if self.requires_approval is None else bool(self.requires_approval),
+            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S') if self.created_at else '',
             'consumable_count': self.consumables.count()
         }
 
@@ -560,7 +585,7 @@ class Consumable(db.Model):
     __tablename__ = 'consumables'
     
     id = db.Column(db.Integer, primary_key=True)
-    global_sn = db.Column(db.String(8), unique=True, nullable=False)  # 全局流水号
+    global_sn = db.Column(db.String(16), unique=True, nullable=False)  # 全局流水号
     supplier = db.Column(db.String(100), nullable=False)  # 供应商
     category_id = db.Column(db.Integer, db.ForeignKey('consumable_categories.id'), nullable=False)  # 品类ID
     specification = db.Column(db.String(200))  # 规格型号
@@ -897,9 +922,16 @@ class NonconformityRecord(db.Model):
     handling_date = db.Column(db.Date, nullable=False, comment='处理日期')
     handling_result = db.Column(db.Text, nullable=False, comment='处理结果')
     notes = db.Column(db.Text, comment='处理说明')
+    status = db.Column(db.String(20), default='open', index=True)  # open/pending_approval/approved/rejected/done
+    approver_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    approved_at = db.Column(db.DateTime)
+    rework_task_id = db.Column(db.Integer, db.ForeignKey('task_assignment.id', ondelete='SET NULL'), nullable=True)
+    scrap_cost = db.Column(db.Float, default=0)
+    workpiece_id = db.Column(db.Integer, db.ForeignKey('workpieces.id', ondelete='SET NULL'), nullable=True)
 
     # 关联关系
-    handler = db.relationship('User', backref=db.backref('handled_nonconformities', lazy='dynamic'))
+    handler = db.relationship('User', foreign_keys=[handler_id], backref=db.backref('handled_nonconformities', lazy='dynamic'))
+    approver = db.relationship('User', foreign_keys=[approver_id], backref=db.backref('approved_concessions', lazy='dynamic'))
 
     def __repr__(self):
         return f'<NonconformityRecord {self.id}: {self.type}>'
@@ -909,7 +941,7 @@ class Product(db.Model):
     __tablename__ = 'products'
     
     id = db.Column(db.Integer, primary_key=True)
-    global_sn = db.Column(db.String(8), unique=True, nullable=False)  # 全局流水号
+    global_sn = db.Column(db.String(16), unique=True, nullable=False)  # 全局流水号
     product_code = db.Column(db.String(50), unique=True, nullable=False, index=True)  # 产品编码
     product_name = db.Column(db.String(100), nullable=False)  # 产品名称
     drawing_number = db.Column(db.String(100))  # 图号
@@ -926,6 +958,7 @@ class Product(db.Model):
     
     # 新增编码规则关联
     code_rule_id = db.Column(db.Integer, db.ForeignKey('code_rule.id', ondelete='SET NULL'), nullable=True)  # 产品编码规则
+    sellable_as_part = db.Column(db.Boolean, default=False)  # 半成品/零件可单独销售
     
     __table_args__ = (
         db.UniqueConstraint('global_sn', name='uq_product_global_sn'),
@@ -987,7 +1020,7 @@ class ProductBOM(db.Model):
     __tablename__ = 'product_bom'
     
     id = db.Column(db.Integer, primary_key=True)
-    global_sn = db.Column(db.String(8), unique=True, nullable=False)  # 全局流水号
+    global_sn = db.Column(db.String(16), unique=True, nullable=False)  # 全局流水号
     product_id = db.Column(db.Integer, db.ForeignKey('products.id', ondelete='CASCADE'), nullable=False)
     material_type = db.Column(db.String(20), nullable=False)  # raw: 原材料, finished: 成品
     material_id = db.Column(db.Integer, nullable=False)  # 原材料或成品ID
@@ -1051,7 +1084,7 @@ class ProductProcess(db.Model):
     __tablename__ = 'product_processes'
     
     id = db.Column(db.Integer, primary_key=True)
-    global_sn = db.Column(db.String(8), unique=True, nullable=False)  # 全局流水号
+    global_sn = db.Column(db.String(16), unique=True, nullable=False)  # 全局流水号
     product_id = db.Column(db.Integer, db.ForeignKey('products.id', ondelete='CASCADE'), nullable=False)
     process_id = db.Column(db.Integer, db.ForeignKey('process_price.id'), nullable=False)
     sequence = db.Column(db.Integer, nullable=False)  # 工序顺序
@@ -1062,6 +1095,9 @@ class ProductProcess(db.Model):
     notes = db.Column(db.Text)  # 备注
     is_required = db.Column(db.Boolean, default=True)  # 是否必需工序
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    # calcine / machine / assemble，决定质检门禁与派工工作中心
+    process_stage = db.Column(db.String(20), default='machine', index=True)
+    work_center_id = db.Column(db.Integer, db.ForeignKey('work_centers.id', ondelete='SET NULL'), nullable=True)
     
     __table_args__ = (
         db.UniqueConstraint('global_sn', name='uq_product_process_global_sn'),
@@ -1070,6 +1106,7 @@ class ProductProcess(db.Model):
     
     # 关系
     process = db.relationship('ProcessPrice', backref=db.backref('product_processes', lazy='dynamic'))
+    work_center = db.relationship('WorkCenter', foreign_keys=[work_center_id])
     
     def __init__(self, **kwargs):
         super(ProductProcess, self).__init__(**kwargs)
@@ -1099,7 +1136,7 @@ class ProductionOrder(db.Model):
     __tablename__ = 'production_orders'
     
     id = db.Column(db.Integer, primary_key=True)
-    global_sn = db.Column(db.String(8), unique=True, nullable=False)  # 全局流水号
+    global_sn = db.Column(db.String(16), unique=True, nullable=False)  # 全局流水号
     order_number = db.Column(db.String(50), unique=True, nullable=False, index=True)  # 订单编号
     product_id = db.Column(db.Integer, db.ForeignKey('products.id', ondelete='CASCADE'), nullable=False)
     planned_quantity = db.Column(db.Integer, nullable=False)  # 计划生产数量
@@ -1234,6 +1271,7 @@ class ProductionOrder(db.Model):
                     material_type=bom_item.material_type,
                     material_id=bom_item.material_id,
                     required_quantity=required_quantity,
+                    allocated_quantity=required_quantity,
                     unit=bom_item.unit,
                     notes=f"根据BOM自动分配 - {bom_item.material_name}"
                 )
@@ -1253,7 +1291,7 @@ class ProductionBatch(db.Model):
     __tablename__ = 'production_batches'
     
     id = db.Column(db.Integer, primary_key=True)
-    global_sn = db.Column(db.String(8), unique=True, nullable=False)  # 全局流水号
+    global_sn = db.Column(db.String(16), unique=True, nullable=False)  # 全局流水号
     batch_number = db.Column(db.String(50), unique=True, nullable=False, index=True)  # 批次号
     production_order_id = db.Column(db.Integer, db.ForeignKey('production_orders.id', ondelete='CASCADE'), nullable=False)
     batch_quantity = db.Column(db.Integer, nullable=False)  # 批次数量
@@ -1394,7 +1432,7 @@ class ProductionBatchItem(db.Model):
     __tablename__ = 'production_batch_items'
     
     id = db.Column(db.Integer, primary_key=True)
-    global_sn = db.Column(db.String(8), unique=True, nullable=False)  # 全局流水号
+    global_sn = db.Column(db.String(16), unique=True, nullable=False)  # 全局流水号
     batch_id = db.Column(db.Integer, db.ForeignKey('production_batches.id', ondelete='CASCADE'), nullable=False)
     item_sequence = db.Column(db.Integer, nullable=False)  # 项目序号
     product_code = db.Column(db.String(100), unique=True, nullable=False, index=True)  # 产品编码
@@ -1425,7 +1463,7 @@ class MaterialAllocation(db.Model):
     __tablename__ = 'material_allocations'
     
     id = db.Column(db.Integer, primary_key=True)
-    global_sn = db.Column(db.String(8), unique=True, nullable=False)  # 全局流水号
+    global_sn = db.Column(db.String(16), unique=True, nullable=False)  # 全局流水号
     production_order_id = db.Column(db.Integer, db.ForeignKey('production_orders.id', ondelete='CASCADE'), nullable=False)
     material_type = db.Column(db.String(20), nullable=False)  # raw, finished, product
     material_id = db.Column(db.Integer, nullable=False)  # 物料ID
@@ -1484,7 +1522,7 @@ class Customer(db.Model):
     __tablename__ = 'customers'
     
     id = db.Column(db.Integer, primary_key=True)
-    global_sn = db.Column(db.String(8), unique=True, nullable=False)  # 全局流水号
+    global_sn = db.Column(db.String(16), unique=True, nullable=False)  # 全局流水号
     customer_code = db.Column(db.String(50), unique=True, nullable=False, index=True)  # 客户编码
     customer_name = db.Column(db.String(100), nullable=False)  # 客户名称
     customer_type = db.Column(db.String(20), default='enterprise')  # 客户类型: enterprise(企业), individual(个人)
@@ -1538,7 +1576,7 @@ class CustomerAddress(db.Model):
     __tablename__ = 'customer_addresses'
     
     id = db.Column(db.Integer, primary_key=True)
-    global_sn = db.Column(db.String(8), unique=True, nullable=False)  # 全局流水号
+    global_sn = db.Column(db.String(16), unique=True, nullable=False)  # 全局流水号
     customer_id = db.Column(db.Integer, db.ForeignKey('customers.id', ondelete='CASCADE'), nullable=False)
     address_type = db.Column(db.String(20), default='shipping')  # 地址类型: shipping(收货), billing(账单), office(办公)
     contact_person = db.Column(db.String(50), nullable=False)  # 联系人
@@ -1579,7 +1617,7 @@ class SalesOrder(db.Model):
     __tablename__ = 'sales_orders'
     
     id = db.Column(db.Integer, primary_key=True)
-    global_sn = db.Column(db.String(8), unique=True, nullable=False)  # 全局流水号
+    global_sn = db.Column(db.String(16), unique=True, nullable=False)  # 全局流水号
     order_number = db.Column(db.String(50), unique=True, nullable=False, index=True)  # 订单编号
     order_source = db.Column(db.String(50), nullable=False)  # 订单来源
     customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'), nullable=False)  # 客户ID
@@ -1621,7 +1659,7 @@ class SalesOrderItem(db.Model):
     __tablename__ = 'sales_order_items'
     
     id = db.Column(db.Integer, primary_key=True)
-    global_sn = db.Column(db.String(8), unique=True, nullable=False)  # 全局流水号
+    global_sn = db.Column(db.String(16), unique=True, nullable=False)  # 全局流水号
     sales_order_id = db.Column(db.Integer, db.ForeignKey('sales_orders.id', ondelete='CASCADE'), nullable=False)
     product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False)  # 产品ID（关联产品管理）
     quantity = db.Column(db.Integer, nullable=False)  # 数量
@@ -1803,7 +1841,7 @@ class NotificationRule(db.Model):
     __tablename__ = 'notification_rules'
     
     id = db.Column(db.Integer, primary_key=True)
-    global_sn = db.Column(db.String(8), unique=True, nullable=False)  # 全局流水号
+    global_sn = db.Column(db.String(16), unique=True, nullable=False)  # 全局流水号
     rule_name = db.Column(db.String(100), nullable=False)  # 规则名称
     trigger_type = db.Column(db.String(50), nullable=False)  # 触发类型
     trigger_conditions = db.Column(db.JSON)  # 触发条件（JSON格式）
@@ -1838,7 +1876,7 @@ class Notification(db.Model):
     __tablename__ = 'notifications'
     
     id = db.Column(db.Integer, primary_key=True)
-    global_sn = db.Column(db.String(8), unique=True, nullable=False)  # 全局流水号
+    global_sn = db.Column(db.String(16), unique=True, nullable=False)  # 全局流水号
     rule_id = db.Column(db.Integer, db.ForeignKey('notification_rules.id'), nullable=True)  # 关联规则
     trigger_type = db.Column(db.String(50), nullable=False)  # 触发类型
     trigger_data = db.Column(db.JSON)  # 触发数据（JSON格式）
@@ -1935,7 +1973,7 @@ class NotificationTemplate(db.Model):
     __tablename__ = 'notification_templates'
     
     id = db.Column(db.Integer, primary_key=True)
-    global_sn = db.Column(db.String(8), unique=True, nullable=False)  # 全局流水号
+    global_sn = db.Column(db.String(16), unique=True, nullable=False)  # 全局流水号
     template_code = db.Column(db.String(50), unique=True, nullable=False)  # 模板编码
     template_name = db.Column(db.String(100), nullable=False)  # 模板名称
     trigger_type = db.Column(db.String(50), nullable=False)  # 适用的触发类型
@@ -1980,7 +2018,7 @@ class MaterialRequisition(db.Model):
     __tablename__ = 'material_requisitions'
     
     id = db.Column(db.Integer, primary_key=True)
-    global_sn = db.Column(db.String(8), unique=True, nullable=False)  # 全局流水号
+    global_sn = db.Column(db.String(16), unique=True, nullable=False)  # 全局流水号
     requisition_number = db.Column(db.String(50), unique=True, nullable=False, index=True)  # 领用单号
     employee_id = db.Column(db.Integer, db.ForeignKey('employee.id'), nullable=False)  # 领用人
     department = db.Column(db.String(50), nullable=False)  # 领用部门
@@ -2067,7 +2105,7 @@ class MaterialRequisitionItem(db.Model):
     __tablename__ = 'material_requisition_items'
     
     id = db.Column(db.Integer, primary_key=True)
-    global_sn = db.Column(db.String(8), unique=True, nullable=False)  # 全局流水号
+    global_sn = db.Column(db.String(16), unique=True, nullable=False)  # 全局流水号
     requisition_id = db.Column(db.Integer, db.ForeignKey('material_requisitions.id', ondelete='CASCADE'), nullable=False)
     material_type = db.Column(db.String(20), nullable=False)  # raw: 原材料, consumable: 易耗品, finished: 成品
     material_id = db.Column(db.Integer, nullable=False)  # 物料ID
@@ -2129,7 +2167,7 @@ class MaterialReturn(db.Model):
     __tablename__ = 'material_returns'
     
     id = db.Column(db.Integer, primary_key=True)
-    global_sn = db.Column(db.String(8), unique=True, nullable=False)  # 全局流水号
+    global_sn = db.Column(db.String(16), unique=True, nullable=False)  # 全局流水号
     return_number = db.Column(db.String(50), unique=True, nullable=False, index=True)  # 归还单号
     employee_id = db.Column(db.Integer, db.ForeignKey('employee.id'), nullable=False)  # 归还人
     department = db.Column(db.String(50), nullable=False)  # 归还部门
@@ -2200,7 +2238,7 @@ class MaterialReturnItem(db.Model):
     __tablename__ = 'material_return_items'
     
     id = db.Column(db.Integer, primary_key=True)
-    global_sn = db.Column(db.String(8), unique=True, nullable=False)  # 全局流水号
+    global_sn = db.Column(db.String(16), unique=True, nullable=False)  # 全局流水号
     return_id = db.Column(db.Integer, db.ForeignKey('material_returns.id', ondelete='CASCADE'), nullable=False)
     material_type = db.Column(db.String(20), nullable=False)  # raw: 原材料, consumable: 易耗品, finished: 成品
     material_id = db.Column(db.Integer, nullable=False)  # 物料ID
@@ -2252,7 +2290,7 @@ class InventoryCount(db.Model):
     __tablename__ = 'inventory_counts'
     
     id = db.Column(db.Integer, primary_key=True)
-    global_sn = db.Column(db.String(8), unique=True, nullable=False)  # 全局流水号
+    global_sn = db.Column(db.String(16), unique=True, nullable=False)  # 全局流水号
     count_number = db.Column(db.String(50), unique=True, nullable=False, index=True)  # 盘点单号
     count_name = db.Column(db.String(100), nullable=False)  # 盘点名称
     count_type = db.Column(db.String(20), default='full')  # full: 全盘, partial: 抽盘, cycle: 循环盘点
@@ -2335,6 +2373,13 @@ class InventoryCount(db.Model):
     def can_complete(self):
         """是否可以完成盘点"""
         return self.status == 'counting' and self.completed_items == self.total_items
+
+    @property
+    def can_cancel(self):
+        """仅未调账的计划中/盘点中可取消"""
+        if self.status not in ('planning', 'counting'):
+            return False
+        return not any(item.adjustment_applied for item in self.items)
     
     @property
     def count_team_members(self):
@@ -2352,7 +2397,7 @@ class InventoryCountItem(db.Model):
     __tablename__ = 'inventory_count_items'
     
     id = db.Column(db.Integer, primary_key=True)
-    global_sn = db.Column(db.String(8), unique=True, nullable=False)  # 全局流水号
+    global_sn = db.Column(db.String(16), unique=True, nullable=False)  # 全局流水号
     count_id = db.Column(db.Integer, db.ForeignKey('inventory_counts.id', ondelete='CASCADE'), nullable=False)
     material_type = db.Column(db.String(20), nullable=False)  # raw: 原材料, consumable: 易耗品, finished: 成品
     material_id = db.Column(db.Integer, nullable=False)  # 物料ID
@@ -2434,7 +2479,7 @@ class ProcessAssignmentRule(db.Model):
     __tablename__ = 'process_assignment_rules'
 
     id = db.Column(db.Integer, primary_key=True)
-    global_sn = db.Column(db.String(8), unique=True, nullable=False)
+    global_sn = db.Column(db.String(16), unique=True, nullable=False)
     process_id = db.Column(db.Integer, db.ForeignKey('process_price.id', ondelete='CASCADE'), nullable=False, index=True)
     strategy = db.Column(db.String(20), nullable=False, default='round_robin')  # round_robin / weighted / fixed
     is_active = db.Column(db.Boolean, default=True)
@@ -2459,7 +2504,7 @@ class ProcessAssignmentMember(db.Model):
     __tablename__ = 'process_assignment_members'
 
     id = db.Column(db.Integer, primary_key=True)
-    global_sn = db.Column(db.String(8), unique=True, nullable=False)
+    global_sn = db.Column(db.String(16), unique=True, nullable=False)
     rule_id = db.Column(db.Integer, db.ForeignKey('process_assignment_rules.id', ondelete='CASCADE'), nullable=False, index=True)
     employee_id = db.Column(db.Integer, db.ForeignKey('employee.id', ondelete='CASCADE'), nullable=False, index=True)
     weight = db.Column(db.Integer, default=1)  # 权重（weighted策略使用）
@@ -2661,3 +2706,385 @@ class SystemConfig(db.Model):
 
     def __repr__(self):
         return f'<SystemConfig {self.key}={self.value}>'
+
+
+# ---------------------------------------------------------------------------
+# 道岔产销：设备 / 工件 / 炉次 / 采购 / 发货
+# ---------------------------------------------------------------------------
+
+class WorkCenter(db.Model):
+    """工作中心：同一能力的机床或炉编组。"""
+    __tablename__ = 'work_centers'
+
+    id = db.Column(db.Integer, primary_key=True)
+    global_sn = db.Column(db.String(16), unique=True, nullable=False)
+    code = db.Column(db.String(50), unique=True, nullable=False, index=True)
+    name = db.Column(db.String(100), nullable=False)
+    notes = db.Column(db.Text)
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        if not self.global_sn:
+            self.global_sn = SerialNumber.get_next_number()
+
+
+class Equipment(db.Model):
+    """设备台账：煅烧炉与机床。增减设备改 status，不删历史。"""
+    __tablename__ = 'equipment'
+
+    id = db.Column(db.Integer, primary_key=True)
+    global_sn = db.Column(db.String(16), unique=True, nullable=False)
+    code = db.Column(db.String(50), unique=True, nullable=False, index=True)
+    name = db.Column(db.String(100), nullable=False)
+    kind = db.Column(db.String(20), nullable=False, index=True)  # furnace/mill/lathe/grinder/other
+    status = db.Column(db.String(20), nullable=False, default='running', index=True)  # running/maintenance/offline/retired
+    length_mm = db.Column(db.Float)
+    width_mm = db.Column(db.Float)
+    height_mm = db.Column(db.Float)
+    notes = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        if not self.global_sn:
+            self.global_sn = SerialNumber.get_next_number()
+
+    @property
+    def is_available(self):
+        return self.status == 'running'
+
+
+class EquipmentCapability(db.Model):
+    __tablename__ = 'equipment_capabilities'
+    id = db.Column(db.Integer, primary_key=True)
+    equipment_id = db.Column(db.Integer, db.ForeignKey('equipment.id', ondelete='CASCADE'), nullable=False)
+    process_id = db.Column(db.Integer, db.ForeignKey('process_price.id', ondelete='CASCADE'), nullable=False)
+    equipment = db.relationship('Equipment', backref=db.backref('capabilities', lazy='dynamic', cascade='all, delete-orphan'))
+    process = db.relationship('ProcessPrice', backref=db.backref('capable_equipment', lazy='dynamic'))
+    __table_args__ = (db.UniqueConstraint('equipment_id', 'process_id', name='uq_equipment_process'),)
+
+
+class WorkCenterEquipment(db.Model):
+    __tablename__ = 'work_center_equipment'
+    id = db.Column(db.Integer, primary_key=True)
+    work_center_id = db.Column(db.Integer, db.ForeignKey('work_centers.id', ondelete='CASCADE'), nullable=False)
+    equipment_id = db.Column(db.Integer, db.ForeignKey('equipment.id', ondelete='CASCADE'), nullable=False)
+    work_center = db.relationship('WorkCenter', backref=db.backref('members', lazy='dynamic', cascade='all, delete-orphan'))
+    equipment = db.relationship('Equipment', backref=db.backref('work_centers', lazy='dynamic'))
+    __table_args__ = (db.UniqueConstraint('work_center_id', 'equipment_id', name='uq_work_center_equipment'),)
+
+
+class EquipmentDowntime(db.Model):
+    __tablename__ = 'equipment_downtime'
+    id = db.Column(db.Integer, primary_key=True)
+    equipment_id = db.Column(db.Integer, db.ForeignKey('equipment.id', ondelete='CASCADE'), nullable=False)
+    started_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    ended_at = db.Column(db.DateTime)
+    reason = db.Column(db.String(200), nullable=False)
+    created_by = db.Column(db.Integer, db.ForeignKey('user.id'))
+    equipment = db.relationship('Equipment', backref=db.backref('downtimes', lazy='dynamic', cascade='all, delete-orphan'))
+
+
+class FurnaceLayout(db.Model):
+    """煅烧炉装炉图。一炉当前一份布局。"""
+    __tablename__ = 'furnace_layouts'
+    id = db.Column(db.Integer, primary_key=True)
+    equipment_id = db.Column(db.Integer, db.ForeignKey('equipment.id', ondelete='CASCADE'), nullable=False, unique=True)
+    name = db.Column(db.String(100), nullable=False)
+    notes = db.Column(db.Text)
+    equipment = db.relationship('Equipment', backref=db.backref('furnace_layout', uselist=False))
+
+
+class FurnaceLayoutCell(db.Model):
+    __tablename__ = 'furnace_layout_cells'
+    id = db.Column(db.Integer, primary_key=True)
+    layout_id = db.Column(db.Integer, db.ForeignKey('furnace_layouts.id', ondelete='CASCADE'), nullable=False)
+    layer = db.Column(db.Integer, nullable=False, default=1)
+    row = db.Column(db.Integer, nullable=False)
+    col = db.Column(db.Integer, nullable=False)
+    zone_name = db.Column(db.String(50))
+    max_pieces = db.Column(db.Integer, default=1)
+    max_length_mm = db.Column(db.Float)
+    max_weight_kg = db.Column(db.Float)
+    layout = db.relationship('FurnaceLayout', backref=db.backref('cells', lazy='dynamic', cascade='all, delete-orphan'))
+    __table_args__ = (db.UniqueConstraint('layout_id', 'layer', 'row', 'col', name='uq_furnace_cell'),)
+
+
+class Workpiece(db.Model):
+    """单件身份：溯源主键。编码沿用原材料内部编号或批次 product_code。"""
+    __tablename__ = 'workpieces'
+    id = db.Column(db.Integer, primary_key=True)
+    global_sn = db.Column(db.String(16), unique=True, nullable=False)
+    code = db.Column(db.String(100), unique=True, nullable=False, index=True)
+    parent_code = db.Column(db.String(100), index=True)
+    status = db.Column(db.String(30), nullable=False, default='raw', index=True)
+    raw_material_id = db.Column(db.Integer, db.ForeignKey('raw_material.id', ondelete='SET NULL'))
+    batch_item_id = db.Column(db.Integer, db.ForeignKey('production_batch_items.id', ondelete='SET NULL'))
+    product_id = db.Column(db.Integer, db.ForeignKey('products.id', ondelete='SET NULL'))
+    current_process_id = db.Column(db.Integer, db.ForeignKey('process_price.id', ondelete='SET NULL'))
+    current_equipment_id = db.Column(db.Integer, db.ForeignKey('equipment.id', ondelete='SET NULL'))
+    notes = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    raw_material = db.relationship('RawMaterial', backref=db.backref('workpieces', lazy='dynamic'))
+    batch_item = db.relationship('ProductionBatchItem', backref=db.backref('workpiece', uselist=False))
+    product = db.relationship('Product', backref=db.backref('workpieces', lazy='dynamic'))
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        if not self.global_sn:
+            self.global_sn = SerialNumber.get_next_number()
+
+
+class WorkpieceEvent(db.Model):
+    __tablename__ = 'workpiece_events'
+    id = db.Column(db.Integer, primary_key=True)
+    workpiece_id = db.Column(db.Integer, db.ForeignKey('workpieces.id', ondelete='CASCADE'), nullable=False, index=True)
+    event_type = db.Column(db.String(40), nullable=False, index=True)
+    at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    heat_lot_id = db.Column(db.Integer, db.ForeignKey('heat_lots.id', ondelete='SET NULL'))
+    equipment_id = db.Column(db.Integer, db.ForeignKey('equipment.id', ondelete='SET NULL'))
+    inspection_record_id = db.Column(db.Integer, db.ForeignKey('inspection_records.id', ondelete='SET NULL'))
+    task_id = db.Column(db.Integer, db.ForeignKey('task_assignment.id', ondelete='SET NULL'))
+    payload = db.Column(db.JSON)
+    workpiece = db.relationship('Workpiece', backref=db.backref('events', lazy='dynamic', cascade='all, delete-orphan'))
+
+
+class HeatLot(db.Model):
+    """一次开炉。"""
+    __tablename__ = 'heat_lots'
+    id = db.Column(db.Integer, primary_key=True)
+    global_sn = db.Column(db.String(16), unique=True, nullable=False)
+    equipment_id = db.Column(db.Integer, db.ForeignKey('equipment.id', ondelete='RESTRICT'), nullable=False)
+    layout_id = db.Column(db.Integer, db.ForeignKey('furnace_layouts.id', ondelete='SET NULL'))
+    status = db.Column(db.String(20), nullable=False, default='charging', index=True)
+    recipe_notes = db.Column(db.Text)
+    started_at = db.Column(db.DateTime)
+    ended_at = db.Column(db.DateTime)
+    operator_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    inspection_task_id = db.Column(db.Integer, db.ForeignKey('inspection_tasks.id', ondelete='SET NULL'))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    equipment = db.relationship('Equipment', backref=db.backref('heat_lots', lazy='dynamic'))
+    layout = db.relationship('FurnaceLayout')
+    operator = db.relationship('User', foreign_keys=[operator_id])
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        if not self.global_sn:
+            self.global_sn = SerialNumber.get_next_number()
+
+
+class HeatLotSlot(db.Model):
+    __tablename__ = 'heat_lot_slots'
+    id = db.Column(db.Integer, primary_key=True)
+    heat_lot_id = db.Column(db.Integer, db.ForeignKey('heat_lots.id', ondelete='CASCADE'), nullable=False)
+    workpiece_id = db.Column(db.Integer, db.ForeignKey('workpieces.id', ondelete='RESTRICT'), nullable=False)
+    layer = db.Column(db.Integer, nullable=False, default=1)
+    row = db.Column(db.Integer, nullable=False)
+    col = db.Column(db.Integer, nullable=False)
+    bundle_code = db.Column(db.String(50))
+    heat_lot = db.relationship('HeatLot', backref=db.backref('slots', lazy='dynamic', cascade='all, delete-orphan'))
+    workpiece = db.relationship('Workpiece', backref=db.backref('heat_slots', lazy='dynamic'))
+    __table_args__ = (
+        db.UniqueConstraint('heat_lot_id', 'layer', 'row', 'col', name='uq_heat_lot_cell'),
+        db.UniqueConstraint('heat_lot_id', 'workpiece_id', name='uq_heat_lot_workpiece'),
+    )
+
+
+class TaskWorkpiece(db.Model):
+    __tablename__ = 'task_workpieces'
+    id = db.Column(db.Integer, primary_key=True)
+    task_id = db.Column(db.Integer, db.ForeignKey('task_assignment.id', ondelete='CASCADE'), nullable=False)
+    workpiece_id = db.Column(db.Integer, db.ForeignKey('workpieces.id', ondelete='RESTRICT'), nullable=False)
+    status = db.Column(db.String(20), default='pending')  # pending/done/blocked
+    task = db.relationship('TaskAssignment', backref=db.backref('workpiece_links', lazy='dynamic', cascade='all, delete-orphan'))
+    workpiece = db.relationship('Workpiece', backref=db.backref('task_links', lazy='dynamic'))
+    __table_args__ = (db.UniqueConstraint('task_id', 'workpiece_id', name='uq_task_workpiece'),)
+
+
+class Supplier(db.Model):
+    __tablename__ = 'suppliers'
+    id = db.Column(db.Integer, primary_key=True)
+    global_sn = db.Column(db.String(16), unique=True, nullable=False)
+    code = db.Column(db.String(50), unique=True, nullable=False, index=True)
+    name = db.Column(db.String(100), nullable=False)
+    contact = db.Column(db.String(50))
+    phone = db.Column(db.String(50))
+    address = db.Column(db.String(200))
+    is_active = db.Column(db.Boolean, default=True)
+    notes = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        if not self.global_sn:
+            self.global_sn = SerialNumber.get_next_number()
+
+
+class PurchaseRequisition(db.Model):
+    __tablename__ = 'purchase_requisitions'
+    id = db.Column(db.Integer, primary_key=True)
+    global_sn = db.Column(db.String(16), unique=True, nullable=False)
+    req_no = db.Column(db.String(50), unique=True, nullable=False, index=True)
+    status = db.Column(db.String(20), default='draft', index=True)
+    requested_by = db.Column(db.Integer, db.ForeignKey('user.id'))
+    approved_by = db.Column(db.Integer, db.ForeignKey('user.id'))
+    notes = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    requester = db.relationship('User', foreign_keys=[requested_by])
+    approver = db.relationship('User', foreign_keys=[approved_by])
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        if not self.global_sn:
+            self.global_sn = SerialNumber.get_next_number()
+        if not self.req_no:
+            self.req_no = 'PR' + SerialNumber.get_next_number()
+
+
+class PurchaseRequisitionItem(db.Model):
+    __tablename__ = 'purchase_requisition_items'
+    id = db.Column(db.Integer, primary_key=True)
+    requisition_id = db.Column(db.Integer, db.ForeignKey('purchase_requisitions.id', ondelete='CASCADE'), nullable=False)
+    material_type = db.Column(db.String(20), default='raw')
+    material_name = db.Column(db.String(100), nullable=False)
+    spec = db.Column(db.String(200))
+    quantity = db.Column(db.Float, nullable=False)
+    unit = db.Column(db.String(20), default='件')
+    notes = db.Column(db.Text)
+    requisition = db.relationship('PurchaseRequisition', backref=db.backref('items', lazy='dynamic', cascade='all, delete-orphan'))
+
+
+class PurchaseOrder(db.Model):
+    __tablename__ = 'purchase_orders'
+    id = db.Column(db.Integer, primary_key=True)
+    global_sn = db.Column(db.String(16), unique=True, nullable=False)
+    po_no = db.Column(db.String(50), unique=True, nullable=False, index=True)
+    supplier_id = db.Column(db.Integer, db.ForeignKey('suppliers.id'), nullable=False)
+    requisition_id = db.Column(db.Integer, db.ForeignKey('purchase_requisitions.id', ondelete='SET NULL'))
+    status = db.Column(db.String(20), default='draft', index=True)
+    order_date = db.Column(db.Date, default=datetime.utcnow)
+    created_by = db.Column(db.Integer, db.ForeignKey('user.id'))
+    notes = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    supplier = db.relationship('Supplier', backref=db.backref('purchase_orders', lazy='dynamic'))
+    requisition = db.relationship('PurchaseRequisition', backref=db.backref('purchase_orders', lazy='dynamic'))
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        if not self.global_sn:
+            self.global_sn = SerialNumber.get_next_number()
+        if not self.po_no:
+            self.po_no = 'PO' + SerialNumber.get_next_number()
+
+
+class PurchaseOrderItem(db.Model):
+    __tablename__ = 'purchase_order_items'
+    id = db.Column(db.Integer, primary_key=True)
+    po_id = db.Column(db.Integer, db.ForeignKey('purchase_orders.id', ondelete='CASCADE'), nullable=False)
+    material_type = db.Column(db.String(20), default='raw')
+    category_id = db.Column(db.Integer)
+    name = db.Column(db.String(100), nullable=False)
+    spec = db.Column(db.String(200))
+    quantity = db.Column(db.Float, nullable=False)
+    received_qty = db.Column(db.Float, default=0)
+    unit_price = db.Column(db.Float, default=0)
+    unit = db.Column(db.String(20), default='件')
+    purchase_order = db.relationship('PurchaseOrder', backref=db.backref('items', lazy='dynamic', cascade='all, delete-orphan'))
+
+
+class GoodsReceipt(db.Model):
+    __tablename__ = 'goods_receipts'
+    id = db.Column(db.Integer, primary_key=True)
+    global_sn = db.Column(db.String(16), unique=True, nullable=False)
+    receipt_no = db.Column(db.String(50), unique=True, nullable=False, index=True)
+    po_id = db.Column(db.Integer, db.ForeignKey('purchase_orders.id'), nullable=False)
+    status = db.Column(db.String(30), default='pending_inspection', index=True)
+    received_at = db.Column(db.DateTime, default=datetime.utcnow)
+    received_by = db.Column(db.Integer, db.ForeignKey('user.id'))
+    inspection_task_id = db.Column(db.Integer, db.ForeignKey('inspection_tasks.id', ondelete='SET NULL'))
+    notes = db.Column(db.Text)
+    purchase_order = db.relationship('PurchaseOrder', backref=db.backref('receipts', lazy='dynamic'))
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        if not self.global_sn:
+            self.global_sn = SerialNumber.get_next_number()
+        if not self.receipt_no:
+            self.receipt_no = 'GR' + SerialNumber.get_next_number()
+
+
+class GoodsReceiptItem(db.Model):
+    __tablename__ = 'goods_receipt_items'
+    id = db.Column(db.Integer, primary_key=True)
+    receipt_id = db.Column(db.Integer, db.ForeignKey('goods_receipts.id', ondelete='CASCADE'), nullable=False)
+    po_item_id = db.Column(db.Integer, db.ForeignKey('purchase_order_items.id', ondelete='SET NULL'))
+    quantity = db.Column(db.Float, nullable=False)
+    receipt = db.relationship('GoodsReceipt', backref=db.backref('items', lazy='dynamic', cascade='all, delete-orphan'))
+    po_item = db.relationship('PurchaseOrderItem')
+
+
+class PurchaseSettlement(db.Model):
+    __tablename__ = 'purchase_settlements'
+    id = db.Column(db.Integer, primary_key=True)
+    global_sn = db.Column(db.String(16), unique=True, nullable=False)
+    po_id = db.Column(db.Integer, db.ForeignKey('purchase_orders.id'), nullable=False)
+    amount = db.Column(db.Float, nullable=False, default=0)
+    status = db.Column(db.String(20), default='pending', index=True)
+    paid_at = db.Column(db.DateTime)
+    notes = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    purchase_order = db.relationship('PurchaseOrder', backref=db.backref('settlements', lazy='dynamic'))
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        if not self.global_sn:
+            self.global_sn = SerialNumber.get_next_number()
+
+
+class Shipment(db.Model):
+    __tablename__ = 'shipments'
+    id = db.Column(db.Integer, primary_key=True)
+    global_sn = db.Column(db.String(16), unique=True, nullable=False)
+    shipment_no = db.Column(db.String(50), unique=True, nullable=False, index=True)
+    sales_order_id = db.Column(db.Integer, db.ForeignKey('sales_orders.id'), nullable=False)
+    status = db.Column(db.String(20), default='draft', index=True)  # draft/shipped/signed/cancelled
+    shipped_at = db.Column(db.DateTime)
+    shipped_by = db.Column(db.Integer, db.ForeignKey('user.id'))
+    notes = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    sales_order = db.relationship('SalesOrder', backref=db.backref('shipments', lazy='dynamic'))
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        if not self.global_sn:
+            self.global_sn = SerialNumber.get_next_number()
+        if not self.shipment_no:
+            self.shipment_no = 'SH' + SerialNumber.get_next_number()
+
+
+class ShipmentItem(db.Model):
+    __tablename__ = 'shipment_items'
+    id = db.Column(db.Integer, primary_key=True)
+    shipment_id = db.Column(db.Integer, db.ForeignKey('shipments.id', ondelete='CASCADE'), nullable=False)
+    sales_order_item_id = db.Column(db.Integer, db.ForeignKey('sales_order_items.id', ondelete='SET NULL'))
+    finished_product_id = db.Column(db.Integer, db.ForeignKey('finished_product.id', ondelete='SET NULL'))
+    workpiece_id = db.Column(db.Integer, db.ForeignKey('workpieces.id', ondelete='SET NULL'))
+    quantity = db.Column(db.Float, nullable=False, default=1)
+    shipment = db.relationship('Shipment', backref=db.backref('items', lazy='dynamic', cascade='all, delete-orphan'))
+    finished_product = db.relationship('FinishedProduct')
+    workpiece = db.relationship('Workpiece')
+
+
+class ShipmentReceipt(db.Model):
+    __tablename__ = 'shipment_receipts'
+    id = db.Column(db.Integer, primary_key=True)
+    shipment_id = db.Column(db.Integer, db.ForeignKey('shipments.id', ondelete='CASCADE'), nullable=False, unique=True)
+    signed_at = db.Column(db.DateTime, default=datetime.utcnow)
+    signed_by_name = db.Column(db.String(100), nullable=False)
+    notes = db.Column(db.Text)
+    attachment_path = db.Column(db.String(300))
+    shipment = db.relationship('Shipment', backref=db.backref('receipt', uselist=False))

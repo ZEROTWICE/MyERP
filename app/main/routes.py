@@ -2,8 +2,8 @@ from sqlalchemy.exc import SQLAlchemyError
 from flask import render_template, redirect, url_for, flash, request, jsonify, current_app, send_file
 from flask_login import login_required, current_user
 from app import db, csrf
-from app.permissions import require_capability, can
-from app.models import Employee, ProcessPrice, ProductionRecord, BonusPenalty, AuditLog, ProcessPrice, User, TaskAssignment, SerialNumber, SalaryChange, CoefficientChange, EmployeeSalaryHistory, EmployeeCoefficientHistory, ProcessPriceGroup, FinishedProduct, RawMaterial, CodeRule, CodeGenerationLog, ProductionRecordMaterial, InspectionTemplate, InspectionBaseItem, InspectionItem, InspectionTask, InspectionRecord, Product, ProductBOM, ProductProcess, ProductionOrder, MaterialAllocation, ProductionBatch, ProductionBatchItem, Customer, CustomerAddress, SalesOrder, SalesOrderItem, SalesOrder, SalesOrderItem, ProcessAssignmentRule, ProcessAssignmentMember, SystemConfig
+from app.permissions import allowed_search_types, require_capability, can
+from app.models import Employee, ProcessPrice, ProductionRecord, BonusPenalty, AuditLog, ProcessPrice, User, TaskAssignment, SerialNumber, SalaryChange, CoefficientChange, EmployeeSalaryHistory, EmployeeCoefficientHistory, ProcessPriceGroup, FinishedProduct, RawMaterial, CodeRule, CodeGenerationLog, ProductionRecordMaterial, InspectionTemplate, InspectionBaseItem, InspectionItem, InspectionTask, InspectionRecord, Product, ProductBOM, ProductProcess, ProductionOrder, MaterialAllocation, ProductionBatch, ProductionBatchItem, Customer, CustomerAddress, SalesOrder, SalesOrderItem, SalesOrder, SalesOrderItem, ProcessAssignmentRule, ProcessAssignmentMember, SystemConfig, RawMaterialCategory, WorkCenter
 from datetime import datetime, timedelta, date
 from . import bp
 from app.main.forms import (
@@ -22,6 +22,7 @@ import os
 import time
 from werkzeug.utils import secure_filename
 from werkzeug.datastructures import FileStorage
+from werkzeug.exceptions import HTTPException
 from typing import Optional
 from flask import after_this_request
 from functools import wraps
@@ -41,8 +42,46 @@ from openpyxl import load_workbook
 # 导入质量管理路由
 from .quality import *
 from .production_center import *
+from . import equipment, purchase, shipping, stock
 
 from app.services.search_service import SearchService
+
+
+def _reraise_http(exc):
+    """get_or_404 / abort 抛出的 HTTPException 是 Exception 子类，
+    被 except Exception 捕获后会变成 500 或带错误文案的 200。"""
+    if isinstance(exc, HTTPException):
+        raise
+
+
+def _wants_json_body():
+    if request.is_json:
+        return True
+    accept = request.accept_mimetypes.best or ''
+    return accept.startswith('application/json')
+
+
+def _warehouse_reply(ok, message, redirect_to, extra=None, status=200):
+    """表单提交走 flash+redirect，JSON/测试客户端走 {success, message}。"""
+    payload = {'success': bool(ok), 'message': message}
+    if extra:
+        payload.update(extra)
+    if _wants_json_body():
+        return jsonify(payload), (status if ok else (status if status != 200 else 400))
+    flash(message, 'success' if ok else 'danger')
+    return redirect(redirect_to)
+
+
+def _parse_flag(data, key, default=None):
+    if not data or key not in data:
+        return default
+    val = data[key]
+    if isinstance(val, bool):
+        return val
+    if val is None or val == '':
+        return default
+    return str(val).lower() in ('1', 'true', 'on', 'yes')
+
 
 @bp.route('/process_assignment', methods=['GET'])
 @login_required
@@ -57,6 +96,7 @@ def process_assignment_page():
 
 @bp.route('/api/process_assignment/<int:process_id>', methods=['GET'])
 @login_required
+@require_capability('process_assignment.manage')
 def get_process_assignment(process_id):
     try:
         rule = ProcessAssignmentRule.query.filter_by(process_id=process_id).first()
@@ -78,6 +118,7 @@ def get_process_assignment(process_id):
 
 @bp.route('/api/process_assignment', methods=['GET'])
 @login_required
+@require_capability('process_assignment.manage')
 def list_process_assignments():
     try:
         rules = ProcessAssignmentRule.query.all()
@@ -121,7 +162,7 @@ def save_process_assignment(process_id):
         for i, m in enumerate(members):
             try:
                 emp_id = int(m.get('employee_id'))
-            except Exception:
+            except (TypeError, ValueError):
                 continue
             member = ProcessAssignmentMember(
                 rule_id=rule.id,
@@ -165,7 +206,7 @@ def save_process_assignment_bulk():
         for pid_str, cfg in payload.items():
             try:
                 pid = int(pid_str)
-            except Exception:
+            except (TypeError, ValueError):
                 continue
             strategy = (cfg.get('strategy') or 'round_robin').strip()
             is_active = bool(cfg.get('is_active', True))
@@ -184,7 +225,7 @@ def save_process_assignment_bulk():
             for i, m in enumerate(members):
                 try:
                     emp_id = int(m.get('employee_id'))
-                except Exception:
+                except (TypeError, ValueError):
                     continue
                 member = ProcessAssignmentMember(
                     rule_id=rule.id,
@@ -1061,6 +1102,7 @@ def delete_process_price(id):
 
 @bp.route('/salary/<int:employee_id>')
 @login_required
+@require_capability('salary.view')
 def salary_details(employee_id):
     employee = Employee.query.get_or_404(employee_id)
     production_records = ProductionRecord.query.filter_by(employee_id=employee_id).all()
@@ -1269,8 +1311,10 @@ def manage_production_records():
             # 搜索通过 ProductionRecordMaterial 关联的原材料
             material_ids = db.session.query(ProductionRecordMaterial.production_record_id).join(
                 RawMaterial, ProductionRecordMaterial.raw_material_id == RawMaterial.id
+            ).join(
+                RawMaterialCategory, RawMaterial.category_id == RawMaterialCategory.id
             ).filter(db.or_(
-                RawMaterial.material_name.like(search_term),
+                RawMaterialCategory.name.like(search_term),
                 RawMaterial.internal_number.like(search_term)
             )).distinct().all()
             
@@ -1281,8 +1325,10 @@ def manage_production_records():
             # 搜索直接关联的原材料
             direct_material_ids = db.session.query(ProductionRecord.id).join(
                 RawMaterial, ProductionRecord.raw_material_id == RawMaterial.id
+            ).join(
+                RawMaterialCategory, RawMaterial.category_id == RawMaterialCategory.id
             ).filter(db.or_(
-                RawMaterial.material_name.like(search_term),
+                RawMaterialCategory.name.like(search_term),
                 RawMaterial.internal_number.like(search_term)
             )).distinct().all()
             
@@ -1633,6 +1679,7 @@ def edit_bonus_penalty(id):
             flash('记录修改成功', 'success')
             return redirect(url_for('main.manage_bonus_penalties'))
         except Exception as e:
+            _reraise_http(e)
             db.session.rollback()
             flash('修改失败，请重试', 'danger')
             return redirect(url_for('main.manage_bonus_penalties'))
@@ -1851,7 +1898,7 @@ def download_employee_template():
         if temp_path and os.path.exists(temp_path):
             try:
                 os.remove(temp_path)
-            except:
+            except OSError:
                 pass
         flash(f'下载模板失败：{str(e)}', 'danger')
         return redirect(url_for('main.manage_employees'))
@@ -1860,7 +1907,7 @@ def download_employee_template():
         if temp_path and os.path.exists(temp_path):
             try:
                 os.remove(temp_path)
-            except:
+            except OSError:
                 pass
 
 @bp.route('/employees/import', methods=['POST'])
@@ -2107,7 +2154,7 @@ def import_employees():
         if temp_path and os.path.exists(temp_path):
             try:
                 os.remove(temp_path)
-            except:
+            except OSError:
                 pass
         db.session.rollback()
         return jsonify({'success': False, 'message': f'导入失败：{str(e)}'})
@@ -2143,6 +2190,7 @@ def before_request():
 
 @bp.route('/employees/export', methods=['GET', 'POST'])
 @login_required
+@require_capability('employee.view')
 def export_employees():
     form = ExportEmployeeForm()
     if form.validate_on_submit():
@@ -2151,42 +2199,40 @@ def export_employees():
             query = query.filter(Employee.department == form.department.data)
         if form.position.data:
             query = query.filter(Employee.position == form.position.data)
-        if form.status.data:
-            query = query.filter(Employee.status == form.status.data)
-        
+
         employees = query.all()
         wb = ExcelGenerator.export_employees(employees)
-        
+
         temp_path = None
-    try:
-        # 创建临时文件
-        fd, temp_path = tempfile.mkstemp(suffix='.xlsx')
-        # 关闭文件描述符
-        os.close(fd)
-        # 保存Excel文件
-        wb.save(temp_path)
-        # 发送文件
-        return send_file(
-            temp_path,
-            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            as_attachment=True,
-            download_name=f'employees_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
-        )
-    except Exception as e:
-        if temp_path and os.path.exists(temp_path):
-            try:
-                os.remove(temp_path)
-            except:
-                pass
-        flash(f'导出失败：{str(e)}', 'danger')
-        return redirect(url_for('main.manage_employees'))
-    finally:
-        # 确保在请求结束后删除临时文件
-        if temp_path and os.path.exists(temp_path):
-            try:
-                os.remove(temp_path)
-            except:
-                pass
+        try:
+            fd, temp_path = tempfile.mkstemp(suffix='.xlsx')
+            os.close(fd)
+            wb.save(temp_path)
+
+            # 必须等响应发完再删，写在 finally 里会在 send_file 之前执行
+            @after_this_request
+            def remove_file(response):
+                try:
+                    os.remove(temp_path)
+                except OSError as e:
+                    current_app.logger.error(f'删除临时文件失败: {str(e)}')
+                return response
+
+            return send_file(
+                temp_path,
+                mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                as_attachment=True,
+                download_name=f'employees_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
+            )
+        except Exception as e:
+            if temp_path and os.path.exists(temp_path):
+                try:
+                    os.remove(temp_path)
+                except OSError:
+                    pass
+            current_app.logger.error(f'导出员工数据失败: {str(e)}')
+            flash(f'导出失败：{str(e)}', 'danger')
+            return redirect(url_for('main.manage_employees'))
 
     return render_template('main/export_form.html', title='导出员工数据', form=form)
 
@@ -2221,7 +2267,7 @@ def download_process_price_template():
         if temp_path and os.path.exists(temp_path):
             try:
                 os.remove(temp_path)
-            except:
+            except OSError:
                 pass
         flash(f'下载模板失败：{str(e)}', 'danger')
         return redirect(url_for('main.process_prices'))
@@ -2230,7 +2276,7 @@ def download_process_price_template():
         if temp_path and os.path.exists(temp_path):
             try:
                 os.remove(temp_path)
-            except:
+            except OSError:
                 pass
 @bp.route('/process_prices/import', methods=['POST'])
 @login_required
@@ -2550,11 +2596,12 @@ def import_process_prices():
         if temp_path and os.path.exists(temp_path):
             try:
                 os.remove(temp_path)
-            except:
+            except OSError:
                 pass
 
 @bp.route('/process_prices/export', methods=['GET', 'POST'])
 @login_required
+@require_capability('process.view')
 def export_process_prices():
     form = ExportProcessForm()
     if form.validate_on_submit():
@@ -2570,38 +2617,38 @@ def export_process_prices():
         
         processes = query.all()
         wb = ExcelGenerator.export_process_prices(processes)
-        
+
         temp_path = None
-    try:
-            # 创建临时文件
-        fd, temp_path = tempfile.mkstemp(suffix='.xlsx')
-            # 关闭文件描述符
-        os.close(fd)
-            # 保存Excel文件
-        wb.save(temp_path)
-            # 发送文件
-        return send_file(
-            temp_path,
+        try:
+            fd, temp_path = tempfile.mkstemp(suffix='.xlsx')
+            os.close(fd)
+            wb.save(temp_path)
+
+            # 必须等响应发完再删，写在 finally 里会在 send_file 之前执行
+            @after_this_request
+            def remove_file(response):
+                try:
+                    os.remove(temp_path)
+                except OSError as e:
+                    current_app.logger.error(f'删除临时文件失败: {str(e)}')
+                return response
+
+            return send_file(
+                temp_path,
                 mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            as_attachment=True,
+                as_attachment=True,
                 download_name=f'processes_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
-        )
-    except Exception as e:
-        if temp_path and os.path.exists(temp_path):
-            try:
-                os.remove(temp_path)
-            except:
-                pass
-        flash(f'导出失败：{str(e)}', 'danger')
-        return redirect(url_for('main.process_prices'))
-    finally:
-            # 确保在请求结束后删除临时文件
-        if temp_path and os.path.exists(temp_path):
-            try:
-                os.remove(temp_path)
-            except:
-                pass
-    
+            )
+        except Exception as e:
+            if temp_path and os.path.exists(temp_path):
+                try:
+                    os.remove(temp_path)
+                except OSError:
+                    pass
+            current_app.logger.error(f'导出工序数据失败: {str(e)}')
+            flash(f'导出失败：{str(e)}', 'danger')
+            return redirect(url_for('main.process_prices'))
+
     return render_template('main/export_form.html', title='导出工序数据', form=form)
 
 @bp.route('/production_records/template')
@@ -2635,7 +2682,7 @@ def download_production_record_template():
         if temp_path and os.path.exists(temp_path):
             try:
                 os.remove(temp_path)
-            except:
+            except OSError:
                 pass
         flash(f'下载模板失败：{str(e)}', 'danger')
         return redirect(url_for('main.manage_production_records'))
@@ -2644,7 +2691,7 @@ def download_production_record_template():
         if temp_path and os.path.exists(temp_path):
             try:
                 os.remove(temp_path)
-            except:
+            except OSError:
                 pass
 
 @bp.route('/production_records/import', methods=['POST'])
@@ -2736,6 +2783,7 @@ def import_production_records():
 
 @bp.route('/production_records/export', methods=['GET', 'POST'])
 @login_required
+@require_capability('production_record.view')
 def export_production_records():
     form = ExportProductionRecordForm()
     if form.validate_on_submit():
@@ -2771,7 +2819,7 @@ def export_production_records():
             if temp_path and os.path.exists(temp_path):
                 try:
                     os.remove(temp_path)
-                except:
+                except OSError:
                     pass
             flash(f'导出失败：{str(e)}', 'danger')
             return redirect(url_for('main.manage_production_records'))
@@ -2780,13 +2828,14 @@ def export_production_records():
             if temp_path and os.path.exists(temp_path):
                 try:
                     os.remove(temp_path)
-                except:
+                except OSError:
                     pass
     
     return render_template('main/export_form.html', form=form, title='导出生产记录')
 
 @bp.route('/bonus_penalties/export', methods=['GET', 'POST'])
 @login_required
+@require_capability('bonus.manage')
 def export_bonus_penalties():
     form = ExportBonusPenaltyForm()
     if form.validate_on_submit():
@@ -2824,7 +2873,7 @@ def export_bonus_penalties():
             if temp_path and os.path.exists(temp_path):
                 try:
                     os.remove(temp_path)
-                except:
+                except OSError:
                     pass
             flash(f'导出失败：{str(e)}', 'danger')
             return redirect(url_for('main.manage_bonus_penalties'))
@@ -2833,17 +2882,19 @@ def export_bonus_penalties():
             if temp_path and os.path.exists(temp_path):
                 try:
                     os.remove(temp_path)
-                except:
+                except OSError:
                     pass
     
     return render_template('main/export_form.html', form=form, title='导出奖惩记录')
 
 @bp.route('/search', methods=['GET', 'POST'])
 @login_required
+@require_capability('search.use')
 def global_search():
     """全局搜索页面"""
     form = GlobalSearchForm()
     search_results = None
+    search_types = allowed_search_types()
     
     # 处理URL参数传递的搜索（快速搜索）
     url_query = request.args.get('query')
@@ -2858,7 +2909,8 @@ def global_search():
             query=url_query,
             search_type=form.search_type.data,
             page=page,
-            per_page=per_page
+            per_page=per_page,
+            allowed_types=search_types
         )
     elif form.validate_on_submit():
         query = form.query.data
@@ -2870,7 +2922,8 @@ def global_search():
             query=query,
             search_type=search_type,
             page=page,
-            per_page=per_page
+            per_page=per_page,
+            allowed_types=search_types
         )
     
     return render_template('main/search/global_search.html', 
@@ -2879,6 +2932,7 @@ def global_search():
 
 @bp.route('/search/advanced', methods=['GET', 'POST'])
 @login_required
+@require_capability('search.use')
 def advanced_search():
     """高级搜索页面"""
     form = AdvancedSearchForm()
@@ -2976,7 +3030,8 @@ def advanced_search():
         search_results = SearchService.advanced_search(
             search_params=search_params,
             page=page,
-            per_page=per_page
+            per_page=per_page,
+            allowed_types=allowed_search_types()
         )
     
     return render_template('main/search/advanced_search.html', 
@@ -2985,6 +3040,7 @@ def advanced_search():
 
 @bp.route('/api/search/suggestions')
 @login_required
+@require_capability('search.use')
 def search_suggestions():
     """搜索建议API"""
     query = request.args.get('q', '')
@@ -2993,10 +3049,12 @@ def search_suggestions():
     if not query or len(query) < 2:
         return jsonify({'suggestions': {}})
     
-    suggestions = SearchService.get_search_suggestions(query, limit)
+    suggestions = SearchService.get_search_suggestions(
+        query, limit, allowed_types=allowed_search_types())
     return jsonify({'suggestions': suggestions})
 @bp.route('/search/quick', methods=['POST'])
 @login_required
+@require_capability('search.use')
 def quick_search():
     """快速搜索API"""
     data = request.get_json()
@@ -3011,7 +3069,8 @@ def quick_search():
         query=query,
         search_type=search_type,
         page=1,
-        per_page=5
+        per_page=5,
+        allowed_types=allowed_search_types()
     )
     
     # 简化结果格式
@@ -3245,26 +3304,72 @@ def manage_tasks():
 
 @bp.route('/tasks/<int:id>/update_status', methods=['POST'])
 @login_required
+@require_capability('task.manage', 'my_tasks.use')
 def update_task_status(id):
     """更新任务状态"""
     try:
         task = TaskAssignment.query.get_or_404(id)
-        
+
+        # 员工自助报工只能改自己名下的任务：这个端点会扣减原材料、生成生产记录
+        # 并按任务上的 employee_id 计件，改他人任务等于替别人报工
+        if not can('task.manage'):
+            employee = Employee.query.filter_by(user_id=current_user.id).first()
+            if not employee or task.employee_id != employee.id:
+                return jsonify({'success': False, 'message': '只能更新分配给本人的任务'}), 403
+
         # 兼容JSON和表单数据
         if request.is_json:
             data = request.get_json()
             completed_quantity = int(data.get('completed_quantity', 0))
             materials_data = data.get('materials', [])
+            equipment_id = data.get('equipment_id')
+            workpiece_codes = data.get('workpiece_codes') or []
+            if isinstance(workpiece_codes, str):
+                workpiece_codes = [c.strip() for c in workpiece_codes.replace(',', ' ').split() if c.strip()]
         else:
             # 处理表单数据
             completed_quantity = int(request.form.get('completed_quantity', 0))
             materials_json = request.form.get('materials', '[]')
+            equipment_id = request.form.get('equipment_id', type=int)
+            workpiece_codes = request.form.getlist('workpiece_codes')
+            if not workpiece_codes:
+                raw_codes = request.form.get('workpiece_codes') or ''
+                workpiece_codes = [c.strip() for c in raw_codes.replace(',', ' ').split() if c.strip()]
             try:
                 import json
                 materials_data = json.loads(materials_json)
             except (json.JSONDecodeError, TypeError):
                 materials_data = []
-        
+
+        from app.services import mes_service
+        from app.models import Equipment, TaskWorkpiece, Workpiece
+
+        if not workpiece_codes:
+            workpiece_codes = [
+                tw.workpiece.code for tw in task.workpiece_links.all() if tw.workpiece
+            ]
+        if not equipment_id and task.equipment_id:
+            equipment_id = task.equipment_id
+
+        if equipment_id:
+            eq = Equipment.query.get(int(equipment_id))
+            ok, msg = mes_service.equipment_available(eq)
+            if not ok:
+                return jsonify({'success': False, 'message': msg}), 400
+            task.equipment_id = eq.id
+
+        for code in workpiece_codes:
+            wp = Workpiece.query.filter_by(code=str(code).strip()).first()
+            if not wp:
+                continue
+            allowed, msg = mes_service.qc_gate_allows(wp)
+            if not allowed:
+                return jsonify({'success': False, 'message': f'{wp.code}: {msg}'}), 400
+            if not TaskWorkpiece.query.filter_by(task_id=task.id, workpiece_id=wp.id).first():
+                db.session.add(TaskWorkpiece(task_id=task.id, workpiece_id=wp.id))
+            wp.current_process_id = task.process_id
+            wp.current_equipment_id = task.equipment_id
+ 
         # 验证完成数量
         if completed_quantity < 0:
             return jsonify({'success': False, 'message': '完成数量不能为负数'}), 400
@@ -3319,9 +3424,11 @@ def update_task_status(id):
                     
                     if default_inspector:
                         # 创建质检任务
-                        from app.models import InspectionTask, SerialNumber
+                        from app.models import InspectionTask, SerialNumber, InspectionTemplate
+                        tmpl = InspectionTemplate.query.filter_by(type='production_record', is_active=True).first()
                         inspection_task = InspectionTask(
                             global_sn=SerialNumber.get_next_number(),
+                            template_id=tmpl.id if tmpl else None,
                             target_type='production_record',
                             target_id=production_record.id,
                             inspector_id=default_inspector.id,
@@ -3353,6 +3460,18 @@ def update_task_status(id):
                         db.session.add(inspection_log)
                         
                         current_app.logger.info(f'自动创建质检任务：{inspection_task.global_sn}，对应生产记录：{production_record.global_sn}')
+                        for tw in task.workpiece_links.all():
+                            if tw.workpiece:
+                                wp_task = mes_service.create_inspection_task(
+                                    'workpiece', tw.workpiece.id,
+                                    notes=f'工序 {process.process_name} 工件 {tw.workpiece.code}',
+                                )
+                                tw.status = 'done'
+                                mes_service.log_event(
+                                    tw.workpiece, 'reported',
+                                    task_id=task.id, equipment_id=task.equipment_id,
+                                    payload={'inspection_task_id': wp_task.id},
+                                )
                     else:
                         current_app.logger.warning(f'未找到可用的质检员，无法为生产记录 {production_record.global_sn} 创建质检任务')
                         
@@ -3373,6 +3492,12 @@ def update_task_status(id):
                 raw_material = RawMaterial.query.get(int(material['raw_material_id']))
                 old_quantity = raw_material.quantity
                 raw_material.quantity -= float(material['quantity'])
+                if task.production_batch_id:
+                    batch = ProductionBatch.query.get(task.production_batch_id)
+                    if batch:
+                        mes_service.write_consumed_allocation(
+                            batch.production_order_id, 'raw', raw_material.id, float(material['quantity'])
+                        )
                 
                 # 如果原材料数量耗尽（小于等于0），将状态修改为已使用
                 if raw_material.quantity <= 0:
@@ -3544,6 +3669,7 @@ def update_task_status(id):
         db.session.commit()
         return jsonify({'success': True, 'message': '更新成功'})
     except Exception as e:
+        _reraise_http(e)
         db.session.rollback()
         current_app.logger.error(f'更新任务状态失败: {str(e)}')
         return jsonify({'success': False, 'message': f'更新失败：{str(e)}'}), 500
@@ -3587,6 +3713,7 @@ def delete_task(id):
         
         return jsonify({'success': True, 'message': '任务删除成功'})
     except Exception as e:
+        _reraise_http(e)
         db.session.rollback()
         return jsonify({'success': False, 'message': f'删除失败：{str(e)}'}), 500
 
@@ -3637,7 +3764,7 @@ def download_bonus_penalty_template():
         if temp_path and os.path.exists(temp_path):
             try:
                 os.remove(temp_path)
-            except:
+            except OSError:
                 pass
         flash(f'下载模板失败：{str(e)}', 'danger')
         return redirect(url_for('main.manage_bonus_penalties'))
@@ -3646,7 +3773,7 @@ def download_bonus_penalty_template():
         if temp_path and os.path.exists(temp_path):
             try:
                 os.remove(temp_path)
-            except:
+            except OSError:
                 pass
 
 @bp.route('/bonus_penalties/import', methods=['POST'])
@@ -3762,7 +3889,7 @@ def download_task_template():
         if temp_path and os.path.exists(temp_path):
             try:
                 os.remove(temp_path)
-            except:
+            except OSError:
                 pass
         flash(f'下载模板失败：{str(e)}', 'danger')
         return redirect(url_for('main.manage_tasks'))
@@ -3771,7 +3898,7 @@ def download_task_template():
         if temp_path and os.path.exists(temp_path):
             try:
                 os.remove(temp_path)
-            except:
+            except OSError:
                 pass
 
 @bp.route('/tasks/import', methods=['POST'])
@@ -3899,8 +4026,7 @@ def export_tasks():
             tasks = query.all()
 
             # 生成并返回 Excel
-            excel_generator = ExcelGenerator()
-            excel_file = excel_generator.generate_tasks_excel(tasks)
+            excel_file = ExcelGenerator.export_tasks(tasks)
 
             temp_dir = tempfile.mkdtemp()
             temp_file = os.path.join(temp_dir, '生产任务数据.xlsx')
@@ -3952,8 +4078,7 @@ def export_tasks():
             tasks = query.all()
             
             # 生成Excel文件
-            excel_generator = ExcelGenerator()
-            excel_file = excel_generator.generate_tasks_excel(tasks)
+            excel_file = ExcelGenerator.export_tasks(tasks)
             
             # 创建临时文件
             temp_dir = tempfile.mkdtemp()
@@ -3983,6 +4108,16 @@ def export_tasks():
     flash('表单验证失败', 'danger')
     return redirect(url_for('main.manage_tasks'))
 
+def _resolve_audit_model(model_name):
+    """按类名从 app.models 取模型。审计日志里存的是字符串，用 globals() 取不到未在本模块 import 的模型。"""
+    import app.models as models_module
+
+    model_class = getattr(models_module, model_name or '', None)
+    if isinstance(model_class, type) and issubclass(model_class, db.Model):
+        return model_class
+    return None
+
+
 @bp.route('/audit_logs/rollback/<int:log_id>', methods=['POST'])
 @login_required
 def rollback_audit_log(log_id):
@@ -3994,11 +4129,14 @@ def rollback_audit_log(log_id):
         
         if not log.can_rollback:
             return jsonify({'success': False, 'message': '此记录不支持回滚'}), 400
-        
+
+        model_class = _resolve_audit_model(log.target_model)
+        if model_class is None:
+            return jsonify({'success': False, 'message': f'未知的目标模型：{log.target_model}'}), 400
+
         # 根据不同的回滚类型执行不同的操作
         if log.rollback_type == 'add':
             # 删除新增的记录
-            model_class = globals()[log.target_model]
             target = model_class.query.get(log.target_id)
             if target:
                 db.session.delete(target)
@@ -4019,7 +4157,6 @@ def rollback_audit_log(log_id):
                 
         elif log.rollback_type == 'edit':
             # 恢复编辑前的数据
-            model_class = globals()[log.target_model]
             target = model_class.query.get(log.target_id)
             if target:
                 for key, value in log.old_data.items():
@@ -4044,7 +4181,6 @@ def rollback_audit_log(log_id):
                 
         elif log.rollback_type == 'delete':
             # 恢复被删除的记录
-            model_class = globals()[log.target_model]
             new_record = model_class()
             for key, value in log.old_data.items():
                 if hasattr(new_record, key):
@@ -4070,139 +4206,14 @@ def rollback_audit_log(log_id):
             return jsonify({'success': False, 'message': '不支持的回滚类型'}), 400
             
     except Exception as e:
+        _reraise_http(e)
         db.session.rollback()
         current_app.logger.error(f'回滚失败: {str(e)}')
         return jsonify({'success': False, 'message': f'回滚失败：{str(e)}'}), 500
 
-@bp.route('/add_production_record', methods=['GET', 'POST'])
-@login_required
-def add_production_record():
-    if not current_user.role in ['admin', 'hr']:
-        flash('权限不足', 'danger')
-        return redirect(url_for('main.index'))
-    
-    form = ProductionRecordForm()
-    if form.validate_on_submit():
-        try:
-            target_date = form.date.data
-            start_of_day = datetime.combine(target_date, datetime.min.time())
-            end_of_day = datetime.combine(target_date, datetime.max.time())
-            
-            # 获取当前生效的工序价格
-            process_price = ProcessPrice.query.filter(
-                ProcessPrice.process_code == form.process_code.data,
-                ProcessPrice.effective_date <= end_of_day + timedelta(days=1)
-            ).order_by(ProcessPrice.effective_date.desc()).first()
-            
-            if not process_price:
-                flash('未找到有效的工序价格', 'danger')
-                return redirect(url_for('main.manage_production_records'))
-            
-            record = ProductionRecord(
-                global_sn=SerialNumber.get_next_number(),
-                employee_id=form.employee_id.data,
-                process_id=process_price.id,  # 使用process_id而不是process_code
-                quantity=form.quantity.data,
-                date=form.date.data,
-                notes=form.notes.data
-            )
-            db.session.add(record)
-            db.session.flush()
-            
-            # 处理多个原材料
-            material_data = []
-            for key, value in request.form.items():
-                if key.startswith('material_data_'):
-                    try:
-                        data = json.loads(value)
-                        material_data.append(data)
-                    except (json.JSONDecodeError, ValueError) as e:
-                        current_app.logger.error(f"解析材料数据失败: {str(e)}")
-                        continue
-            
-            # 添加原材料关联记录
-            for data in material_data:
-                material_id = data.get('id')
-                quantity = data.get('quantity')
-                
-                if material_id and quantity:
-                    # 获取原材料
-                    raw_material = RawMaterial.query.get(material_id)
-                    if raw_material:
-                        # 检查库存是否足够
-                        if raw_material.quantity >= float(quantity):
-                            # 创建关联记录
-                            record_material = ProductionRecordMaterial(
-                                production_record_id=record.id,
-                                raw_material_id=material_id,
-                                quantity=float(quantity)
-                            )
-                            db.session.add(record_material)
-                            
-                            # 更新原材料库存
-                            old_quantity = raw_material.quantity
-                            raw_material.quantity -= float(quantity)
-                            
-                            # 如果原材料数量耗尽（小于等于0），将状态修改为已使用
-                            if raw_material.quantity <= 0:
-                                raw_material.status = 'used'
-                                # 记录状态变更的审计日志
-                                status_log = AuditLog(
-                                    user_id=current_user.id,
-                                    action='自动更新原材料状态',
-                                    details=f'原材料 {raw_material.material_name} 数量耗尽，状态自动更新为已使用',
-                                    can_rollback=True,
-                                    rollback_type='edit',
-                                    target_model='RawMaterial',
-                                    target_id=raw_material.id,
-                                    old_data={'status': 'in_stock', 'quantity': old_quantity},
-                                    new_data={'status': 'used', 'quantity': raw_material.quantity}
-                                )
-                                db.session.add(status_log)
-                        else:
-                            db.session.rollback()
-                            flash(f'原材料 {raw_material.material_name} 库存不足！', 'danger')
-                            return redirect(url_for('main.manage_production_records'))
-            
-            log = AuditLog(
-                user_id=current_user.id,
-                action='添加生产记录',
-                details=f'添加生产记录：员工 {record.employee.name}，工序 {process_price.process_name}，数量 {record.quantity}',
-                can_rollback=True,
-                rollback_type='add',
-                target_model='ProductionRecord',
-                target_id=record.id,
-                new_data={
-                    'employee_id': record.employee_id,
-                    'process_id': record.process_id,
-                    'quantity': record.quantity,
-                    'date': record.date.isoformat() if record.date else None,
-                    'notes': record.notes,
-                    'materials': material_data
-                }
-            )
-            db.session.add(log)
-            db.session.commit()
-            flash('生产记录添加成功', 'success')
-            return redirect(url_for('main.manage_production_records'))
-        except Exception as e:
-            db.session.rollback()
-            current_app.logger.error(f'添加生产记录失败: {str(e)}')
-            flash(f'添加失败：{str(e)}', 'danger')
-            return redirect(url_for('main.manage_production_records'))
-    
-    # 获取可用的原材料列表 - 用于前端展示
-    available_raw_materials = RawMaterial.query.filter(RawMaterial.quantity > 0).all()
-    raw_materials_json = [{
-        'id': m.id,
-        'name': m.material_name,
-        'quantity': m.quantity
-    } for m in available_raw_materials]
-    
-    return render_template('main/production_record_form.html', form=form, title='添加生产记录', raw_materials=raw_materials_json)
-
 @bp.route('/bonus_penalties/<int:id>', methods=['GET'])
 @login_required
+@require_capability('bonus.manage')
 def get_bonus_penalty(id):
     """获取单个奖惩记录"""
     record = BonusPenalty.query.get_or_404(id)
@@ -4269,12 +4280,14 @@ def update_bonus_penalty(id):
         
         return jsonify({'success': True, 'message': '记录更新成功'})
     except Exception as e:
+        _reraise_http(e)
         db.session.rollback()
         current_app.logger.error(f'更新奖惩记录失败: {str(e)}')
         return jsonify({'success': False, 'message': f'更新失败：{str(e)}'}), 500
 
 @bp.route('/tasks/<int:id>', methods=['GET'])
 @login_required
+@require_capability('task.manage')
 def get_task(id):
     """获取单个任务"""
     try:
@@ -4292,6 +4305,7 @@ def get_task(id):
             }
         })
     except Exception as e:
+        _reraise_http(e)
         current_app.logger.error(f'获取任务失败: {str(e)}')
         return jsonify({'success': False, 'message': f'获取失败：{str(e)}'}), 500
 
@@ -4377,6 +4391,7 @@ def add_task():
 
 @bp.route('/tasks/assignment/<int:id>', methods=['GET'])
 @login_required
+@require_capability('task.manage')
 def get_task_assignment(id):
     """获取任务分配详情"""
     try:
@@ -4396,6 +4411,7 @@ def get_task_assignment(id):
             }
         })
     except Exception as e:
+        _reraise_http(e)
         current_app.logger.error(f'获取任务分配详情失败: {str(e)}')
         return jsonify({'success': False, 'message': f'获取失败：{str(e)}'}), 500
 
@@ -4480,12 +4496,14 @@ def edit_task(id):
             }
         })
     except Exception as e:
+        _reraise_http(e)
         db.session.rollback()
         current_app.logger.error(f'更新任务失败: {str(e)}')
         return jsonify({'success': False, 'message': f'更新失败：{str(e)}'}), 500
 
 @bp.route('/employee_salary_changes/<int:employee_id>')
 @login_required
+@require_capability('employee.salary_change')
 def employee_salary_changes(employee_id):
     page = request.args.get('page', 1, type=int)
     per_page = 20
@@ -4693,15 +4711,19 @@ def manage_inventory():
     if inventory_type == 'raw':
         query = RawMaterial.query
         if search:
-            query = query.filter(or_(
+            # material_name 是取 category.name 的 property，不能直接进 SQL
+            query = query.join(
+                RawMaterialCategory, RawMaterial.category_id == RawMaterialCategory.id
+            ).filter(or_(
                 RawMaterial.supplier.ilike(f'%{search}%'),
-                RawMaterial.material_name.ilike(f'%{search}%'),
+                RawMaterialCategory.name.ilike(f'%{search}%'),
                 RawMaterial.melt_number.ilike(f'%{search}%'),
                 RawMaterial.supplier_number.ilike(f'%{search}%'),
                 RawMaterial.internal_number.ilike(f'%{search}%')
             ))
         if not show_archived:
-            query = query.filter_by(is_archived=False)
+            # 上面 join 之后 filter_by 会落到 RawMaterialCategory 上，必须写全限定
+            query = query.filter(RawMaterial.is_archived.is_(False))
     else:
         query = FinishedProduct.query
         if search:
@@ -4725,6 +4747,7 @@ def manage_inventory():
 
 @bp.route('/inventory/template')
 @login_required
+@require_capability('inventory.view')
 def download_inventory_template():
     """下载库存导入模板"""
     inventory_type = request.args.get('type', 'finished')
@@ -4773,7 +4796,7 @@ def download_inventory_template():
             try:
                 if len(str(cell.value)) > max_length:
                     max_length = len(str(cell.value))
-            except:
+            except OSError:
                 pass
         ws.column_dimensions[col[0].column_letter].width = max_length + 2
     
@@ -4956,73 +4979,6 @@ def import_raw_materials():
         # 清理临时文件
         if os.path.exists(temp_path):
             os.remove(temp_path)
-
-@bp.route('/inventory/export')
-@login_required
-def export_inventory():
-    """导出库存数据"""
-    inventory_type = request.args.get('type', 'finished')
-    
-    try:
-        # 创建Excel生成器
-        excel_generator = ExcelGenerator()
-        
-        if inventory_type == 'finished':
-            # 导出成品库存
-            headers = ['全局流水号', '产品编号', '生产日期', '图号', '型号', '检验员', '状态', '备注']
-            excel_generator.add_headers(headers)
-            
-            # 查询数据
-            products = FinishedProduct.query.order_by(FinishedProduct.created_at.desc()).all()
-            
-            # 添加数据行
-            for product in products:
-                row = [
-                    product.global_sn,
-                    product.product_number,
-                    product.production_date.strftime('%Y-%m-%d'),
-                    product.drawing_number,
-                    product.model,
-                    product.inspector,
-                    product.status,
-                    product.notes or ''
-                ]
-                excel_generator.add_row(row)
-            
-            filename = f'成品库存_{datetime.now().strftime("%Y%m%d")}.xlsx'
-        else:
-            # 导出原材料库存
-            headers = ['全局流水号', '供应商', '品名', '原料冶炼炉号', '供应商编号', '内部编号', 
-                      '入库时间', '数量', '是否带样品', '备注']
-            excel_generator.add_headers(headers)
-            
-            # 查询数据
-            materials = RawMaterial.query.order_by(RawMaterial.created_at.desc()).all()
-            
-            # 添加数据行
-            for material in materials:
-                row = [
-                    material.global_sn,
-                    material.supplier,
-                    material.material_name,
-                    material.melt_number,
-                    material.supplier_number,
-                    material.internal_number,
-                    material.storage_date.strftime('%Y-%m-%d'),
-                    f'{material.quantity:.2f}',
-                    '是' if material.has_sample else '否',
-                    material.notes or ''
-                ]
-                excel_generator.add_row(row)
-            
-            filename = f'原材料库存_{datetime.now().strftime("%Y%m%d")}.xlsx'
-        
-        # 生成并返回文件
-        return excel_generator.generate_response(filename)
-        
-    except Exception as e:
-        flash(f'导出失败：{str(e)}', 'danger')
-        return redirect(url_for('main.manage_inventory', type=inventory_type))
 
 def validate_raw_material_data(df):
     """验证原材料数据的必填字段"""
@@ -5380,9 +5336,20 @@ def manage_system_configs():
 
     if request.method == 'POST':
         try:
+            # 只动本次提交涵盖的配置项。原先遍历全表，bool 型一律按「表单里没有
+            # 这个字段 = false」处理，于是只提交一个字段的 POST 会把其余开关全部
+            # 静默关掉。cfg_present 由模板逐项声明；再并上表单里实际出现的
+            # cfg__ 字段，兼容不带该声明的调用方。
+            managed_keys = set(request.form.getlist('cfg_present'))
+            managed_keys.update(
+                name[len('cfg__'):] for name in request.form if name.startswith('cfg__')
+            )
+
             configs = SystemConfig.query.all()
             changed = 0
             for config in configs:
+                if config.key not in managed_keys:
+                    continue
                 field = f'cfg__{config.key}'
                 if config.value_type == 'bool':
                     value = field in request.form
@@ -5608,6 +5575,7 @@ def generate_code(rule_id):
 
 @bp.route('/code_rules/available/product', methods=['GET'])
 @login_required
+@require_capability('product.view')
 def get_available_product_rules():
     """获取可用的产品编码规则"""
     try:
@@ -5634,6 +5602,7 @@ def get_available_product_rules():
 
 @bp.route('/code_rules/available/material', methods=['GET'])
 @login_required
+@require_capability('inventory.view')
 def get_available_material_rules():
     """获取可用的原材料编码规则"""
     try:
@@ -5682,6 +5651,7 @@ def get_finished_product(id):
             }
         })
     except Exception as e:
+        _reraise_http(e)
         return jsonify({'success': False, 'message': f'获取成品详情失败：{str(e)}'})
 
 @bp.route('/inventory/finished/<int:id>', methods=['PUT'])
@@ -5751,6 +5721,7 @@ def update_finished_product(id):
         })
         
     except Exception as e:
+        _reraise_http(e)
         db.session.rollback()
         return jsonify({'success': False, 'message': f'更新失败：{str(e)}'})
 
@@ -5782,6 +5753,7 @@ def get_raw_material(id):
             }
         })
     except Exception as e:
+        _reraise_http(e)
         return jsonify({'success': False, 'message': f'获取原材料详情失败：{str(e)}'})
 
 @bp.route('/inventory/raw/<int:id>', methods=['PUT'])
@@ -5868,11 +5840,13 @@ def update_raw_material(id):
         })
         
     except Exception as e:
+        _reraise_http(e)
         db.session.rollback()
         return jsonify({'success': False, 'message': f'更新失败：{str(e)}'})
 
 @bp.route('/process_prices/<int:id>', methods=['GET'])
 @login_required
+@require_capability('process.view')
 def get_process_price(id):
     """获取工序详情"""
     try:
@@ -5912,6 +5886,7 @@ def get_process_price(id):
             }
         })
     except Exception as e:
+        _reraise_http(e)
         return jsonify({'success': False, 'message': f'获取工序详情失败：{str(e)}'}), 500
 
 
@@ -5972,6 +5947,7 @@ def delete_raw_material(id):
         })
         
     except Exception as e:
+        _reraise_http(e)
         db.session.rollback()
         current_app.logger.error(f'删除原材料失败: {str(e)}')
         return jsonify({
@@ -6032,6 +6008,7 @@ def delete_finished_product(id):
         })
         
     except Exception as e:
+        _reraise_http(e)
         db.session.rollback()
         current_app.logger.error(f'删除成品失败: {str(e)}')
         return jsonify({
@@ -6088,10 +6065,12 @@ def get_task_details(id):
             }
         })
     except Exception as e:
+        _reraise_http(e)
         return jsonify({'success': False, 'message': f'获取任务详情失败：{str(e)}'}), 500
 
 @bp.route('/api/inventory/raw-materials')
 @login_required
+@require_capability('material.lookup')
 def get_available_raw_materials():
     """获取可用的原材料列表
     
@@ -6129,6 +6108,7 @@ def get_available_raw_materials():
 
 @bp.route('/api/inventory/finished-products')
 @login_required
+@require_capability('product.view')
 def get_available_finished_products():
     """获取可用的成品列表
     
@@ -6166,6 +6146,31 @@ def get_available_finished_products():
             'message': f'获取成品列表失败: {str(e)}'
         }), 500
 
+@bp.route('/api/inventory/consumables')
+@login_required
+@require_capability('inventory.manage')
+def get_available_consumables():
+    """获取可用的易耗品列表，结构与原材料接口一致。"""
+    try:
+        from app.models import Consumable
+        query = Consumable.query.filter_by(is_archived=False)
+        if request.args.get('only_available', 'false').lower() == 'true':
+            query = query.filter(Consumable.quantity > 0, Consumable.status == 'in_stock')
+        rows = query.all()
+        data = [{
+            'id': c.id,
+            'name': c.consumable_name,
+            'specification': c.specification or c.internal_number,
+            'quantity': c.quantity,
+            'unit': c.unit,
+            'supplier': c.supplier,
+            'internal_number': c.internal_number,
+            'status': c.status,
+        } for c in rows]
+        return jsonify({'success': True, 'data': data})
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'获取易耗品列表失败: {str(e)}'}), 500
+
 @bp.route('/inventory/raw/<int:id>/archive', methods=['POST'])
 @login_required
 def toggle_raw_material_archive(id):
@@ -6202,6 +6207,7 @@ def toggle_raw_material_archive(id):
         })
         
     except Exception as e:
+        _reraise_http(e)
         db.session.rollback()
         current_app.logger.error(f'原材料存档状态切换失败: {str(e)}')
         return jsonify({
@@ -6244,6 +6250,7 @@ def toggle_finished_product_archive(id):
         })
         
     except Exception as e:
+        _reraise_http(e)
         db.session.rollback()
         current_app.logger.error(f'成品存档状态切换失败: {str(e)}')
         return jsonify({
@@ -6253,6 +6260,7 @@ def toggle_finished_product_archive(id):
 
 @bp.route('/inventory/auto-archive', methods=['POST'])
 @login_required
+@require_capability('inventory.manage')
 def auto_archive_inventory():
     """自动存档库存"""
     try:
@@ -6304,6 +6312,7 @@ def auto_archive_inventory():
 
 @bp.route('/inventory/inbound', methods=['GET', 'POST'])
 @login_required
+@require_capability('inventory.manage')
 def inventory_inbound():
     """批量入库管理"""
     from app.main.forms import InventoryInboundForm
@@ -6792,7 +6801,8 @@ def add_raw_material_category():
             name=data['name'].strip(),
             code=data['code'].strip(),
             description=data.get('description', '').strip(),
-            is_active=data.get('is_active', True),
+            is_active=_parse_flag(data, 'is_active', True),
+            requires_approval=_parse_flag(data, 'requires_approval', True),
             created_by=current_user.id
         )
         
@@ -6826,6 +6836,7 @@ def add_raw_material_category():
 
 @bp.route('/inventory/raw-material/categories/<int:category_id>', methods=['GET'])
 @login_required
+@require_capability('inventory.manage')
 def get_raw_material_category(category_id):
     """获取原材料品类详情"""
     from app.models import RawMaterialCategory
@@ -6837,6 +6848,7 @@ def get_raw_material_category(category_id):
             'data': category.to_dict()
         })
     except Exception as e:
+        _reraise_http(e)
         return jsonify({'success': False, 'message': f'获取品类详情失败：{str(e)}'})
 
 
@@ -6881,6 +6893,8 @@ def update_raw_material_category(category_id):
         category.code = data.get('code', category.code).strip()
         category.description = data.get('description', category.description).strip()
         category.is_active = data.get('is_active', category.is_active)
+        if 'requires_approval' in data:
+            category.requires_approval = _parse_flag(data, 'requires_approval', True)
         category.updated_at = datetime.utcnow()
         
         # 记录审计日志
@@ -6905,6 +6919,7 @@ def update_raw_material_category(category_id):
         })
         
     except Exception as e:
+        _reraise_http(e)
         db.session.rollback()
         return jsonify({'success': False, 'message': f'更新失败：{str(e)}'})
 
@@ -6951,12 +6966,14 @@ def delete_raw_material_category(category_id):
         })
         
     except Exception as e:
+        _reraise_http(e)
         db.session.rollback()
         return jsonify({'success': False, 'message': f'删除失败：{str(e)}'})
 
 
 @bp.route('/api/raw-material-categories', methods=['GET'])
 @login_required
+@require_capability('inventory.view')
 def get_raw_material_categories_api():
     """获取原材料品类列表API"""
     from app.models import RawMaterialCategory
@@ -7031,6 +7048,7 @@ def manage_products():
 
 @bp.route('/products/add', methods=['POST'])
 @login_required
+@require_capability('product.manage')
 def add_product():
     """添加产品"""
     try:
@@ -7066,7 +7084,8 @@ def add_product():
             version=data.get('version', '1.0').strip(),
             notes=data.get('notes', '').strip(),
             code_rule_id=data.get('code_rule_id') if data.get('code_rule_id') else None,
-            created_by=current_user.id
+            created_by=current_user.id,
+            sellable_as_part=bool(data.get('sellable_as_part')),
         )
         
         # 添加到数据库
@@ -7106,6 +7125,7 @@ def add_product():
 
 @bp.route('/products/<int:id>', methods=['GET'])
 @login_required
+@require_capability('product.view')
 def get_product(id):
     """获取产品详情"""
     try:
@@ -7126,6 +7146,7 @@ def get_product(id):
                 'status': product.status,
                 'notes': product.notes or '',
                 'code_rule_id': product.code_rule_id,
+                'sellable_as_part': bool(product.sellable_as_part),
                 'total_material_cost': product.total_material_cost,
                 'total_process_cost': product.total_process_cost,
                 'total_cost': product.total_cost
@@ -7133,10 +7154,12 @@ def get_product(id):
         })
         
     except Exception as e:
+        _reraise_http(e)
         return jsonify({'success': False, 'message': f'获取产品详情失败: {str(e)}'})
 
 @bp.route('/products/<int:id>', methods=['PUT'])
 @login_required
+@require_capability('product.manage')
 def update_product(id):
     """更新产品"""
     try:
@@ -7160,6 +7183,7 @@ def update_product(id):
         product.status = data.get('status', 'active')
         product.notes = data.get('notes', '')
         product.code_rule_id = data.get('code_rule_id') if data.get('code_rule_id') else None
+        product.sellable_as_part = bool(data.get('sellable_as_part'))
         product.updated_at = datetime.utcnow()
         
         db.session.commit()
@@ -7167,11 +7191,13 @@ def update_product(id):
         return jsonify({'success': True, 'message': '产品更新成功'})
         
     except Exception as e:
+        _reraise_http(e)
         db.session.rollback()
         return jsonify({'success': False, 'message': f'更新失败: {str(e)}'})
 
 @bp.route('/products/<int:id>', methods=['DELETE'])
 @login_required
+@require_capability('product.manage')
 @csrf.exempt
 def delete_product(id):
     """删除产品"""
@@ -7193,11 +7219,13 @@ def delete_product(id):
         return jsonify({'success': True, 'message': '产品删除成功'})
         
     except Exception as e:
+        _reraise_http(e)
         db.session.rollback()
         return jsonify({'success': False, 'message': f'删除失败: {str(e)}'})
 
 @bp.route('/products/<int:id>/bom')
 @login_required
+@require_capability('product.view')
 def product_bom(id):
     """产品BOM管理页面"""
     product = Product.query.get_or_404(id)
@@ -7217,6 +7245,7 @@ def product_bom(id):
 
 @bp.route('/products/<int:product_id>/bom/add', methods=['POST'])
 @login_required
+@require_capability('product.manage')
 def add_product_bom(product_id):
     """批量添加产品BOM项"""
     try:
@@ -7319,11 +7348,13 @@ def add_product_bom(product_id):
         })
         
     except Exception as e:
+        _reraise_http(e)
         db.session.rollback()
         return jsonify({'success': False, 'message': f'添加失败: {str(e)}'})
 
 @bp.route('/products/<int:product_id>/bom/<int:bom_item_id>', methods=['GET'])
 @login_required
+@require_capability('product.view')
 def get_product_bom_item(product_id, bom_item_id):
     """获取BOM项详情"""
     try:
@@ -7352,6 +7383,7 @@ def get_product_bom_item(product_id, bom_item_id):
 
 @bp.route('/products/<int:product_id>/bom/<int:bom_item_id>', methods=['PUT'])
 @login_required
+@require_capability('product.manage')
 def update_product_bom_item(product_id, bom_item_id):
     """更新BOM项"""
     try:
@@ -7385,6 +7417,7 @@ def update_product_bom_item(product_id, bom_item_id):
 
 @bp.route('/products/<int:product_id>/bom/<int:bom_item_id>', methods=['DELETE'])
 @login_required
+@require_capability('product.manage')
 @csrf.exempt
 def delete_product_bom_item(product_id, bom_item_id):
     """删除BOM项"""
@@ -7405,6 +7438,7 @@ def delete_product_bom_item(product_id, bom_item_id):
 
 @bp.route('/products/<int:product_id>/processes')
 @login_required
+@require_capability('product.view')
 def product_processes(product_id):
     """产品工序管理页面"""
     product = Product.query.get_or_404(product_id)
@@ -7414,14 +7448,17 @@ def product_processes(product_id):
     
     # 获取可用的工序
     processes = ProcessPrice.query.filter_by(is_current=True).all()
+    work_centers = WorkCenter.query.filter_by(is_active=True).order_by(WorkCenter.code).all()
     
     return render_template('main/product_processes.html',
                          product=product,
                          process_items=process_items,
-                         processes=processes)
+                         processes=processes,
+                         work_centers=work_centers)
 
 @bp.route('/products/<int:product_id>/processes/add', methods=['POST'])
 @login_required
+@require_capability('product.manage')
 def add_product_process(product_id):
     """批量添加产品工序"""
     try:
@@ -7486,7 +7523,9 @@ def add_product_process(product_id):
                 setup_time=float(process_data.get('setup_time', 0)),
                 process_time=float(process_data.get('process_time', 0)),
                 notes=process_data.get('notes', ''),
-                is_required=process_data.get('is_required', True)
+                is_required=process_data.get('is_required', True),
+                process_stage=process_data.get('process_stage') or 'machine',
+                work_center_id=int(process_data['work_center_id']) if process_data.get('work_center_id') else None,
             )
             
             db.session.add(process_item)
@@ -7510,11 +7549,13 @@ def add_product_process(product_id):
         })
         
     except Exception as e:
+        _reraise_http(e)
         db.session.rollback()
         return jsonify({'success': False, 'message': f'添加失败: {str(e)}'})
 
 @bp.route('/products/<int:product_id>/processes/<int:process_item_id>', methods=['DELETE'])
 @login_required
+@require_capability('product.manage')
 @csrf.exempt
 def delete_product_process(product_id, process_item_id):
     """删除产品工序"""
@@ -7535,6 +7576,7 @@ def delete_product_process(product_id, process_item_id):
 
 @bp.route('/products/<int:product_id>/processes/<int:process_item_id>', methods=['PUT'])
 @login_required
+@require_capability('product.manage')
 def update_product_process(product_id, process_item_id):
     """更新产品工序"""
     try:
@@ -7568,6 +7610,8 @@ def update_product_process(product_id, process_item_id):
         process_item.process_time = float(data.get('process_time', 0))
         process_item.notes = data.get('notes', '')
         process_item.is_required = data.get('is_required', True)
+        process_item.process_stage = data.get('process_stage') or process_item.process_stage or 'machine'
+        process_item.work_center_id = int(data['work_center_id']) if data.get('work_center_id') else None
         
         db.session.commit()
         
@@ -7579,6 +7623,7 @@ def update_product_process(product_id, process_item_id):
 
 @bp.route('/products/<int:product_id>/processes/<int:process_item_id>', methods=['GET'])
 @login_required
+@require_capability('product.view')
 def get_product_process(product_id, process_item_id):
     """获取产品工序详情"""
     try:
@@ -7599,6 +7644,8 @@ def get_product_process(product_id, process_item_id):
                 'process_time': process_item.process_time,
                 'notes': process_item.notes or '',
                 'is_required': process_item.is_required,
+                'process_stage': process_item.process_stage or 'machine',
+                'work_center_id': process_item.work_center_id,
                 'process_name': process_item.process.process_name,
                 'process_code': process_item.process.process_code,
                 'default_price': process_item.process.price
@@ -7641,7 +7688,7 @@ def download_product_template():
         if temp_path and os.path.exists(temp_path):
             try:
                 os.remove(temp_path)
-            except:
+            except OSError:
                 pass
         flash(f'下载模板失败：{str(e)}', 'danger')
         return redirect(url_for('main.manage_products'))
@@ -7650,7 +7697,7 @@ def download_product_template():
         if temp_path and os.path.exists(temp_path):
             try:
                 os.remove(temp_path)
-            except:
+            except OSError:
                 pass
 @bp.route('/products/import', methods=['POST'])
 @login_required
@@ -7965,6 +8012,7 @@ def export_products():
 
 @bp.route('/api/products/search')
 @login_required
+@require_capability('product.lookup')
 def search_products():
     """搜索产品"""
     try:
@@ -8046,6 +8094,7 @@ def manage_production_orders():
 
 @bp.route('/production_orders/add', methods=['POST'])
 @login_required
+@require_capability('production_order.manage')
 def add_production_order():
     """添加生产订单"""
     try:
@@ -8061,6 +8110,9 @@ def add_production_order():
         product = Product.query.get(data['product_id'])
         if not product:
             return jsonify({'success': False, 'message': '产品不存在'})
+        from app.services import mes_service
+        if not mes_service.product_has_routing(product):
+            return jsonify({'success': False, 'message': '产品未配置工艺路线，不能创建生产订单'}), 400
         
         # 创建生产订单
         order = ProductionOrder(
@@ -8090,8 +8142,9 @@ def add_production_order():
 
 @bp.route('/production_orders/<int:order_id>', methods=['GET'])
 @login_required
+@require_capability('production_order.view', 'sales_order.manage')
 def production_order_detail(order_id):
-    """生产订单详情页面"""
+    """生产订单详情页面。并上 sales_order.manage 是因为销售会从销售订单详情页链进来。"""
     order = ProductionOrder.query.get_or_404(order_id)
     
     # 获取物料分配
@@ -8155,6 +8208,7 @@ def delete_production_order(order_id):
         return jsonify({'success': True, 'message': f'生产订单 {order.order_number} 删除成功'})
         
     except Exception as e:
+        _reraise_http(e)
         db.session.rollback()
         return jsonify({'success': False, 'message': f'删除失败: {str(e)}'})
 
@@ -8355,6 +8409,8 @@ def create_production_order_from_sales(order_id):
             return jsonify({'success': False, 'message': '请选择至少一条订单行或该销售订单没有可用的订单行'})
         
         created_orders = []
+        skipped = []
+        from app.services import mes_service
         
         # 为每个订单行创建生产订单（跳过已有待处理/进行中的生产订单）
         for item in order_items:
@@ -8365,7 +8421,13 @@ def create_production_order_from_sales(order_id):
             ).first()
             
             if existing_order:
+                skipped.append(f'{item.product_name or item.id}: 已有进行中的生产订单')
                 continue  # 跳过已有生产订单的订单行
+
+            product = Product.query.get(item.product_id)
+            if not mes_service.product_has_routing(product):
+                skipped.append(f'{item.product_name or item.id}: 未配置工艺路线')
+                continue
             
             # 创建生产订单
             production_order = ProductionOrder(
@@ -8408,7 +8470,10 @@ def create_production_order_from_sales(order_id):
             })
         
         if not created_orders:
-            return jsonify({'success': False, 'message': '没有可创建的生产订单（可能都已存在）'})
+            msg = '没有可创建的生产订单'
+            if skipped:
+                msg += '（' + '；'.join(skipped) + '）'
+            return jsonify({'success': False, 'message': msg}), 400
         
         # 更新销售订单状态为生产中
         if sales_order.status == 'confirmed':
@@ -8426,13 +8491,17 @@ def create_production_order_from_sales(order_id):
         
         db.session.commit()
         
+        success_msg = f'成功创建 {len(created_orders)} 个生产订单'
+        if skipped:
+            success_msg += '；部分行未创建：' + '；'.join(skipped)
         return jsonify({
             'success': True, 
-            'message': f'成功创建 {len(created_orders)} 个生产订单',
+            'message': success_msg,
             'created_orders': created_orders
         })
         
     except Exception as e:
+        _reraise_http(e)
         db.session.rollback()
         return jsonify({'success': False, 'message': f'创建失败: {str(e)}'})
 @bp.route('/sales_order_item/<int:item_id>/create_production_order', methods=['POST'])
@@ -8463,6 +8532,11 @@ def create_production_order_from_item(item_id):
         
         if remaining_to_create <= 0:
             return jsonify({'success': False, 'message': '该订单行已全部创建生产订单，无剩余数量可创建'})
+
+        from app.services import mes_service
+        product = Product.query.get(order_item.product_id)
+        if not mes_service.product_has_routing(product):
+            return jsonify({'success': False, 'message': '产品未配置工艺路线，不能创建生产订单'}), 400
         
         # 计划数量：未传则默认使用剩余数量；传入则校验不超过剩余数量
         requested_qty = data.get('planned_quantity')
@@ -8546,6 +8620,7 @@ def create_production_order_from_item(item_id):
         })
         
     except Exception as e:
+        _reraise_http(e)
         db.session.rollback()
         return jsonify({'success': False, 'message': f'创建失败: {str(e)}'})
 
@@ -8621,6 +8696,7 @@ def check_and_handle_material_shortage(order, batch_quantity):
 
 @bp.route('/production_orders/<int:order_id>/batches/add', methods=['POST'])
 @login_required
+@require_capability('production_order.manage')
 def add_production_batch(order_id):
     """添加生产批次"""
     try:
@@ -8700,6 +8776,7 @@ def add_production_batch(order_id):
             return jsonify({'success': False, 'message': '生产批次创建失败，无法生成产品编码'})
         
     except Exception as e:
+        _reraise_http(e)
         db.session.rollback()
         return jsonify({'success': False, 'message': f'创建失败: {str(e)}'})
 
@@ -8780,6 +8857,18 @@ def create_tasks_for_production_batch(batch):
             
             db.session.add(task)
             created_tasks.append(task)
+            from app.services import mes_service
+            from app.models import TaskWorkpiece
+            eq = mes_service.pick_equipment_for_process(process_item.process_id, process_item.work_center_id)
+            task.work_center_id = process_item.work_center_id
+            if eq:
+                task.equipment_id = eq.id
+            db.session.flush()
+            for bi in batch.batch_items.all():
+                wp = mes_service.ensure_workpiece(
+                    code=bi.product_code, batch_item_id=bi.id, product_id=product.id, status='raw',
+                )
+                db.session.add(TaskWorkpiece(task_id=task.id, workpiece_id=wp.id))
             
             # 记录审计日志
             log = AuditLog(
@@ -8825,8 +8914,9 @@ def create_tasks_for_production_batch(batch):
 
 @bp.route('/production_batches/<int:batch_id>')
 @login_required
+@require_capability('production_order.view', 'task.manage')
 def production_batch_detail(batch_id):
-    """生产批次详情页面"""
+    """生产批次详情页面。并上 task.manage 是因为 hr 会从任务分配页的批次链接进来。"""
     batch = ProductionBatch.query.get_or_404(batch_id)
     
     # 获取批次项目
@@ -8842,6 +8932,7 @@ def production_batch_detail(batch_id):
 
 @bp.route('/production_batch_items/<int:item_id>/update', methods=['PUT'])
 @login_required
+@require_capability('production_order.manage')
 def update_batch_item(item_id):
     """更新批次项目状态"""
     try:
@@ -8875,11 +8966,13 @@ def update_batch_item(item_id):
         return jsonify({'success': True, 'message': '批次项目更新成功'})
         
     except Exception as e:
+        _reraise_http(e)
         db.session.rollback()
         return jsonify({'success': False, 'message': f'更新失败: {str(e)}'})
 
 @bp.route('/production_batches/<int:batch_id>/status', methods=['PUT'])
 @login_required
+@require_capability('production_order.manage')
 def update_batch_status(batch_id):
     """更新生产批次状态"""
     try:
@@ -8935,6 +9028,7 @@ def update_batch_status(batch_id):
         return jsonify({'success': True, 'message': status_text.get(new_status, '状态更新成功')})
         
     except Exception as e:
+        _reraise_http(e)
         db.session.rollback()
         return jsonify({'success': False, 'message': f'状态更新失败: {str(e)}'})
 
@@ -9123,6 +9217,7 @@ def add_customer():
 
 @bp.route('/customer/<int:customer_id>')
 @login_required
+@require_capability('customer.manage')
 def customer_detail(customer_id):
     """客户详情页面"""
     customer = Customer.query.get_or_404(customer_id)
@@ -9237,6 +9332,7 @@ def delete_customer(customer_id):
         return jsonify({'success': True, 'message': '客户删除成功'})
         
     except Exception as e:
+        _reraise_http(e)
         db.session.rollback()
         return jsonify({'success': False, 'message': f'删除失败：{str(e)}'})
 @bp.route('/customer/<int:customer_id>/address/add', methods=['GET', 'POST'])
@@ -9404,6 +9500,7 @@ def delete_customer_address(customer_id, address_id):
         return jsonify({'success': True, 'message': '地址删除成功'})
         
     except Exception as e:
+        _reraise_http(e)
         db.session.rollback()
         return jsonify({'success': False, 'message': f'删除失败：{str(e)}'})
 
@@ -9444,6 +9541,7 @@ def set_primary_address(customer_id, address_id):
         return jsonify({'success': True, 'message': '主要地址设置成功'})
         
     except Exception as e:
+        _reraise_http(e)
         db.session.rollback()
         return jsonify({'success': False, 'message': f'设置失败：{str(e)}'})
 
@@ -9451,6 +9549,7 @@ def set_primary_address(customer_id, address_id):
 
 @bp.route('/api/customers/search')
 @login_required
+@require_capability('customer.manage')
 def api_search_customers():
     """客户搜索API"""
     try:
@@ -9601,6 +9700,7 @@ def add_sales_order():
 
 @bp.route('/sales_order/<int:order_id>')
 @login_required
+@require_capability('sales_order.manage')
 def sales_order_detail(order_id):
     """销售订单详情页面"""
     order = SalesOrder.query.get_or_404(order_id)
@@ -9751,6 +9851,7 @@ def delete_sales_order(order_id):
         return jsonify({'success': True, 'message': '销售订单删除成功'})
         
     except Exception as e:
+        _reraise_http(e)
         db.session.rollback()
         return jsonify({'success': False, 'message': f'删除失败：{str(e)}'})
 
@@ -10004,6 +10105,7 @@ def delete_sales_order_item(item_id):
         return jsonify({'success': True, 'message': '订单行删除成功'})
         
     except Exception as e:
+        _reraise_http(e)
         db.session.rollback()
         return jsonify({'success': False, 'message': f'删除失败：{str(e)}'})
 
@@ -10078,6 +10180,7 @@ def manage_delivery_batches(item_id):
 
 @bp.route('/api/sales_orders/search')
 @login_required
+@require_capability('sales_order.manage')
 def api_search_sales_orders():
     """销售订单搜索API"""
     try:
@@ -10115,48 +10218,13 @@ def api_search_sales_orders():
         
     except Exception as e:
         return jsonify({'success': False, 'message': f'搜索失败：{str(e)}'})
-@bp.route('/api/products/search')
-@login_required
-def api_search_products_for_sales():
-    """产品搜索API（用于销售订单）"""
-    try:
-        search = request.args.get('search', '').strip()
-        only_active = request.args.get('only_active', 'true').lower() == 'true'
-        
-        query = Product.query
-        
-        if only_active:
-            query = query.filter(Product.status == 'active')
-        
-        if search:
-            search_term = f"%{search}%"
-            query = query.filter(db.or_(
-                Product.product_code.like(search_term),
-                Product.product_name.like(search_term),
-                Product.drawing_number.like(search_term)
-            ))
-        
-        products = query.order_by(Product.product_name).limit(50).all()
-        
-        return jsonify({
-            'success': True,
-            'data': [{
-                'id': product.id,
-                'product_code': product.product_code,
-                'product_name': product.product_name,
-                'drawing_number': product.drawing_number or '',
-                'unit': product.unit,
-                'status': product.status
-            } for product in products]
-        })
-        
-    except Exception as e:
-        return jsonify({'success': False, 'message': f'搜索失败：{str(e)}'})
+
 
 # ==================== 产品名称和图号选择 API ====================
 
 @bp.route('/api/products/names')
 @login_required
+@require_capability('product.lookup')
 def api_get_product_names():
     """获取产品名称列表（去重）"""
     try:
@@ -10179,6 +10247,7 @@ def api_get_product_names():
 
 @bp.route('/api/products/drawings-by-name')
 @login_required
+@require_capability('product.lookup')
 def api_get_drawings_by_product_name():
     """根据产品名称获取图号列表"""
     try:
@@ -10213,6 +10282,7 @@ def api_get_drawings_by_product_name():
 
 @bp.route('/api/customers/<int:customer_id>/addresses')
 @login_required
+@require_capability('customer.manage')
 def api_get_customer_addresses(customer_id):
     """获取指定客户的地址列表"""
     try:
@@ -10242,6 +10312,7 @@ def api_get_customer_addresses(customer_id):
 
 @bp.route('/api/sales_orders/<int:order_id>/customer_addresses')
 @login_required
+@require_capability('sales_order.manage')
 def api_get_sales_order_customer_addresses(order_id):
     """获取销售订单对应客户的地址列表"""
     try:
@@ -10268,6 +10339,7 @@ def api_get_sales_order_customer_addresses(order_id):
         })
         
     except Exception as e:
+        _reraise_http(e)
         return jsonify({'success': False, 'message': f'获取客户地址失败：{str(e)}'}) 
 
 
@@ -10292,7 +10364,7 @@ def manage_notifications():
 
 
 @bp.route('/notifications/<int:notification_id>/read', methods=['POST'])
-@login_required  
+@login_required
 def mark_notification_read(notification_id):
     """标记通知为已读"""
     from app.services.notification_service import NotificationService
@@ -10406,32 +10478,52 @@ def api_recent_notifications():
 
 @bp.route('/api/chart-data/salary')
 @login_required
+@require_capability('dashboard.chart.view')
 def api_chart_data_salary():
-    """获取工资统计图表数据"""
+    """获取最近12个自然月的计件工资总额"""
     try:
-        # 获取最近12个月的工资数据
-        from datetime import datetime, timedelta
-        end_date = datetime.now().date()
-        start_date = end_date - timedelta(days=365)
-        
-        # 这里需要根据实际的工资计算表结构来查询
-        # 暂时返回示例数据
+        # 逐月回退，避免用固定天数近似月份
+        months = []
+        year, month = date.today().year, date.today().month
+        for _ in range(12):
+            months.append((year, month))
+            month -= 1
+            if month == 0:
+                year, month = year - 1, 12
+        months.reverse()
+        start_date = date(months[0][0], months[0][1], 1)
+
+        rows = db.session.query(
+            ProductionRecord.date,
+            ProductionRecord.quantity,
+            ProcessPrice.price
+        ).join(
+            ProcessPrice, ProductionRecord.process_id == ProcessPrice.id
+        ).filter(ProductionRecord.date >= start_date).all()
+
+        monthly_wage = {}
+        for record_date, quantity, price in rows:
+            key = (record_date.year, record_date.month)
+            monthly_wage[key] = monthly_wage.get(key, 0) + (quantity or 0) * (price or 0)
+
         data = {
-            'labels': ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'],
+            'labels': [f'{y}年{m}月' for y, m in months],
             'datasets': [{
-                'label': '平均工资',
-                'data': [8500, 8600, 8700, 8800, 8900, 9000, 9100, 9200, 9300, 9400, 9500, 9600],
+                'label': '月度计件工资',
+                'data': [round(monthly_wage.get(key, 0), 2) for key in months],
                 'borderColor': '#007bff',
                 'backgroundColor': 'rgba(0, 123, 255, 0.1)'
             }]
         }
-        
+
         return jsonify({'success': True, 'data': data})
     except Exception as e:
+        current_app.logger.error(f'获取工资统计数据失败: {str(e)}')
         return jsonify({'success': False, 'message': f'获取工资统计数据失败: {str(e)}'})
 
 @bp.route('/api/chart-data/production')
 @login_required
+@require_capability('dashboard.chart.view')
 def api_chart_data_production():
     """获取生产统计图表数据"""
     try:
@@ -10442,13 +10534,13 @@ def api_chart_data_production():
         
         # 查询生产记录
         production_records = ProductionRecord.query.filter(
-            ProductionRecord.production_date.between(start_date, end_date)
+            ProductionRecord.date.between(start_date, end_date)
         ).all()
         
         # 按日期汇总生产数量
         daily_production = {}
         for record in production_records:
-            date_str = record.production_date.strftime('%m-%d')
+            date_str = record.date.strftime('%m-%d')
             if date_str not in daily_production:
                 daily_production[date_str] = 0
             daily_production[date_str] += record.quantity
@@ -10479,6 +10571,7 @@ def api_chart_data_production():
 
 @bp.route('/api/chart-data/department')
 @login_required
+@require_capability('dashboard.chart.view')
 def api_chart_data_department():
     """获取部门统计图表数据"""
     try:
@@ -10487,7 +10580,7 @@ def api_chart_data_department():
         department_stats = db.session.query(
             Employee.department,
             func.count(Employee.id).label('count')
-        ).filter(Employee.status == 'active').group_by(Employee.department).all()
+        ).filter(Employee.is_active.is_(True)).group_by(Employee.department).all()
         
         data = {
             'labels': [stat[0] or '未分配' for stat in department_stats],
@@ -10507,15 +10600,16 @@ def api_chart_data_department():
 
 @bp.route('/api/chart-data/task')
 @login_required
+@require_capability('dashboard.chart.view')
 def api_chart_data_task():
     """获取任务统计图表数据"""
     try:
         # 按状态统计任务数量
         from sqlalchemy import func
         task_stats = db.session.query(
-            Task.status,
-            func.count(Task.id).label('count')
-        ).group_by(Task.status).all()
+            TaskAssignment.status,
+            func.count(TaskAssignment.id).label('count')
+        ).group_by(TaskAssignment.status).all()
         
         status_labels = {
             'pending': '待处理',
@@ -10739,8 +10833,11 @@ def consumable_inbound():
 
 @bp.route('/consumables/<int:id>', methods=['GET'])
 @login_required
+@require_capability('inventory.manage')
 def get_consumable(id):
     """获取易耗品详情"""
+    from app.models import Consumable
+
     consumable = Consumable.query.get_or_404(id)
     
     return jsonify({
@@ -10770,6 +10867,7 @@ def get_consumable(id):
     })
 @bp.route('/consumables/<int:id>', methods=['PUT'])
 @login_required
+@require_capability('inventory.manage')
 def update_consumable(id):
     """更新易耗品"""
     from app.main.forms import ConsumableUpdateForm
@@ -10919,12 +11017,14 @@ def delete_consumable(id):
         return jsonify({'success': True, 'message': '删除成功'})
         
     except Exception as e:
+        _reraise_http(e)
         db.session.rollback()
         current_app.logger.error(f'删除易耗品失败: {str(e)}')
         return jsonify({'success': False, 'message': f'删除失败：{str(e)}'}), 500
 
 @bp.route('/consumables/<int:id>/use', methods=['POST'])
 @login_required
+@require_capability('inventory.manage')
 def use_consumable(id):
     """使用易耗品"""
     from app.main.forms import ConsumableUsageForm
@@ -11002,6 +11102,7 @@ def consumable_categories():
 
 @bp.route('/consumables/categories/add', methods=['POST'])
 @login_required
+@require_capability('inventory.manage')
 def add_consumable_category():
     """添加易耗品品类"""
     from app.main.forms import ConsumableCategoryForm
@@ -11026,6 +11127,7 @@ def add_consumable_category():
                 code=form.code.data,
                 description=form.description.data,
                 is_active=form.is_active.data,
+                requires_approval=form.requires_approval.data,
                 created_by=current_user.id
             )
             
@@ -11044,7 +11146,8 @@ def add_consumable_category():
                     'name': category.name,
                     'code': category.code,
                     'description': category.description,
-                    'is_active': category.is_active
+                    'is_active': category.is_active,
+                    'requires_approval': category.requires_approval
                 }
             )
             db.session.add(audit_log)
@@ -11067,6 +11170,7 @@ def add_consumable_category():
 
 @bp.route('/consumables/categories/<int:category_id>', methods=['GET'])
 @login_required
+@require_capability('inventory.manage')
 def get_consumable_category(category_id):
     """获取易耗品品类详情"""
     from app.models import ConsumableCategory
@@ -11076,6 +11180,7 @@ def get_consumable_category(category_id):
 
 @bp.route('/consumables/categories/<int:category_id>', methods=['PUT'])
 @login_required
+@require_capability('inventory.manage')
 def update_consumable_category(category_id):
     """更新易耗品品类"""
     from app.models import ConsumableCategory
@@ -11087,11 +11192,12 @@ def update_consumable_category(category_id):
         'name': category.name,
         'code': category.code,
         'description': category.description,
-        'is_active': category.is_active
+        'is_active': category.is_active,
+        'requires_approval': category.requires_approval
     }
     
     try:
-        data = request.get_json()
+        data = request.get_json() or {}
         
         # 检查名称唯一性
         if 'name' in data and data['name'] != category.name:
@@ -11114,6 +11220,8 @@ def update_consumable_category(category_id):
             category.description = data['description']
         if 'is_active' in data:
             category.is_active = data['is_active']
+        if 'requires_approval' in data:
+            category.requires_approval = _parse_flag(data, 'requires_approval', False)
         
         category.updated_at = datetime.utcnow()
         
@@ -11122,7 +11230,8 @@ def update_consumable_category(category_id):
             'name': category.name,
             'code': category.code,
             'description': category.description,
-            'is_active': category.is_active
+            'is_active': category.is_active,
+            'requires_approval': category.requires_approval
         }
         
         # 记录审计日志
@@ -11193,12 +11302,14 @@ def delete_consumable_category(category_id):
         return jsonify({'success': True, 'message': '删除成功'})
         
     except Exception as e:
+        _reraise_http(e)
         db.session.rollback()
         current_app.logger.error(f'删除易耗品品类失败: {str(e)}')
         return jsonify({'success': False, 'message': f'删除失败：{str(e)}'}), 500
 
 @bp.route('/api/consumable-categories', methods=['GET'])
 @login_required
+@require_capability('inventory.manage')
 def get_consumable_categories_api():
     """获取易耗品品类列表API"""
     from app.models import ConsumableCategory
@@ -11297,97 +11408,96 @@ def manage_material_requisitions():
 
 @bp.route('/material_requisitions/add', methods=['GET', 'POST'])
 @login_required
+@require_capability('inventory.manage')
 def add_material_requisition():
-    """添加物料领用记录"""
+    """添加物料领用记录：选真实库存行，按品类决定是否审批。"""
     from app.main.forms import MaterialRequisitionRecordForm
     from app.models import MaterialRequisition, MaterialRequisitionItem, Employee
+    from app.services import mes_service
     import json
     
     form = MaterialRequisitionRecordForm()
     
     if form.validate_on_submit():
         try:
-            # 获取员工信息
             employee = Employee.query.get(form.employee_id.data)
             if not employee:
                 flash('员工不存在', 'error')
                 return render_template('main/material_requisition_form.html', form=form, title='创建物料领用记录')
             
-            # 验证物料数据
             materials_data = json.loads(form.materials_data.data or '[]')
             if not materials_data:
                 flash('请至少添加一项物料', 'error')
                 return render_template('main/material_requisition_form.html', form=form, title='创建物料领用记录')
-            
-            # 生成领用单号
-            today = datetime.now()
-            prefix = f"MR{today.strftime('%Y%m%d')}"
-            
-            # 查找当天最大序号
-            last_requisition = MaterialRequisition.query.filter(
-                MaterialRequisition.requisition_number.like(f"{prefix}%")
-            ).order_by(MaterialRequisition.requisition_number.desc()).first()
-            
-            if last_requisition:
-                last_seq = int(last_requisition.requisition_number[-3:])
-                seq = last_seq + 1
-            else:
-                seq = 1
-            
-            requisition_number = f"{prefix}{seq:03d}"
-            
-            # 创建领用记录
+
+            need_approval = False
+            parsed_lines = []
+            for material_data in materials_data:
+                mtype = material_data.get('material_type')
+                mid = material_data.get('material_id')
+                if not mtype or not mid:
+                    flash('必须选择具体库存物料，不能手填品名', 'error')
+                    return render_template('main/material_requisition_form.html', form=form, title='创建物料领用记录')
+                mid = int(mid)
+                qty = float(material_data.get('quantity') or 0)
+                if qty <= 0:
+                    flash('领用数量必须大于0', 'error')
+                    return render_template('main/material_requisition_form.html', form=form, title='创建物料领用记录')
+                if mes_service.get_stock_row(mtype, mid) is None:
+                    flash('所选物料不存在', 'error')
+                    return render_template('main/material_requisition_form.html', form=form, title='创建物料领用记录')
+                if mes_service.line_requires_approval(mtype, mid):
+                    need_approval = True
+                parsed_lines.append({
+                    'material_type': mtype,
+                    'material_id': mid,
+                    'quantity': qty,
+                    'unit': material_data.get('unit') or '件',
+                    'notes': material_data.get('notes') or '',
+                })
+
+            po_id = form.production_order_id.data or 0
             requisition = MaterialRequisition(
-                requisition_number=requisition_number,
                 employee_id=form.employee_id.data,
-                department=employee.department,
+                department=employee.department or '',
                 purpose=form.purpose.data,
                 required_date=form.requisition_date.data,
                 notes=form.notes.data,
-                status='completed',  # 直接完成状态
-                requested_date=datetime.now()
+                status='pending' if need_approval else 'approved',
+                requested_date=datetime.now(),
+                production_order_id=po_id if po_id else None,
             )
-            
             db.session.add(requisition)
-            db.session.flush()  # 获取ID
-            
-            # 添加物料明细
-            for material_data in materials_data:
-                item = MaterialRequisitionItem(
+            db.session.flush()
+
+            for line in parsed_lines:
+                db.session.add(MaterialRequisitionItem(
                     requisition_id=requisition.id,
-                    material_type=material_data['material_type'],
-                    material_id=1,  # 临时设置，实际应该根据material_type和material_name查找对应ID
-                    quantity=float(material_data['quantity']),
-                    unit=material_data['unit'],
-                    notes=material_data.get('notes', ''),
-                    issued_quantity=float(material_data['quantity'])  # 直接设为已发料
-                )
-                db.session.add(item)
-            
-            db.session.commit()
-            
-            # 记录操作日志
-            from app.models import AuditLog
-            audit_log = AuditLog(
+                    material_type=line['material_type'],
+                    material_id=line['material_id'],
+                    quantity=line['quantity'],
+                    unit=line['unit'],
+                    notes=line['notes'],
+                    issued_quantity=0,
+                ))
+
+            db.session.add(AuditLog(
                 user_id=current_user.id,
                 action='创建物料领用记录',
-                details=f'创建物料领用记录：{requisition_number} - {employee.name}',
+                details=f'创建物料领用记录：{requisition.requisition_number} - {employee.name}',
                 can_rollback=True,
                 rollback_type='add',
                 target_model='MaterialRequisition',
                 target_id=requisition.id,
                 new_data={
-                    'requisition_number': requisition_number,
+                    'requisition_number': requisition.requisition_number,
                     'employee_id': requisition.employee_id,
-                    'department': requisition.department,
+                    'status': requisition.status,
                     'purpose': requisition.purpose,
-                    'required_date': requisition.required_date.strftime('%Y-%m-%d')
                 }
-            )
-            db.session.add(audit_log)
+            ))
             db.session.commit()
-            
-            flash('物料领用记录创建成功！', 'success')
+            flash('物料领用记录创建成功！' + ('待审批。' if need_approval else '免审，可直接发料。'), 'success')
             return redirect(url_for('main.material_requisition_detail', id=requisition.id))
             
         except Exception as e:
@@ -11399,13 +11509,144 @@ def add_material_requisition():
 
 @bp.route('/material_requisitions/<int:id>')
 @login_required
+@require_capability('inventory.manage')
 def material_requisition_detail(id):
     """物料领用详情"""
     from app.models import MaterialRequisition
-    
     requisition = MaterialRequisition.query.get_or_404(id)
-    
     return render_template('main/material_requisition_detail.html', requisition=requisition)
+
+
+@bp.route('/api/material_requisitions/<int:id>/issued-items')
+@login_required
+@require_capability('inventory.manage')
+def api_requisition_issued_items(id):
+    from app.models import MaterialRequisition
+    try:
+        requisition = MaterialRequisition.query.get_or_404(id)
+        if requisition.status != 'completed':
+            return jsonify({'success': False, 'message': '只能关联已发料的领用单'}), 400
+        data = []
+        for item in requisition.items.all():
+            data.append({
+                'id': item.id,
+                'material_type': item.material_type,
+                'material_id': item.material_id,
+                'material_name': item.material_name,
+                'issued_quantity': item.issued_quantity or 0,
+                'unit': item.unit,
+            })
+        return jsonify({'success': True, 'data': data, 'employee_id': requisition.employee_id,
+                        'department': requisition.department})
+    except Exception as e:
+        _reraise_http(e)
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@bp.route('/material_requisitions/<int:id>/approve', methods=['POST'])
+@login_required
+@require_capability('inventory.manage')
+def approve_material_requisition(id):
+    from app.models import MaterialRequisition
+    dest = url_for('main.material_requisition_detail', id=id)
+    try:
+        requisition = MaterialRequisition.query.get_or_404(id)
+        if not requisition.can_approve:
+            return _warehouse_reply(False, '当前状态不可审批', dest)
+        requisition.status = 'approved'
+        requisition.approved_by = current_user.id
+        requisition.approved_at = datetime.utcnow()
+        db.session.add(AuditLog(
+            user_id=current_user.id, action='审批物料领用',
+            details=f'通过领用单 {requisition.requisition_number}',
+            target_model='MaterialRequisition', target_id=requisition.id,
+        ))
+        db.session.commit()
+        return _warehouse_reply(True, '审批通过', dest)
+    except Exception as e:
+        _reraise_http(e)
+        db.session.rollback()
+        current_app.logger.error(f'审批领用单失败: {str(e)}')
+        return _warehouse_reply(False, f'审批失败：{str(e)}', dest)
+
+
+@bp.route('/material_requisitions/<int:id>/reject', methods=['POST'])
+@login_required
+@require_capability('inventory.manage')
+def reject_material_requisition(id):
+    from app.models import MaterialRequisition
+    dest = url_for('main.material_requisition_detail', id=id)
+    try:
+        requisition = MaterialRequisition.query.get_or_404(id)
+        if not requisition.can_approve:
+            return _warehouse_reply(False, '当前状态不可拒绝', dest)
+        requisition.status = 'rejected'
+        requisition.approved_by = current_user.id
+        requisition.approved_at = datetime.utcnow()
+        db.session.add(AuditLog(
+            user_id=current_user.id, action='拒绝物料领用',
+            details=f'拒绝领用单 {requisition.requisition_number}',
+            target_model='MaterialRequisition', target_id=requisition.id,
+        ))
+        db.session.commit()
+        return _warehouse_reply(True, '已拒绝', dest)
+    except Exception as e:
+        _reraise_http(e)
+        db.session.rollback()
+        current_app.logger.error(f'拒绝领用单失败: {str(e)}')
+        return _warehouse_reply(False, f'操作失败：{str(e)}', dest)
+
+
+@bp.route('/material_requisitions/<int:id>/issue', methods=['POST'])
+@login_required
+@require_capability('inventory.manage')
+def issue_material_requisition(id):
+    from app.models import MaterialRequisition
+    from app.services import mes_service
+    dest = url_for('main.material_requisition_detail', id=id)
+    try:
+        requisition = MaterialRequisition.query.get_or_404(id)
+        mes_service.issue_requisition(requisition, current_user.id)
+        db.session.add(AuditLog(
+            user_id=current_user.id, action='领用发料',
+            details=f'发料 {requisition.requisition_number}',
+            can_rollback=False, target_model='MaterialRequisition', target_id=requisition.id,
+        ))
+        db.session.commit()
+        return _warehouse_reply(True, '发料成功，已扣减库存', dest)
+    except ValueError as e:
+        db.session.rollback()
+        return _warehouse_reply(False, str(e), dest)
+    except Exception as e:
+        _reraise_http(e)
+        db.session.rollback()
+        current_app.logger.error(f'发料失败: {str(e)}')
+        return _warehouse_reply(False, f'发料失败：{str(e)}', dest)
+
+
+@bp.route('/material_requisitions/<int:id>/cancel', methods=['POST'])
+@login_required
+@require_capability('inventory.manage')
+def cancel_material_requisition(id):
+    from app.models import MaterialRequisition
+    dest = url_for('main.material_requisition_detail', id=id)
+    try:
+        requisition = MaterialRequisition.query.get_or_404(id)
+        if not requisition.can_cancel:
+            return _warehouse_reply(False, '当前状态不可取消', dest)
+        requisition.status = 'cancelled'
+        db.session.add(AuditLog(
+            user_id=current_user.id, action='取消物料领用',
+            details=f'取消领用单 {requisition.requisition_number}',
+            target_model='MaterialRequisition', target_id=requisition.id,
+        ))
+        db.session.commit()
+        return _warehouse_reply(True, '已取消', dest)
+    except Exception as e:
+        _reraise_http(e)
+        db.session.rollback()
+        current_app.logger.error(f'取消领用单失败: {str(e)}')
+        return _warehouse_reply(False, f'取消失败：{str(e)}', dest)
 
 
 
@@ -11475,6 +11716,166 @@ def manage_material_returns():
                          pending_count=pending_count,
                          confirmed_count=confirmed_count)
 
+
+@bp.route('/material_returns/add', methods=['GET', 'POST'])
+@login_required
+@require_capability('inventory.manage')
+def add_material_return():
+    """新建归还单，必须关联已发料领用单，数量不超过已发数量。"""
+    from app.main.forms import MaterialReturnForm
+    from app.models import MaterialReturn, MaterialReturnItem, Employee, MaterialRequisition
+    import json
+
+    form = MaterialReturnForm()
+    if form.validate_on_submit():
+        try:
+            orig_id = form.original_requisition_id.data or 0
+            if not orig_id:
+                flash('请选择原领用单', 'error')
+                return render_template('main/material_return_form.html', form=form, title='新建物料归还')
+            orig = MaterialRequisition.query.get(orig_id)
+            if not orig or orig.status != 'completed':
+                flash('只能关联已发料完成的领用单', 'error')
+                return render_template('main/material_return_form.html', form=form, title='新建物料归还')
+            employee = Employee.query.get(form.employee_id.data)
+            if not employee:
+                flash('员工不存在', 'error')
+                return render_template('main/material_return_form.html', form=form, title='新建物料归还')
+            lines = json.loads(form.materials_data.data or '[]')
+            if not lines:
+                flash('请至少添加一项归还明细', 'error')
+                return render_template('main/material_return_form.html', form=form, title='新建物料归还')
+
+            issued_map = {}
+            for it in orig.items.all():
+                key = (it.material_type, it.material_id)
+                issued_map[key] = issued_map.get(key, 0) + (it.issued_quantity or 0)
+            already = {}
+            for ret in orig.returns:
+                if ret.status == 'rejected':
+                    continue
+                for it in ret.items.all():
+                    key = (it.material_type, it.material_id)
+                    already[key] = already.get(key, 0) + it.quantity
+
+            parsed = []
+            for line in lines:
+                mtype = line.get('material_type')
+                mid = int(line.get('material_id') or 0)
+                qty = float(line.get('quantity') or 0)
+                if not mtype or not mid or qty <= 0:
+                    flash('归还明细不完整', 'error')
+                    return render_template('main/material_return_form.html', form=form, title='新建物料归还')
+                key = (mtype, mid)
+                remain = issued_map.get(key, 0) - already.get(key, 0)
+                if qty > remain + 1e-9:
+                    flash(f'{line.get("material_name") or "物料"} 归还数量不能超过已发剩余 {remain}', 'error')
+                    return render_template('main/material_return_form.html', form=form, title='新建物料归还')
+                parsed.append({
+                    'material_type': mtype, 'material_id': mid, 'quantity': qty,
+                    'condition': line.get('condition') or 'good',
+                    'unit': line.get('unit') or '件',
+                    'notes': line.get('notes') or '',
+                })
+                already[key] = already.get(key, 0) + qty
+
+            ret = MaterialReturn(
+                employee_id=form.employee_id.data,
+                department=form.department.data or employee.department or '',
+                return_reason=form.return_reason.data,
+                original_requisition_id=orig.id,
+                status='pending',
+                returned_date=form.returned_date.data or datetime.utcnow(),
+                notes=form.notes.data,
+            )
+            db.session.add(ret)
+            db.session.flush()
+            for line in parsed:
+                db.session.add(MaterialReturnItem(
+                    return_id=ret.id, **line
+                ))
+            db.session.add(AuditLog(
+                user_id=current_user.id, action='创建物料归还',
+                details=f'创建归还单 {ret.return_number}',
+                can_rollback=True, rollback_type='add',
+                target_model='MaterialReturn', target_id=ret.id,
+            ))
+            db.session.commit()
+            flash('归还单已提交，等待确认回库', 'success')
+            return redirect(url_for('main.material_return_detail', id=ret.id))
+        except Exception as e:
+            db.session.rollback()
+            current_app.logger.error(f'创建归还单失败: {str(e)}')
+            flash(f'创建失败：{str(e)}', 'danger')
+    return render_template('main/material_return_form.html', form=form, title='新建物料归还')
+
+
+@bp.route('/material_returns/<int:id>')
+@login_required
+@require_capability('inventory.manage')
+def material_return_detail(id):
+    from app.models import MaterialReturn
+    ret = MaterialReturn.query.get_or_404(id)
+    return render_template('main/material_return_detail.html', ret=ret)
+
+
+@bp.route('/material_returns/<int:id>/confirm', methods=['POST'])
+@login_required
+@require_capability('inventory.manage')
+def confirm_material_return(id):
+    from app.models import MaterialReturn
+    from app.services import mes_service
+    dest = url_for('main.material_return_detail', id=id)
+    try:
+        ret = MaterialReturn.query.get_or_404(id)
+        mes_service.confirm_return(ret, current_user.id)
+        notes = (request.get_json() or {}).get('notes') if request.is_json else request.form.get('notes')
+        if notes:
+            ret.notes = ((ret.notes or '') + '\n确认：' + notes).strip()
+        db.session.add(AuditLog(
+            user_id=current_user.id, action='确认物料归还',
+            details=f'确认归还单 {ret.return_number}，完好项已回库',
+            target_model='MaterialReturn', target_id=ret.id,
+        ))
+        db.session.commit()
+        return _warehouse_reply(True, '已确认，完好物料已回库', dest)
+    except ValueError as e:
+        db.session.rollback()
+        return _warehouse_reply(False, str(e), dest)
+    except Exception as e:
+        _reraise_http(e)
+        db.session.rollback()
+        current_app.logger.error(f'确认归还失败: {str(e)}')
+        return _warehouse_reply(False, f'确认失败：{str(e)}', dest)
+
+
+@bp.route('/material_returns/<int:id>/reject', methods=['POST'])
+@login_required
+@require_capability('inventory.manage')
+def reject_material_return(id):
+    from app.models import MaterialReturn
+    dest = url_for('main.material_return_detail', id=id)
+    try:
+        ret = MaterialReturn.query.get_or_404(id)
+        if not ret.can_confirm:
+            return _warehouse_reply(False, '当前状态不可拒绝', dest)
+        ret.status = 'rejected'
+        ret.confirmed_by = current_user.id
+        ret.confirmed_at = datetime.utcnow()
+        db.session.add(AuditLog(
+            user_id=current_user.id, action='拒绝物料归还',
+            details=f'拒绝归还单 {ret.return_number}',
+            target_model='MaterialReturn', target_id=ret.id,
+        ))
+        db.session.commit()
+        return _warehouse_reply(True, '已拒绝归还', dest)
+    except Exception as e:
+        _reraise_http(e)
+        db.session.rollback()
+        current_app.logger.error(f'拒绝归还失败: {str(e)}')
+        return _warehouse_reply(False, f'操作失败：{str(e)}', dest)
+
+
 # ==================== 库存盘点管理 ====================
 
 @bp.route('/inventory_counts')
@@ -11529,9 +11930,9 @@ def manage_inventory_counts():
     
     # 统计数据
     total_count = InventoryCount.query.count()
-    in_progress_count = InventoryCount.query.filter_by(status='in_progress').count()
+    in_progress_count = InventoryCount.query.filter_by(status='counting').count()
     completed_count = InventoryCount.query.filter_by(status='completed').count()
-    approved_count = InventoryCount.query.filter_by(status='approved').count()
+    planning_count = InventoryCount.query.filter_by(status='planning').count()
     
     return render_template('main/inventory_counts.html',
                          counts=counts,
@@ -11539,10 +11940,176 @@ def manage_inventory_counts():
                          total_count=total_count,
                          in_progress_count=in_progress_count,
                          completed_count=completed_count,
-                         approved_count=approved_count)
+                         planning_count=planning_count)
+
+
+@bp.route('/inventory_counts/add', methods=['GET', 'POST'])
+@login_required
+@require_capability('inventory.manage')
+def add_inventory_count():
+    from app.main.forms import InventoryCountForm
+    from app.models import InventoryCount
+    from app.services import mes_service
+
+    form = InventoryCountForm()
+    if form.validate_on_submit():
+        try:
+            count = InventoryCount(
+                count_name=form.count_name.data,
+                count_type=form.count_type.data,
+                count_scope=form.count_scope.data,
+                warehouse_location=form.warehouse_location.data,
+                planned_date=form.planned_date.data,
+                count_team=form.count_team.data or [],
+                notes=form.notes.data,
+                status='planning',
+                created_by=current_user.id,
+            )
+            db.session.add(count)
+            db.session.flush()
+            mes_service.snapshot_inventory_count(count)
+            db.session.add(AuditLog(
+                user_id=current_user.id, action='创建库存盘点',
+                details=f'创建盘点 {count.count_number}，快照 {count.total_items} 行',
+                can_rollback=True, rollback_type='add',
+                target_model='InventoryCount', target_id=count.id,
+            ))
+            db.session.commit()
+            flash('盘点单已创建并生成库存快照', 'success')
+            return redirect(url_for('main.inventory_count_detail', id=count.id))
+        except Exception as e:
+            db.session.rollback()
+            current_app.logger.error(f'创建盘点失败: {str(e)}')
+            flash(f'创建失败：{str(e)}', 'danger')
+    return render_template('main/inventory_count_form.html', form=form, title='新建库存盘点')
+
+
+@bp.route('/inventory_counts/<int:id>')
+@login_required
+@require_capability('inventory.manage')
+def inventory_count_detail(id):
+    from app.models import InventoryCount
+    count = InventoryCount.query.get_or_404(id)
+    return render_template('main/inventory_count_detail.html', count=count)
+
+
+@bp.route('/inventory_counts/<int:id>/start', methods=['POST'])
+@login_required
+@require_capability('inventory.manage')
+def start_inventory_count(id):
+    from app.models import InventoryCount
+    dest = url_for('main.inventory_count_detail', id=id)
+    try:
+        count = InventoryCount.query.get_or_404(id)
+        if not count.can_start:
+            return _warehouse_reply(False, '当前状态不可开始盘点', dest)
+        count.status = 'counting'
+        count.start_date = datetime.utcnow()
+        db.session.commit()
+        return _warehouse_reply(True, '已开始盘点', dest)
+    except Exception as e:
+        _reraise_http(e)
+        db.session.rollback()
+        return _warehouse_reply(False, f'操作失败：{str(e)}', dest)
+
+
+@bp.route('/inventory_counts/<int:id>/record', methods=['POST'])
+@login_required
+@require_capability('inventory.manage')
+def record_inventory_count(id):
+    from app.models import InventoryCount, InventoryCountItem
+    dest = url_for('main.inventory_count_detail', id=id)
+    try:
+        count = InventoryCount.query.get_or_404(id)
+        if count.status != 'counting':
+            return _warehouse_reply(False, '仅盘点中的单据可以录入实盘', dest)
+        payload = request.get_json(silent=True) or {}
+        items_payload = payload.get('items')
+        if items_payload is None:
+            items_payload = []
+            for item in count.items.all():
+                raw = request.form.get(f'actual_{item.id}')
+                if raw is None or str(raw).strip() == '':
+                    continue
+                items_payload.append({
+                    'id': item.id,
+                    'actual_quantity': raw,
+                    'variance_reason': request.form.get(f'reason_{item.id}', ''),
+                })
+        for row in items_payload:
+            item = InventoryCountItem.query.get(row.get('id'))
+            if item is None or item.count_id != count.id:
+                continue
+            item.actual_quantity = float(row.get('actual_quantity'))
+            item.variance_reason = row.get('variance_reason') or item.variance_reason
+            item.counted_by = current_user.id
+            item.counted_at = datetime.utcnow()
+            item.calculate_variance()
+        db.session.commit()
+        return _warehouse_reply(True, '实盘数量已保存', dest)
+    except Exception as e:
+        _reraise_http(e)
+        db.session.rollback()
+        current_app.logger.error(f'录入盘点失败: {str(e)}')
+        return _warehouse_reply(False, f'保存失败：{str(e)}', dest)
+
+
+@bp.route('/inventory_counts/<int:id>/complete', methods=['POST'])
+@login_required
+@require_capability('inventory.manage')
+def complete_inventory_count(id):
+    from app.models import InventoryCount
+    from app.services import mes_service
+    dest = url_for('main.inventory_count_detail', id=id)
+    try:
+        count = InventoryCount.query.get_or_404(id)
+        if not count.can_complete:
+            return _warehouse_reply(False, '未盘完或当前状态不可完成', dest)
+        mes_service.apply_inventory_count(count)
+        db.session.add(AuditLog(
+            user_id=current_user.id, action='完成库存盘点',
+            details=f'完成盘点 {count.count_number} 并调账',
+            can_rollback=False, target_model='InventoryCount', target_id=count.id,
+        ))
+        db.session.commit()
+        return _warehouse_reply(True, '盘点完成，库存已按实盘调整', dest)
+    except ValueError as e:
+        db.session.rollback()
+        return _warehouse_reply(False, str(e), dest)
+    except Exception as e:
+        _reraise_http(e)
+        db.session.rollback()
+        current_app.logger.error(f'完成盘点失败: {str(e)}')
+        return _warehouse_reply(False, f'完成失败：{str(e)}', dest)
+
+
+@bp.route('/inventory_counts/<int:id>/cancel', methods=['POST'])
+@login_required
+@require_capability('inventory.manage')
+def cancel_inventory_count(id):
+    from app.models import InventoryCount
+    dest = url_for('main.inventory_count_detail', id=id)
+    try:
+        count = InventoryCount.query.get_or_404(id)
+        if not count.can_cancel:
+            return _warehouse_reply(False, '已调账或当前状态不可取消', dest)
+        count.status = 'cancelled'
+        db.session.add(AuditLog(
+            user_id=current_user.id, action='取消库存盘点',
+            details=f'取消盘点 {count.count_number}',
+            target_model='InventoryCount', target_id=count.id,
+        ))
+        db.session.commit()
+        return _warehouse_reply(True, '已取消盘点', dest)
+    except Exception as e:
+        _reraise_http(e)
+        db.session.rollback()
+        return _warehouse_reply(False, f'取消失败：{str(e)}', dest)
+
 # ==================== API接口 ====================
 @bp.route('/api/materials/search')
 @login_required
+@require_capability('inventory.manage')
 def api_search_materials():
     """搜索物料API"""
     try:

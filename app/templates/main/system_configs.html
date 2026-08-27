@@ -18,6 +18,9 @@
             <div class="card-body">
                 {% for config in configs %}
                 <div class="mb-4 {% if not loop.last %}border-bottom pb-3{% endif %}">
+                    {# 声明本次提交涵盖哪些 key。未勾选的 checkbox 不会出现在表单里，
+                       后端靠这个才能区分「取消勾选」和「本次根本没提交这一项」。 #}
+                    <input type="hidden" name="cfg_present" value="{{ config.key }}">
                     {% if config.value_type == 'bool' %}
                     <div class="form-check form-switch">
                         <input class="form-check-input" type="checkbox"

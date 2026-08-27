@@ -28,6 +28,7 @@
                             <th>品类编码</th>
                             <th>描述</th>
                             <th>状态</th>
+                            <th>领用审批</th>
                             <th>原材料数量</th>
                             <th>创建时间</th>
                             <th>操作</th>
@@ -52,6 +53,13 @@
                                     <span class="badge bg-success">启用</span>
                                 {% else %}
                                     <span class="badge bg-secondary">停用</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if category.requires_approval is none or category.requires_approval %}
+                                    <span class="badge bg-warning text-dark">需审批</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">免审</span>
                                 {% endif %}
                             </td>
                             <td>
@@ -111,9 +119,13 @@
                     <div class="mb-3">
                         <div class="form-check">
                             <input class="form-check-input" type="checkbox" id="categoryIsActive" name="is_active" checked>
-                            <label class="form-check-label" for="categoryIsActive">
-                                启用状态
-                            </label>
+                            <label class="form-check-label" for="categoryIsActive">启用状态</label>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="categoryRequiresApproval" name="requires_approval" checked>
+                            <label class="form-check-label" for="categoryRequiresApproval">领用需审批</label>
                         </div>
                     </div>
                 </form>
@@ -152,9 +164,13 @@
                     <div class="mb-3">
                         <div class="form-check">
                             <input class="form-check-input" type="checkbox" id="editCategoryIsActive" name="is_active">
-                            <label class="form-check-label" for="editCategoryIsActive">
-                                启用状态
-                            </label>
+                            <label class="form-check-label" for="editCategoryIsActive">启用状态</label>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="editCategoryRequiresApproval" name="requires_approval">
+                            <label class="form-check-label" for="editCategoryRequiresApproval">领用需审批</label>
                         </div>
                     </div>
                 </form>
@@ -179,7 +195,8 @@ function submitCategory() {
         name: formData.get('name'),
         code: formData.get('code'),
         description: formData.get('description'),
-        is_active: formData.get('is_active') ? true : false
+        is_active: formData.get('is_active') ? true : false,
+        requires_approval: formData.get('requires_approval') ? true : false
     };
     
     if (!data.name || !data.code) {
@@ -222,6 +239,7 @@ function editCategory(categoryId) {
             document.getElementById('editCategoryCode').value = category.code;
             document.getElementById('editCategoryDescription').value = category.description || '';
             document.getElementById('editCategoryIsActive').checked = category.is_active;
+            document.getElementById('editCategoryRequiresApproval').checked = !!category.requires_approval;
             
             const modal = new bootstrap.Modal(document.getElementById('editCategoryModal'));
             modal.show();
@@ -245,7 +263,8 @@ function updateCategory() {
         name: formData.get('name'),
         code: formData.get('code'),
         description: formData.get('description'),
-        is_active: formData.get('is_active') ? true : false
+        is_active: formData.get('is_active') ? true : false,
+        requires_approval: formData.get('requires_approval') ? true : false
     };
     
     if (!data.name || !data.code) {

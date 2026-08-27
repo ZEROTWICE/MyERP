@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}炉次 {{ lot.global_sn }}{% endblock %}
+{% block content %}
+<div class="container mt-4">
+    <h2>炉次 {{ lot.global_sn }} <span class="badge bg-secondary">{{ lot.status }}</span></h2>
+    <p>炉：{{ lot.equipment.code }} {{ lot.equipment.name }}　工艺：{{ lot.recipe_notes or '-' }}</p>
+    {% if lot.status == 'charging' %}
+    <div class="card card-body mb-3">
+        <div class="row g-2">
+            <div class="col-md-3"><input class="form-control" id="wpCode" placeholder="工件编码"></div>
+            <div class="col-md-2"><input class="form-control" id="layer" type="number" value="1" placeholder="层"></div>
+            <div class="col-md-2"><input class="form-control" id="row" type="number" placeholder="行"></div>
+            <div class="col-md-2"><input class="form-control" id="col" type="number" placeholder="列"></div>
+            <div class="col-md-3"><button class="btn btn-primary" type="button" onclick="charge()">装入炉位</button></div>
+        </div>
+        <small class="text-muted">禁止无坐标入炉。可填原材料内部编号或批次产品编码。</small>
+    </div>
+    <form method="post" action="{{ url_for('main.heat_lot_fire', id=lot.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="btn btn-warning">开炉</button>
+    </form>
+    {% elif lot.status == 'firing' %}
+    <form method="post" action="{{ url_for('main.heat_lot_unload', id=lot.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="btn btn-success">出炉并生成质检</button>
+    </form>
+    {% endif %}
+    <h5 class="mt-4">炉位</h5>
+    <table class="table table-sm table-bordered">
+        <thead><tr><th>层</th><th>行</th><th>列</th><th>工件</th></tr></thead>
+        <tbody>
+        {% for cell in cells %}
+            {% set slot = occupied.get((cell.layer, cell.row, cell.col)) %}
+            <tr>
+                <td>{{ cell.layer }}</td><td>{{ cell.row }}</td><td>{{ cell.col }}</td>
+                <td>{% if slot %}{{ slot.workpiece.code }}{% else %}<span class="text-muted">空</span>{% endif %}</td>
+            </tr>
+        {% else %}
+            {% for slot in lot.slots %}
+            <tr><td>{{ slot.layer }}</td><td>{{ slot.row }}</td><td>{{ slot.col }}</td><td>{{ slot.workpiece.code }}</td></tr>
+            {% endfor %}
+        {% endfor %}
+        </tbody>
+    </table>
+    <a href="{{ url_for('main.manage_heat_lots') }}" class="btn btn-secondary">返回</a>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function charge() {
+    fetch("{{ url_for('main.heat_lot_charge', id=lot.id) }}", {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token() }}'},
+        body: JSON.stringify({
+            code: document.getElementById('wpCode').value,
+            layer: document.getElementById('layer').value,
+            row: document.getElementById('row').value,
+            col: document.getElementById('col').value
+        })
+    }).then(r => r.json()).then(d => {
+        if (d.success) location.reload();
+        else toastr.error(d.message || '装炉失败');
+    });
+}
+</script>
+{% endblock %}

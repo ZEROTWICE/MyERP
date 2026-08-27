@@ -46,22 +46,30 @@ CAPABILITIES = {
     'production_order.view': ('admin', 'manager'),
     'production_order.manage': ('admin', 'manager'),
     'production_center.use': ('admin', 'manager'),
+    'equipment.manage': ('admin', 'manager'),
 
     # 库存
     'inventory.view': ('admin', 'manager'),
     'inventory.manage': ('admin', 'manager'),
     'consumable.delete': ('admin',),
+    # 原材料/成品下拉数据。任务分配、我的任务、生产记录、质检任务、产品 BOM 五个页面
+    # 都要用，角色范围是这几个页面的并集，不能收成 inventory.view
+    'material.lookup': ('admin', 'manager', 'hr', 'inspector', 'user'),
 
     # 产品
     'product.view': ('admin', 'manager'),
     'product.manage': ('admin', 'manager'),
     'product.import': ('admin',),
+    # 产品名称/图号下拉，销售订单行表单要用，故比 product.view 多一个 sales
+    'product.lookup': ('admin', 'manager', 'sales'),
 
     # 客户与销售
     'customer.manage': ('admin', 'manager', 'sales'),
     'customer.delete': ('admin', 'manager'),
     'sales_order.manage': ('admin', 'manager', 'sales'),
     'sales_order.delete': ('admin', 'manager'),
+    'purchase.manage': ('admin', 'manager'),
+    'shipment.manage': ('admin', 'manager', 'sales'),
 
     # 质量
     'quality.view': ('admin', 'manager', 'inspector'),
@@ -69,6 +77,13 @@ CAPABILITIES = {
     'quality.template.manage': ('admin', 'manager'),
     'quality.task.manage': ('admin', 'manager'),
     'quality.export': ('admin', 'manager'),
+
+    # 首页仪表盘图表（含工资聚合，跟随 admin_dashboard.html 的可见范围）
+    'dashboard.chart.view': ('admin', 'manager'),
+
+    # 全局搜索。取 SEARCH_TYPE_CAPABILITIES 里各能力允许角色的并集：
+    # accountant/inspector/user 一类实体都搜不到，导航直接不显示
+    'search.use': ('admin', 'hr', 'manager', 'sales'),
 
     # 系统
     'code_rule.manage': ('admin',),
@@ -80,6 +95,25 @@ CAPABILITIES = {
     # 员工自助（手机端）
     'my_tasks.use': ('user',),
 }
+
+
+# 全局搜索的实体类型 -> 需要的能力。搜索结果按此逐类过滤，
+# 否则任何登录用户都能借搜索拿到花名册、工序工价、客户与订单。
+SEARCH_TYPE_CAPABILITIES = {
+    'employees': 'employee.view',
+    'process_prices': 'process.view',
+    'production_records': 'production_record.view',
+    'products': 'product.view',
+    'inventory': 'inventory.view',
+    'customers': 'customer.manage',
+    'sales_orders': 'sales_order.manage',
+    'production_orders': 'production_order.view',
+}
+
+
+def allowed_search_types():
+    """当前用户能搜的实体类型集合。"""
+    return {t for t, capability in SEARCH_TYPE_CAPABILITIES.items() if can(capability)}
 
 
 def roles_for(capability):

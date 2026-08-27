@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}设备台账{% endblock %}
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>设备台账</h2>
+        <form method="get" class="d-flex gap-2">
+            <select name="kind" class="form-select" onchange="this.form.submit()">
+                <option value="">全部类型</option>
+                {% for k, lab in [('furnace','煅烧炉'),('mill','铣床'),('lathe','车床'),('grinder','磨床'),('other','其他')] %}
+                <option value="{{ k }}" {% if kind == k %}selected{% endif %}>{{ lab }}</option>
+                {% endfor %}
+            </select>
+        </form>
+    </div>
+    <div class="card mb-4">
+        <div class="card-header">新增 / 编辑设备</div>
+        <div class="card-body">
+            <form method="post" action="{{ url_for('main.save_equipment') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="row g-3">
+                    <div class="col-md-2"><input class="form-control" name="code" placeholder="编号 *" required></div>
+                    <div class="col-md-3"><input class="form-control" name="name" placeholder="名称 *" required></div>
+                    <div class="col-md-2">
+                        <select class="form-select" name="kind">
+                            <option value="furnace">煅烧炉</option>
+                            <option value="mill">铣床</option>
+                            <option value="lathe">车床</option>
+                            <option value="grinder">磨床</option>
+                            <option value="other">其他</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <select class="form-select" name="status">
+                            <option value="running">运行</option>
+                            <option value="maintenance">维修</option>
+                            <option value="offline">离线</option>
+                            <option value="retired">退役</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3"><button class="btn btn-primary" type="submit">保存</button></div>
+                    <div class="col-md-12">
+                        <label class="form-label">可承担工序</label>
+                        <select class="form-select" name="process_ids" multiple size="4">
+                            {% for p in processes %}
+                            <option value="{{ p.id }}">{{ p.process_code }} {{ p.process_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover">
+            <thead><tr><th>编号</th><th>名称</th><th>类型</th><th>状态</th><th>尺寸(mm)</th><th>操作</th></tr></thead>
+            <tbody>
+            {% for eq in items %}
+                <tr>
+                    <td><code>{{ eq.code }}</code></td>
+                    <td>{{ eq.name }}</td>
+                    <td>{{ eq.kind }}</td>
+                    <td>{{ eq.status }}</td>
+                    <td>{{ eq.length_mm or '-' }}×{{ eq.width_mm or '-' }}×{{ eq.height_mm or '-' }}</td>
+                    <td>
+                        {% if eq.kind == 'furnace' %}
+                        <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('main.furnace_layout', id=eq.id) }}">装炉图</a>
+                        {% endif %}
+                        {% if eq.status == 'running' %}
+                        <form class="d-inline" method="post" action="{{ url_for('main.equipment_downtime', id=eq.id) }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="reason" value="维修">
+                            <button class="btn btn-sm btn-warning">停机</button>
+                        </form>
+                        {% else %}
+                        <form class="d-inline" method="post" action="{{ url_for('main.equipment_resume', id=eq.id) }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button class="btn btn-sm btn-success">恢复</button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% else %}
+                <tr><td colspan="6" class="text-muted">暂无设备</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

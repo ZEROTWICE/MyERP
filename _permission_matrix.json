@@ -1,0 +1,1302 @@
+{
+ "/ [main.index]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "OK",
+  "accountant": "OK",
+  "inspector": "OK",
+  "sales": "OK",
+  "user": "OK",
+  "anonymous": "LOGIN"
+ },
+ "/add_process_price [main.add_process_price]": {
+  "admin": "OK",
+  "manager": "DENY",
+  "hr": "OK",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/api/chart-data/department [main.api_chart_data_department]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "DENY"
+ },
+ "/api/chart-data/production [main.api_chart_data_production]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "DENY"
+ },
+ "/api/chart-data/salary [main.api_chart_data_salary]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "DENY"
+ },
+ "/api/chart-data/task [main.api_chart_data_task]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "DENY"
+ },
+ "/api/consumable-categories [main.get_consumable_categories_api]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "DENY"
+ },
+ "/api/customers/<int:customer_id>/addresses [main.api_get_customer_addresses]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "OK",
+  "user": "DENY",
+  "anonymous": "DENY"
+ },
+ "/api/customers/search [main.api_search_customers]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "OK",
+  "user": "DENY",
+  "anonymous": "DENY"
+ },
+ "/api/inventory/finished-products [main.get_available_finished_products]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "DENY"
+ },
+ "/api/inventory/raw-materials [main.get_available_raw_materials]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "OK",
+  "accountant": "DENY",
+  "inspector": "OK",
+  "sales": "DENY",
+  "user": "OK",
+  "anonymous": "DENY"
+ },
+ "/api/materials/search [main.api_search_materials]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "DENY"
+ },
+ "/api/notifications/recent [main.api_recent_notifications]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "OK",
+  "accountant": "OK",
+  "inspector": "OK",
+  "sales": "OK",
+  "user": "OK",
+  "anonymous": "DENY"
+ },
+ "/api/notifications/stats [main.api_notification_stats]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "OK",
+  "accountant": "OK",
+  "inspector": "OK",
+  "sales": "OK",
+  "user": "OK",
+  "anonymous": "DENY"
+ },
+ "/api/process_assignment [main.list_process_assignments]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "DENY"
+ },
+ "/api/process_assignment/<int:process_id> [main.get_process_assignment]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "DENY"
+ },
+ "/api/production_center/items/<int:item_id>/detail [main.api_item_detail]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "DENY"
+ },
+ "/api/products/drawings-by-name [main.api_get_drawings_by_product_name]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "OK",
+  "user": "DENY",
+  "anonymous": "DENY"
+ },
+ "/api/products/names [main.api_get_product_names]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "OK",
+  "user": "DENY",
+  "anonymous": "DENY"
+ },
+ "/api/products/search [main.search_products]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "OK",
+  "user": "DENY",
+  "anonymous": "DENY"
+ },
+ "/api/quality/finished-products [main.get_finished_products]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "OK",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "DENY"
+ },
+ "/api/quality/inspectors [main.get_inspectors]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "OK",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "DENY"
+ },
+ "/api/quality/processes [main.get_processes]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "OK",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "DENY"
+ },
+ "/api/quality/production-records [main.get_production_records]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "OK",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "DENY"
+ },
+ "/api/quality/records [main.get_inspection_records]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "OK",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "DENY"
+ },
+ "/api/quality/records/<int:record_id> [main.get_inspection_record_detail]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "DENY"
+ },
+ "/api/quality/records/<int:record_id>/print [main.print_inspection_record]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "DENY"
+ },
+ "/api/quality/records/export [main.export_inspection_records]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "DENY"
+ },
+ "/api/quality/tasks [main.get_tasks]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "OK",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "DENY"
+ },
+ "/api/quality/tasks/<int:task_id> [main.get_task_detail]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "OK",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "DENY"
+ },
+ "/api/quality/templates [main.get_templates]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "OK",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "DENY"
+ },
+ "/api/quality/templates/<int:template_id> [main.get_template_detail]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "DENY"
+ },
+ "/api/raw-material-categories [main.get_raw_material_categories_api]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "DENY"
+ },
+ "/api/sales_orders/<int:order_id>/customer_addresses [main.api_get_sales_order_customer_addresses]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "OK",
+  "user": "DENY",
+  "anonymous": "DENY"
+ },
+ "/api/sales_orders/search [main.api_search_sales_orders]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "OK",
+  "user": "DENY",
+  "anonymous": "DENY"
+ },
+ "/api/search/suggestions [main.search_suggestions]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "OK",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "OK",
+  "user": "DENY",
+  "anonymous": "DENY"
+ },
+ "/audit_logs [main.view_audit_logs]": {
+  "admin": "OK",
+  "manager": "DENY",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/bonus_penalties [main.manage_bonus_penalties]": {
+  "admin": "OK",
+  "manager": "DENY",
+  "hr": "OK",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/bonus_penalties/<int:id> [main.get_bonus_penalty]": {
+  "admin": "OK",
+  "manager": "DENY",
+  "hr": "OK",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/bonus_penalties/export [main.export_bonus_penalties]": {
+  "admin": "OK",
+  "manager": "DENY",
+  "hr": "OK",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/bonus_penalties/template [main.download_bonus_penalty_template]": {
+  "admin": "OK",
+  "manager": "DENY",
+  "hr": "OK",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/code_rules [main.manage_code_rules]": {
+  "admin": "OK",
+  "manager": "DENY",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/code_rules/<int:rule_id>/edit [main.edit_code_rule]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "OK",
+  "accountant": "OK",
+  "inspector": "OK",
+  "sales": "OK",
+  "user": "OK",
+  "anonymous": "LOGIN"
+ },
+ "/code_rules/add [main.add_code_rule]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "OK",
+  "accountant": "OK",
+  "inspector": "OK",
+  "sales": "OK",
+  "user": "OK",
+  "anonymous": "LOGIN"
+ },
+ "/code_rules/available/material [main.get_available_material_rules]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/code_rules/available/product [main.get_available_product_rules]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/consumables [main.manage_consumables]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/consumables/<int:id> [main.get_consumable]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/consumables/categories [main.consumable_categories]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/consumables/categories/<int:category_id> [main.get_consumable_category]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/consumables/inbound [main.consumable_inbound]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/customer/<int:customer_id> [main.customer_detail]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "OK",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/customer/<int:customer_id>/address/<int:address_id>/edit [main.edit_customer_address]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "OK",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/customer/<int:customer_id>/address/add [main.add_customer_address]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "OK",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/customer/<int:customer_id>/edit [main.edit_customer]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "OK",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/customer/add [main.add_customer]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "OK",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/customers [main.manage_customers]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "OK",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/employee/add [main.add_employee]": {
+  "admin": "OK",
+  "manager": "DENY",
+  "hr": "OK",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/employee_salary_changes/<int:employee_id> [main.employee_salary_changes]": {
+  "admin": "OK",
+  "manager": "DENY",
+  "hr": "OK",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/employees [main.manage_employees]": {
+  "admin": "OK",
+  "manager": "DENY",
+  "hr": "OK",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/employees/<int:id>/edit [main.edit_employee]": {
+  "admin": "OK",
+  "manager": "DENY",
+  "hr": "OK",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/employees/export [main.export_employees]": {
+  "admin": "OK",
+  "manager": "DENY",
+  "hr": "OK",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/employees/template [main.download_employee_template]": {
+  "admin": "OK",
+  "manager": "DENY",
+  "hr": "OK",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/export_tasks [main.export_tasks]": {
+  "admin": "OK",
+  "manager": "DENY",
+  "hr": "OK",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/inventory [main.manage_inventory]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/inventory/finished-product/inbound [main.finished_product_inbound]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/inventory/finished/<int:id> [main.get_finished_product]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "OK",
+  "accountant": "OK",
+  "inspector": "OK",
+  "sales": "OK",
+  "user": "OK",
+  "anonymous": "LOGIN"
+ },
+ "/inventory/inbound [main.inventory_inbound]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/inventory/raw-material/categories [main.raw_material_categories]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/inventory/raw-material/categories/<int:category_id> [main.get_raw_material_category]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/inventory/raw-material/inbound [main.raw_material_inbound]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/inventory/raw/<int:id> [main.get_raw_material]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "OK",
+  "accountant": "OK",
+  "inspector": "OK",
+  "sales": "OK",
+  "user": "OK",
+  "anonymous": "LOGIN"
+ },
+ "/inventory/template [main.download_inventory_template]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/inventory_counts [main.manage_inventory_counts]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/material_requisitions [main.manage_material_requisitions]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/material_requisitions/<int:id> [main.material_requisition_detail]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/material_requisitions/add [main.add_material_requisition]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/material_returns [main.manage_material_returns]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/my_tasks [main.my_tasks]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "OK",
+  "accountant": "OK",
+  "inspector": "OK",
+  "sales": "OK",
+  "user": "OK",
+  "anonymous": "LOGIN"
+ },
+ "/notification_rules [main.manage_notification_rules]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/notification_rules/add [main.add_notification_rule]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/notifications [main.manage_notifications]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "OK",
+  "accountant": "OK",
+  "inspector": "OK",
+  "sales": "OK",
+  "user": "OK",
+  "anonymous": "LOGIN"
+ },
+ "/process_assignment [main.process_assignment_page]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/process_prices [main.process_prices]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "OK",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/process_prices/<int:id> [main.get_process_price]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "OK",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/process_prices/<int:id>/edit [main.edit_process_price]": {
+  "admin": "OK",
+  "manager": "DENY",
+  "hr": "OK",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/process_prices/export [main.export_process_prices]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "OK",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/process_prices/template [main.download_process_price_template]": {
+  "admin": "OK",
+  "manager": "DENY",
+  "hr": "OK",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/production_batches/<int:batch_id> [main.production_batch_detail]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "OK",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/production_center [main.production_center]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/production_center/items/<int:item_id> [main.production_center_item_detail]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/production_orders [main.manage_production_orders]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/production_orders/<int:order_id> [main.production_order_detail]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "OK",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/production_orders/<int:order_id>/edit [main.edit_production_order]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/production_records [main.manage_production_records]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "OK",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/production_records/export [main.export_production_records]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "OK",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/production_records/template [main.download_production_record_template]": {
+  "admin": "OK",
+  "manager": "DENY",
+  "hr": "OK",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/products [main.manage_products]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/products/<int:id> [main.get_product]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/products/<int:id>/bom [main.product_bom]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/products/<int:product_id>/bom/<int:bom_item_id> [main.get_product_bom_item]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/products/<int:product_id>/processes [main.product_processes]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/products/<int:product_id>/processes/<int:process_item_id> [main.get_product_process]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/products/export [main.export_products]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/products/template [main.download_product_template]": {
+  "admin": "OK",
+  "manager": "DENY",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/quality [main.quality_management]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "OK",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/quality/inspection/<int:record_id> [main.quality_inspection]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "OK",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/quality/records [main.quality_records]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "OK",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/quality/tasks [main.quality_tasks]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "OK",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/quality/tasks/<int:task_id> [main.quality_task_detail]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "OK",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/quality/templates [main.quality_templates]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/salary/<int:employee_id> [main.salary_details]": {
+  "admin": "OK",
+  "manager": "DENY",
+  "hr": "DENY",
+  "accountant": "OK",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/salary_calculation [main.salary_calculation]": {
+  "admin": "OK",
+  "manager": "DENY",
+  "hr": "DENY",
+  "accountant": "OK",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/sales_order/<int:order_id> [main.sales_order_detail]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "OK",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/sales_order/<int:order_id>/edit [main.edit_sales_order]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "OK",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/sales_order/<int:order_id>/item/add [main.add_sales_order_item]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "OK",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/sales_order/add [main.add_sales_order]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "OK",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/sales_order_item/<int:item_id>/delivery_batches [main.manage_delivery_batches]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "OK",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/sales_order_item/<int:item_id>/delivery_batches/manage [main.manage_delivery_batches_page]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "OK",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/sales_order_item/<int:item_id>/edit [main.edit_sales_order_item]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "OK",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/sales_orders [main.manage_sales_orders]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "OK",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/search [main.global_search]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "OK",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "OK",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/search/advanced [main.advanced_search]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "OK",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "OK",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/system_configs [main.manage_system_configs]": {
+  "admin": "OK",
+  "manager": "DENY",
+  "hr": "DENY",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/tasks [main.manage_tasks]": {
+  "admin": "OK",
+  "manager": "DENY",
+  "hr": "OK",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/tasks/<int:id> [main.get_task]": {
+  "admin": "OK",
+  "manager": "DENY",
+  "hr": "OK",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/tasks/<int:id>/get [main.get_task_details]": {
+  "admin": "OK",
+  "manager": "DENY",
+  "hr": "OK",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/tasks/assignment/<int:id> [main.get_task_assignment]": {
+  "admin": "OK",
+  "manager": "DENY",
+  "hr": "OK",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/tasks/template [main.download_task_template]": {
+  "admin": "OK",
+  "manager": "DENY",
+  "hr": "OK",
+  "accountant": "DENY",
+  "inspector": "DENY",
+  "sales": "DENY",
+  "user": "DENY",
+  "anonymous": "LOGIN"
+ },
+ "/user_dashboard [main.user_dashboard]": {
+  "admin": "OK",
+  "manager": "OK",
+  "hr": "OK",
+  "accountant": "OK",
+  "inspector": "OK",
+  "sales": "OK",
+  "user": "OK",
+  "anonymous": "LOGIN"
+ }
+}

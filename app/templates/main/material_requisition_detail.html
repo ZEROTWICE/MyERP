@@ -52,9 +52,19 @@
                                 <tr>
                                     <td class="fw-bold text-muted">记录状态：</td>
                                     <td>
-                                        <span class="badge bg-success">
-                                            <i class="fas fa-check-circle me-1"></i>已完成
-                                        </span>
+                                        {% if requisition.status == 'pending' %}
+                                            <span class="badge bg-warning text-dark">待审批</span>
+                                        {% elif requisition.status == 'approved' %}
+                                            <span class="badge bg-info">已审批，待发料</span>
+                                        {% elif requisition.status == 'completed' %}
+                                            <span class="badge bg-success">已发料</span>
+                                        {% elif requisition.status == 'rejected' %}
+                                            <span class="badge bg-danger">已拒绝</span>
+                                        {% elif requisition.status == 'cancelled' %}
+                                            <span class="badge bg-secondary">已取消</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">{{ requisition.status }}</span>
+                                        {% endif %}
                                     </td>
                                 </tr>
                                 <tr>
@@ -74,15 +84,17 @@
             </div>
 
             <!-- 物料明细卡片 -->
+            {# items 是 lazy='dynamic' 关系，先取成列表，避免 |length 与真值判断作用在 AppenderQuery 上 #}
+            {% set requisition_items = requisition.items.all() %}
             <div class="card shadow-sm">
                 <div class="card-header bg-light">
                     <h5 class="mb-0">
                         <i class="fas fa-list me-2"></i>物料明细
-                        <span class="badge bg-info ms-2">共 {{ requisition.items|length }} 项</span>
+                        <span class="badge bg-info ms-2">共 {{ requisition_items|length }} 项</span>
                     </h5>
                 </div>
                 <div class="card-body">
-                    {% if requisition.items %}
+                    {% if requisition_items %}
                         <div class="table-responsive">
                             <table class="table table-hover">
                                 <thead class="table-light">
@@ -96,7 +108,7 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {% for item in requisition.items %}
+                                    {% for item in requisition_items %}
                                     <tr>
                                         <td>{{ loop.index }}</td>
                                         <td>
@@ -130,8 +142,8 @@
                                 <div class="alert alert-info">
                                     <i class="fas fa-info-circle me-2"></i>
                                     <strong>统计信息：</strong>
-                                    共领用 {{ requisition.items|length }} 种物料，
-                                    总数量：{{ requisition.items|sum(attribute='quantity') }} 件
+                                    共领用 {{ requisition_items|length }} 种物料，
+                                    总数量：{{ requisition_items|sum(attribute='quantity') }} 件
                                 </div>
                             </div>
                         </div>
@@ -152,14 +164,33 @@
                             <i class="fas fa-arrow-left me-2"></i>返回列表
                         </a>
                         <div>
+                            {% if can('inventory.manage') %}
+                            {% if requisition.can_approve %}
+                            <form method="POST" action="{{ url_for('main.approve_material_requisition', id=requisition.id) }}" class="d-inline">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-success">审批通过</button>
+                            </form>
+                            <form method="POST" action="{{ url_for('main.reject_material_requisition', id=requisition.id) }}" class="d-inline">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-outline-danger">拒绝</button>
+                            </form>
+                            {% endif %}
+                            {% if requisition.can_issue %}
+                            <form method="POST" action="{{ url_for('main.issue_material_requisition', id=requisition.id) }}" class="d-inline">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-primary">发料扣账</button>
+                            </form>
+                            {% endif %}
+                            {% if requisition.can_cancel %}
+                            <form method="POST" action="{{ url_for('main.cancel_material_requisition', id=requisition.id) }}" class="d-inline">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-outline-secondary">取消</button>
+                            </form>
+                            {% endif %}
+                            {% endif %}
                             <button class="btn btn-info" onclick="printRecord()">
                                 <i class="fas fa-print me-2"></i>打印记录
                             </button>
-                            {% if current_user.role in ['admin', 'manager'] %}
-                            <button class="btn btn-warning" onclick="exportRecord()">
-                                <i class="fas fa-file-export me-2"></i>导出记录
-                            </button>
-                            {% endif %}
                         </div>
                     </div>
                 </div>

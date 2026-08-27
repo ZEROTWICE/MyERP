@@ -57,7 +57,15 @@ def used_capabilities():
     return used
 
 
-ROUTE_FILES = ('app/main/routes.py', 'app/main/quality.py', 'app/main/production_center.py')
+ROUTE_FILES = (
+    'app/main/routes.py',
+    'app/main/quality.py',
+    'app/main/production_center.py',
+    'app/main/equipment.py',
+    'app/main/purchase.py',
+    'app/main/shipping.py',
+    'app/main/stock.py',
+)
 
 
 def route_capabilities():

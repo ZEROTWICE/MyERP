@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}请购单{% endblock %}
+{% block content %}
+<div class="container mt-4">
+    <h2>请购单</h2>
+    <form method="post" action="{{ url_for('main.save_purchase_requisition') }}" class="card card-body mb-4">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="row g-2 mb-2">
+            <div class="col-md-6"><input class="form-control" name="item_name" placeholder="物料名称" required></div>
+            <div class="col-md-2"><input class="form-control" name="item_qty" type="number" step="0.01" value="1"></div>
+            <div class="col-md-4"><input class="form-control" name="notes" placeholder="备注"></div>
+        </div>
+        <button class="btn btn-primary">提交请购</button>
+    </form>
+    <table class="table table-hover">
+        <thead><tr><th>单号</th><th>状态</th><th>明细</th><th>操作</th></tr></thead>
+        <tbody>
+        {% for r in items %}
+            <tr>
+                <td><code>{{ r.req_no }}</code></td>
+                <td>{{ r.status }}</td>
+                <td>{% for i in r.items %}{{ i.material_name }}×{{ i.quantity }}{% if not loop.last %}；{% endif %}{% endfor %}</td>
+                <td>
+                    {% if r.status == 'pending' %}
+                    <form class="d-inline" method="post" action="{{ url_for('main.approve_purchase_requisition', id=r.id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button class="btn btn-sm btn-success" name="decision" value="approve">通过</button>
+                        <button class="btn btn-sm btn-outline-danger" name="decision" value="reject">驳回</button>
+                    </form>
+                    {% endif %}
+                </td>
+            </tr>
+        {% else %}
+            <tr><td colspan="4" class="text-muted">暂无请购单</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

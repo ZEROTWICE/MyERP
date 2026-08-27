@@ -5,7 +5,8 @@ alwaysApply: true
 
 # DeepWiki 使用协议
 
-本仓库对应 DeepWiki 仓库名固定为 `ZEROTWICE/MyERP`（remote: `git@github.com:ZEROTWICE/MyERP.git`）。
+本仓库对应 DeepWiki 仓库名固定为 `ZEROTWICE/MyERP`（GitHub 远端 `https://github.com/ZEROTWICE/MyERP`）。
+DeepWiki 仓库名跟随 GitHub 仓库，与本地目录名无关；本地目录改名或换盘符都不影响这里。
 
 ## 何时必须查
 

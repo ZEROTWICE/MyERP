@@ -1,0 +1,24 @@
+{# 通用分页条。调用方只需提供 pagination 对象，筛选参数从 request.args 原样带走。 #}
+{% set _args = request.args.to_dict() %}
+{% set _ = _args.pop('page', None) %}
+{% if request.view_args %}{% set _ = _args.update(request.view_args) %}{% endif %}
+<nav aria-label="Page navigation" class="mt-3">
+    <ul class="pagination justify-content-center">
+        <li class="page-item {{ 'disabled' if not pagination.has_prev else '' }}">
+            <a class="page-link" href="{{ url_for(request.endpoint, page=pagination.prev_num, **_args) if pagination.has_prev else '#' }}">上一页</a>
+        </li>
+        {% for page in pagination.iter_pages() %}
+            {% if page %}
+                <li class="page-item {{ 'active' if page == pagination.page else '' }}">
+                    <a class="page-link" href="{{ url_for(request.endpoint, page=page, **_args) }}">{{ page }}</a>
+                </li>
+            {% else %}
+                <li class="page-item disabled"><span class="page-link">...</span></li>
+            {% endif %}
+        {% endfor %}
+        <li class="page-item {{ 'disabled' if not pagination.has_next else '' }}">
+            <a class="page-link" href="{{ url_for(request.endpoint, page=pagination.next_num, **_args) if pagination.has_next else '#' }}">下一页</a>
+        </li>
+    </ul>
+    <div class="text-center text-muted small">共 {{ pagination.total }} 条，第 {{ pagination.page }}/{{ pagination.pages }} 页</div>
+</nav>

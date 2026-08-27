@@ -283,7 +283,7 @@
                             </ul>
                         </li>
                         {% endif %}
-                        {% if can_any('process.view', 'process_assignment.manage', 'production_record.view', 'task.manage', 'production_order.view', 'production_center.use') %}
+                        {% if can_any('process.view', 'process_assignment.manage', 'production_record.view', 'task.manage', 'production_order.view', 'production_center.use', 'equipment.manage') %}
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="productionDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                                 生产管理
@@ -304,6 +304,16 @@
                                 {% if can('production_order.view') %}
                                 <li><a class="dropdown-item" href="{{ url_for('main.manage_production_orders') }}">生产订单</a></li>
                                 {% endif %}
+                                {% if can('equipment.manage') %}
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="{{ url_for('main.manage_equipment') }}">设备台账</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('main.manage_work_centers') }}">工作中心</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('main.manage_heat_lots') }}">煅烧炉次</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('main.manage_workpieces') }}">工件溯源</a></li>
+                                {% endif %}
+                                {% if can('production_order.manage') %}
+                                <li><a class="dropdown-item" href="{{ url_for('main.assemble_index') }}">组装扣料</a></li>
+                                {% endif %}
                                 {% if can('production_center.use') %}
                                 <li><hr class="dropdown-divider"></li>
                                 <li><a class="dropdown-item" href="{{ url_for('main.production_center') }}">生产中心（产品）</a></li>
@@ -321,6 +331,13 @@
                                 <li><a class="dropdown-item" href="{{ url_for('main.manage_inventory') }}">
                                     库存查询
                                 </a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('main.stock_by_kind', kind='wip_part') }}">半成品库</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('main.stock_by_kind', kind='failed') }}">未通过库</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('main.stock_by_kind', kind='scrap') }}">报废库</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('main.stock_by_kind', kind='fg') }}">成品库</a></li>
+                                {% endif %}
+                                {% if can('production_order.manage') %}
+                                <li><a class="dropdown-item" href="{{ url_for('main.assemble_index') }}">组装扣料</a></li>
                                 {% endif %}
                                 {% if can('inventory.manage') %}
                                 <li><hr class="dropdown-divider"></li>
@@ -367,7 +384,7 @@
                             <a class="nav-link" href="{{ url_for('main.manage_products') }}">产品管理</a>
                         </li>
                         {% endif %}
-                        {% if can_any('customer.manage', 'sales_order.manage') %}
+                        {% if can_any('customer.manage', 'sales_order.manage', 'shipment.manage') %}
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="salesDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                                 销售管理
@@ -379,12 +396,35 @@
                                 {% if can('sales_order.manage') %}
                                 <li><a class="dropdown-item" href="{{ url_for('main.manage_sales_orders') }}">销售订单</a></li>
                                 {% endif %}
+                                {% if can('shipment.manage') %}
+                                <li><a class="dropdown-item" href="{{ url_for('main.manage_shipments') }}">发货出库</a></li>
+                                {% endif %}
                             </ul>
                         </li>
                         {% endif %}
-                        {% if can('quality.view') %}
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('main.quality_management') }}">质量管理</a>
+                        {% if can('purchase.manage') %}
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="purchaseDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                采购管理
+                            </a>
+                            <ul class="dropdown-menu" aria-labelledby="purchaseDropdown">
+                                <li><a class="dropdown-item" href="{{ url_for('main.manage_suppliers') }}">供应商</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('main.manage_purchase_orders') }}">采购单</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('main.manage_purchase_requisitions') }}">请购单</a></li>
+                            </ul>
+                        </li>
+                        {% endif %}
+                        {% if can_any('quality.view', 'quality.inspect') %}
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="qualityDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                质量管理
+                            </a>
+                            <ul class="dropdown-menu" aria-labelledby="qualityDropdown">
+                                {% if can('quality.view') %}
+                                <li><a class="dropdown-item" href="{{ url_for('main.quality_management') }}">质量看板</a></li>
+                                {% endif %}
+                                <li><a class="dropdown-item" href="{{ url_for('main.manage_nonconformities') }}">不合格处置</a></li>
+                            </ul>
                         </li>
                         {% endif %}
                         {% if can_any('code_rule.manage', 'audit.view', 'notification_rule.manage', 'system_config.manage') %}
@@ -425,6 +465,7 @@
                 </ul>
                 <ul class="navbar-nav ms-auto">
                     {% if current_user.is_authenticated %}
+                        {% if can('search.use') %}
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="searchDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false" title="搜索">
                                 <i class="fas fa-search"></i>
@@ -449,6 +490,7 @@
                                 </li>
                             </ul>
                         </li>
+                        {% endif %}
                         <li class="nav-item">
                             <a class="nav-link position-relative" href="{{ url_for('main.manage_notifications') }}" title="通知中心">
                                 <i class="fas fa-bell"></i>

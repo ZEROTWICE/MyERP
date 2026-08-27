@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}采购单 {{ po.po_no }}{% endblock %}
+{% block content %}
+<div class="container mt-4">
+    <h2>采购单 {{ po.po_no }} <span class="badge bg-secondary">{{ po.status }}</span></h2>
+    <p>供应商：{{ po.supplier.name if po.supplier else '-' }}　日期：{{ po.order_date }}</p>
+    <table class="table">
+        <thead><tr><th>物料</th><th>类型</th><th>数量</th><th>已收</th><th>单价</th></tr></thead>
+        <tbody>
+        {% for i in po.items %}
+            <tr><td>{{ i.name }}</td><td>{{ i.material_type }}</td><td>{{ i.quantity }}</td><td>{{ i.received_qty }}</td><td>{{ i.unit_price }}</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    <form method="post" action="{{ url_for('main.receive_purchase_order', id=po.id) }}" class="card card-body mb-3">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <h6>到货登记{% if incoming_qc %}（需来料检验）{% endif %}</h6>
+        {% for i in po.items %}
+        <div class="mb-2">
+            <label>{{ i.name }} 本次到货数量</label>
+            <input class="form-control" name="qty_{{ i.id }}" type="number" step="0.01" value="{{ i.quantity - (i.received_qty or 0) }}">
+        </div>
+        {% endfor %}
+        <button class="btn btn-primary">登记到货</button>
+    </form>
+    <h6>到货单</h6>
+    <ul>
+        {% for r in po.receipts %}
+        <li>{{ r.receipt_no }} {{ r.status }}
+            {% if r.status in ('accepted', 'pending_inspection') %}
+            <form class="d-inline" method="post" action="{{ url_for('main.putaway_goods_receipt', id=r.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn btn-sm btn-outline-success">入库</button>
+            </form>
+            {% endif %}
+        </li>
+        {% else %}
+        <li class="text-muted">尚无到货</li>
+        {% endfor %}
+    </ul>
+    {% if settlement_on %}
+    <form method="post" action="{{ url_for('main.settle_purchase_order', id=po.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="btn btn-warning">登记付款</button>
+    </form>
+    {% endif %}
+    <a class="btn btn-secondary mt-3" href="{{ url_for('main.manage_purchase_orders') }}">返回</a>
+</div>
+{% endblock %}

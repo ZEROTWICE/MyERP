@@ -12,7 +12,7 @@ from app.models import (
     Product, ProductBOM, ProductProcess, ProductionOrder, 
     ProductionBatch, ProductionBatchItem, Customer, CustomerAddress,
     SalesOrder, SalesOrderItem, FinishedProduct, RawMaterial,
-    MaterialAllocation, TaskAssignment, InspectionRecord,
+    RawMaterialCategory, MaterialAllocation, TaskAssignment, InspectionRecord,
     AuditLog, NotificationRule, Notification
 )
 
@@ -21,7 +21,8 @@ class SearchService:
     """搜索服务类"""
     
     @staticmethod
-    def global_search(query: str, search_type: str = 'all', page: int = 1, per_page: int = 20) -> Dict[str, Any]:
+    def global_search(query: str, search_type: str = 'all', page: int = 1, per_page: int = 20,
+                      *, allowed_types) -> Dict[str, Any]:
         """
         全局搜索功能
         
@@ -30,35 +31,41 @@ class SearchService:
             search_type: 搜索类型 (all, employees, process_prices, etc.)
             page: 页码
             per_page: 每页数量
+            allowed_types: 当前用户可搜索的实体类型集合，见
+                `permissions.allowed_search_types()`。设为必填关键字参数，
+                避免新调用方漏传导致越权。
             
         Returns:
             包含搜索结果的字典
         """
         results = {}
         search_term = f"%{query}%"
-        
-        if search_type == 'all' or search_type == 'employees':
+
+        def wanted(entity_type):
+            return (search_type in ('all', entity_type)) and entity_type in allowed_types
+
+        if wanted('employees'):
             results['employees'] = SearchService._search_employees(search_term, page, per_page)
             
-        if search_type == 'all' or search_type == 'process_prices':
+        if wanted('process_prices'):
             results['process_prices'] = SearchService._search_process_prices(search_term, page, per_page)
             
-        if search_type == 'all' or search_type == 'production_records':
+        if wanted('production_records'):
             results['production_records'] = SearchService._search_production_records(search_term, page, per_page)
             
-        if search_type == 'all' or search_type == 'products':
+        if wanted('products'):
             results['products'] = SearchService._search_products(search_term, page, per_page)
             
-        if search_type == 'all' or search_type == 'inventory':
+        if wanted('inventory'):
             results['inventory'] = SearchService._search_inventory(search_term, page, per_page)
             
-        if search_type == 'all' or search_type == 'customers':
+        if wanted('customers'):
             results['customers'] = SearchService._search_customers(search_term, page, per_page)
             
-        if search_type == 'all' or search_type == 'sales_orders':
+        if wanted('sales_orders'):
             results['sales_orders'] = SearchService._search_sales_orders(search_term, page, per_page)
             
-        if search_type == 'all' or search_type == 'production_orders':
+        if wanted('production_orders'):
             results['production_orders'] = SearchService._search_production_orders(search_term, page, per_page)
         
         # 计算总结果数量
@@ -170,11 +177,13 @@ class SearchService:
     @staticmethod
     def _search_inventory(search_term: str, page: int, per_page: int) -> Dict[str, Any]:
         """搜索库存（原材料和成品）"""
-        # 搜索原材料
-        raw_materials = RawMaterial.query.filter(
+        # 搜索原材料。material_name 是取 category.name 的 property，不能直接进 SQL
+        raw_materials = RawMaterial.query.join(
+            RawMaterialCategory, RawMaterial.category_id == RawMaterialCategory.id
+        ).filter(
             or_(
                 RawMaterial.supplier.like(search_term),
-                RawMaterial.material_name.like(search_term),
+                RawMaterialCategory.name.like(search_term),
                 RawMaterial.melt_number.like(search_term),
                 RawMaterial.supplier_number.like(search_term),
                 RawMaterial.internal_number.like(search_term),
@@ -294,7 +303,8 @@ class SearchService:
         }
     
     @staticmethod
-    def advanced_search(search_params: Dict[str, Any], page: int = 1, per_page: int = 20) -> Dict[str, Any]:
+    def advanced_search(search_params: Dict[str, Any], page: int = 1, per_page: int = 20,
+                        *, allowed_types) -> Dict[str, Any]:
         """
         高级搜索功能
         
@@ -302,42 +312,46 @@ class SearchService:
             search_params: 搜索参数字典
             page: 页码
             per_page: 每页数量
+            allowed_types: 同 `global_search`
             
         Returns:
             搜索结果字典
         """
         results = {}
+
+        def wanted(entity_type, fields):
+            return entity_type in allowed_types and any(search_params.get(f) for f in fields)
         
         # 员工高级搜索
-        if any(search_params.get(field) for field in ['employee_name', 'employee_id', 'department', 'position', 'is_active']):
+        if wanted('employees', ['employee_name', 'employee_id', 'department', 'position', 'is_active']):
             results['employees'] = SearchService._advanced_search_employees(search_params, page, per_page)
         
         # 工序价格高级搜索
-        if any(search_params.get(field) for field in ['process_code', 'process_name', 'component', 'drawing_no', 'model_no']):
+        if wanted('process_prices', ['process_code', 'process_name', 'component', 'drawing_no', 'model_no']):
             results['process_prices'] = SearchService._advanced_search_process_prices(search_params, page, per_page)
         
         # 生产记录高级搜索
-        if any(search_params.get(field) for field in ['production_date_start', 'production_date_end']):
+        if wanted('production_records', ['production_date_start', 'production_date_end']):
             results['production_records'] = SearchService._advanced_search_production_records(search_params, page, per_page)
         
         # 产品高级搜索
-        if any(search_params.get(field) for field in ['product_code', 'product_name', 'drawing_number', 'model']):
+        if wanted('products', ['product_code', 'product_name', 'drawing_number', 'model']):
             results['products'] = SearchService._advanced_search_products(search_params, page, per_page)
         
         # 库存高级搜索
-        if any(search_params.get(field) for field in ['inventory_type', 'supplier', 'material_name', 'storage_date_start', 'storage_date_end']):
+        if wanted('inventory', ['inventory_type', 'supplier', 'material_name', 'storage_date_start', 'storage_date_end']):
             results['inventory'] = SearchService._advanced_search_inventory(search_params, page, per_page)
         
         # 客户高级搜索
-        if any(search_params.get(field) for field in ['customer_code', 'customer_name', 'contact_person', 'customer_type']):
+        if wanted('customers', ['customer_code', 'customer_name', 'contact_person', 'customer_type']):
             results['customers'] = SearchService._advanced_search_customers(search_params, page, per_page)
         
         # 销售订单高级搜索
-        if any(search_params.get(field) for field in ['sales_order_number', 'order_source', 'year_month', 'order_status']):
+        if wanted('sales_orders', ['sales_order_number', 'order_source', 'year_month', 'order_status']):
             results['sales_orders'] = SearchService._advanced_search_sales_orders(search_params, page, per_page)
         
         # 生产订单高级搜索
-        if any(search_params.get(field) for field in ['production_order_number', 'production_status', 'planned_start_date', 'planned_end_date']):
+        if wanted('production_orders', ['production_order_number', 'production_status', 'planned_start_date', 'planned_end_date']):
             results['production_orders'] = SearchService._advanced_search_production_orders(search_params, page, per_page)
         
         # 计算总结果数量
@@ -480,7 +494,10 @@ class SearchService:
                 query = query.filter(RawMaterial.supplier.like(f"%{search_params['supplier']}%"))
             
             if search_params.get('material_name'):
-                query = query.filter(RawMaterial.material_name.like(f"%{search_params['material_name']}%"))
+                # 同上：品名存在 RawMaterialCategory.name 上
+                query = query.join(
+                    RawMaterialCategory, RawMaterial.category_id == RawMaterialCategory.id
+                ).filter(RawMaterialCategory.name.like(f"%{search_params['material_name']}%"))
             
             if search_params.get('storage_date_start'):
                 query = query.filter(func.date(RawMaterial.storage_date) >= search_params['storage_date_start'])
@@ -613,13 +630,15 @@ class SearchService:
         }
     
     @staticmethod
-    def get_search_suggestions(query: str, limit: int = 10) -> Dict[str, List[str]]:
+    def get_search_suggestions(query: str, limit: int = 10, *, allowed_types) -> Dict[str, List[str]]:
         """
         获取搜索建议
         
         Args:
             query: 搜索关键词
             limit: 建议数量限制
+            allowed_types: 同 `global_search`。建议里的姓名本身就是数据，
+                不按能力过滤等于绕过搜索结果的权限控制
             
         Returns:
             各类别的搜索建议
@@ -628,27 +647,31 @@ class SearchService:
         suggestions = {}
         
         # 员工姓名建议
-        employee_names = db.session.query(Employee.name).filter(
-            Employee.name.like(search_term)
-        ).distinct().limit(limit).all()
-        suggestions['employee_names'] = [name[0] for name in employee_names]
+        if 'employees' in allowed_types:
+            employee_names = db.session.query(Employee.name).filter(
+                Employee.name.like(search_term)
+            ).distinct().limit(limit).all()
+            suggestions['employee_names'] = [name[0] for name in employee_names]
         
         # 工序名称建议
-        process_names = db.session.query(ProcessPrice.process_name).filter(
-            ProcessPrice.process_name.like(search_term)
-        ).distinct().limit(limit).all()
-        suggestions['process_names'] = [name[0] for name in process_names]
+        if 'process_prices' in allowed_types:
+            process_names = db.session.query(ProcessPrice.process_name).filter(
+                ProcessPrice.process_name.like(search_term)
+            ).distinct().limit(limit).all()
+            suggestions['process_names'] = [name[0] for name in process_names]
         
         # 产品名称建议
-        product_names = db.session.query(Product.product_name).filter(
-            Product.product_name.like(search_term)
-        ).distinct().limit(limit).all()
-        suggestions['product_names'] = [name[0] for name in product_names]
+        if 'products' in allowed_types:
+            product_names = db.session.query(Product.product_name).filter(
+                Product.product_name.like(search_term)
+            ).distinct().limit(limit).all()
+            suggestions['product_names'] = [name[0] for name in product_names]
         
         # 客户名称建议
-        customer_names = db.session.query(Customer.customer_name).filter(
-            Customer.customer_name.like(search_term)
-        ).distinct().limit(limit).all()
-        suggestions['customer_names'] = [name[0] for name in customer_names]
+        if 'customers' in allowed_types:
+            customer_names = db.session.query(Customer.customer_name).filter(
+                Customer.customer_name.like(search_term)
+            ).distinct().limit(limit).all()
+            suggestions['customer_names'] = [name[0] for name in customer_names]
         
         return suggestions 

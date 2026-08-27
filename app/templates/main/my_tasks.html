@@ -45,7 +45,10 @@
                                 {% endif %}
                             </td>
                             <td>
-                                <button class="btn btn-sm btn-primary update-quantity" data-task-id="{{ task.id }}" data-bs-toggle="modal" data-bs-target="#quantityModal">
+                                <button class="btn btn-sm btn-primary update-quantity" data-task-id="{{ task.id }}"
+                                    data-equipment-id="{{ task.equipment_id or '' }}"
+                                    data-workpiece-codes="{% for tw in task.workpiece_links %}{{ tw.workpiece.code }}{% if not loop.last %},{% endif %}{% endfor %}"
+                                    data-bs-toggle="modal" data-bs-target="#quantityModal">
                                     更新进度
                                 </button>
                             </td>
@@ -70,6 +73,14 @@
                 <div class="mb-3">
                     <label class="form-label">完成数量</label>
                 <input type="number" class="form-control" id="completedQuantity" min="0">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">机台 / 设备 ID</label>
+                    <input type="number" class="form-control" id="equipmentId" placeholder="任务已派机台可留空">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">工件编码（逗号分隔）</label>
+                    <input type="text" class="form-control" id="workpieceCodes" placeholder="扫码或填写，可留空则用任务已绑工件">
                 </div>
                 
                 <!-- 原材料列表 -->
@@ -248,6 +259,8 @@ $(document).ready(function() {
     $('.update-quantity').click(function() {
         const taskId = $(this).data('task-id');
         $('#taskId').val(taskId);
+        $('#equipmentId').val($(this).data('equipment-id') || '');
+        $('#workpieceCodes').val($(this).data('workpiece-codes') || '');
         selectedMaterials.clear();
         $('#selectedMaterials').empty();
         $('#materialSelect').val(null).trigger('change');
@@ -319,7 +332,9 @@ $(document).ready(function() {
             method: 'POST',
             data: {
                 completed_quantity: quantity,
-                materials: JSON.stringify(materials)
+                materials: JSON.stringify(materials),
+                equipment_id: $('#equipmentId').val() || '',
+                workpiece_codes: $('#workpieceCodes').val() || ''
             },
             headers: {
                 'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content

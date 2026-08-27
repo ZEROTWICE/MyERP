@@ -1,0 +1,9 @@
+.git
+__pycache__
+*.pyc
+app.db
+*.db
+uploads/temp
+.cursor
+docs
+scripts/_*.py

@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<div class="container mt-4">
+    <h2>{{ title }}</h2>
+    <p>
+        <a href="{{ url_for('main.stock_by_kind', kind='fg') }}">成品</a> ·
+        <a href="{{ url_for('main.stock_by_kind', kind='wip_part') }}">半成品</a> ·
+        <a href="{{ url_for('main.stock_by_kind', kind='failed') }}">未通过</a> ·
+        <a href="{{ url_for('main.stock_by_kind', kind='scrap') }}">报废</a>
+    </p>
+    <table class="table table-hover">
+        <thead><tr><th>序列号</th><th>产品编号</th><th>库别</th><th>状态</th><th>工件</th></tr></thead>
+        <tbody>
+        {% for fp in items %}
+            <tr>
+                <td><code>{{ fp.serial_number }}</code></td>
+                <td>{{ fp.product_number }}</td>
+                <td>{{ fp.stock_kind }}</td>
+                <td>{{ fp.status }}</td>
+                <td>
+                    {% if fp.workpiece_id %}
+                    <a href="{{ url_for('main.workpiece_detail', id=fp.workpiece_id) }}">{{ fp.workpiece.code if fp.workpiece else fp.workpiece_id }}</a>
+                    {% else %}-{% endif %}
+                </td>
+            </tr>
+        {% else %}
+            <tr><td colspan="5" class="text-muted">本库暂无记录</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

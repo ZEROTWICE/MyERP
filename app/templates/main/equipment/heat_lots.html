@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}煅烧炉次{% endblock %}
+{% block content %}
+<div class="container mt-4">
+    <h2 class="mb-4">煅烧炉次</h2>
+    <form method="post" action="{{ url_for('main.create_heat_lot') }}" class="card card-body mb-4">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <select class="form-select" name="equipment_id" required>
+                    <option value="">选择煅烧炉</option>
+                    {% for f in furnaces %}
+                    <option value="{{ f.id }}">{{ f.code }} {{ f.name }}（{{ f.status }}）</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-6"><input class="form-control" name="recipe_notes" placeholder="工艺曲线备注"></div>
+            <div class="col-md-2"><button class="btn btn-primary">创建炉次</button></div>
+        </div>
+    </form>
+    <table class="table table-hover">
+        <thead><tr><th>炉次号</th><th>炉</th><th>状态</th><th>开炉</th><th>出炉</th><th></th></tr></thead>
+        <tbody>
+        {% for lot in lots %}
+            <tr>
+                <td><a href="{{ url_for('main.heat_lot_detail', id=lot.id) }}"><code>{{ lot.global_sn }}</code></a></td>
+                <td>{{ lot.equipment.code if lot.equipment else '-' }}</td>
+                <td>{{ lot.status }}</td>
+                <td>{{ lot.started_at.strftime('%Y-%m-%d %H:%M') if lot.started_at else '-' }}</td>
+                <td>{{ lot.ended_at.strftime('%Y-%m-%d %H:%M') if lot.ended_at else '-' }}</td>
+                <td><a class="btn btn-sm btn-outline-primary" href="{{ url_for('main.heat_lot_detail', id=lot.id) }}">装炉</a></td>
+            </tr>
+        {% else %}
+            <tr><td colspan="6" class="text-muted">暂无炉次</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
