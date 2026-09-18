@@ -14,7 +14,7 @@
 <div class="container mt-4">
     <h2>奖惩管理</h2>
     
-    {% if current_user.role in ['admin', 'manager'] %}
+    {% if can('bonus.manage') %}
     <div class="mb-3">
         <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addModal">
             <i class="fas fa-plus"></i> 添加奖惩记录
@@ -101,7 +101,7 @@
                             <td>{{ "%.2f"|format(record.amount) }}</td>
                             <td>{{ record.reason }}</td>
                             <td>
-                                {% if current_user.role in ['admin', 'manager'] %}
+                                {% if can('bonus.manage') %}
                                 <button class="btn btn-primary btn-sm edit-record" data-id="{{ record.id }}" data-bs-toggle="modal" data-bs-target="#editModal">
                                     编辑
                                 </button>

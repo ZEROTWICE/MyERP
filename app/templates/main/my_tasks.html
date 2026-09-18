@@ -172,7 +172,7 @@ $(document).ready(function() {
         placeholder: '搜索并选择原材料...',
         allowClear: true,
         ajax: {
-            url: '/api/inventory/raw-materials',
+            url: "{{ url_for('main.get_available_raw_materials') }}",
             dataType: 'json',
             delay: 250,
             data: function(params) {
@@ -506,7 +506,7 @@ function handleQrResult(text) {
     if (/^\d+$/.test(token)) {
         // 直接把这个ID加入已选（延迟到下方Select2加载）
         // 这里调用一次库存API查验并加入
-        $.get('/api/inventory/raw-materials?only_available=true&search=', function(resp) {
+        $.get("{{ url_for('main.get_available_raw_materials') }}?only_available=true&search=", function(resp) {
             if (resp && resp.success && Array.isArray(resp.data)) {
                 const found = resp.data.find(x => String(x.id) === token);
                 if (found) addSelectedMaterial(found);
@@ -514,7 +514,7 @@ function handleQrResult(text) {
             }
         });
     } else {
-        $.get('/api/inventory/raw-materials?only_available=true&search=' + encodeURIComponent(token), function(resp) {
+        $.get("{{ url_for('main.get_available_raw_materials') }}?only_available=true&search=" + encodeURIComponent(token), function(resp) {
             if (resp && resp.success && Array.isArray(resp.data)) {
                 if (resp.data.length > 0) addSelectedMaterial(resp.data[0]);
                 else toastr.warning('未找到匹配原材料：' + token);

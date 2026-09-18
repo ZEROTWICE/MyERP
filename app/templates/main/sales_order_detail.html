@@ -7,7 +7,7 @@
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2>销售订单详情</h2>
         <div>
-            {% if current_user.role in ['admin', 'manager', 'sales'] %}
+            {% if can('sales_order.manage') %}
             <a href="{{ url_for('main.edit_sales_order', order_id=order.id) }}" class="btn btn-primary">
                 <i class="fas fa-edit"></i> 编辑订单
             </a>
@@ -15,7 +15,7 @@
                 <i class="fas fa-plus"></i> 添加订单行
             </a>
             {% endif %}
-            {% if current_user.role in ['admin', 'manager'] %}
+            {% if can('production_order.manage') %}
             <button type="button" class="btn btn-warning" onclick="createProductionOrderFromSales()">
                 <i class="fas fa-industry"></i> 创建生产订单
             </button>
@@ -108,7 +108,7 @@
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">订单行明细 ({{ order_items|length }}项)</h5>
-                    {% if current_user.role in ['admin', 'manager', 'sales'] %}
+                    {% if can('sales_order.manage') %}
                     <a href="{{ url_for('main.add_sales_order_item', order_id=order.id) }}" class="btn btn-sm btn-success">
                         <i class="fas fa-plus"></i> 添加订单行
                     </a>
@@ -224,7 +224,7 @@
                                     </td>
                                     <td>
                                         <div class="btn-group">
-                                            {% if current_user.role in ['admin', 'manager', 'sales'] %}
+                                            {% if can('sales_order.manage') %}
                                             <a href="{{ url_for('main.edit_sales_order_item', item_id=item.id) }}" 
                                                class="btn btn-sm btn-outline-primary">
                                                 <i class="fas fa-edit"></i>
@@ -239,7 +239,7 @@
                                                 <i class="fas fa-trash"></i>
                                             </button>
                                             {% endif %}
-                                            {% if current_user.role in ['admin', 'manager'] %}
+                                            {% if can('production_order.manage') %}
                                             <button class="btn btn-sm btn-outline-warning" 
                                                     onclick="createProductionOrderFromItem({{ item.id }}, '{{ item.product_name }}', {{ item.quantity }})" 
                                                     data-item-id="{{ item.id }}">
@@ -266,7 +266,7 @@
                     <div class="text-center py-4">
                         <i class="fas fa-list fa-3x text-muted mb-3"></i>
                         <p class="text-muted">暂无订单行数据</p>
-                        {% if current_user.role in ['admin', 'manager', 'sales'] %}
+                        {% if can('sales_order.manage') %}
                         <a href="{{ url_for('main.add_sales_order_item', order_id=order.id) }}" class="btn btn-primary">
                             <i class="fas fa-plus"></i> 添加订单行
                         </a>

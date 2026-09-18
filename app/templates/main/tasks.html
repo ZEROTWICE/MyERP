@@ -8,7 +8,7 @@
 <div class="container mt-4">
     <h2>任务管理</h2>
 
-    {% if current_user.role in ['admin', 'manager'] %}
+    {% if can('task.manage') %}
     <div class="mb-3">
         <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addModal">
             <i class="fas fa-plus"></i> 添加任务
@@ -140,7 +140,7 @@
                                 {% endif %}
                             </td>
                             <td>
-                                {% if current_user.role in ['admin', 'manager'] %}
+                                {% if can('task.manage') %}
                                 <button class="btn btn-primary btn-sm edit-task" data-id="{{ task.id }}" data-bs-toggle="modal" data-bs-target="#editModal">
                                     编辑
                                 </button>
@@ -407,7 +407,7 @@ $(document).ready(function() {
         placeholder: '搜索并选择原材料...',
         allowClear: true,
         ajax: {
-            url: '/api/inventory/raw-materials',
+            url: "{{ url_for('main.get_available_raw_materials') }}",
             dataType: 'json',
             delay: 250,
             data: function(params) {

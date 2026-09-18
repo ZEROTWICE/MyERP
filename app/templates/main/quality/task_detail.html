@@ -312,7 +312,7 @@
     {% endif %}
 
     <!-- 操作按钮 -->
-    {% if current_user.role in ['admin', 'manager'] %}
+    {% if can('quality.task.manage') %}
     <div class="card">
         <div class="card-header">
             <h5 class="mb-0">操作</h5>
@@ -393,7 +393,7 @@ function startInspection(taskId) {
 
 // 加载质检模板
 function loadInspectionTemplates(taskType) {
-    fetch(`/api/quality/templates?type=${taskType}&is_active=true`)
+    fetch("{{ url_for('main.get_templates') }}?type=" + encodeURIComponent(taskType) + "&is_active=true")
         .then(response => response.json())
         .then(data => {
             if (data.success) {
@@ -430,7 +430,7 @@ function confirmStartInspection() {
     }
     
     // 发送开始质检请求
-    fetch(`/api/quality/tasks/${taskId}/start-inspection`, {
+    fetch("{{ url_for('main.get_tasks') }}" + '/' + taskId + '/start-inspection', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
@@ -472,7 +472,7 @@ function editTask(id) {
 function deleteTask(id) {
     if (!confirm('确定要删除这个任务吗？')) return;
     
-    fetch(`/api/quality/tasks/${id}`, {
+    fetch("{{ url_for('main.get_tasks') }}" + '/' + id, {
         method: 'DELETE'
     })
     .then(response => response.json())

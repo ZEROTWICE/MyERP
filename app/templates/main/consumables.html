@@ -216,7 +216,7 @@
                                                 <i class="fas fa-hand-paper"></i>
                                             </button>
                                             {% endif %}
-                                            {% if current_user.role == 'admin' %}
+                                            {% if can('consumable.delete') %}
                                             <button type="button" class="btn btn-danger" onclick="deleteConsumable({{ consumable.id }})">
                                                 <i class="fas fa-trash"></i>
                                             </button>
@@ -492,7 +492,7 @@ function editConsumable(id) {
     currentConsumableId = id;
     
     // 加载品类选项
-    fetch('/api/consumable-categories')
+    fetch("{{ url_for('main.get_consumable_categories_api') }}")
         .then(response => response.json())
         .then(data => {
             const categorySelect = document.querySelector('#editConsumableForm select[name="category_id"]');

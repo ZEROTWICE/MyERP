@@ -123,7 +123,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // 加载品类数据
 function loadCategories() {
-    fetch('/api/raw-material-categories')
+    fetch("{{ url_for('main.get_raw_material_categories_api') }}")
     .then(response => response.json())
     .then(data => {
         if (data.success) {

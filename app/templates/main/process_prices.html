@@ -38,7 +38,7 @@
 <div class="container mt-4">
     <h2>工序价格管理</h2>
     
-    {% if current_user.role in ['admin', 'hr'] %}
+    {% if can('process.manage') %}
     <div class="mb-3">
         <a href="{{ url_for('main.add_process_price') }}" class="btn btn-primary">
             <i class="fas fa-plus"></i> 添加工序价格
@@ -146,8 +146,10 @@
                             {% endif %}
                         </td>
                         <td>
-                            {% if current_user.role in ['admin', 'hr'] %}
+                            {% if can('process.manage') %}
                             <a href="{{ url_for('main.edit_process_price', id=process.id) }}" class="btn btn-sm btn-primary">编辑</a>
+                            {% endif %}
+                            {% if can('process.delete') %}
                             <button class="btn btn-danger btn-sm delete-process" data-id="{{ process.id }}" data-bs-toggle="modal" data-bs-target="#deleteModal">
                                 删除
                             </button>

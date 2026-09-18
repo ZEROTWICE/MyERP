@@ -21,9 +21,8 @@
                     <p class="text-muted mb-4">请从顶部导航栏选择要使用的功能。</p>
                     {% endif %}
 
-                    <p class="text-muted small mb-0">
-                        当前角色：<code>{{ current_user.role }}</code>
-                    </p>
+                    {# 权限一律走 can()/can_any()（app/permissions.py 是唯一事实来源），
+                       本页是角色无关的落地页，不再在模板里显示/判断角色。 #}
                 </div>
             </div>
         </div>

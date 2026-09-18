@@ -27,11 +27,23 @@
     <ul>
         {% for r in po.receipts %}
         <li>{{ r.receipt_no }} {{ r.status }}
-            {% if r.status in ('accepted', 'pending_inspection') %}
+            {# 入库只对「来料检合格」的到货单开放（服务端 /goods_receipts/<id>/putaway 同样只放行 accepted） #}
+            {% if r.status == 'accepted' %}
             <form class="d-inline" method="post" action="{{ url_for('main.putaway_goods_receipt', id=r.id) }}">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button class="btn btn-sm btn-outline-success">入库</button>
             </form>
+            {% elif r.status == 'rejected' and can('quality.inspect') %}
+            {# 来料检不合格且未处置：退货 / 让步接收 / 报废（端点只提供 JSON 响应，故由脚本提交） #}
+            <span class="ms-2 d-inline-flex align-items-center gap-1">
+                <select class="form-select form-select-sm w-auto" id="ncAction-{{ r.id }}">
+                    <option value="return">退货</option>
+                    <option value="accept">让步接收</option>
+                    <option value="scrap">报废</option>
+                </select>
+                <button type="button" class="btn btn-sm btn-outline-warning"
+                        onclick="disposeIncomingNonconformity({{ r.id }})">来料检不合格处置</button>
+            </span>
             {% endif %}
         </li>
         {% else %}
@@ -46,4 +58,45 @@
     {% endif %}
     <a class="btn btn-secondary mt-3" href="{{ url_for('main.manage_purchase_orders') }}">返回</a>
 </div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+// 来料检不合格处置（退货/让步接收/报废）：端点返回 JSON，故用 fetch 提交而不是普通表单
+function disposeIncomingNonconformity(receiptId) {
+    const select = document.getElementById('ncAction-' + receiptId);
+    const action = select ? select.value : '';
+    const labels = { 'return': '退货', 'accept': '让步接收', 'scrap': '报废' };
+    if (!action) {
+        return;
+    }
+    if (!confirm('确定按「' + (labels[action] || action) + '」处置该到货单的来料检不合格品吗？')) {
+        return;
+    }
+
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+    // URL 由 url_for 生成，只把占位 id 段替换成真实到货单 id
+    const url = "{{ url_for('main.dispose_goods_receipt_nonconformity', id=0) }}"
+        .replace('/0/', '/' + receiptId + '/');
+    fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': csrfToken
+        },
+        body: new URLSearchParams({ action: action, csrf_token: csrfToken })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            toastr.success(data.message || '处置已记录');
+            location.reload();
+        } else {
+            toastr.error(data.message || '处置失败');
+        }
+    })
+    .catch(() => toastr.error('处置失败，请重试'));
+}
+</script>
 {% endblock %}

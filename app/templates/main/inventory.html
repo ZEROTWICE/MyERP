@@ -47,7 +47,7 @@
                     </div>
                 </div>
                 <div class="col-md-6 text-end">
-                    {% if current_user.role in ['admin', 'manager'] %}
+                    {% if can('inventory.manage') %}
                     <a href="{{ url_for('main.download_inventory_template', type=request.args.get('type', 'finished')) }}" 
                        class="btn btn-info">
                         <i class="fas fa-download"></i> 下载模板
@@ -125,7 +125,7 @@
                         {% endif %}
                     </td>
                     <td>
-                        {% if current_user.role in ['admin', 'manager'] %}
+                        {% if can('inventory.manage') %}
                         <div class="btn-group">
                             <button class="btn btn-sm btn-primary edit-raw-material" data-id="{{ item.id }}">编辑</button>
                             <button class="btn btn-sm {% if item.is_archived %}btn-success{% else %}btn-warning{% endif %} toggle-archive-raw-material" 
@@ -193,7 +193,7 @@
                         {% endif %}
                     </td>
                     <td>
-                        {% if current_user.role in ['admin', 'manager'] %}
+                        {% if can('inventory.manage') %}
                         <div class="btn-group">
                             <button class="btn btn-sm btn-primary edit-finished-product" data-id="{{ item.id }}">编辑</button>
                             <button class="btn btn-sm {% if item.is_archived %}btn-success{% else %}btn-warning{% endif %} toggle-archive-finished-product" 
@@ -802,7 +802,7 @@ function submitRawMaterial() {
 
 // 加载原材料品类选项
 function loadRawMaterialCategories() {
-    fetch('/api/raw-material-categories')
+    fetch("{{ url_for('main.get_raw_material_categories_api') }}")
     .then(response => response.json())
     .then(data => {
         if (data.success) {

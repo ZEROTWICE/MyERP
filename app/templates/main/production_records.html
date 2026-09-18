@@ -22,7 +22,7 @@
 <div class="container mt-4">
     <h2>生产记录管理</h2>
 
-    {% if current_user.role in ['admin', 'hr'] %}
+    {% if can('production_record.manage') %}
     <div class="mb-3">
         <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addProductionRecordModal">
             <i class="fas fa-plus"></i> 添加生产记录
@@ -137,7 +137,7 @@
                             </td>
                     <td>{{ record.notes or '-' }}</td>
                             <td>
-                        {% if current_user.role in ['admin', 'hr'] %}
+                        {% if can('production_record.manage') %}
                         <button class="btn btn-sm btn-danger delete-record" data-id="{{ record.id }}">删除</button>
                                 {% endif %}
                             </td>
@@ -353,7 +353,7 @@ function handleProcessChange(processId) {
 function addMaterialRow() {
     // 加载原材料列表
     $.ajax({
-        url: '/api/inventory/raw-materials?only_available=true',
+        url: "{{ url_for('main.get_available_raw_materials') }}?only_available=true",
         type: 'GET',
         success: function(result) {
             if (result.success) {
@@ -468,7 +468,7 @@ function refreshAllMaterialSelects() {
     
     // 重新加载原材料列表
     $.ajax({
-        url: '/api/inventory/raw-materials?only_available=true',
+        url: "{{ url_for('main.get_available_raw_materials') }}?only_available=true",
         type: 'GET',
         success: function(result) {
             if (result.success) {

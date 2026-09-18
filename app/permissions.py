@@ -140,7 +140,12 @@ def _wants_json():
         return True
     if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         return True
-    return request.accept_mimetypes.best == 'application/json'
+    if request.accept_mimetypes.best == 'application/json':
+        return True
+    # DELETE/PUT/PATCH 只可能由前端 fetch/XHR 发起（HTML 表单只有 GET/POST，
+    # 页面跳转只有 GET），失败时也必须回 JSON，否则前端 response.json() 会
+    # 拿到重定向后的 HTML，把「权限不足」变成通用的「操作失败」
+    return request.method in ('DELETE', 'PUT', 'PATCH')
 
 
 def require_capability(*capabilities):

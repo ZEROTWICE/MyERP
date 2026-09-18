@@ -7,7 +7,7 @@
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2>生产订单详情</h2>
         <div>
-            {% if current_user.role in ['admin', 'manager'] %}
+            {% if can('production_order.manage') %}
             <a href="{{ url_for('main.edit_production_order', order_id=order.id) }}" class="btn btn-primary">
                 <i class="fas fa-edit"></i> 编辑订单
             </a>
@@ -200,7 +200,7 @@
     <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center">
             <h5 class="mb-0">生产批次</h5>
-            {% if current_user.role in ['admin', 'manager'] and order.status != 'completed' %}
+            {% if can('production_order.manage') and order.status != 'completed' %}
             <button class="btn btn-sm btn-primary" onclick="addBatch()">
                 <i class="fas fa-plus"></i> 添加批次
             </button>

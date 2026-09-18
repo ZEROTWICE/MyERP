@@ -914,12 +914,22 @@ class InspectionItemRecord(db.Model):
         return f'<InspectionItemRecord {self.id}>'
 
 class NonconformityRecord(db.Model):
-    """不合格品处理记录"""
+    """不合格品处理记录
+
+    处置对象口径（P1-3）：``target_type`` + ``target_id`` 明确区分两类来源，
+    不再靠“workpiece_id 是否为空”猜测：
+
+      - ``workpiece``    生产质检不合格，锚在工件上（同时保留 workpiece_id 兼容既有页面/流程）；
+      - ``goods_receipt`` 来料检不合格，锚在到货单上（无工件，故 workpiece_id 为空）。
+
+    老数据两列可能为 NULL，``target_label`` 与 mes_service.nonconformity_target 会按
+    workpiece_id / 质检记录的任务回退判定。
+    """
     __tablename__ = 'nonconformity_records'
 
     id = db.Column(db.Integer, primary_key=True)
     record_id = db.Column(db.Integer, db.ForeignKey('inspection_records.id'), nullable=False)
-    type = db.Column(db.String(20), nullable=False, comment='处理类型(rework/scrap/accept)')
+    type = db.Column(db.String(20), nullable=False, comment='处理类型(生产:rework/scrap/accept；来料检:return/scrap/accept)')
     handler_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     handling_date = db.Column(db.Date, nullable=False, comment='处理日期')
     handling_result = db.Column(db.Text, nullable=False, comment='处理结果')
@@ -930,10 +940,22 @@ class NonconformityRecord(db.Model):
     rework_task_id = db.Column(db.Integer, db.ForeignKey('task_assignment.id', ondelete='SET NULL'), nullable=True)
     scrap_cost = db.Column(db.Float, default=0)
     workpiece_id = db.Column(db.Integer, db.ForeignKey('workpieces.id', ondelete='SET NULL'), nullable=True)
+    # 处置对象口径：workpiece=生产质检 / goods_receipt=来料检（与 InspectionTask 同名同义）
+    target_type = db.Column(db.String(20))
+    target_id = db.Column(db.Integer)
 
     # 关联关系
     handler = db.relationship('User', foreign_keys=[handler_id], backref=db.backref('handled_nonconformities', lazy='dynamic'))
     approver = db.relationship('User', foreign_keys=[approver_id], backref=db.backref('approved_concessions', lazy='dynamic'))
+
+    @property
+    def target_label(self):
+        """人读的处置对象口径：来料检 / 生产质检（老数据按工件回退）。"""
+        if self.target_type == 'goods_receipt':
+            return '来料检'
+        if self.target_type == 'workpiece' or self.workpiece_id:
+            return '生产质检'
+        return self.target_type or '未知'
 
     def __repr__(self):
         return f'<NonconformityRecord {self.id}: {self.type}>'

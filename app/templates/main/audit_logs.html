@@ -67,7 +67,7 @@
                         {% endif %}
                     </td>
                     <td>
-                        {% if current_user.role == 'admin' and log.can_rollback and not log.rolled_back %}
+                        {% if can('audit.rollback') and log.can_rollback and not log.rolled_back %}
                         <button class="btn btn-warning btn-sm rollback-btn" 
                                 data-id="{{ log.id }}"
                                 data-bs-toggle="modal" 

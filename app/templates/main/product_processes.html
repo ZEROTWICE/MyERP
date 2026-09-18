@@ -51,7 +51,7 @@
                     <a href="{{ url_for('main.process_prices') }}" class="btn btn-outline-info me-2">
                         <i class="fas fa-cogs"></i> 工序价格管理
                     </a>
-                    {% if current_user.role in ['admin', 'manager'] %}
+                    {% if can('product.manage') %}
                     <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addProcessModal">
                         <i class="fas fa-plus"></i> 添加工序
                     </button>
@@ -105,7 +105,7 @@
                     <td>{{ item.work_center.code if item.work_center else '-' }}</td>
                     <td>{{ item.notes or '-' }}</td>
                     <td>
-                        {% if current_user.role in ['admin', 'manager'] %}
+                        {% if can('product.manage') %}
                         <div class="btn-group">
                             <button class="btn btn-sm btn-primary" onclick="editProcessItem({{ item.id }})">
                                 <i class="fas fa-edit"></i>

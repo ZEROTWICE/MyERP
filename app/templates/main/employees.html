@@ -6,7 +6,7 @@
 <div class="container mt-4">
     <h2>员工管理</h2>
 
-    {% if current_user.role in ['admin', 'hr'] %}
+    {% if can('employee.manage') %}
     <div class="mb-3">
         <a href="{{ url_for('main.add_employee') }}" class="btn btn-primary">
             <i class="fas fa-plus"></i> 添加员工

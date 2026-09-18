@@ -486,6 +486,14 @@ function updateGreeting(hour) {
 // 图表实例存储
 const chartInstances = {};
 
+// 图表数据接口（URL 由服务端 url_for 注入，不在 JS 里硬编码路径）
+const CHART_API = {
+    salary: "{{ url_for('main.api_chart_data_salary') }}",
+    production: "{{ url_for('main.api_chart_data_production') }}",
+    department: "{{ url_for('main.api_chart_data_department') }}",
+    task: "{{ url_for('main.api_chart_data_task') }}"
+};
+
 // 图表配置
 const chartConfigs = {
     salary: {
@@ -656,7 +664,7 @@ function createChart(canvasId, configKey) {
     cardBody.innerHTML = '<div class="d-flex justify-content-center align-items-center h-100"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">加载中...</span></div></div>';
     
     // 从后端获取数据
-    fetch(`/api/chart-data/${configKey}`)
+    fetch(CHART_API[configKey])
         .then(response => response.json())
         .then(data => {
             // 恢复canvas元素
@@ -753,7 +761,7 @@ function createChart(canvasId, configKey) {
 
 // 加载通知数据
 function loadNotifications() {
-    fetch('/api/notifications/recent')
+    fetch("{{ url_for('main.api_recent_notifications') }}")
         .then(response => response.json())
         .then(data => {
             if (data.success) {

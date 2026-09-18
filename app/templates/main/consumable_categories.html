@@ -67,7 +67,7 @@
                                             <button type="button" class="btn btn-warning" onclick="editCategory({{ category.id }})">
                                                 <i class="fas fa-edit"></i>
                                             </button>
-                                            {% if current_user.role == 'admin' %}
+                                            {% if can('consumable.delete') %}
                                             <button type="button" class="btn btn-danger" onclick="deleteCategory({{ category.id }})">
                                                 <i class="fas fa-trash"></i>
                                             </button>

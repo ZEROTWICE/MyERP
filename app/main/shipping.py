@@ -38,7 +38,8 @@ def create_shipment():
         db.session.flush()
         whole = request.form.get('whole') == '1'
         if whole:
-            for line in order.items:
+            # 销售订单行的真实关系名是 order_items（lazy='dynamic'，只可迭代，不要 len()/下标）
+            for line in order.order_items:
                 fps = FinishedProduct.query.filter_by(
                     product_id=line.product_id, stock_kind='fg', status='in_stock'
                 ).limit(int(line.quantity or 0)).all()
@@ -66,7 +67,7 @@ def shipment_detail(id):
     ship = Shipment.query.get_or_404(id)
     available = []
     if ship.sales_order:
-        for line in ship.sales_order.items:
+        for line in ship.sales_order.order_items:
             fps = FinishedProduct.query.filter(
                 FinishedProduct.status == 'in_stock',
                 FinishedProduct.stock_kind.in_(['fg', 'wip_part']),
@@ -134,7 +135,7 @@ def confirm_shipment(id):
             remaining = FinishedProduct.query.filter_by(status='in_stock').count()
             # 若订单行均已发完则完成
             shipped_qty = sum(i.quantity or 0 for sh in order.shipments for i in sh.items)
-            ordered = sum(i.quantity or 0 for i in order.items)
+            ordered = sum(i.quantity or 0 for i in order.order_items)
             if shipped_qty >= ordered:
                 order.status = 'completed'
             elif order.status == 'confirmed':

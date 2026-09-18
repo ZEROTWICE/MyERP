@@ -1,7 +1,7 @@
 from flask import render_template, request, jsonify, redirect, url_for, flash, current_app
 from flask_login import login_required, current_user
 from app import db, csrf
-from app.permissions import can
+from app.permissions import require_capability
 from . import bp
 from sqlalchemy import or_, and_
 from datetime import datetime, date
@@ -13,18 +13,11 @@ from app.models import (
 )
 
 
-def _can_use_production_center():
-    """生产中心的可用角色统一由 app/permissions.py 的 production_center.use 决定"""
-    return can('production_center.use')
-
-
 @bp.route('/production_center', methods=['GET'])
 @login_required
+@require_capability('production_center.use')
 def production_center():
     """生产中心首页（以产品实例为中心的视图）"""
-    if not _can_use_production_center():
-        flash('权限不足', 'danger')
-        return redirect(url_for('main.index'))
 
     # 查询参数
     page = request.args.get('page', 1, type=int)
@@ -62,11 +55,9 @@ def production_center():
 
 @bp.route('/production_center/items/<int:item_id>', methods=['GET'])
 @login_required
+@require_capability('production_center.use')
 def production_center_item_detail(item_id: int):
     """实例详情页：展示该成品实例的工序、进度与执行记录"""
-    if not _can_use_production_center():
-        flash('权限不足', 'danger')
-        return redirect(url_for('main.index'))
 
     item = ProductionBatchItem.query.get_or_404(item_id)
 
@@ -96,11 +87,10 @@ def production_center_item_detail(item_id: int):
 
 @bp.route('/api/production_center/create_instances', methods=['POST'])
 @login_required
+@require_capability('production_center.use')
 @csrf.exempt
 def api_create_instances():
     """使用生产订单数据创建成品实例（生成批次与批次项）"""
-    if not _can_use_production_center():
-        return jsonify({'success': False, 'message': '权限不足'}), 403
 
     try:
         data = request.get_json() or {}
@@ -179,11 +169,10 @@ def api_create_instances():
 
 @bp.route('/api/production_center/items/<int:item_id>/tech_decomposition', methods=['POST'])
 @login_required
+@require_capability('production_center.use')
 @csrf.exempt
 def api_save_tech_decomposition(item_id: int):
     """保存实例级技术拆解（存入 notes JSON，不改动表结构）"""
-    if not _can_use_production_center():
-        return jsonify({'success': False, 'message': '权限不足'}), 403
 
     try:
         item = ProductionBatchItem.query.get_or_404(item_id)
@@ -228,10 +217,9 @@ def api_save_tech_decomposition(item_id: int):
 
 @bp.route('/api/production_center/items/<int:item_id>/detail', methods=['GET'])
 @login_required
+@require_capability('production_center.use')
 def api_item_detail(item_id: int):
     """实例级详情（用于前端可视化）：基本信息、任务、执行记录与物料消耗"""
-    if not _can_use_production_center():
-        return jsonify({'success': False, 'message': '权限不足'}), 403
 
     try:
         item = ProductionBatchItem.query.get_or_404(item_id)
@@ -307,11 +295,10 @@ def api_item_detail(item_id: int):
 
 @bp.route('/api/production_center/items/<int:item_id>/execute_operation', methods=['POST'])
 @login_required
+@require_capability('production_center.use')
 @csrf.exempt
 def api_execute_operation(item_id: int):
     """记录工序执行（操作者与物料消耗），并更新相关任务进度"""
-    if not _can_use_production_center():
-        return jsonify({'success': False, 'message': '权限不足'}), 403
 
     try:
         item = ProductionBatchItem.query.get_or_404(item_id)

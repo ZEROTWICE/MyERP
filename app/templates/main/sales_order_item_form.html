@@ -328,7 +328,7 @@ const copiedProductName = {{ (form.product_name.data or '')|tojson }};
 const copiedDrawingNumber = {{ (form.drawing_number.data or '')|tojson }};
 
 function loadProductNames() {
-    fetch('/api/products/names?only_active=true')
+    fetch("{{ url_for('main.api_get_product_names') }}?only_active=true")
         .then(response => response.json())
         .then(data => {
             if (data.success) {
@@ -370,7 +370,7 @@ function loadDrawingNumbers(productName, selectedDrawing = null) {
         return;
     }
     
-    fetch(`/api/products/drawings-by-name?product_name=${encodeURIComponent(productName)}&only_active=true`)
+    fetch("{{ url_for('main.api_get_drawings_by_product_name') }}?product_name=" + encodeURIComponent(productName) + "&only_active=true")
         .then(response => response.json())
         .then(data => {
             if (data.success) {
@@ -437,7 +437,10 @@ function clearProductInfo() {
 function loadCustomerAddresses() {
     const orderId = {{ order.id }};
     
-    fetch(`/api/sales_orders/${orderId}/customer_addresses?only_active=true`)
+    // 路径参数端点的 URL 由 url_for 生成，仅把占位 id 段替换为真实订单 id
+    const customerAddressUrl = "{{ url_for('main.api_get_sales_order_customer_addresses', order_id=0) }}"
+        .replace('/0/', '/' + orderId + '/');
+    fetch(customerAddressUrl + '?only_active=true')
         .then(response => response.json())
         .then(data => {
             if (data.success) {

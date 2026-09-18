@@ -148,7 +148,7 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function loadCustomers() {
-    fetch('/api/customers/search?only_active=true')
+    fetch("{{ url_for('main.api_search_customers') }}?only_active=true")
         .then(response => response.json())
         .then(data => {
             if (data.success) {

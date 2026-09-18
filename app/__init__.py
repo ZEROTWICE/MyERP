@@ -30,6 +30,31 @@ _ENSURED_COLUMNS = {
         ('completed_at', 'DATETIME'),
         ('equipment_id', 'INTEGER'),
         ('work_center_id', 'INTEGER'),
+        ('spec_splice_hole', 'VARCHAR(100)'),
+        ('spec_gasket_hole', 'VARCHAR(100)'),
+        ('anti_corrosion', 'VARCHAR(100)'),
+        ('rubber_gasket_material', 'VARCHAR(100)'),
+        ('turnout_rail', 'VARCHAR(100)'),
+        ('using_unit', 'VARCHAR(100)'),
+    ],
+    # 这三个规格列组只由 eb1234567890 补过一次，且该修订在早于它的老库上
+    # 是无条件 add_column；这里登记后，版本停留在 c81522b131f7 及更早、
+    # schema 却由 create_all() 建出的库也能在启动时自愈。
+    'production_orders': [
+        ('spec_splice_hole', 'VARCHAR(100)'),
+        ('spec_gasket_hole', 'VARCHAR(100)'),
+        ('anti_corrosion', 'VARCHAR(100)'),
+        ('rubber_gasket_material', 'VARCHAR(100)'),
+        ('turnout_rail', 'VARCHAR(100)'),
+        ('using_unit', 'VARCHAR(100)'),
+    ],
+    'production_batches': [
+        ('spec_splice_hole', 'VARCHAR(100)'),
+        ('spec_gasket_hole', 'VARCHAR(100)'),
+        ('anti_corrosion', 'VARCHAR(100)'),
+        ('rubber_gasket_material', 'VARCHAR(100)'),
+        ('turnout_rail', 'VARCHAR(100)'),
+        ('using_unit', 'VARCHAR(100)'),
     ],
     'products': [
         ('sellable_as_part', 'BOOLEAN'),
@@ -50,6 +75,9 @@ _ENSURED_COLUMNS = {
         ('rework_task_id', 'INTEGER'),
         ('scrap_cost', 'FLOAT'),
         ('workpiece_id', 'INTEGER'),
+        # P1-3：处置对象口径（workpiece=生产质检 / goods_receipt=来料检）
+        ('target_type', 'VARCHAR(20)'),
+        ('target_id', 'INTEGER'),
     ],
     'raw_material_categories': [
         ('requires_approval', 'BOOLEAN'),

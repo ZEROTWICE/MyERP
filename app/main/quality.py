@@ -11,13 +11,26 @@ from app.permissions import require_capability
 from datetime import datetime, timedelta
 from . import bp
 
+# 分页白名单：与全站 handle_pagination_args（app/main/routes.py）的 per_page 口径逐值一致
+# （非数字 / 不在白名单 → 20）。这三个端点是 JSON API，且 routes.py 不在本模块的可改范围内，
+# 故在本地按同一口径校验，不引入会 flash 的装饰器。
+PAGE_SIZE_WHITELIST = (20, 50, 100)
+
+
+def _validated_per_page(default=20):
+    """从查询串取 per_page 并按白名单回落（缺省/非数字/不在 (20,50,100) → default）。"""
+    raw = request.args.get('per_page', default)
+    try:
+        per_page = int(raw)
+    except (TypeError, ValueError):
+        return default
+    return per_page if per_page in PAGE_SIZE_WHITELIST else default
+
 @bp.route('/quality')
 @login_required
+@require_capability('quality.view')
 def quality_management():
     """质量管理主页"""
-    if current_user.role not in ['admin', 'manager', 'inspector']:
-        flash('权限不足', 'danger')
-        return redirect(url_for('main.index'))
     
     # 获取质检任务统计信息
     query = InspectionTask.query
@@ -35,31 +48,25 @@ def quality_management():
 
 @bp.route('/quality/templates', methods=['GET'])
 @login_required
+@require_capability('quality.template.manage')
 def quality_templates():
     """质检模板列表"""
-    if current_user.role not in ['admin', 'manager']:
-        flash('权限不足', 'danger')
-        return redirect(url_for('main.index'))
     
     return render_template('main/quality/templates.html')
 
 @bp.route('/quality/tasks', methods=['GET'])
 @login_required
+@require_capability('quality.view')
 def quality_tasks():
     """质检任务列表"""
-    if current_user.role not in ['admin', 'manager', 'inspector']:
-        flash('权限不足', 'danger')
-        return redirect(url_for('main.index'))
     
     return render_template('main/quality/tasks.html')
 
 @bp.route('/quality/records', methods=['GET'])
 @login_required
+@require_capability('quality.view')
 def quality_records():
     """质检记录列表"""
-    if current_user.role not in ['admin', 'manager', 'inspector']:
-        flash('权限不足', 'danger')
-        return redirect(url_for('main.index'))
     
     # 获取质检任务统计信息
     query = InspectionTask.query
@@ -77,11 +84,9 @@ def quality_records():
 
 @bp.route('/quality/tasks/<int:task_id>')
 @login_required
+@require_capability('quality.view')
 def quality_task_detail(task_id):
     """质检任务详情页面"""
-    if current_user.role not in ['admin', 'manager', 'inspector']:
-        flash('权限不足', 'danger')
-        return redirect(url_for('main.index'))
     
     # 获取质检任务
     task = InspectionTask.query.get_or_404(task_id)
@@ -95,11 +100,9 @@ def quality_task_detail(task_id):
 
 @bp.route('/quality/inspection/<int:record_id>')
 @login_required
+@require_capability('quality.view')
 def quality_inspection(record_id):
     """质检执行页面"""
-    if current_user.role not in ['admin', 'manager', 'inspector']:
-        flash('权限不足', 'danger')
-        return redirect(url_for('main.index'))
     
     # 获取质检记录
     record = InspectionRecord.query.get_or_404(record_id)
@@ -118,7 +121,7 @@ def quality_inspection(record_id):
 def get_templates():
     """获取质检模板列表"""
     page = request.args.get('page', 1, type=int)
-    per_page = request.args.get('per_page', 20, type=int)
+    per_page = _validated_per_page()
     search = request.args.get('search', '')
     template_type = request.args.get('type', '')
     is_active = request.args.get('is_active', None, type=lambda x: x.lower() == 'true' if x else None)
@@ -220,11 +223,10 @@ def get_template_detail(template_id):
 
 @bp.route('/api/quality/templates', methods=['POST'])
 @login_required
+@require_capability('quality.template.manage')
 @csrf.exempt  # 对API请求豁免CSRF保护
 def create_template():
     """创建质检模板"""
-    if current_user.role not in ['admin', 'manager']:
-        return jsonify({'success': False, 'message': '权限不足'}), 403
 
     try:
         data = request.get_json()
@@ -325,11 +327,10 @@ def create_template():
 
 @bp.route('/api/quality/templates/<int:template_id>', methods=['PUT', 'DELETE'])
 @login_required
+@require_capability('quality.template.manage')
 @csrf.exempt
 def manage_template(template_id):
     """管理质检模板（更新/删除）"""
-    if current_user.role not in ['admin', 'manager']:
-        return jsonify({'success': False, 'message': '权限不足'}), 403
 
     try:
         template = InspectionTemplate.query.get_or_404(template_id)
@@ -490,7 +491,7 @@ def manage_template(template_id):
 def get_tasks():
     """获取质检任务列表"""
     page = request.args.get('page', 1, type=int)
-    per_page = request.args.get('per_page', 20, type=int)
+    per_page = _validated_per_page()
     search = request.args.get('search', '')
     task_type = request.args.get('type', '')
     status = request.args.get('status', '')
@@ -572,11 +573,10 @@ def get_task_detail(task_id):
 
 @bp.route('/api/quality/tasks', methods=['POST'])
 @login_required
+@require_capability('quality.task.manage')
 @csrf.exempt  # 对API请求豁免CSRF保护
 def create_task():
     """创建质检任务"""
-    if current_user.role not in ['admin', 'manager']:
-        return jsonify({'success': False, 'message': '权限不足'}), 403
 
     try:
         data = request.get_json()
@@ -623,11 +623,10 @@ def create_task():
 
 @bp.route('/api/quality/tasks/<int:task_id>', methods=['PUT', 'DELETE'])
 @login_required
+@require_capability('quality.task.manage')
 @csrf.exempt  # 对API请求豁免CSRF保护
 def manage_task(task_id):
     """管理质检任务（更新/删除）"""
-    if current_user.role not in ['admin', 'manager', 'inspector']:
-        return jsonify({'success': False, 'message': '权限不足'}), 403
 
     if request.method == 'DELETE':
         return delete_inspection_task(task_id)
@@ -766,6 +765,7 @@ def get_production_records():
 
 @bp.route('/api/quality/tasks/<int:task_id>/start-inspection', methods=['POST'])
 @login_required
+@require_capability('quality.inspect')
 @csrf.exempt
 def start_inspection(task_id):
     """开始质检任务"""
@@ -773,9 +773,6 @@ def start_inspection(task_id):
         task = InspectionTask.query.get_or_404(task_id)
         data = request.get_json()
         
-        # 检查权限
-        if current_user.role not in ['admin', 'manager', 'inspector']:
-            return jsonify({'success': False, 'message': '权限不足'}), 403
         
         # 检查任务状态
         if task.status not in ['pending', 'in_progress']:
@@ -866,6 +863,7 @@ def start_inspection(task_id):
 
 @bp.route('/api/quality/records/<int:record_id>/submit', methods=['POST'])
 @login_required
+@require_capability('quality.inspect')
 @csrf.exempt
 def submit_inspection_record(record_id):
     """提交质检记录"""
@@ -876,9 +874,6 @@ def submit_inspection_record(record_id):
         if not data:
             return jsonify({'success': False, 'message': '请求数据为空'}), 400
         
-        # 检查权限
-        if current_user.role not in ['admin', 'manager', 'inspector']:
-            return jsonify({'success': False, 'message': '权限不足'}), 403
         
         # 检查是否是指定的检验员
         if current_user.role == 'inspector' and record.inspector_id != current_user.id:
@@ -953,12 +948,13 @@ def submit_inspection_record(record_id):
         from app.services import mes_service
         mes_service.apply_inspection_result(record)
         if task and task.target_type == 'goods_receipt' and record.result == 'pass':
+            # 来料检合格：到货单已由 apply_inspection_result 置 accepted，这里按既有口径入库
+            # （库存写入归 mes_service；不合格结论由 apply_inspection_result 生成不合格单并拒收）
             from app.models import GoodsReceipt
-            from app.main.purchase import _putaway_receipt
             receipt = GoodsReceipt.query.get(task.target_id)
             if receipt:
                 receipt.status = 'accepted'
-                _putaway_receipt(receipt)
+                mes_service.putaway_goods_receipt(receipt)
         db.session.commit()
 
         return jsonify({
@@ -996,9 +992,6 @@ def delete_inspection_task(task_id):
     try:
         task = InspectionTask.query.get_or_404(task_id)
         
-        # 检查权限
-        if current_user.role not in ['admin', 'manager']:
-            return jsonify({'success': False, 'message': '权限不足'}), 403
         
         # 检查任务状态
         if task.status in ['in_progress', 'completed']:
@@ -1047,9 +1040,6 @@ def update_task(task_id):
         task = InspectionTask.query.get_or_404(task_id)
         data = request.get_json()
         
-        # 检查权限
-        if current_user.role not in ['admin', 'manager']:
-            return jsonify({'success': False, 'message': '权限不足'}), 403
         
         # 保存旧数据用于审计日志
         old_data = {
@@ -1132,7 +1122,7 @@ def get_inspection_records():
         start_date = request.args.get('start_date', '').strip()
         end_date = request.args.get('end_date', '').strip()
         page = request.args.get('page', 1, type=int)
-        per_page = request.args.get('per_page', 20, type=int)
+        per_page = _validated_per_page()
         
         # 构建查询
         query = InspectionRecord.query
@@ -1295,14 +1285,13 @@ def get_inspection_record_detail(record_id):
 
 @bp.route('/api/quality/records/<int:record_id>/print', methods=['GET'])
 @login_required
+@require_capability('quality.view')
 def print_inspection_record(record_id):
     """打印质检记录"""
     try:
         record = InspectionRecord.query.get_or_404(record_id)
         
         # 权限控制
-        if current_user.role not in ['admin', 'manager', 'inspector']:
-            return jsonify({'success': False, 'message': '权限不足'}), 403
         
         if current_user.role == 'inspector' and record.inspector_id != current_user.id:
             return jsonify({'success': False, 'message': '权限不足'}), 403
@@ -1325,12 +1314,10 @@ def print_inspection_record(record_id):
 
 @bp.route('/api/quality/records/export', methods=['GET'])
 @login_required
+@require_capability('quality.export')
 def export_inspection_records():
     """导出质检记录"""
     try:
-        # 检查权限
-        if current_user.role not in ['admin', 'manager']:
-            return jsonify({'success': False, 'message': '权限不足'}), 403
         
         # 获取查询参数（与列表查询相同的参数）
         search = request.args.get('search', '').strip()

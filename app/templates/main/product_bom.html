@@ -51,7 +51,7 @@
                     <a href="{{ url_for('main.manage_inventory') }}" class="btn btn-outline-info me-2">
                         <i class="fas fa-boxes"></i> 库存管理
                     </a>
-                    {% if current_user.role in ['admin', 'manager'] %}
+                    {% if can('product.manage') %}
                     <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addBomModal">
                         <i class="fas fa-plus"></i> 批量添加物料
                     </button>
@@ -101,7 +101,7 @@
                     <td>¥{{ "%.2f"|format(item.total_cost) }}</td>
                     <td>{{ item.notes or '-' }}</td>
                     <td>
-                        {% if current_user.role in ['admin', 'manager'] %}
+                        {% if can('product.manage') %}
                         <div class="btn-group">
                             <button class="btn btn-sm btn-primary" onclick="editBomItem({{ item.id }})">
                                 <i class="fas fa-edit"></i>

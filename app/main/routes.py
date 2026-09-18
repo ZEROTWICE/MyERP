@@ -2,7 +2,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from flask import render_template, redirect, url_for, flash, request, jsonify, current_app, send_file
 from flask_login import login_required, current_user
 from app import db, csrf
-from app.permissions import allowed_search_types, require_capability, can
+from app.permissions import allowed_search_types, require_capability, can, can_any
 from app.models import Employee, ProcessPrice, ProductionRecord, BonusPenalty, AuditLog, ProcessPrice, User, TaskAssignment, SerialNumber, SalaryChange, CoefficientChange, EmployeeSalaryHistory, EmployeeCoefficientHistory, ProcessPriceGroup, FinishedProduct, RawMaterial, CodeRule, CodeGenerationLog, ProductionRecordMaterial, InspectionTemplate, InspectionBaseItem, InspectionItem, InspectionTask, InspectionRecord, Product, ProductBOM, ProductProcess, ProductionOrder, MaterialAllocation, ProductionBatch, ProductionBatchItem, Customer, CustomerAddress, SalesOrder, SalesOrderItem, SalesOrder, SalesOrderItem, ProcessAssignmentRule, ProcessAssignmentMember, SystemConfig, RawMaterialCategory, WorkCenter
 from datetime import datetime, timedelta, date
 from . import bp
@@ -29,7 +29,6 @@ from functools import wraps
 import tempfile
 from flask_paginate import Pagination
 import pandas as pd
-from app.decorators import admin_required
 import numpy as np
 from werkzeug.datastructures import FileStorage
 from typing import List, Dict, Any, Optional, Union
@@ -83,12 +82,53 @@ def _parse_flag(data, key, default=None):
     return str(val).lower() in ('1', 'true', 'on', 'yes')
 
 
+def _coerce_excel_date(value, label='日期'):
+    """把 Excel 单元格里的真日期/文本日期统一成日期类型。
+
+    openpyxl 对「真日期单元格」给 datetime/date，对文本日期给 str；把 str 直接塞进
+    Date/DateTime 列时 SQLite 方言会抛 TypeError（t7 门禁实测：导入任务与奖惩逐行失败）。
+    真日期原样返回（保留原有口径），文本用 pandas 兜底解析。返回 (值, 错误原因)。
+    """
+    if isinstance(value, datetime):
+        return value, None
+    if isinstance(value, date):
+        return value, None
+    if value is None or (isinstance(value, str) and not value.strip()):
+        return None, f'{label}不能为空'
+    try:
+        parsed = pd.to_datetime(str(value).strip(), errors='coerce')
+    except (ValueError, TypeError, OverflowError):
+        parsed = None
+    if parsed is None or pd.isna(parsed):
+        return None, f'{label}格式错误（{value}）'
+    return parsed.to_pydatetime(), None
+
+
+def _resolve_raw_material_category(name, created_by=None):
+    """把「品名」解析成原材料品类并返回真实记录。
+
+    RawMaterial.material_name 是取 category.name 的 @property，**不是数据库列**，
+    不能当作构造函数参数或查询条件；RawMaterial.category_id 又是 NOT NULL，
+    所以入库必须落到真实品类上。品类名不存在时按需建一个
+    （与采购入库自动建「采购入库」品类的既有做法一致）。
+    """
+    category_name = (name or '').strip() or '未分类'
+    category = RawMaterialCategory.query.filter_by(name=category_name).first()
+    if category is None:
+        category = RawMaterialCategory(
+            name=category_name,
+            code=SerialNumber.get_next_number(),
+            created_by=created_by,
+        )
+        db.session.add(category)
+        db.session.flush()
+    return category
+
+
 @bp.route('/process_assignment', methods=['GET'])
 @login_required
+@require_capability('process_assignment.manage')
 def process_assignment_page():
-    if current_user.role not in ['admin', 'manager']:
-        flash('权限不足', 'danger')
-        return redirect(url_for('main.index'))
     processes = ProcessPrice.query.order_by(ProcessPrice.process_code).all()
     employees = Employee.query.filter_by(is_active=True).order_by(Employee.name).all()
     employees_data = [{'id': e.id, 'employee_id': e.employee_id, 'name': e.name} for e in employees]
@@ -139,10 +179,9 @@ def list_process_assignments():
 
 @bp.route('/api/process_assignment/<int:process_id>', methods=['POST'])
 @login_required
+@require_capability('process_assignment.manage')
 @csrf.exempt
 def save_process_assignment(process_id):
-    if current_user.role not in ['admin', 'manager']:
-        return jsonify({'success': False, 'message': '权限不足'}), 403
     try:
         data = request.get_json() or {}
         strategy = (data.get('strategy') or 'round_robin').strip()
@@ -196,10 +235,9 @@ def save_process_assignment(process_id):
 
 @bp.route('/api/process_assignment/bulk', methods=['POST'])
 @login_required
+@require_capability('process_assignment.manage')
 @csrf.exempt
 def save_process_assignment_bulk():
-    if current_user.role not in ['admin', 'manager']:
-        return jsonify({'success': False, 'message': '权限不足'}), 403
     try:
         payload = request.get_json() or {}
         # payload: { process_id: {strategy, is_active, members: [{employee_id, sequence, weight}]}, ... }
@@ -305,8 +343,10 @@ def user_dashboard():
         f'user_dashboard accessed by user {current_user.id} ({current_user.username}) role={current_user.role}'
     )
 
-    # 以下两处直接渲染欢迎页而不是重定向回 index，避免与 index 互相跳转
-    if current_user.role not in ['user', 'inspector', 'admin', 'manager']:
+    # 以下两处直接渲染欢迎页而不是重定向回 index，避免与 index 互相跳转。
+    # 「有工作台」的角色 = 员工自助(my_tasks.use) + 生产/质检视角，由能力表推导，
+    # 不再手写角色名，避免与 permissions.py 漂移
+    if not can_any('my_tasks.use', 'production_order.view', 'quality.view'):
         return render_template(
             'main/welcome.html',
             message='当前角色没有员工工作台，请从导航栏进入所需功能。'
@@ -401,11 +441,9 @@ def user_dashboard():
 
 @bp.route('/employees')
 @login_required
+@require_capability('employee.view')
 @handle_pagination_args
 def manage_employees():
-    if current_user.role not in ['admin', 'hr']:
-        flash('权限不足', 'danger')
-        return redirect(url_for('main.index'))
     
     search_form = ProductionRecordSearchForm()
     
@@ -434,9 +472,8 @@ def manage_employees():
 
 @bp.route('/employee/<int:id>', methods=['DELETE'])
 @login_required
+@require_capability('employee.delete')
 def delete_employee(id):
-    if not current_user.role == 'admin':
-        return jsonify({'success': False, 'message': '权限不足'}), 403
     
     try:
         employee = Employee.query.get_or_404(id)
@@ -479,10 +516,8 @@ def delete_employee(id):
 
 @bp.route('/employee/add', methods=['GET', 'POST'])
 @login_required
+@require_capability('employee.manage')
 def add_employee():
-    if current_user.role not in ['admin', 'hr']:
-        flash('权限不足', 'danger')
-        return redirect(url_for('main.index'))
     
     form = EmployeeForm()
     if form.validate_on_submit():
@@ -559,10 +594,8 @@ def add_employee():
 
 @bp.route('/employees/<int:id>/edit', methods=['GET', 'POST'])
 @login_required
+@require_capability('employee.manage')
 def edit_employee(id):
-    if current_user.role not in ['admin', 'hr']:
-        flash('权限不足', 'danger')
-        return redirect(url_for('main.index'))
     
     employee = Employee.query.get_or_404(id)
     form = EmployeeForm()
@@ -617,7 +650,6 @@ def edit_employee(id):
             # 记录工资变更历史
             if salary_changed:
                 salary_history = EmployeeSalaryHistory(
-                    serial_number=SerialNumber.get_next_number(),
                     employee_id=employee.id,
                     old_salary=old_data['base_salary'],
                     new_salary=employee.base_salary,
@@ -630,7 +662,6 @@ def edit_employee(id):
             # 记录系数变更历史
             if coefficient_changed:
                 coefficient_history = EmployeeCoefficientHistory(
-                    serial_number=SerialNumber.get_next_number(),
                     employee_id=employee.id,
                     old_coefficient=old_data['coefficient'],
                     new_coefficient=employee.coefficient,
@@ -774,11 +805,9 @@ def process_prices():
                          today=today)
 @bp.route('/add_process_price', methods=['GET', 'POST'])
 @login_required
+@require_capability('process.manage')
 def add_process_price():
     """添加工序价格"""
-    if current_user.role not in ['admin', 'hr']:
-        flash('权限不足', 'danger')
-        return redirect(url_for('main.index'))
     
     form = ProcessPriceForm()
     
@@ -889,10 +918,8 @@ def add_process_price():
                          raw_rules_json=raw_rules_json)
 @bp.route('/process_prices/<int:id>/edit', methods=['GET', 'POST'])
 @login_required
+@require_capability('process.manage')
 def edit_process_price(id):
-    if current_user.role not in ['admin', 'hr']:
-        flash('权限不足', 'danger')
-        return redirect(url_for('main.index'))
     
     process_price = ProcessPrice.query.get_or_404(id)
     form = ProcessPriceForm()
@@ -1055,9 +1082,8 @@ def edit_process_price(id):
 
 @bp.route('/process_price/<int:id>', methods=['DELETE'])
 @login_required
+@require_capability('process.delete')
 def delete_process_price(id):
-    if not current_user.role == 'admin':
-        return jsonify({'success': False, 'message': '权限不足'}), 403
     
     try:
         process = ProcessPrice.query.get_or_404(id)
@@ -1383,9 +1409,8 @@ def manage_production_records():
 
 @bp.route('/delete_production_record/<int:id>', methods=['DELETE'])
 @login_required
+@require_capability('production_record.manage')
 def delete_production_record(id):
-    if not current_user.role in ['admin', 'hr']:
-        return jsonify({'success': False, 'message': '权限不足'}), 403
     
     try:
         record = ProductionRecord.query.get_or_404(id)
@@ -1483,12 +1508,10 @@ def delete_production_record(id):
         return jsonify({'success': False, 'message': '删除失败，请重试'}), 500
 @bp.route('/bonus_penalties', methods=['GET', 'POST'])
 @login_required
+@require_capability('bonus.manage')
 @handle_pagination_args
 def manage_bonus_penalties():
     """管理奖惩记录"""
-    if current_user.role not in ['admin', 'hr']:
-        flash('权限不足', 'danger')
-        return redirect(url_for('main.index'))
     
     form = BonusPenaltyForm()
     search_form = BonusPenaltySearchForm()
@@ -1593,9 +1616,8 @@ def manage_bonus_penalties():
 
 @bp.route('/bonus_penalty/<int:id>', methods=['DELETE'])
 @login_required
+@require_capability('bonus.manage')
 def delete_bonus_penalty(id):
-    if not current_user.role in ['admin', 'hr']:
-        return jsonify({'success': False, 'message': '权限不足'}), 403
     
     try:
         record = BonusPenalty.query.get_or_404(id)
@@ -1629,10 +1651,8 @@ def delete_bonus_penalty(id):
 
 @bp.route('/bonus_penalties/<int:id>/edit', methods=['POST'])
 @login_required
+@require_capability('bonus.manage')
 def edit_bonus_penalty(id):
-    if current_user.role not in ['admin', 'hr']:
-        flash('权限不足', 'danger')
-        return redirect(url_for('main.index'))
     
     form = BonusPenaltyForm()
     if form.validate_on_submit():
@@ -1686,10 +1706,9 @@ def edit_bonus_penalty(id):
     return render_template('main/edit_bonus_penalty.html', form=form, record=record)
 @bp.route('/bonus_penalties/add', methods=['POST'])
 @login_required
+@require_capability('bonus.manage')
 def add_bonus_penalty():
     """添加奖金/罚款记录"""
-    if current_user.role not in ['admin', 'hr']:
-        return jsonify({'success': False, 'message': '权限不足'}), 403
     
     try:
         data = request.get_json()
@@ -1737,10 +1756,8 @@ def add_bonus_penalty():
 
 @bp.route('/salary_calculation', methods=['GET', 'POST'])
 @login_required
+@require_capability('salary.view')
 def salary_calculation():
-    if current_user.role not in ['admin', 'accountant']:
-        flash('权限不足')
-        return redirect(url_for('main.index'))
     
     form = SalaryCalculationForm()
     
@@ -1830,10 +1847,9 @@ def salary_calculation():
 
 @bp.route('/audit_logs', methods=['GET', 'POST'])
 @login_required
+@require_capability('audit.view')
+@handle_pagination_args
 def view_audit_logs():
-    if current_user.role != 'admin':
-        flash('权限不足', 'danger')
-        return redirect(url_for('main.index'))
     
     form = AuditLogSearchForm()
     # 获取所有用户供选择
@@ -1857,9 +1873,9 @@ def view_audit_logs():
         if form.user_id.data and form.user_id.data != 0:
             query = query.filter(AuditLog.user_id == form.user_id.data)
     
-    # 分页
-    page = request.args.get('page', 1, type=int)
-    pagination = query.paginate(page=page, per_page=20, error_out=False)
+    # 分页（统一走 @handle_pagination_args 的白名单口径）
+    page = request.validated_page
+    pagination = query.paginate(page=page, per_page=request.validated_per_page, error_out=False)
     logs = pagination.items
     
     return render_template('main/audit_logs.html', 
@@ -1869,11 +1885,9 @@ def view_audit_logs():
 
 @bp.route('/employees/template')
 @login_required
+@require_capability('employee.manage')
 def download_employee_template():
     """下载员工导入模板"""
-    if current_user.role not in ['admin', 'hr']:
-        flash('权限不足', 'danger')
-        return redirect(url_for('main.index'))
     
     temp_path = None
     try:
@@ -1912,10 +1926,9 @@ def download_employee_template():
 
 @bp.route('/employees/import', methods=['POST'])
 @login_required
+@require_capability('employee.manage')
 def import_employees():
     """导入员工数据"""
-    if current_user.role not in ['admin', 'hr']:
-        return jsonify({'success': False, 'message': '权限不足'})
     
     if 'file' not in request.files:
         return jsonify({'success': False, 'message': '没有上传文件'})
@@ -2238,11 +2251,9 @@ def export_employees():
 
 @bp.route('/process_prices/template')
 @login_required
+@require_capability('process.manage')
 def download_process_price_template():
     """下载工序价格导入模板"""
-    if current_user.role not in ['admin', 'hr']:
-        flash('权限不足', 'danger')
-        return redirect(url_for('main.index'))
     
     temp_path = None
     try:
@@ -2280,10 +2291,9 @@ def download_process_price_template():
                 pass
 @bp.route('/process_prices/import', methods=['POST'])
 @login_required
+@require_capability('process.manage')
 def import_process_prices():
     """导入工序价格数据"""
-    if current_user.role not in ['admin', 'hr']:
-        return jsonify({'success': False, 'message': '权限不足'})
     
     if 'file' not in request.files:
         return jsonify({'success': False, 'message': '没有上传文件'})
@@ -2653,11 +2663,9 @@ def export_process_prices():
 
 @bp.route('/production_records/template')
 @login_required
+@require_capability('production_record.manage')
 def download_production_record_template():
     """下载生产记录导入模板"""
-    if current_user.role not in ['admin', 'hr']:
-        flash('权限不足', 'danger')
-        return redirect(url_for('main.index'))
     
     temp_path = None
     try:
@@ -2696,10 +2704,9 @@ def download_production_record_template():
 
 @bp.route('/production_records/import', methods=['POST'])
 @login_required
+@require_capability('production_record.manage')
 def import_production_records():
     """导入生产记录数据"""
-    if current_user.role not in ['admin', 'hr']:
-        return jsonify({'success': False, 'message': '权限不足'})
     
     if 'file' not in request.files:
         return jsonify({'success': False, 'message': '没有上传文件'})
@@ -2890,6 +2897,7 @@ def export_bonus_penalties():
 @bp.route('/search', methods=['GET', 'POST'])
 @login_required
 @require_capability('search.use')
+@handle_pagination_args
 def global_search():
     """全局搜索页面"""
     form = GlobalSearchForm()
@@ -2902,8 +2910,9 @@ def global_search():
         form.query.data = url_query
         form.search_type.data = request.args.get('search_type', 'all')
         
-        page = request.args.get('page', 1, type=int)
-        per_page = 20
+        # 分页（统一走 @handle_pagination_args 的白名单口径）
+        page = request.validated_page
+        per_page = request.validated_per_page
         
         search_results = SearchService.global_search(
             query=url_query,
@@ -2915,8 +2924,9 @@ def global_search():
     elif form.validate_on_submit():
         query = form.query.data
         search_type = form.search_type.data
-        page = request.args.get('page', 1, type=int)
-        per_page = 20
+        # 分页（统一走 @handle_pagination_args 的白名单口径）
+        page = request.validated_page
+        per_page = request.validated_per_page
         
         search_results = SearchService.global_search(
             query=query,
@@ -2933,6 +2943,7 @@ def global_search():
 @bp.route('/search/advanced', methods=['GET', 'POST'])
 @login_required
 @require_capability('search.use')
+@handle_pagination_args
 def advanced_search():
     """高级搜索页面"""
     form = AdvancedSearchForm()
@@ -3024,8 +3035,9 @@ def advanced_search():
         if form.planned_end_date.data:
             search_params['planned_end_date'] = form.planned_end_date.data
         
-        page = request.args.get('page', 1, type=int)
-        per_page = 20
+        # 分页（统一走 @handle_pagination_args 的白名单口径）
+        page = request.validated_page
+        per_page = request.validated_per_page
         
         search_results = SearchService.advanced_search(
             search_params=search_params,
@@ -3064,7 +3076,8 @@ def quick_search():
     if not query:
         return jsonify({'error': '请输入搜索关键词'}), 400
     
-    # 只返回前5个结果用于快速预览
+    # 只返回前5个结果用于快速预览：本端点是不分页的固定窗口建议接口，
+    # 白名单即固定 per_page=5/page=1（页面列表一律走 @handle_pagination_args 的 20/50/100 口径）
     search_results = SearchService.global_search(
         query=query,
         search_type=search_type,
@@ -3124,12 +3137,10 @@ def quick_search():
 
 @bp.route('/tasks', methods=['GET', 'POST'])
 @login_required
+@require_capability('task.manage')
 @handle_pagination_args
 def manage_tasks():
     """管理任务分配"""
-    if current_user.role not in ['admin', 'hr']:
-        flash('权限不足', 'danger')
-        return redirect(url_for('main.index'))
     
     form = TaskAssignmentForm()
     search_form = TaskSearchForm()
@@ -3396,6 +3407,22 @@ def update_task_status(id):
         # 更新任务状态
         task.completed_quantity = completed_quantity
         if completed_quantity >= task.quantity:
+            # 重复报工按幂等拒绝：ProductionRecord 以 task.global_sn 作为与任务的关联键
+            # （一个任务只应有一条生产记录，计件薪资也按它计算）。历史上第二次达量报工会撞
+            # global_sn 唯一约束、让整单回滚并抛 500；这里在扣料/计件/建质检任务之前就挡住，
+            # 既不重复计件也不重复扣料，同时给出可读提示并留日志，不静默丢数据。
+            existing_record = ProductionRecord.query.filter_by(global_sn=task.global_sn).first()
+            if existing_record is not None:
+                db.session.rollback()
+                current_app.logger.warning(
+                    f'重复报工被拒：任务 {task.id} 已有生产记录 {existing_record.id}'
+                    f'（global_sn={existing_record.global_sn}）'
+                )
+                return jsonify({
+                    'success': False,
+                    'message': f'该任务已报工完成（生产记录 {existing_record.global_sn}，'
+                               f'{existing_record.date}），请勿重复提交',
+                }), 400
             task.status = 'completed'
             task.completed_at = datetime.now()
             
@@ -3492,12 +3519,6 @@ def update_task_status(id):
                 raw_material = RawMaterial.query.get(int(material['raw_material_id']))
                 old_quantity = raw_material.quantity
                 raw_material.quantity -= float(material['quantity'])
-                if task.production_batch_id:
-                    batch = ProductionBatch.query.get(task.production_batch_id)
-                    if batch:
-                        mes_service.write_consumed_allocation(
-                            batch.production_order_id, 'raw', raw_material.id, float(material['quantity'])
-                        )
                 
                 # 如果原材料数量耗尽（小于等于0），将状态修改为已使用
                 if raw_material.quantity <= 0:
@@ -3515,6 +3536,27 @@ def update_task_status(id):
                         new_data={'status': 'used', 'quantity': raw_material.quantity}
                     )
                     db.session.add(status_log)
+
+            # 决策 2：报工扣料按「任务所属生产订单」归集已消耗数量，与上面的实扣同口径，
+            # 避免计划账（MaterialAllocation.required/allocated）与实际账（RawMaterial.quantity）脱节。
+            # 覆盖 production_batch_id 与 batch_item_id 两种挂接；没有对应分配行时只记 missing 并留痕，
+            # 不臆造计划行；非法明细只记 invalid，不阻断本次报工。
+            try:
+                with db.session.begin_nested():
+                    consumption = mes_service.record_task_material_consumption(task, materials_data)
+                if consumption['written']:
+                    current_app.logger.info(
+                        f'报工扣料已回写生产订单 {consumption["production_order_id"]}：'
+                        f'{len(consumption["written"])} 条分配行'
+                    )
+                if consumption['missing']:
+                    current_app.logger.warning(
+                        f'报工扣料未回写（该订单无对应分配行）：{consumption["missing"]}'
+                    )
+                if consumption['invalid']:
+                    current_app.logger.warning(f'报工扣料明细被跳过：{consumption["invalid"]}')
+            except Exception as e:
+                current_app.logger.error(f'报工扣料回写 MaterialAllocation 失败: {str(e)}')
         else:
             # 如果任务还未完成，但已经开始，更新状态为进行中
             task.status = 'in_progress'
@@ -3650,8 +3692,10 @@ def update_task_status(id):
                 # 不影响主流程，继续执行
         
         # 同步生产中心：若任务关联实例/批次则更新实例或批次下各实例的可视状态
+        # 注意：ProductionBatchItem 由模块顶部统一 import；这里绝不能再用函数内 import，
+        # 否则 Python 会把该名字视为整个函数的局部变量，函数前部的替用分析（L3557 附近）
+        # 会抛 UnboundLocalError 并被 except 吞掉，导致实例任务的替用通知发不出。
         try:
-            from app.models import ProductionBatchItem
             if task.batch_item_id:
                 bi = ProductionBatchItem.query.get(task.batch_item_id)
                 if bi:
@@ -3666,6 +3710,72 @@ def update_task_status(id):
         except Exception as sync_err:
             current_app.logger.warning(f'同步生产中心状态失败: {str(sync_err)}')
 
+        # 决策 1：报工路径末道工序完成后按工件域 MES 口径把产出计入正品库（stock_kind='fg'）。
+        # 两套入口并存：只补 /my_tasks 报工这条链，工件域（/production_center + 质检）路径不动。
+        # 门禁、末道判定、幂等都由 mes_service 统一负责（本次报工自身随之创建的质检任务属于
+        # 下游流程，其不合格由既有未通过库口径处置；入库前仍须过 qc_gate_allows_output）。
+        if completed_quantity >= task.quantity:
+            try:
+                batch_for_output = (ProductionBatch.query.get(task.production_batch_id)
+                                    if task.production_batch_id else None)
+                item_for_output = (ProductionBatchItem.query.get(task.batch_item_id)
+                                   if task.batch_item_id else None)
+                order_for_output = (batch_for_output.production_order if batch_for_output else None) or (
+                    item_for_output.batch.production_order
+                    if item_for_output and item_for_output.batch else None)
+
+                if order_for_output is None:
+                    current_app.logger.debug(
+                        f'任务 {task.id} 未挂生产批次/批次实例，报工产出不入正品库'
+                    )
+                elif not mes_service.is_last_process(order_for_output.product_id, task.process_id):
+                    current_app.logger.info(
+                        f'任务 {task.id} 工序 {task.process_id} 不是末道工序，产出不入正品库'
+                    )
+                else:
+                    # 入库数量与同口径生成的 ProductionRecord.quantity 一致（本次报工数量）
+                    with db.session.begin_nested():
+                        finished_product, reason = mes_service.inbound_production_output(
+                            task=task,
+                            production_order=order_for_output,
+                            process_id=task.process_id,
+                            quantity=task.quantity,
+                        )
+                    if finished_product is None:
+                        current_app.logger.warning(
+                            f'任务 {task.id} 末道产出未入正品库（{order_for_output.order_number}）：{reason}'
+                        )
+                    elif reason:
+                        # 已有同编号正品库行（服务幂等），本次没有新建，不写入库审计
+                        current_app.logger.info(
+                            f'任务 {task.id} 末道产出未重复入库：{finished_product.product_number}（{reason}）'
+                        )
+                    else:
+                        current_app.logger.info(
+                            f'任务 {task.id} 末道产出已入正品库：'
+                            f'{finished_product.product_number} × {finished_product.quantity}'
+                        )
+                        db.session.add(AuditLog(
+                            user_id=current_user.id,
+                            action='报工末道入库',
+                            details=f'任务 {task.id} 末道工序报工，产出 {finished_product.product_number} '
+                                    f'入正品库，数量 {finished_product.quantity}',
+                            can_rollback=True,
+                            rollback_type='delete',
+                            target_model='FinishedProduct',
+                            target_id=finished_product.id,
+                            new_data={
+                                'product_number': finished_product.product_number,
+                                'quantity': finished_product.quantity,
+                                'stock_kind': 'fg',
+                                'production_order_id': order_for_output.id,
+                                'task_id': task.id,
+                                'process_id': task.process_id,
+                            }
+                        ))
+            except Exception as inbound_err:
+                current_app.logger.error(f'报工末道入库失败: {str(inbound_err)}')
+
         db.session.commit()
         return jsonify({'success': True, 'message': '更新成功'})
     except Exception as e:
@@ -3676,10 +3786,9 @@ def update_task_status(id):
 
 @bp.route('/tasks/<int:id>', methods=['DELETE'])
 @login_required
+@require_capability('task.manage')
 def delete_task(id):
     """删除任务"""
-    if current_user.role not in ['admin', 'hr']:
-        return jsonify({'success': False, 'message': '权限不足'}), 403
     
     try:
         task = TaskAssignment.query.get_or_404(id)
@@ -3735,11 +3844,9 @@ def my_tasks():
 
 @bp.route('/bonus_penalties/template')
 @login_required
+@require_capability('bonus.manage')
 def download_bonus_penalty_template():
     """下载奖金/罚款导入模板"""
-    if current_user.role not in ['admin', 'hr']:
-        flash('权限不足', 'danger')
-        return redirect(url_for('main.manage_bonus_penalties'))
     
     temp_path = None
     try:
@@ -3778,10 +3885,9 @@ def download_bonus_penalty_template():
 
 @bp.route('/bonus_penalties/import', methods=['POST'])
 @login_required
+@require_capability('bonus.manage')
 def import_bonus_penalties():
     """导入奖金/罚款数据"""
-    if current_user.role not in ['admin', 'hr']:
-        return jsonify({'success': False, 'message': '权限不足'})
     
     if 'file' not in request.files:
         return jsonify({'success': False, 'message': '没有上传文件'})
@@ -3804,12 +3910,18 @@ def import_bonus_penalties():
         success_count = 0
         error_messages = []
         
-        for data in record_data:
+        for index, data in enumerate(record_data):
             try:
                 # 查找员工
                 employee = Employee.query.filter_by(employee_id=data['employee_id']).first()
                 if not employee:
                     error_messages.append(f"员工工号 {data['employee_id']} 不存在")
+                    continue
+                
+                # 日期兜底：文本日期单元格（str）会被 SQLite 方言拒绝，统一解析
+                bonus_date, date_error = _coerce_excel_date(data.get('date'), '日期')
+                if date_error:
+                    error_messages.append(f'第 {index + 2} 行：{date_error}')
                     continue
                 
                 # 查找工序（如果有）
@@ -3825,7 +3937,7 @@ def import_bonus_penalties():
                     employee_id=employee.id,
                     type=data['type'],
                     amount=data['amount'],
-                    date=data['date'],
+                    date=bonus_date,
                     process_id=process_id,
                     reason=data['reason']
                 )
@@ -3860,11 +3972,9 @@ def import_bonus_penalties():
 
 @bp.route('/tasks/template')
 @login_required
+@require_capability('task.manage')
 def download_task_template():
     """下载任务导入模板"""
-    if current_user.role not in ['admin', 'hr']:
-        flash('权限不足', 'danger')
-        return redirect(url_for('main.manage_tasks'))
     
     temp_path = None
     try:
@@ -3903,10 +4013,9 @@ def download_task_template():
 
 @bp.route('/tasks/import', methods=['POST'])
 @login_required
+@require_capability('task.manage')
 def import_tasks():
     """导入任务数据"""
-    if current_user.role not in ['admin', 'hr']:
-        return jsonify({'success': False, 'message': '权限不足'})
     
     if 'file' not in request.files:
         return jsonify({'success': False, 'message': '没有上传文件'})
@@ -3929,7 +4038,7 @@ def import_tasks():
         success_count = 0
         error_messages = []
         
-        for data in task_data:
+        for index, data in enumerate(task_data):
             try:
                 # 查找员工
                 employee = Employee.query.filter_by(employee_id=data['employee_id']).first()
@@ -3943,13 +4052,19 @@ def import_tasks():
                     error_messages.append(f"工序编号 {data['process_code']} 不存在")
                     continue
                 
+                # 目标日期兜底：文本日期单元格（str）会被 SQLite 方言拒绝，统一解析
+                target_date, date_error = _coerce_excel_date(data.get('target_date'), '目标完成日期')
+                if date_error:
+                    error_messages.append(f'第 {index + 2} 行：{date_error}')
+                    continue
+                
                 # 创建任务记录
                 task = TaskAssignment(
                     global_sn=SerialNumber.get_next_number(),
                     employee_id=employee.id,
                     process_id=process.id,
                     quantity=data['quantity'],
-                    target_date=data['target_date'],
+                    target_date=target_date,
                     notes=data['notes']
                 )
                 db.session.add(task)
@@ -3982,10 +4097,8 @@ def import_tasks():
         return jsonify({'success': False, 'message': f'导入失败：{str(e)}'})
 @bp.route('/export_tasks', methods=['GET', 'POST'])
 @login_required
+@require_capability('task.manage')
 def export_tasks():
-    if current_user.role not in ['admin', 'hr']:
-        flash('权限不足', 'danger')
-        return redirect(url_for('main.index'))
 
     # 新增：支持 GET 导出以兼容前端直接链接
     if request.method == 'GET':
@@ -4055,15 +4168,20 @@ def export_tasks():
     form = ExportTaskForm()
     if form.validate_on_submit():
         try:
-            # 构建查询
-            query = TaskAssignment.query.join(Employee)
+            # 构建查询（与 GET 分支同口径：员工工号 / 工序编号 / 状态 / 目标日期区间）
+            query = TaskAssignment.query.join(Employee).join(ProcessPrice)
             
             # 处理搜索条件
             if form.employee_id.data:
-                query = query.filter(TaskAssignment.employee_id == form.employee_id.data)
+                # 表单里填的是员工工号（人事编号），任务表存的是 employee.id
+                employee = Employee.query.filter_by(employee_id=form.employee_id.data).first()
+                if employee is None:
+                    flash(f'员工工号 {form.employee_id.data} 不存在', 'warning')
+                    return redirect(url_for('main.manage_tasks'))
+                query = query.filter(TaskAssignment.employee_id == employee.id)
             
-            if form.process_id.data:
-                query = query.filter(TaskAssignment.process_id == form.process_id.data)
+            if form.process_code.data:
+                query = query.filter(ProcessPrice.process_code == form.process_code.data)
             
             if form.status.data:
                 query = query.filter(TaskAssignment.status == form.status.data)
@@ -4120,9 +4238,8 @@ def _resolve_audit_model(model_name):
 
 @bp.route('/audit_logs/rollback/<int:log_id>', methods=['POST'])
 @login_required
+@require_capability('audit.rollback')
 def rollback_audit_log(log_id):
-    if not current_user.role == 'admin':
-        return jsonify({'success': False, 'message': '权限不足'}), 403
     
     try:
         log = AuditLog.query.get_or_404(log_id)
@@ -4229,10 +4346,9 @@ def get_bonus_penalty(id):
 
 @bp.route('/bonus_penalties/<int:id>/update', methods=['POST'])
 @login_required
+@require_capability('bonus.manage')
 def update_bonus_penalty(id):
     """更新奖惩记录"""
-    if current_user.role not in ['admin', 'hr']:
-        return jsonify({'success': False, 'message': '权限不足'}), 403
     
     try:
         record = BonusPenalty.query.get_or_404(id)
@@ -4311,10 +4427,9 @@ def get_task(id):
 
 @bp.route('/tasks/add', methods=['POST'])
 @login_required
+@require_capability('task.manage')
 def add_task():
     """添加任务"""
-    if current_user.role not in ['admin', 'hr']:
-        return jsonify({'success': False, 'message': '权限不足'}), 403
     
     try:
         data = request.get_json()
@@ -4417,9 +4532,8 @@ def get_task_assignment(id):
 
 @bp.route('/tasks/<int:id>/edit', methods=['POST'])
 @login_required
+@require_capability('task.manage')
 def edit_task(id):
-    if not current_user.role in ['admin', 'hr']:
-        return jsonify({'success': False, 'message': '权限不足'}), 403
     
     try:
         data = request.get_json()
@@ -4454,10 +4568,10 @@ def edit_task(id):
         new_status = data.get('status')
         if new_status in ['pending', 'completed', 'cancelled']:
             task.status = new_status
+            # TaskAssignment 只有 completed_at（DateTime），没有 completed_date/cancelled_date；
+            # 原来写的是不存在的属性，赋值被 SQLAlchemy 静默丢弃、完成时间从未落库
             if new_status == 'completed':
-                task.completed_date = datetime.now().date()
-            elif new_status == 'cancelled':
-                task.cancelled_date = datetime.now().date()
+                task.completed_at = datetime.now()
         
         # 记录可回滚的审计日志
         log = AuditLog(
@@ -4504,9 +4618,10 @@ def edit_task(id):
 @bp.route('/employee_salary_changes/<int:employee_id>')
 @login_required
 @require_capability('employee.salary_change')
+@handle_pagination_args
 def employee_salary_changes(employee_id):
-    page = request.args.get('page', 1, type=int)
-    per_page = 20
+    page = request.validated_page
+    per_page = request.validated_per_page
     
     # 获取员工信息
     employee = Employee.query.get_or_404(employee_id)
@@ -4573,9 +4688,8 @@ def employee_salary_changes(employee_id):
 
 @bp.route('/add_salary_change', methods=['POST'])
 @login_required
+@require_capability('employee.salary_change')
 def add_salary_change():
-    if current_user.role not in ['admin', 'hr']:
-        return jsonify({'success': False, 'message': '权限不足'})
     
     data = request.get_json()
     employee_id = data.get('employee_id')
@@ -4630,9 +4744,8 @@ def add_salary_change():
         return jsonify({'success': False, 'message': str(e)})
 @bp.route('/delete_salary_change', methods=['POST'])
 @login_required
+@require_capability('employee.salary_change')
 def delete_salary_change():
-    if current_user.role not in ['admin', 'hr']:
-        return jsonify({'success': False, 'message': '权限不足'})
     
     change_id = request.form.get('id')
     
@@ -4702,8 +4815,9 @@ def delete_salary_change():
 @require_capability('inventory.view')
 @handle_pagination_args
 def manage_inventory():
-    page = request.args.get('page', 1, type=int)
-    per_page = 20
+    # 分页口径统一走 @handle_pagination_args（per_page 白名单 20/50/100）
+    page = request.validated_page
+    per_page = request.validated_per_page
     inventory_type = request.args.get('type', 'finished')
     search = request.args.get('search', '')
     show_archived = request.args.get('show_archived', '0') == '1'
@@ -4805,10 +4919,9 @@ def download_inventory_template():
 
 @bp.route('/inventory/finished/import', methods=['POST'])
 @login_required
+@require_capability('inventory.manage')
 def import_finished_products():
     """导入成品库存"""
-    if current_user.role not in ['admin', 'manager']:
-        return jsonify({'success': False, 'message': '权限不足'})
     
     if 'file' not in request.files:
         return jsonify({'success': False, 'message': '没有上传文件'})
@@ -4893,10 +5006,9 @@ def import_finished_products():
 
 @bp.route('/inventory/raw/import', methods=['POST'])
 @login_required
+@require_capability('inventory.manage')
 def import_raw_materials():
     """导入原材料库存"""
-    if current_user.role not in ['admin', 'manager']:
-        return jsonify({'success': False, 'message': '权限不足'})
     
     if 'file' not in request.files:
         return jsonify({'success': False, 'message': '没有上传文件'})
@@ -4926,10 +5038,13 @@ def import_raw_materials():
         for index, row in df.iterrows():
             try:
                 # 创建原材料记录
+                # 品名在 RawMaterial 上是取 category.name 的 @property，不是列；
+                # 必须落成真实品类（不存在则按需建），否则 category_id 缺失 + TypeError
+                category = _resolve_raw_material_category(row['品名'], current_user.id)
                 material = RawMaterial(
                     global_sn=SerialNumber.get_next_number(),
                     supplier=str(row['供应商']),
-                    material_name=str(row['品名']),
+                    category_id=category.id,
                     melt_number=str(row['原料冶炼炉号']),
                     supplier_number=str(row['供应商编号']),
                     storage_date=pd.to_datetime(row['入库时间']).date(),
@@ -5017,7 +5132,7 @@ def save_temp_file(file: FileStorage) -> str:
 
 @bp.route('/upload/raw-materials', methods=['POST'])
 @login_required
-@admin_required
+@require_capability('inventory.manage')
 def upload_raw_materials():
     """处理原材料数据文件上传"""
     try:
@@ -5069,7 +5184,7 @@ def upload_raw_materials():
 
 @bp.route('/upload/finished-products', methods=['POST'])
 @login_required
-@admin_required
+@require_capability('inventory.manage')
 def upload_finished_products():
     """处理成品数据文件上传"""
     try:
@@ -5122,10 +5237,9 @@ def upload_finished_products():
 
 @bp.route('/inventory/finished/add', methods=['POST'])
 @login_required
+@require_capability('inventory.manage')
 def add_finished_product():
     """添加单个成品"""
-    if current_user.role not in ['admin', 'manager']:
-        return jsonify({'success': False, 'message': '权限不足'})
     
     try:
         # 检查Content-Type
@@ -5214,10 +5328,9 @@ def add_finished_product():
 
 @bp.route('/inventory/raw/add', methods=['POST'])
 @login_required
+@require_capability('inventory.manage')
 def add_raw_material():
     """添加单个原材料"""
-    if current_user.role not in ['admin', 'manager']:
-        return jsonify({'success': False, 'message': '权限不足'})
     
     try:
         # 检查Content-Type
@@ -5393,10 +5506,9 @@ def manage_code_rules():
     return render_template('main/code_rules.html', rules=rules)
 @bp.route('/code_rules/add', methods=['GET', 'POST'])
 @login_required
+@require_capability('code_rule.manage')
 def add_code_rule():
     """添加编码规则"""
-    if current_user.role != 'admin':
-        return jsonify({'success': False, 'message': '权限不足'})
     
     if request.method == 'POST':
         try:
@@ -5445,10 +5557,9 @@ def add_code_rule():
 
 @bp.route('/code_rules/<int:rule_id>/edit', methods=['GET', 'POST'])
 @login_required
+@require_capability('code_rule.manage')
 def edit_code_rule(rule_id):
     """编辑编码规则"""
-    if current_user.role != 'admin':
-        return jsonify({'success': False, 'message': '权限不足'})
     
     rule = CodeRule.query.get_or_404(rule_id)
     
@@ -5502,10 +5613,9 @@ def edit_code_rule(rule_id):
 
 @bp.route('/code_rules/<int:rule_id>/delete', methods=['POST'])
 @login_required
+@require_capability('code_rule.manage')
 def delete_code_rule(rule_id):
     """删除编码规则"""
-    if current_user.role != 'admin':
-        return jsonify({'success': False, 'message': '权限不足'})
     
     rule = CodeRule.query.get_or_404(rule_id)
     
@@ -5541,10 +5651,9 @@ def delete_code_rule(rule_id):
 
 @bp.route('/code_rules/<int:rule_id>/generate', methods=['POST'])
 @login_required
+@require_capability('code_rule.manage')
 def generate_code(rule_id):
     """生成编码"""
-    if current_user.role != 'admin':
-        return jsonify({'success': False, 'message': '权限不足'})
         
     rule = CodeRule.query.get_or_404(rule_id)
     
@@ -5629,10 +5738,9 @@ def get_available_material_rules():
 
 @bp.route('/inventory/finished/<int:id>', methods=['GET'])
 @login_required
+@require_capability('inventory.view')
 def get_finished_product(id):
     """获取成品详情"""
-    if current_user.role not in ['admin', 'manager']:
-        return jsonify({'success': False, 'message': '权限不足'})
     
     try:
         product = FinishedProduct.query.get_or_404(id)
@@ -5656,10 +5764,9 @@ def get_finished_product(id):
 
 @bp.route('/inventory/finished/<int:id>', methods=['PUT'])
 @login_required
+@require_capability('inventory.manage')
 def update_finished_product(id):
     """更新成品信息"""
-    if current_user.role not in ['admin', 'manager']:
-        return jsonify({'success': False, 'message': '权限不足'})
     
     try:
         product = FinishedProduct.query.get_or_404(id)
@@ -5688,8 +5795,8 @@ def update_finished_product(id):
         product.quantity = data['quantity']
         product.status = data['status']
         product.notes = data.get('notes', '')
-        product.code_rule_id = data.get('code_rule_id') if data.get('code_rule_id') else None
-        product.updated_at = datetime.utcnow()
+        # FinishedProduct 没有 code_rule_id / updated_at 列（那是 Product 的列），
+        # 原写法只是给实例挂了个不落库的临时属性，属于同一类「不存在的列」误用，已删除
         
         # 记录审计日志
         log = AuditLog(
@@ -5727,10 +5834,9 @@ def update_finished_product(id):
 
 @bp.route('/inventory/raw/<int:id>', methods=['GET'])
 @login_required
+@require_capability('inventory.view')
 def get_raw_material(id):
     """获取原材料详情"""
-    if current_user.role not in ['admin', 'manager']:
-        return jsonify({'success': False, 'message': '权限不足'})
     
     try:
         material = RawMaterial.query.get_or_404(id)
@@ -5758,10 +5864,9 @@ def get_raw_material(id):
 
 @bp.route('/inventory/raw/<int:id>', methods=['PUT'])
 @login_required
+@require_capability('inventory.manage')
 def update_raw_material(id):
     """更新原材料信息"""
-    if current_user.role not in ['admin', 'manager']:
-        return jsonify({'success': False, 'message': '权限不足'})
     
     try:
         material = RawMaterial.query.get_or_404(id)
@@ -5893,11 +5998,10 @@ def get_process_price(id):
 
 @bp.route('/inventory/raw/<int:id>', methods=['DELETE'])
 @login_required
+@require_capability('inventory.manage')
 @csrf.exempt  # 对DELETE请求豁免CSRF保护
 def delete_raw_material(id):
     """删除原材料"""
-    if current_user.role not in ['admin', 'manager']:
-        return jsonify({'success': False, 'message': '权限不足'}), 403
     
     try:
         material = RawMaterial.query.get_or_404(id)
@@ -5957,11 +6061,10 @@ def delete_raw_material(id):
 
 @bp.route('/inventory/finished/<int:id>', methods=['DELETE'])
 @login_required
+@require_capability('inventory.manage')
 @csrf.exempt  # 对DELETE请求豁免CSRF保护
 def delete_finished_product(id):
     """删除成品"""
-    if current_user.role not in ['admin', 'manager']:
-        return jsonify({'success': False, 'message': '权限不足'}), 403
     
     try:
         product = FinishedProduct.query.get_or_404(id)
@@ -6123,6 +6226,16 @@ def get_available_finished_products():
             query = query.filter(FinishedProduct.status == 'in_stock')
             
         finished_products = query.all()
+        # 成品表没有 specification/unit 列：规格按 raw-materials 同一风格用自身列拼，
+        # 单位取关联产品（一次批量查，避免逐行懒加载打 N+1）
+        product_ids = {p.product_id for p in finished_products if p.product_id}
+        product_units = {}
+        if product_ids:
+            product_units = {
+                pid: (unit or '件')
+                for pid, unit in db.session.query(Product.id, Product.unit).filter(
+                    Product.id.in_(product_ids)).all()
+            }
         products_list = [{
             'id': product.id,
             'name': product.product_number,
@@ -6130,6 +6243,9 @@ def get_available_finished_products():
             'drawing_number': product.drawing_number,
             'model': product.model,
             'serial_number': product.serial_number,
+            # Select2 契约与 /api/inventory/raw-materials 对齐：id/name/specification/quantity
+            'specification': f"{product.drawing_number or '-'} - {product.model or '-'}",
+            'unit': product_units.get(product.product_id, '件'),
             'quantity': product.quantity,
             'status': product.status,
             'inspector': product.inspector,
@@ -6173,10 +6289,9 @@ def get_available_consumables():
 
 @bp.route('/inventory/raw/<int:id>/archive', methods=['POST'])
 @login_required
+@require_capability('inventory.manage')
 def toggle_raw_material_archive(id):
     """切换原材料存档状态"""
-    if current_user.role not in ['admin', 'manager']:
-        return jsonify({'success': False, 'message': '权限不足'}), 403
     
     try:
         material = RawMaterial.query.get_or_404(id)
@@ -6216,10 +6331,9 @@ def toggle_raw_material_archive(id):
         }), 500
 @bp.route('/inventory/finished/<int:id>/archive', methods=['POST'])
 @login_required
+@require_capability('inventory.manage')
 def toggle_finished_product_archive(id):
     """切换成品存档状态"""
-    if current_user.role not in ['admin', 'manager']:
-        return jsonify({'success': False, 'message': '权限不足'}), 403
     
     try:
         product = FinishedProduct.query.get_or_404(id)
@@ -6384,9 +6498,12 @@ def inventory_inbound():
                         # 自动生成内部编号
                         internal_number = field5 if field5 else SerialNumber.get_next_number()
                         
+                        # field2 是品名（品类名）：material_name 是 @property，写不进库，
+                        # 必须落成真实外键 category_id
+                        category = _resolve_raw_material_category(field2, current_user.id)
                         raw_material = RawMaterial(
                             supplier=field1,           # 供应商
-                            material_name=field2,      # 品名
+                            category_id=category.id,   # 品名 -> 原材料品类
                             quantity=quantity,
                             storage_date=storage_date,
                             melt_number=field3 if field3 else '',        # 冶炼炉号
@@ -6431,12 +6548,14 @@ def inventory_inbound():
                             error_messages.append(f'第 {row_index + 1} 行：生产日期格式错误')
                             continue
                         
+                        # FinishedProduct 没有 storage_date 列：入库日期由 created_at 承担
+                        # （与 search_service 对成品 storage_date 的过滤口径一致）
                         finished_product = FinishedProduct(
                             product_number=field1,     # 产品编号
                             drawing_number=field2,     # 图号
                             model=field3,              # 型号
                             quantity=int(quantity),
-                            storage_date=storage_date,
+                            created_at=datetime.combine(storage_date, datetime.min.time()),
                             inspector=field4,          # 检验员
                             production_date=production_date,
                             notes=notes,
@@ -6698,12 +6817,14 @@ def finished_product_inbound():
                     
                     notes = row_data.get('notes', '').strip()
                     
+                    # FinishedProduct 没有 storage_date 列：入库日期由 created_at 承担
+                    # （与 search_service 对成品 storage_date 的过滤口径一致）
                     finished_product = FinishedProduct(
                         product_number=product_number,
                         drawing_number=drawing_number,
                         model=model,
                         quantity=quantity,
-                        storage_date=storage_date,
+                        created_at=datetime.combine(storage_date, datetime.min.time()),
                         inspector=inspector,
                         production_date=production_date,
                         notes=notes,
@@ -6772,13 +6893,12 @@ def raw_material_categories():
 
 @bp.route('/inventory/raw-material/categories/add', methods=['POST'])
 @login_required
+@require_capability('inventory.manage')
 def add_raw_material_category():
     """添加原材料品类"""
     from app.models import RawMaterialCategory, AuditLog
     from app.main.forms import RawMaterialCategoryForm
     
-    if current_user.role not in ['admin', 'manager']:
-        return jsonify({'success': False, 'message': '权限不足'})
     
     try:
         data = request.json if request.is_json else request.form.to_dict()
@@ -6854,12 +6974,11 @@ def get_raw_material_category(category_id):
 
 @bp.route('/inventory/raw-material/categories/<int:category_id>', methods=['PUT'])
 @login_required
+@require_capability('inventory.manage')
 def update_raw_material_category(category_id):
     """更新原材料品类"""
     from app.models import RawMaterialCategory, AuditLog
     
-    if current_user.role not in ['admin', 'manager']:
-        return jsonify({'success': False, 'message': '权限不足'})
     
     try:
         category = RawMaterialCategory.query.get_or_404(category_id)
@@ -6926,12 +7045,11 @@ def update_raw_material_category(category_id):
 
 @bp.route('/inventory/raw-material/categories/<int:category_id>', methods=['DELETE'])
 @login_required
+@require_capability('inventory.manage')
 def delete_raw_material_category(category_id):
     """删除原材料品类"""
     from app.models import RawMaterialCategory, AuditLog
     
-    if current_user.role not in ['admin', 'manager']:
-        return jsonify({'success': False, 'message': '权限不足'})
     
     try:
         category = RawMaterialCategory.query.get_or_404(category_id)
@@ -7029,9 +7147,9 @@ def manage_products():
     if category_filter:
         query = query.filter(Product.category == category_filter)
     
-    # 分页
-    page = request.args.get('page', 1, type=int)
-    per_page = current_app.config.get('ITEMS_PER_PAGE', 10)
+    # 分页（统一走 @handle_pagination_args 的白名单口径，不再读 ITEMS_PER_PAGE）
+    page = request.validated_page
+    per_page = request.validated_per_page
     
     products = query.order_by(Product.created_at.desc()).paginate(
         page=page, per_page=per_page, error_out=False
@@ -7659,11 +7777,9 @@ def get_product_process(product_id, process_item_id):
 
 @bp.route('/products/template')
 @login_required
+@require_capability('product.import')
 def download_product_template():
     """下载产品导入模板"""
-    if current_user.role not in ['admin']:
-        flash('权限不足', 'danger')
-        return redirect(url_for('main.manage_products'))
     
     temp_path = None
     try:
@@ -7701,11 +7817,10 @@ def download_product_template():
                 pass
 @bp.route('/products/import', methods=['POST'])
 @login_required
+@require_capability('product.import')
 def import_products():
     """批量导入产品（含BOM和工序）"""
     try:
-        if current_user.role not in ['admin']:
-            return jsonify({'success': False, 'message': '权限不足，只有管理员可以导入数据'})
         
         form = ProductImportForm()
         if not form.validate_on_submit():
@@ -7929,12 +8044,10 @@ def import_products():
 
 @bp.route('/products/export', methods=['GET', 'POST'])
 @login_required  
+@require_capability('product.view')
 def export_products():
     """导出产品数据"""
     try:
-        if current_user.role not in ['admin', 'manager']:
-            flash('权限不足，只有管理员和经理可以导出数据', 'danger')
-            return redirect(url_for('main.manage_products'))
         
         form = ExportProductForm()
         
@@ -8078,8 +8191,8 @@ def manage_production_orders():
     # 排序和分页
     query = query.order_by(ProductionOrder.created_at.desc())
     orders = query.paginate(
-        page=request.args.get('page', 1, type=int),
-        per_page=request.args.get('per_page', 20, type=int),
+        page=request.validated_page,
+        per_page=request.validated_per_page,
         error_out=False
     )
     
@@ -8160,15 +8273,13 @@ def production_order_detail(order_id):
 
 @bp.route('/production_orders/<int:order_id>', methods=['DELETE'])
 @login_required
+@require_capability('production_order.manage')
 @csrf.exempt
 def delete_production_order(order_id):
     """删除生产订单"""
     try:
         order = ProductionOrder.query.get_or_404(order_id)
         
-        # 检查权限
-        if current_user.role not in ['admin', 'manager']:
-            return jsonify({'success': False, 'message': '权限不足'})
         
         # 检查订单状态，只能删除待开始或已取消的订单
         if order.status not in ['pending', 'cancelled']:
@@ -8214,14 +8325,11 @@ def delete_production_order(order_id):
 
 @bp.route('/production_orders/<int:order_id>/edit', methods=['GET', 'POST'])
 @login_required
+@require_capability('production_order.manage')
 def edit_production_order(order_id):
     """编辑生产订单"""
     order = ProductionOrder.query.get_or_404(order_id)
     
-    # 检查权限
-    if current_user.role not in ['admin', 'manager']:
-        flash('权限不足', 'error')
-        return redirect(url_for('main.production_order_detail', order_id=order_id))
     
     form = ProductionOrderForm()
     
@@ -8380,12 +8488,10 @@ def edit_production_order(order_id):
 
 @bp.route('/sales_order/<int:order_id>/create_production_order', methods=['POST'])
 @login_required
+@require_capability('production_order.manage')
 def create_production_order_from_sales(order_id):
     """从销售订单创建生产订单"""
     try:
-        # 检查权限
-        if current_user.role not in ['admin', 'manager']:
-            return jsonify({'success': False, 'message': '权限不足'})
         
         sales_order = SalesOrder.query.get_or_404(order_id)
         data = request.get_json()
@@ -8506,12 +8612,10 @@ def create_production_order_from_sales(order_id):
         return jsonify({'success': False, 'message': f'创建失败: {str(e)}'})
 @bp.route('/sales_order_item/<int:item_id>/create_production_order', methods=['POST'])
 @login_required
+@require_capability('production_order.manage')
 def create_production_order_from_item(item_id):
     """从销售订单行创建生产订单"""
     try:
-        # 检查权限
-        if current_user.role not in ['admin', 'manager']:
-            return jsonify({'success': False, 'message': '权限不足'})
         
         order_item = SalesOrderItem.query.get_or_404(item_id)
         data = request.get_json()
@@ -8625,74 +8729,82 @@ def create_production_order_from_item(item_id):
         return jsonify({'success': False, 'message': f'创建失败: {str(e)}'})
 
 def check_and_handle_material_shortage(order, batch_quantity):
-    """检查并处理物料短缺情况"""
+    """检查该订单在本次批次下的物料缺口，返回短缺清单。
+
+    注意：RawMaterial/FinishedProduct 都没有 current_stock 列，库存量是 quantity；
+    曾把不存在的属性当列访问，AttributeError 被外层 except 吞掉 → 永远返回空清单。
+    另外「自动分配物料」与「自动创建子生产订单」两个分支都未实现，这里不产生任何
+    写操作（created_orders 恒为空），调用方的用户提示必须与此保持一致。
+    """
+    created_orders = []
+
     try:
-        shortage_info = []
-        created_orders = []
-        
-        # 获取该订单的物料分配
         material_allocations = MaterialAllocation.query.filter_by(production_order_id=order.id).all()
-        
-        for allocation in material_allocations:
-            # 计算此批次需要的物料数量
-            batch_required = (allocation.required_quantity / order.planned_quantity) * batch_quantity
-            
-            # 检查是否有足够的已分配物料
-            available_quantity = allocation.allocated_quantity - allocation.consumed_quantity
-            
-            if available_quantity < batch_required:
-                shortage = batch_required - available_quantity
-                
-                # 检查库存是否足够补充
-                material = allocation.material_info
-                if material:
-                    if allocation.material_type == 'raw':
-                        current_stock = material.current_stock
-                    elif allocation.material_type == 'finished':
-                        current_stock = material.current_stock
-                    elif allocation.material_type == 'product':
-                        # 对于产品类型，需要检查成品库存
-                        current_stock = 0  # 产品通常需要生产，不是库存
-                    else:
-                        current_stock = 0
-                    
-                    shortage_item = {
-                        'material_name': allocation.material_name,
-                        'material_type': allocation.material_type,
-                        'required': batch_required,
-                        'available': available_quantity,
-                        'shortage': shortage,
-                        'current_stock': current_stock,
-                        'can_fulfill': current_stock >= shortage
-                    }
-                    shortage_info.append(shortage_item)
-                    
-                    # 如果是产品类型且有短缺，可以考虑创建子生产订单
-                    if allocation.material_type == 'product' and shortage > 0:
-                        # 这里可以实现自动创建子生产订单的逻辑
-                        # 暂时只记录信息
-                        pass
-        
-        # 如果有短缺但库存足够，自动分配
-        for info in shortage_info:
-            if info['shortage'] > 0 and info['can_fulfill']:
-                # 这里可以实现自动分配逻辑
-                # 暂时只记录信息，不自动分配
-                pass
-        
-        return {
-            'shortage_info': shortage_info,
-            'created_orders': created_orders,
-            'has_shortage': len(shortage_info) > 0
-        }
-        
     except Exception as e:
-        current_app.logger.error(f"检查物料短缺时出错: {str(e)}")
+        current_app.logger.error(f"检查物料短缺时查询物料分配失败: {str(e)}")
         return {
             'shortage_info': [],
-            'created_orders': [],
+            'created_orders': created_orders,
             'has_shortage': False
         }
+
+    planned_quantity = order.planned_quantity or 0
+    if planned_quantity <= 0:
+        current_app.logger.error(
+            f"检查物料短缺失败：生产订单 {order.order_number} 的计划数量为 "
+            f"{order.planned_quantity}，无法折算批次用量"
+        )
+        return {
+            'shortage_info': [],
+            'created_orders': created_orders,
+            'has_shortage': False
+        }
+
+    shortage_info = []
+    for allocation in material_allocations:
+        try:
+            # 计算此批次需要的物料数量
+            batch_required = (allocation.required_quantity / planned_quantity) * batch_quantity
+
+            # 检查是否有足够的已分配物料
+            available_quantity = (allocation.allocated_quantity or 0) - (allocation.consumed_quantity or 0)
+
+            if available_quantity >= batch_required:
+                continue
+
+            shortage = batch_required - available_quantity
+
+            # 库存量只能取真实列：RawMaterial.quantity / FinishedProduct.quantity；
+            # product 是需要先生产的物料，不是库存，恒按 0 处理
+            material = allocation.material_info
+            if allocation.material_type in ('raw', 'finished'):
+                current_stock = (material.quantity or 0) if material else 0
+            else:
+                current_stock = 0
+
+            shortage_info.append({
+                'material_name': allocation.material_name,
+                'material_type': allocation.material_type,
+                'required': batch_required,
+                'available': available_quantity,
+                'shortage': shortage,
+                'current_stock': current_stock,
+                'can_fulfill': current_stock >= shortage
+            })
+        except Exception as e:
+            # 单条分配数据异常不应吞掉整份短缺清单；只有数据库错误才需要回滚会话
+            if isinstance(e, SQLAlchemyError):
+                db.session.rollback()
+            current_app.logger.error(
+                f"检查物料短缺时处理分配记录 {allocation.id} 失败: {str(e)}"
+            )
+            continue
+
+    return {
+        'shortage_info': shortage_info,
+        'created_orders': created_orders,
+        'has_shortage': len(shortage_info) > 0
+    }
 
 @bp.route('/production_orders/<int:order_id>/batches/add', methods=['POST'])
 @login_required
@@ -8761,9 +8873,14 @@ def add_production_batch(order_id):
             else:
                 message += '，但生产任务创建失败（可能是产品未配置工序或无可用员工）'
                 
-            if material_shortage_info['created_orders']:
-                message += f'。已自动创建{len(material_shortage_info["created_orders"])}个子生产订单来补充不足的产品物料'
-                message += f'：{", ".join(material_shortage_info["created_orders"])}'
+            # 系统不会自动创建子生产订单（该分支未实现，created_orders 恒为空），
+            # 有缺口时只如实提示，避免出现与实际行为不符的文案
+            if material_shortage_info['has_shortage']:
+                shortage_names = '、'.join(
+                    str(info.get('material_name') or '未知物料')
+                    for info in material_shortage_info['shortage_info']
+                )
+                message += f'。注意：以下物料存在缺口，请人工补充（未自动创建子生产订单）：{shortage_names}'
             
             return jsonify({
                 'success': True, 
@@ -9113,12 +9230,10 @@ def update_production_status_hierarchy():
 
 @bp.route('/customers')
 @login_required
+@require_capability('customer.manage')
 @handle_pagination_args
 def manage_customers():
     """客户管理页面"""
-    if current_user.role not in ['admin', 'manager', 'sales']:
-        flash('权限不足', 'danger')
-        return redirect(url_for('main.index'))
     
     # 构建基础查询
     query = Customer.query
@@ -9162,11 +9277,9 @@ def manage_customers():
 
 @bp.route('/customer/add', methods=['GET', 'POST'])
 @login_required
+@require_capability('customer.manage')
 def add_customer():
     """新增客户"""
-    if current_user.role not in ['admin', 'manager', 'sales']:
-        flash('权限不足', 'danger')
-        return redirect(url_for('main.manage_customers'))
     
     form = CustomerForm()
     if form.validate_on_submit():
@@ -9234,11 +9347,9 @@ def customer_detail(customer_id):
 
 @bp.route('/customer/<int:customer_id>/edit', methods=['GET', 'POST'])
 @login_required
+@require_capability('customer.manage')
 def edit_customer(customer_id):
     """编辑客户"""
-    if current_user.role not in ['admin', 'manager', 'sales']:
-        flash('权限不足', 'danger')
-        return redirect(url_for('main.customer_detail', customer_id=customer_id))
     
     customer = Customer.query.get_or_404(customer_id)
     form = CustomerForm(obj=customer)
@@ -9292,10 +9403,9 @@ def edit_customer(customer_id):
 
 @bp.route('/customer/<int:customer_id>/delete', methods=['DELETE'])
 @login_required
+@require_capability('customer.delete')
 def delete_customer(customer_id):
     """删除客户"""
-    if current_user.role not in ['admin', 'manager']:
-        return jsonify({'success': False, 'message': '权限不足'}), 403
     
     try:
         customer = Customer.query.get_or_404(customer_id)
@@ -9337,11 +9447,9 @@ def delete_customer(customer_id):
         return jsonify({'success': False, 'message': f'删除失败：{str(e)}'})
 @bp.route('/customer/<int:customer_id>/address/add', methods=['GET', 'POST'])
 @login_required
+@require_capability('customer.manage')
 def add_customer_address(customer_id):
     """新增客户地址"""
-    if current_user.role not in ['admin', 'manager', 'sales']:
-        flash('权限不足', 'danger')
-        return redirect(url_for('main.customer_detail', customer_id=customer_id))
     
     customer = Customer.query.get_or_404(customer_id)
     form = CustomerAddressForm()
@@ -9395,11 +9503,9 @@ def add_customer_address(customer_id):
                          title='新增地址')
 @bp.route('/customer/<int:customer_id>/address/<int:address_id>/edit', methods=['GET', 'POST'])
 @login_required
+@require_capability('customer.manage')
 def edit_customer_address(customer_id, address_id):
     """编辑客户地址"""
-    if current_user.role not in ['admin', 'manager', 'sales']:
-        flash('权限不足', 'danger')
-        return redirect(url_for('main.customer_detail', customer_id=customer_id))
     
     customer = Customer.query.get_or_404(customer_id)
     address = CustomerAddress.query.filter_by(
@@ -9458,10 +9564,9 @@ def edit_customer_address(customer_id, address_id):
 
 @bp.route('/customer/<int:customer_id>/address/<int:address_id>/delete', methods=['DELETE'])
 @login_required
+@require_capability('customer.manage')
 def delete_customer_address(customer_id, address_id):
     """删除客户地址"""
-    if current_user.role not in ['admin', 'manager', 'sales']:
-        return jsonify({'success': False, 'message': '权限不足'}), 403
     
     try:
         customer = Customer.query.get_or_404(customer_id)
@@ -9506,10 +9611,9 @@ def delete_customer_address(customer_id, address_id):
 
 @bp.route('/customer/<int:customer_id>/address/<int:address_id>/set_primary', methods=['POST'])
 @login_required
+@require_capability('customer.manage')
 def set_primary_address(customer_id, address_id):
     """设置主要地址"""
-    if current_user.role not in ['admin', 'manager', 'sales']:
-        return jsonify({'success': False, 'message': '权限不足'}), 403
     
     try:
         customer = Customer.query.get_or_404(customer_id)
@@ -9593,12 +9697,10 @@ def api_search_customers():
 
 @bp.route('/sales_orders')
 @login_required
+@require_capability('sales_order.manage')
 @handle_pagination_args
 def manage_sales_orders():
     """销售订单管理页面"""
-    if current_user.role not in ['admin', 'manager', 'sales']:
-        flash('权限不足', 'danger')
-        return redirect(url_for('main.index'))
     
     # 构建基础查询
     query = SalesOrder.query
@@ -9654,11 +9756,9 @@ def manage_sales_orders():
 
 @bp.route('/sales_order/add', methods=['GET', 'POST'])
 @login_required
+@require_capability('sales_order.manage')
 def add_sales_order():
     """新增销售订单"""
-    if current_user.role not in ['admin', 'manager', 'sales']:
-        flash('权限不足', 'danger')
-        return redirect(url_for('main.manage_sales_orders'))
     
     form = SalesOrderForm()
     
@@ -9764,11 +9864,9 @@ def sales_order_detail(order_id):
 
 @bp.route('/sales_order/<int:order_id>/edit', methods=['GET', 'POST'])
 @login_required
+@require_capability('sales_order.manage')
 def edit_sales_order(order_id):
     """编辑销售订单"""
-    if current_user.role not in ['admin', 'manager', 'sales']:
-        flash('权限不足', 'danger')
-        return redirect(url_for('main.sales_order_detail', order_id=order_id))
     
     order = SalesOrder.query.get_or_404(order_id)
     form = SalesOrderForm(obj=order)
@@ -9815,10 +9913,9 @@ def edit_sales_order(order_id):
 
 @bp.route('/sales_order/<int:order_id>/delete', methods=['DELETE'])
 @login_required
+@require_capability('sales_order.delete')
 def delete_sales_order(order_id):
     """删除销售订单"""
-    if current_user.role not in ['admin', 'manager']:
-        return jsonify({'success': False, 'message': '权限不足'}), 403
     
     try:
         order = SalesOrder.query.get_or_404(order_id)
@@ -9857,11 +9954,9 @@ def delete_sales_order(order_id):
 
 @bp.route('/sales_order/<int:order_id>/item/add', methods=['GET', 'POST'])
 @login_required
+@require_capability('sales_order.manage')
 def add_sales_order_item(order_id):
     """新增销售订单行"""
-    if current_user.role not in ['admin', 'manager', 'sales']:
-        flash('权限不足', 'danger')
-        return redirect(url_for('main.sales_order_detail', order_id=order_id))
     
     order = SalesOrder.query.get_or_404(order_id)
     form = SalesOrderItemForm()
@@ -9975,11 +10070,9 @@ def add_sales_order_item(order_id):
 
 @bp.route('/sales_order_item/<int:item_id>/edit', methods=['GET', 'POST'])
 @login_required
+@require_capability('sales_order.manage')
 def edit_sales_order_item(item_id):
     """编辑销售订单行"""
-    if current_user.role not in ['admin', 'manager', 'sales']:
-        flash('权限不足', 'danger')
-        return redirect(url_for('main.manage_sales_orders'))
     
     order_item = SalesOrderItem.query.get_or_404(item_id)
     order = order_item.sales_order
@@ -10065,10 +10158,9 @@ def edit_sales_order_item(item_id):
 
 @bp.route('/sales_order_item/<int:item_id>/delete', methods=['DELETE'])
 @login_required
+@require_capability('sales_order.manage')
 def delete_sales_order_item(item_id):
     """删除销售订单行"""
-    if current_user.role not in ['admin', 'manager', 'sales']:
-        return jsonify({'success': False, 'message': '权限不足'}), 403
     
     try:
         order_item = SalesOrderItem.query.get_or_404(item_id)
@@ -10111,11 +10203,9 @@ def delete_sales_order_item(item_id):
 
 @bp.route('/sales_order_item/<int:item_id>/delivery_batches/manage', methods=['GET'])
 @login_required
+@require_capability('sales_order.manage')
 def manage_delivery_batches_page(item_id):
     """分批到货管理页面"""
-    if current_user.role not in ['admin', 'manager', 'sales']:
-        flash('权限不足', 'danger')
-        return redirect(url_for('main.manage_sales_orders'))
     
     order_item = SalesOrderItem.query.get_or_404(item_id)
     batches = order_item.delivery_batches_list
@@ -10125,11 +10215,10 @@ def manage_delivery_batches_page(item_id):
                          batches=batches)
 @bp.route('/sales_order_item/<int:item_id>/delivery_batches', methods=['GET', 'POST'])
 @login_required
+@require_capability('sales_order.manage')
 @csrf.exempt  # 对分批到货API豁免CSRF保护
 def manage_delivery_batches(item_id):
     """管理分批到货"""
-    if current_user.role not in ['admin', 'manager', 'sales']:
-        return jsonify({'success': False, 'message': '权限不足'}), 403
     
     order_item = SalesOrderItem.query.get_or_404(item_id)
     
@@ -10379,11 +10468,9 @@ def mark_notification_read(notification_id):
 
 @bp.route('/notification_rules')
 @login_required
+@require_capability('notification_rule.manage')
 def manage_notification_rules():
     """通知规则管理"""
-    if current_user.role not in ['admin', 'manager']:
-        flash('权限不足', 'danger')
-        return redirect(url_for('main.index'))
     
     from app.models import NotificationRule
     rules = NotificationRule.query.order_by(NotificationRule.priority.desc()).all()
@@ -10393,11 +10480,9 @@ def manage_notification_rules():
 
 @bp.route('/notification_rules/add', methods=['GET', 'POST'])  
 @login_required
+@require_capability('notification_rule.manage')
 def add_notification_rule():
     """添加通知规则"""
-    if current_user.role not in ['admin', 'manager']:
-        flash('权限不足', 'danger')
-        return redirect(url_for('main.index'))
     
     form = NotificationRuleForm()
     
@@ -10713,8 +10798,9 @@ def manage_consumables():
     query = query.order_by(Consumable.created_at.desc())
     
     # 分页
-    page = request.args.get('page', 1, type=int)
-    per_page = request.args.get('per_page', 20, type=int)
+    # 分页（统一走 @handle_pagination_args 的白名单口径）
+    page = request.validated_page
+    per_page = request.validated_per_page
     consumables = query.paginate(
         page=page, per_page=per_page, error_out=False
     )
@@ -10970,11 +11056,10 @@ def update_consumable(id):
         return jsonify({'success': False, 'message': f'更新失败：{str(e)}'}), 500
 @bp.route('/consumables/<int:id>', methods=['DELETE'])
 @login_required
+@require_capability('consumable.delete')
 @csrf.exempt
 def delete_consumable(id):
     """删除易耗品"""
-    if current_user.role not in ['admin']:
-        return jsonify({'success': False, 'message': '权限不足'}), 403
     
     try:
         consumable = Consumable.query.get_or_404(id)
@@ -11258,12 +11343,11 @@ def update_consumable_category(category_id):
 
 @bp.route('/consumables/categories/<int:category_id>', methods=['DELETE'])
 @login_required
+@require_capability('consumable.delete')
 def delete_consumable_category(category_id):
     """删除易耗品品类"""
     from app.models import ConsumableCategory, Consumable
     
-    if current_user.role not in ['admin']:
-        return jsonify({'success': False, 'message': '权限不足'}), 403
     
     try:
         category = ConsumableCategory.query.get_or_404(category_id)
@@ -11379,8 +11463,9 @@ def manage_material_requisitions():
     # 排序和分页
     query = query.order_by(MaterialRequisition.requested_date.desc())
     
-    page = request.args.get('page', 1, type=int)
-    per_page = request.args.get('per_page', 20, type=int)
+    # 分页（统一走 @handle_pagination_args 的白名单口径）
+    page = request.validated_page
+    per_page = request.validated_per_page
     
     requisitions = query.paginate(
         page=page, per_page=per_page, error_out=False
@@ -11697,8 +11782,9 @@ def manage_material_returns():
     # 排序和分页
     query = query.order_by(MaterialReturn.returned_date.desc())
     
-    page = request.args.get('page', 1, type=int)
-    per_page = request.args.get('per_page', 20, type=int)
+    # 分页（统一走 @handle_pagination_args 的白名单口径）
+    page = request.validated_page
+    per_page = request.validated_per_page
     
     returns = query.paginate(
         page=page, per_page=per_page, error_out=False
@@ -11921,8 +12007,9 @@ def manage_inventory_counts():
     # 排序和分页
     query = query.order_by(InventoryCount.planned_date.desc())
     
-    page = request.args.get('page', 1, type=int)
-    per_page = request.args.get('per_page', 20, type=int)
+    # 分页（统一走 @handle_pagination_args 的白名单口径）
+    page = request.validated_page
+    per_page = request.validated_per_page
     
     counts = query.paginate(
         page=page, per_page=per_page, error_out=False

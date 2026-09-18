@@ -263,7 +263,7 @@
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav me-auto">
+                <ul class="navbar-nav me-auto" id="mainNavMenu">
                     {% if current_user.is_authenticated %}
                         {% if can_any('employee.view', 'bonus.manage', 'salary.view') %}
                         <li class="nav-item dropdown">
@@ -423,7 +423,9 @@
                                 {% if can('quality.view') %}
                                 <li><a class="dropdown-item" href="{{ url_for('main.quality_management') }}">质量看板</a></li>
                                 {% endif %}
+                                {% if can('quality.view') %}
                                 <li><a class="dropdown-item" href="{{ url_for('main.manage_nonconformities') }}">不合格处置</a></li>
+                                {% endif %}
                             </ul>
                         </li>
                         {% endif %}
@@ -545,6 +547,23 @@
     <script src="{{ url_for('static', filename='vendor/select2/select2.min.js') }}"></script>
     <script src="{{ url_for('static', filename='vendor/sweetalert2/sweetalert2.min.js') }}"></script>
     <script src="{{ url_for('static', filename='vendor/jsqr/jsQR.min.js') }}"></script>
+    {# 移动端侧边栏的元数据：URL 全部由 url_for 生成，菜单项本身复用 #mainNavMenu（can() 过滤后的服务端渲染结果） #}
+    {% if current_user.is_authenticated %}
+    <script type="application/json" id="mobileNavMeta">
+        {{ {'authenticated': true,
+            'home': url_for('main.index'),
+            'notifications': url_for('main.manage_notifications'),
+            'logout': url_for('auth.logout'),
+            'username': current_user.username} | tojson }}
+    </script>
+    {% else %}
+    <script type="application/json" id="mobileNavMeta">
+        {{ {'authenticated': false,
+            'home': url_for('main.index'),
+            'login': url_for('auth.login'),
+            'register': url_for('auth.register')} | tojson }}
+    </script>
+    {% endif %}
     <script src="{{ url_for('static', filename='js/mobile-optimization.js') }}"></script>
     <script src="{{ url_for('static', filename='js/pagination.js') }}"></script>
     
@@ -570,7 +589,7 @@
         // 加载通知计数
         function loadNotificationCount() {
             {% if current_user.is_authenticated %}
-            fetch('/api/notifications/stats')
+            fetch("{{ url_for('main.api_notification_stats') }}")
                 .then(response => response.json())
                 .then(data => {
                     const badge = document.getElementById('notificationBadge');

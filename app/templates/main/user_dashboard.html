@@ -353,7 +353,7 @@
 <script>
 function startInspection(taskId) {
     if (confirm('确定要开始这个质检任务吗？')) {
-        fetch(`/api/quality/tasks/${taskId}/start-inspection`, {
+        fetch("{{ url_for('main.get_tasks') }}" + '/' + taskId + '/start-inspection', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

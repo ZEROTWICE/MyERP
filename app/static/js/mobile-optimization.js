@@ -1,9 +1,14 @@
 // ==================== 移动端优化脚本 ====================
+//
+// 侧边栏菜单**不再由本文件重建**：base.html 里已经用 can()/can_any() 渲染好唯一一份
+// 按权限过滤的导航（#mainNavMenu），这里只做「结构搬运 + CSS class 映射」。
+// 因此移动端与桌面端看到的菜单项天然一致，且本文件不含任何硬编码 URL/角色判断。
+// 少量非权限信息（首页/登录/通知中心/退出/用户名）由 base.html 以 JSON
+// （#mobileNavMeta，全部由 url_for 生成）注入。
 
 document.addEventListener('DOMContentLoaded', function() {
     // 检测移动设备
     const isMobile = window.innerWidth <= 768;
-    const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
     
     // 如果是移动设备，执行优化
     if (isMobile) {
@@ -20,8 +25,6 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function initMobileOptimizations() {
-    console.log('🔧 初始化移动端优化...');
-    
     // 1. 优化表格显示
     optimizeTables();
     
@@ -42,8 +45,6 @@ function initMobileOptimizations() {
     
     // 7. 优化搜索和筛选
     optimizeFilters();
-    
-    console.log('✅ 移动端优化完成');
 }
 
 // 表格优化
@@ -90,7 +91,7 @@ function addMobileNavigation() {
     const sidebar = document.createElement('div');
     sidebar.className = 'mobile-sidebar';
     
-    // 动态生成导航内容
+    // 导航内容复用服务端按权限渲染的菜单
     const navContent = generateSidebarNavigation();
     
     sidebar.innerHTML = `
@@ -114,9 +115,6 @@ function addMobileNavigation() {
     // 绑定事件
     setupSidebarEvents(menuToggle, sidebar, overlay);
     
-    // 调试：输出生成的侧边栏内容
-    console.log('Generated sidebar HTML:', sidebar.innerHTML);
-    
     // 为主内容添加底部padding，避免被菜单按钮遮挡
     const mainContent = document.querySelector('.container, .container-fluid');
     if (mainContent) {
@@ -126,221 +124,165 @@ function addMobileNavigation() {
     }
 }
 
-// 获取用户信息和角色
-function getUserInfo() {
-    // 从页面中获取用户信息
-    const userElement = document.querySelector('.navbar-text');
-    const isAuthenticated = !!userElement;
-    const username = isAuthenticated ? userElement.textContent.replace('欢迎，', '') : '';
-    
-    // 检查用户角色（通过检查页面中的导航元素来判断）
-    const hasEmployeeDropdown = !!document.querySelector('#employeeDropdown');
-    const hasProductionDropdown = !!document.querySelector('#productionDropdown');
-    const hasSystemDropdown = !!document.querySelector('#systemDropdown');
-    const hasMyTasksOnly = !!document.querySelector('a[href*="my_tasks"]') && !hasEmployeeDropdown;
-    
-    let role = 'guest';
-    if (isAuthenticated) {
-        if (hasEmployeeDropdown || hasProductionDropdown || hasSystemDropdown) {
-            role = 'admin';
-        } else if (hasMyTasksOnly) {
-            role = 'user';
-        } else {
-            // 如果无法确定角色，默认为admin（因为大多数功能需要管理员权限）
-            role = 'admin';
-        }
+// 读取 base.html 注入的导航元数据（url 全部由服务端 url_for 生成）
+function getMobileNavMeta() {
+    const el = document.getElementById('mobileNavMeta');
+    if (!el) {
+        return { authenticated: false };
     }
-    
-    console.log('User Info:', { 
-        isAuthenticated, 
-        username, 
-        role,
-        hasEmployeeDropdown,
-        hasProductionDropdown,
-        hasSystemDropdown 
-    }); // 调试信息
-    return { isAuthenticated, username, role };
+    try {
+        return JSON.parse(el.textContent) || { authenticated: false };
+    } catch (e) {
+        return { authenticated: false };
+    }
 }
 
-// 生成侧边栏导航内容
+// 菜单图标：纯展示映射，键为服务端渲染出来的菜单文字；找不到就用默认图标。
+var MOBILE_NAV_ICONS = {
+    '员工管理': 'fa-users',
+    '工序管理': 'fa-cogs',
+    '工序分配': 'fa-sitemap',
+    '生产记录': 'fa-clipboard-list',
+    '任务管理': 'fa-tasks',
+    '生产订单': 'fa-file-alt',
+    '设备台账': 'fa-tools',
+    '工作中心': 'fa-industry',
+    '煅烧炉次': 'fa-fire',
+    '工件溯源': 'fa-qrcode',
+    '组装扣料': 'fa-puzzle-piece',
+    '生产中心（产品）': 'fa-cubes',
+    '库存查询': 'fa-warehouse',
+    '半成品库': 'fa-boxes',
+    '未通过库': 'fa-ban',
+    '报废库': 'fa-trash-alt',
+    '成品库': 'fa-box',
+    '原材料入库': 'fa-dolly',
+    '原材料品类管理': 'fa-tags',
+    '易耗品管理': 'fa-toolbox',
+    '易耗品入库': 'fa-dolly',
+    '易耗品品类管理': 'fa-tags',
+    '成品入库': 'fa-box-open',
+    '物料领用': 'fa-clipboard-check',
+    '物料归还': 'fa-undo',
+    '库存盘点': 'fa-clipboard-list',
+    '产品管理': 'fa-box',
+    '客户管理': 'fa-user-tie',
+    '销售订单': 'fa-file-invoice',
+    '发货出库': 'fa-shipping-fast',
+    '供应商': 'fa-truck',
+    '采购单': 'fa-file-invoice-dollar',
+    '请购单': 'fa-file-signature',
+    '质量看板': 'fa-medal',
+    '不合格处置': 'fa-exclamation-triangle',
+    '编码管理': 'fa-code',
+    '审计日志': 'fa-history',
+    '通知规则': 'fa-bell-slash',
+    '系统配置': 'fa-cog',
+    '我的任务': 'fa-tasks',
+    '奖惩管理': 'fa-award',
+    '工资管理': 'fa-calculator',
+    '首页': 'fa-home',
+    '通知中心': 'fa-bell',
+    '登录': 'fa-sign-in-alt',
+    '注册': 'fa-user-plus'
+};
+
+function mobileNavIcon(text, fallback) {
+    return MOBILE_NAV_ICONS[text] || fallback;
+}
+
+// 生成侧边栏导航内容：直接搬运 #mainNavMenu（服务端 can()/can_any() 过滤后的菜单）
 function generateSidebarNavigation() {
-    const userInfo = getUserInfo();
+    const meta = getMobileNavMeta();
     const currentPath = window.location.pathname;
-    
-    if (!userInfo.isAuthenticated) {
-        return `
-            <a href="/" class="mobile-sidebar-item ${currentPath === '/' ? 'active' : ''}">
-                <i class="fas fa-home"></i>
-                <span>首页</span>
-            </a>
-            <a href="/auth/login" class="mobile-sidebar-item">
-                <i class="fas fa-sign-in-alt"></i>
-                <span>登录</span>
-            </a>
-            <a href="/auth/register" class="mobile-sidebar-item">
-                <i class="fas fa-user-plus"></i>
-                <span>注册</span>
-            </a>
-        `;
+    const parts = [];
+
+    const directItem = function(href, text) {
+        const active = href === currentPath ? ' active' : '';
+        return `<a href="${href}" class="mobile-sidebar-item${active}">
+            <i class="fas ${mobileNavIcon(text, 'fa-circle')}"></i>
+            <span>${text}</span>
+        </a>`;
+    };
+
+    const subItem = function(href, text) {
+        const active = href === currentPath ? ' active' : '';
+        return `<a href="${href}" class="mobile-sidebar-subitem${active}">
+            <i class="fas ${mobileNavIcon(text, 'fa-angle-right')}"></i>
+            <span>${text}</span>
+        </a>`;
+    };
+
+    if (meta.home) {
+        parts.push(directItem(meta.home, '首页'));
     }
-    
-    let navHtml = `
-        <a href="/" class="mobile-sidebar-item ${currentPath === '/' ? 'active' : ''}">
-            <i class="fas fa-home"></i>
-            <span>首页</span>
-        </a>
-    `;
-    
-    // 管理员菜单
-    if (userInfo.role === 'admin') {
-        console.log('Generating admin menu'); // 调试信息
-        navHtml += `
-            <!-- 员工管理 -->
-            <div class="mobile-sidebar-expandable" data-toggle="employee">
-                <div class="mobile-sidebar-item">
-                    <i class="fas fa-users"></i>
-                    <span>员工管理</span>
-                    <i class="fas fa-chevron-right toggle-icon"></i>
-                </div>
-                <div class="mobile-sidebar-submenu" data-submenu="employee">
-                    <a href="/employees" class="mobile-sidebar-subitem ${currentPath === '/employees' ? 'active' : ''}">
-                        <i class="fas fa-user"></i>
-                        <span>员工管理</span>
-                    </a>
-                    <a href="/bonus_penalties" class="mobile-sidebar-subitem ${currentPath === '/bonus_penalties' ? 'active' : ''}">
-                        <i class="fas fa-award"></i>
-                        <span>奖惩管理</span>
-                    </a>
-                    <a href="/salary_calculation" class="mobile-sidebar-subitem ${currentPath === '/salary_calculation' ? 'active' : ''}">
-                        <i class="fas fa-calculator"></i>
-                        <span>工资管理</span>
-                    </a>
-                </div>
-            </div>
-            
-            <!-- 生产管理 -->
-            <div class="mobile-sidebar-expandable" data-toggle="production">
-                <div class="mobile-sidebar-item">
-                    <i class="fas fa-industry"></i>
-                    <span>生产管理</span>
-                    <i class="fas fa-chevron-right toggle-icon"></i>
-                </div>
-                <div class="mobile-sidebar-submenu" data-submenu="production">
-                    <a href="/process_prices" class="mobile-sidebar-subitem ${currentPath === '/process_prices' ? 'active' : ''}">
-                        <i class="fas fa-cogs"></i>
-                        <span>工序管理</span>
-                    </a>
-                    <a href="/production_records" class="mobile-sidebar-subitem ${currentPath === '/production_records' ? 'active' : ''}">
-                        <i class="fas fa-clipboard-list"></i>
-                        <span>生产记录</span>
-                    </a>
-                    <a href="/tasks" class="mobile-sidebar-subitem ${currentPath === '/tasks' ? 'active' : ''}">
-                        <i class="fas fa-tasks"></i>
-                        <span>任务管理</span>
-                    </a>
-                    <a href="/production_orders" class="mobile-sidebar-subitem ${currentPath === '/production_orders' ? 'active' : ''}">
-                        <i class="fas fa-file-alt"></i>
-                        <span>生产订单</span>
-                    </a>
-                </div>
-            </div>
-            
-            <!-- 库存管理 -->
-            <a href="/inventory" class="mobile-sidebar-item ${currentPath === '/inventory' ? 'active' : ''}">
-                <i class="fas fa-warehouse"></i>
-                <span>库存管理</span>
-            </a>
-            
-            <!-- 产品管理 -->
-            <a href="/products" class="mobile-sidebar-item ${currentPath === '/products' ? 'active' : ''}">
-                <i class="fas fa-box"></i>
-                <span>产品管理</span>
-            </a>
-            
-            <!-- 销售管理 -->
-            <div class="mobile-sidebar-expandable" data-toggle="sales">
-                <div class="mobile-sidebar-item">
-                    <i class="fas fa-shopping-cart"></i>
-                    <span>销售管理</span>
-                    <i class="fas fa-chevron-right toggle-icon"></i>
-                </div>
-                <div class="mobile-sidebar-submenu" data-submenu="sales">
-                    <a href="/customers" class="mobile-sidebar-subitem ${currentPath === '/customers' ? 'active' : ''}">
-                        <i class="fas fa-user-tie"></i>
-                        <span>客户管理</span>
-                    </a>
-                    <a href="/sales_orders" class="mobile-sidebar-subitem ${currentPath === '/sales_orders' ? 'active' : ''}">
-                        <i class="fas fa-file-invoice"></i>
-                        <span>销售订单</span>
-                    </a>
-                </div>
-            </div>
-            
-            <!-- 质量管理 -->
-            <a href="/quality" class="mobile-sidebar-item ${currentPath.includes('/quality') ? 'active' : ''}">
-                <i class="fas fa-medal"></i>
-                <span>质量管理</span>
-            </a>
-            
-            <!-- 系统管理 -->
-            <div class="mobile-sidebar-expandable" data-toggle="system">
-                <div class="mobile-sidebar-item">
-                    <i class="fas fa-cog"></i>
-                    <span>系统管理</span>
-                    <i class="fas fa-chevron-right toggle-icon"></i>
-                </div>
-                <div class="mobile-sidebar-submenu" data-submenu="system">
-                    <a href="/code_rules" class="mobile-sidebar-subitem ${currentPath === '/code_rules' ? 'active' : ''}">
-                        <i class="fas fa-code"></i>
-                        <span>编码管理</span>
-                    </a>
-                    <a href="/audit_logs" class="mobile-sidebar-subitem ${currentPath === '/audit_logs' ? 'active' : ''}">
-                        <i class="fas fa-history"></i>
-                        <span>审计日志</span>
-                    </a>
-                    <a href="/notification_rules" class="mobile-sidebar-subitem ${currentPath === '/notification_rules' ? 'active' : ''}">
-                        <i class="fas fa-bell-slash"></i>
-                        <span>通知规则</span>
-                    </a>
-                </div>
-            </div>
-        `;
-    } else if (userInfo.role === 'user') {
-        // 普通用户菜单
-        navHtml += `
-            <a href="/my_tasks" class="mobile-sidebar-item ${currentPath === '/my_tasks' ? 'active' : ''}">
-                <i class="fas fa-tasks"></i>
-                <span>我的任务</span>
-            </a>
-        `;
+
+    if (!meta.authenticated) {
+        // 未登录：与桌面端一致，只给登录/注册入口
+        if (meta.login) parts.push(directItem(meta.login, '登录'));
+        if (meta.register) parts.push(directItem(meta.register, '注册'));
+        return parts.join('');
     }
-    
-    // 通知中心（所有登录用户都可访问）
-    navHtml += `
-        <a href="/notifications" class="mobile-sidebar-item ${currentPath === '/notifications' ? 'active' : ''}">
-            <i class="fas fa-bell"></i>
-            <span>通知中心</span>
-        </a>
-    `;
-    
-    console.log('Generated nav HTML length:', navHtml.length); // 调试信息
-    return navHtml;
+
+    const menu = document.getElementById('mainNavMenu');
+    if (menu) {
+        let groupIndex = 0;
+        Array.prototype.forEach.call(menu.children, function(li) {
+            if (!li.classList || !li.classList.contains('nav-item')) {
+                return;
+            }
+            const toggle = li.querySelector('a.dropdown-toggle');
+            const direct = li.querySelector('a.nav-link');
+            if (toggle) {
+                const label = toggle.textContent.trim();
+                const subLinks = [];
+                Array.prototype.forEach.call(li.querySelectorAll('ul.dropdown-menu a.dropdown-item'), function(a) {
+                    const href = a.getAttribute('href');
+                    if (href) {
+                        subLinks.push(subItem(href, a.textContent.trim()));
+                    }
+                });
+                if (!subLinks.length) {
+                    return; // 空分组（例如该项当前角色看不到任何子项）不渲染
+                }
+                const key = 'group-' + (groupIndex++);
+                parts.push(`<div class="mobile-sidebar-expandable" data-toggle="${key}">
+                    <div class="mobile-sidebar-item">
+                        <i class="fas ${mobileNavIcon(label, 'fa-folder')}"></i>
+                        <span>${label}</span>
+                        <i class="fas fa-chevron-right toggle-icon"></i>
+                    </div>
+                    <div class="mobile-sidebar-submenu" data-submenu="${key}">
+                        ${subLinks.join('')}
+                    </div>
+                </div>`);
+            } else if (direct && direct.getAttribute('href')) {
+                parts.push(directItem(direct.getAttribute('href'), direct.textContent.trim()));
+            }
+        });
+    }
+
+    if (meta.notifications) {
+        parts.push(directItem(meta.notifications, '通知中心'));
+    }
+
+    return parts.join('');
 }
 
 // 生成用户信息区域
 function generateUserSection() {
-    const userInfo = getUserInfo();
+    const meta = getMobileNavMeta();
     
-    if (!userInfo.isAuthenticated) {
+    if (!meta.authenticated) {
         return '';
     }
     
     return `
         <div class="mobile-sidebar-user">
             <div class="mobile-sidebar-user-info">
-                <div class="mobile-sidebar-user-name">欢迎，${userInfo.username}</div>
+                <div class="mobile-sidebar-user-name">欢迎，${meta.username || ''}</div>
             </div>
-            <a href="/auth/logout" class="mobile-sidebar-logout">
+            <a href="${meta.logout}" class="mobile-sidebar-logout">
                 <i class="fas fa-sign-out-alt"></i>
                 <span>退出登录</span>
             </a>
@@ -397,12 +339,8 @@ function setupSidebarEvents(toggle, sidebar, overlay) {
     
     // 子菜单项点击后关闭侧边栏
     const subNavItems = sidebar.querySelectorAll('.mobile-sidebar-subitem');
-    console.log('Found subNavItems:', subNavItems.length); // 调试信息
-    subNavItems.forEach((item, index) => {
-        console.log(`Binding click event to subitem ${index}:`, item.href); // 调试信息
+    subNavItems.forEach((item) => {
         item.addEventListener('click', function(e) {
-            // 确保链接能正常工作
-            console.log('Clicking subitem:', item.href); // 调试信息
             // 允许链接正常跳转
             setTimeout(() => {
                 closeSidebar();
@@ -422,8 +360,6 @@ function setupSidebarEvents(toggle, sidebar, overlay) {
                 const toggleName = item.getAttribute('data-toggle');
                 const submenu = sidebar.querySelector(`[data-submenu="${toggleName}"]`);
                 const isExpanded = item.classList.contains('expanded');
-                
-                console.log('Toggling menu:', toggleName, 'expanded:', isExpanded); // 调试信息
                 
                 // 关闭其他展开的菜单
                 expandableItems.forEach(otherItem => {
@@ -499,7 +435,7 @@ function optimizeButtons() {
             this.style.transform = 'scale(0.98)';
         });
         
-        button.addEventListener('touchend', function(e) {
+        button.addEventListener('touchend', function() {
             this.style.transform = 'scale(1)';
         });
     });
@@ -691,4 +627,4 @@ window.MobileOptimization = {
     showToast: showMobileToast,
     formatTime: formatMobileTime,
     isMobile: () => window.innerWidth <= 768
-}; 
+};

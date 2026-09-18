@@ -164,7 +164,7 @@
                                                class="btn btn-outline-primary" title="查看详情">
                                                 <i class="fas fa-eye"></i>
                                             </a>
-                                            {% if current_user.role in ['admin', 'manager'] %}
+                                            {% if can('inventory.manage') %}
                                             <button class="btn btn-outline-info" title="打印记录" 
                                                     onclick="printRecord('{{ requisition.requisition_number }}')">
                                                 <i class="fas fa-print"></i>

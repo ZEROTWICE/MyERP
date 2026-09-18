@@ -7,12 +7,12 @@
     <h2>产品管理</h2>
 
     <!-- 操作按钮 -->
-    {% if current_user.role in ['admin', 'manager'] %}
+    {% if can('product.manage') %}
     <div class="mb-3">
         <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addProductModal">
             <i class="fas fa-plus"></i> 添加产品
         </button>
-        {% if current_user.role in ['admin'] %}
+        {% if can('product.import') %}
         <a href="{{ url_for('main.download_product_template') }}" class="btn btn-info">
             <i class="fas fa-download"></i> 下载导入模板
         </a>
@@ -107,7 +107,7 @@
                             <a href="{{ url_for('main.product_processes', product_id=product.id) }}" class="btn btn-sm btn-info">
                                 <i class="fas fa-cogs"></i> 工序
                             </a>
-                            {% if current_user.role in ['admin', 'manager'] %}
+                            {% if can('product.manage') %}
                             <button class="btn btn-sm btn-primary" onclick="editProduct({{ product.id }})">
                                 <i class="fas fa-edit"></i> 编辑
                             </button>

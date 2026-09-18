@@ -3,7 +3,7 @@ from flask import current_app, flash, jsonify, redirect, render_template, reques
 from flask_login import current_user, login_required
 from werkzeug.exceptions import HTTPException
 
-from app import csrf, db
+from app import db
 from app.models import FinishedProduct, NonconformityRecord, Product, Workpiece
 from app.permissions import require_capability
 from app.services import mes_service
@@ -74,12 +74,18 @@ def assemble_product(product_id):
 @bp.route('/api/quality/nonconformities/<int:id>/dispose', methods=['POST'])
 @login_required
 @require_capability('quality.inspect')
-@csrf.exempt
 def dispose_nonconformity_api(id):
+    """不合格处置：生产质检（返工/报废/让步）与来料检（退货/让步接收/报废）共用一个入口。
+
+    P1-3：本端点由 templates/main/stock/nonconformities.html 的真实 HTML 表单 POST 调用，
+    表单已渲染 csrf_token，原先的 @csrf.exempt 等于对跨站表单完全不设防，已删除。
+    处置对象口径（target_type=workpiece / goods_receipt）由 mes_service.dispose_nonconformity
+    按单据自动分流，动作不适用时返回 400 与明确提示。
+    """
     try:
         nc = NonconformityRecord.query.get_or_404(id)
-        data = request.get_json() or request.form
-        action = data.get('action') or data.get('type')
+        data = request.get_json(silent=True) or request.form
+        action = (data.get('action') or data.get('type') or '').strip()
         proc = data.get('rework_process_id')
         emp = data.get('employee_id')
         mes_service.dispose_nonconformity(
@@ -90,9 +96,14 @@ def dispose_nonconformity_api(id):
             employee_id=int(emp) if emp else None,
         )
         db.session.commit()
-        return jsonify({'success': True, 'message': '处置已记录', 'status': nc.status})
+        target_type, target_id = mes_service.nonconformity_target(nc)
+        return jsonify({'success': True, 'message': '处置已记录', 'status': nc.status,
+                        'target_type': target_type, 'target_id': target_id})
     except HTTPException:
         raise
+    except ValueError as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f'不合格处置失败: {e}')

@@ -116,7 +116,9 @@
                             <small class="form-text text-muted">如果员工在职，请留空</small>
                         </div>
                     </div>
-                    {% if current_user.role == 'admin' %}
+                    {# 能力表里没有「授予管理员」专用能力；员工域内惟一的 admin-only 能力是 employee.delete，
+                       角色集与原先「仅 admin」的硬编码完全一致，待 P1 补专用能力后再替换。 #}
+                    {% if can('employee.delete') %}
                     <div class="col-md-6">
                         <div class="form-check mt-4">
                             {{ form.is_admin(class="form-check-input") }}
@@ -124,7 +126,7 @@
                         </div>
                     </div>
                     {% endif %}
-                    {% if current_user.role in ['admin', 'hr'] %}
+                    {% if can('employee.manage') %}
                     <div class="col-md-6">
                         <div class="form-group">
                             {{ form.password.label }}

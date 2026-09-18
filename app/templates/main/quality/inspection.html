@@ -269,7 +269,7 @@ function submitInspectionResult() {
     submitBtn.textContent = '提交中...';
     
     // 提交数据
-    fetch(`/api/quality/records/${recordId}/submit`, {
+    fetch("{{ url_for('main.get_inspection_records') }}" + '/' + recordId + '/submit', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
