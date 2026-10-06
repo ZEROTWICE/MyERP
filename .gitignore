@@ -15,3 +15,12 @@ __pycache__/
 # 沙箱遗留的空临时目录
 .tmp_p01/
 tmp_p01/
+
+# 本地开发数据库：由 create_all() + db_bootstrap.py（从已跟踪的 app/data.sqlite 播种）重建，
+# 不再纳入版本控制；服务器上的真实 app.db 由部署脚本自行备份。
+/app.db
+/app.db.bak-*
+
+# 测试套件每次运行都会重写的报告产物（permission_matrix.py / smoke_test.py）
+/_permission_matrix.json
+/_smoke_results.json
