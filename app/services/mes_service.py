@@ -9,8 +9,9 @@ from app.models import (
     AuditLog, Equipment, EquipmentCapability, FinishedProduct, GoodsReceipt, InspectionTemplate,
     InspectionTask, MaterialAllocation, NonconformityRecord, ProcessPrice, Product, ProductBOM,
     ProductProcess, ProductionBatch, ProductionBatchItem, ProductionRecord, RawMaterial,
-    RawMaterialCategory, SerialNumber, SystemConfig, Consumable, ConsumableCategory,
-    TaskAssignment, TaskWorkpiece, User, WorkCenterEquipment, Workpiece, WorkpieceEvent,
+    RawMaterialCategory, SerialNumber, Shipment, ShipmentItem, SystemConfig, Consumable,
+    ConsumableCategory, TaskAssignment, TaskWorkpiece, User, WorkCenterEquipment, Workpiece,
+    WorkpieceEvent,
 )
 
 
@@ -1068,6 +1069,245 @@ def apply_inventory_count(count):
     count.status = 'completed'
     count.end_date = datetime.utcnow()
     return count
+
+
+# ---------------------------------------------------------------- 发货出库（销售订单 → 发货单）
+# 2026-09-18 用户定口径：
+#   1) 「一条成品行 = 一个发货单位」改为按需拆分成品行；
+#   2) 整单模式与按行模式统一校验「本次发货数量 = min(订单行剩余待发量, 该成品可用在库件数)」；
+#   3) 完成判定按订单行逐行累计（见 app/main/shipping.py::confirm_shipment）。
+
+SHIPPABLE_STOCK_KINDS = ('fg', 'wip_part')
+# 占用订单行额度/成品行的发货单状态：draft 未出库也算占用，避免两张草稿单重复计入同一成品行
+SHIPMENT_OPEN_STATUSES = ('draft', 'shipped', 'signed')
+# 已实际出库的发货单状态：只有这些才计入「已发数量」
+SHIPMENT_SHIPPED_STATUSES = ('shipped', 'signed')
+
+
+def _to_quantity(value, default=0.0):
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def shipment_product_matches_line(fp, line):
+    """成品是否属于该订单行：同产品 id，或图号一致（与发货详情页列示口径相同）。"""
+    if fp is None or line is None:
+        return False
+    if line.product_id and fp.product_id == line.product_id:
+        return True
+    drawing = getattr(line.product, 'drawing_number', None) or ''
+    return bool(drawing) and fp.drawing_number == drawing
+
+
+def shipment_allocated_product_ids():
+    """已被未取消发货单占用的成品行 id（draft 草稿单占用也算，防止重复计入两张草稿单）。"""
+    rows = db.session.query(ShipmentItem.finished_product_id).join(
+        Shipment, ShipmentItem.shipment_id == Shipment.id
+    ).filter(
+        ShipmentItem.finished_product_id.isnot(None),
+        Shipment.status.in_(SHIPMENT_OPEN_STATUSES),
+    ).all()
+    return {row[0] for row in rows}
+
+
+def shipment_order_line_allocated_quantity(line_id, statuses=SHIPMENT_OPEN_STATUSES):
+    """该订单行已登记到发货单的件数（默认含 draft 草稿占用）。"""
+    if not line_id:
+        return 0.0
+    total = db.session.query(db.func.coalesce(db.func.sum(ShipmentItem.quantity), 0.0)).join(
+        Shipment, ShipmentItem.shipment_id == Shipment.id
+    ).filter(
+        ShipmentItem.sales_order_item_id == line_id,
+        Shipment.status.in_(tuple(statuses)),
+    ).scalar()
+    return _to_quantity(total)
+
+
+def shipment_order_line_shipped_quantity(line_id):
+    """该订单行已实际出库件数（只算已出库/已签收的发货单，用于完成判定）。"""
+    return shipment_order_line_allocated_quantity(line_id, statuses=SHIPMENT_SHIPPED_STATUSES)
+
+
+def shipment_order_line_remaining_quantity(line):
+    """订单行剩余待发量 = 订购数量 - 已登记件数（含 draft 草稿占用），不小于 0。"""
+    if line is None:
+        return 0.0
+    return max(0.0, _to_quantity(line.quantity) - shipment_order_line_allocated_quantity(line.id))
+
+
+def shipment_candidate_stock(line):
+    """订单行当前可发的在库成品行（按 id 升序）。
+
+    口径：in_stock + stock_kind in (fg, wip_part) + 成品与订单行同产品/图号；
+    并剔除已被未取消发货单占用的行，使第二张草稿单「取不到该行」。
+    """
+    if line is None:
+        return []
+    query = FinishedProduct.query.filter(
+        FinishedProduct.status == 'in_stock',
+        FinishedProduct.stock_kind.in_(SHIPPABLE_STOCK_KINDS),
+        # 已存档的成品行不再参与配货（与 routes/quality 的 is_archived == False 口径一致）
+        FinishedProduct.is_archived.is_(False),
+    )
+    if line.product_id:
+        drawing = getattr(line.product, 'drawing_number', None) or ''
+        query = query.filter(db.or_(
+            FinishedProduct.product_id == line.product_id,
+            FinishedProduct.drawing_number == drawing,
+        ))
+    taken = shipment_allocated_product_ids()
+    return [fp for fp in query.order_by(FinishedProduct.id.asc()).all()
+            if _to_quantity(fp.quantity) > 0 and fp.id not in taken]
+
+
+def shipment_take_finished_product(fp, quantity):
+    """按需拆分成品行，返回实际用于发货的成品行（不提交事务，调用方负责 commit/rollback）。
+
+    - quantity == fp.quantity：整行发货，返回原行；
+    - quantity < fp.quantity 且未绑定工件：原行 quantity -= quantity 留在库，
+      另建一条 quantity = quantity 的成品行（新流水号）作为实际发货对象；
+    - 绑定工件（1 件 1 行，不可拆）：只允许整行发，数量不等时抛 ValueError。
+    数量必须是正整数件：小数（如 1.5）会拆出小数库存行，一律抛 ValueError。
+    """
+    if fp is None:
+        raise ValueError('成品行不存在')
+    available = _to_quantity(fp.quantity)
+    take = _to_quantity(quantity)
+    if take <= 0:
+        raise ValueError('发货数量必须大于 0')
+    if abs(take - round(take)) > 1e-9:
+        raise ValueError('发货数量必须是整数件')
+    if take > available:
+        raise ValueError(f'库存 {fp.serial_number} 只有 {int(available)} 件，不能发 {int(take)} 件')
+    if abs(take - available) < 1e-9:
+        return fp
+    if fp.workpiece_id:
+        code = getattr(fp.workpiece, 'code', None) or fp.workpiece_id
+        raise ValueError(
+            f'库存 {fp.serial_number} 已绑定工件 {code}，只能整行发 {int(available)} 件，'
+            f'不能拆成 {int(take)} 件'
+        )
+    fp.quantity = available - take
+    new_fp = FinishedProduct(
+        serial_number=SerialNumber.get_next_number(),
+        global_sn=SerialNumber.get_next_number(),
+        product_number=fp.product_number,
+        production_date=fp.production_date,
+        drawing_number=fp.drawing_number,
+        model=fp.model,
+        inspector=fp.inspector,
+        quantity=int(take),
+        status='in_stock',
+        stock_kind=fp.stock_kind,
+        product_id=fp.product_id,
+        notes=f'{fp.notes or ""}（由 {fp.serial_number} 按 {int(take)} 件拆分）',
+        is_archived=fp.is_archived,
+    )
+    db.session.add(new_fp)
+    db.session.flush()
+    return new_fp
+
+
+def shipment_register_finished_product(ship, line, *, finished_product, quantity=None):
+    """整单/按行两条路径的**统一**登记入口：把成品（按需拆分）登记到发货明细。
+
+    校验：本次发货数量 = min(订单行剩余待发量, 该成品可用在库件数)，且不得超过订单行剩余待发量；
+    成品行已被任何未取消发货单占用（含本单）时拒绝；绑定工件的成品行只允许整行发。
+    返回 (ShipmentItem, None) 或 (None, 可读原因)。不提交事务。
+    """
+    if ship is None or line is None:
+        return None, '缺少发货单或销售订单行'
+    if line.sales_order_id != ship.sales_order_id:
+        return None, '所选订单行不属于本发货单的销售订单'
+    if finished_product is None:
+        return None, '请选择要发货的库存'
+    if finished_product.status != 'in_stock':
+        return None, f'库存 {finished_product.serial_number} 不在库'
+    if finished_product.stock_kind not in SHIPPABLE_STOCK_KINDS:
+        return None, f'库存 {finished_product.serial_number} 不是可发货的成品/自制件'
+    if _to_quantity(finished_product.quantity) <= 0:
+        return None, f'库存 {finished_product.serial_number} 没有可发件数'
+    if finished_product.is_archived:
+        # 已存档视为不再对外发货（NULL 按未存档处理，只拦显式 True）
+        return None, f'库存 {finished_product.serial_number} 已存档，不能发货'
+    if finished_product.id in shipment_allocated_product_ids():
+        return None, f'库存 {finished_product.serial_number} 已加入发货单，不能重复发货'
+    if not shipment_product_matches_line(finished_product, line):
+        return None, f'库存 {finished_product.serial_number} 与所选订单行的产品不一致'
+
+    remaining = shipment_order_line_remaining_quantity(line)
+    if remaining <= 0:
+        return None, (f'订单行已发满（订购 {int(_to_quantity(line.quantity))} 件），'
+                      f'不能超过剩余待发量')
+    requested = None if quantity is None else _to_quantity(quantity)
+    if requested is not None and requested <= 0:
+        return None, '发货数量必须大于 0'
+    # 成品按整件发货：1.5 件会拆出小数库存行，直接拒绝（整单路径不传数量，不受影响）
+    if requested is not None and abs(requested - round(requested)) > 1e-9:
+        return None, '发货数量必须是整数件'
+
+    row_qty = _to_quantity(finished_product.quantity)
+    if finished_product.workpiece_id:
+        # 绑定工件：1 件 1 行，不可拆；数量不等时拒绝，绝不静默按整行发
+        target = row_qty if requested is None else requested
+        if abs(target - row_qty) >= 1e-9:
+            return None, (f'库存 {finished_product.serial_number} 已绑定工件，只能整行发 '
+                          f'{int(row_qty)} 件，不能发 {int(target)} 件')
+        if row_qty > remaining:
+            return None, (f'库存 {finished_product.serial_number} 已绑定工件需整行发 '
+                          f'{int(row_qty)} 件，超过订单行剩余待发量 {int(remaining)} 件')
+    else:
+        target = min(remaining, row_qty) if requested is None else min(requested, remaining, row_qty)
+    if target <= 0:
+        return None, '可发数量为 0，无法发货'
+
+    try:
+        shipped_fp = shipment_take_finished_product(finished_product, target)
+    except ValueError as exc:
+        return None, str(exc)
+
+    item = ShipmentItem(
+        shipment_id=ship.id,
+        sales_order_item_id=line.id,
+        finished_product_id=shipped_fp.id,
+        workpiece_id=shipped_fp.workpiece_id,
+        quantity=int(target),
+    )
+    db.session.add(item)
+    db.session.flush()
+    return item, None
+
+
+def shipment_fill_order_line(ship, line):
+    """整单模式：把订单行剩余待发量按**件数**配到在库成品上（按需拆分）。
+
+    返回 (本次登记件数, 提示列表)；库存不足以发满时只登记能发的部分并给出提示，
+    绝不按成品行条数超发。
+    """
+    remaining = shipment_order_line_remaining_quantity(line)
+    messages = []
+    shipped = 0.0
+    if remaining <= 0:
+        if _to_quantity(line.quantity) > 0:
+            messages.append(f'订单行（订购 {int(_to_quantity(line.quantity))} 件）已发满，不再配货')
+        return shipped, messages
+    for fp in shipment_candidate_stock(line):
+        if remaining <= 0:
+            break
+        row_qty = _to_quantity(fp.quantity)
+        if fp.workpiece_id and row_qty > remaining + 1e-9:
+            messages.append(f'库存 {fp.serial_number} 绑定工件需整行发 {int(row_qty)} 件，'
+                            f'超过剩余待发量 {int(remaining)} 件，已跳过')
+            continue
+        item, error = shipment_register_finished_product(ship, line, finished_product=fp)
+        if item is None:
+            messages.append(error)
+            continue
+        shipped += _to_quantity(item.quantity)
+        remaining -= _to_quantity(item.quantity)
+    return shipped, messages
 
 
 def pick_equipment_for_process(process_id, work_center_id=None):
