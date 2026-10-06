@@ -1148,8 +1148,10 @@ def shipment_candidate_stock(line):
     query = FinishedProduct.query.filter(
         FinishedProduct.status == 'in_stock',
         FinishedProduct.stock_kind.in_(SHIPPABLE_STOCK_KINDS),
-        # 已存档的成品行不再参与配货（与 routes/quality 的 is_archived == False 口径一致）
-        FinishedProduct.is_archived.is_(False),
+        # 已存档的成品行不再参与配货；NULL 视为未存档，与下方登记判断（只拦显式 True）
+        # 保持同一口径，避免出现「候选里看不到、强行指定 id 却能发」的两套语义
+        db.or_(FinishedProduct.is_archived.is_(False),
+               FinishedProduct.is_archived.is_(None)),
     )
     if line.product_id:
         drawing = getattr(line.product, 'drawing_number', None) or ''

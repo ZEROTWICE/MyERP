@@ -28,6 +28,8 @@
             <option value="{{ fp.id }}">{{ fp.serial_number }} {{ fp.product_number }} ({{ fp.stock_kind }})</option>
             {% endfor %}
         </select>
+        <input type="number" name="quantity" min="1" step="1" class="form-control mb-2"
+               placeholder="数量（留空=按剩余待发量最多发；只接受整数件）">
         <button class="btn btn-outline-primary">加入发货单</button>
     </form>
     <form method="post" action="{{ url_for('main.confirm_shipment', id=ship.id) }}">

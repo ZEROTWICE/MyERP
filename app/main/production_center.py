@@ -382,3 +382,57 @@ def api_execute_operation(item_id: int):
         return jsonify({'success': False, 'message': f'记录失败：{str(e)}'}), 500
 
 
+@bp.route('/api/production/generate-codes', methods=['POST'])
+@login_required
+@require_capability('production_center.use')
+def generate_batch_product_codes():
+    """为指定生产批次补生成产品编码。
+
+    前端入口：main/production_batch_detail.html 的「生成产品编码」按钮。
+    复用 ProductionBatch.generate_product_codes()，不另写编码规则逻辑。
+    幂等：该方法每次都无条件插入批次项，因此已有批次项时直接返回、不重复生成。
+    """
+    try:
+        payload = request.get_json(silent=True) or request.form or {}
+        raw_id = payload.get('batch_id') or payload.get('id')
+        if raw_id in (None, ''):
+            return jsonify({'success': False, 'message': '缺少批次 id'}), 400
+        try:
+            batch_id = int(raw_id)
+        except (TypeError, ValueError):
+            return jsonify({'success': False, 'message': '批次 id 必须是整数'}), 400
+
+        batch = ProductionBatch.query.get(batch_id)
+        if batch is None:
+            return jsonify({'success': False, 'message': f'批次 {batch_id} 不存在'}), 404
+
+        existing = ProductionBatchItem.query.filter_by(batch_id=batch.id).order_by(
+            ProductionBatchItem.item_sequence).all()
+        if existing:
+            return jsonify({
+                'success': True,
+                'message': f'该批次已有 {len(existing)} 条产品编码，未重复生成',
+                'data': [{'id': it.id, 'product_code': it.product_code} for it in existing],
+            })
+
+        if not batch.generate_product_codes():
+            db.session.rollback()
+            return jsonify({
+                'success': False,
+                'message': '生成产品编码失败：产品的编码规则未配置或生成异常',
+            }), 400
+        db.session.commit()
+
+        items = ProductionBatchItem.query.filter_by(batch_id=batch.id).order_by(
+            ProductionBatchItem.item_sequence).all()
+        return jsonify({
+            'success': True,
+            'message': f'已生成 {len(items)} 条产品编码',
+            'data': [{'id': it.id, 'product_code': it.product_code} for it in items],
+        })
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f'生成批次产品编码失败: {str(e)}')
+        return jsonify({'success': False, 'message': f'生成失败：{str(e)}'}), 500
+
+

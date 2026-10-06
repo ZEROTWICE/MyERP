@@ -1431,3 +1431,250 @@ def export_inspection_records():
     except Exception as e:
         current_app.logger.error(f'导出质检记录失败: {str(e)}')
         return jsonify({'success': False, 'message': f'导出失败：{str(e)}'}), 500
+
+
+# ---------------------------------------------------------------------------
+# 质检任务：导出 / 导入模板 / 导入
+# 前端入口在 main/quality/tasks.html。导出与模板一律内存生成，不落临时文件
+# （本仓库在 Windows 上出现过 send_file 之后临时文件被占用、WinError 32 删不掉的问题）。
+# ---------------------------------------------------------------------------
+
+TASK_IMPORT_COL_TYPE = '检验类型(product/production_record/material)'
+TASK_IMPORT_COL_TARGET = '检验对象ID'
+TASK_IMPORT_COL_INSPECTOR = '检验员用户名'
+TASK_IMPORT_COL_PRIORITY = '优先级'
+TASK_IMPORT_COL_DEADLINE = '截止时间(YYYY-MM-DD)'
+TASK_IMPORT_COL_NOTES = '备注'
+
+_TASK_TYPE_NAMES = {
+    'product': '成品质检',
+    'production_record': '生产记录质检',
+    'material': '原材料质检',
+}
+_VALID_TASK_TYPES = ('product', 'production_record', 'material')
+
+
+def _task_export_rows(query):
+    """把质检任务查询结果整理成导出行（列名与导入模板保持同一套）。"""
+    rows = []
+    for task in query.order_by(InspectionTask.created_at.desc()).all():
+        inspector = task.inspector
+        inspector_name = ''
+        if inspector is not None:
+            employee = getattr(inspector, 'employee', None)
+            inspector_name = employee.name if employee else inspector.username
+        rows.append({
+            '任务编号': task.global_sn,
+            '检验类型': _TASK_TYPE_NAMES.get(task.target_type, task.target_type or ''),
+            '检验对象ID': task.target_id,
+            '状态': task.status,
+            '优先级': task.priority or 0,
+            '检验员': inspector_name,
+            '截止时间': task.deadline.strftime('%Y-%m-%d %H:%M') if task.deadline else '',
+            '创建时间': task.created_at.strftime('%Y-%m-%d %H:%M:%S') if task.created_at else '',
+            '备注': task.notes or '',
+        })
+    return rows
+
+
+@bp.route('/api/quality/tasks/export', methods=['GET'])
+@login_required
+@require_capability('quality.export')
+def export_inspection_tasks():
+    """导出质检任务清单（xlsx，内存生成）。"""
+    try:
+        import pandas as pd
+        from io import BytesIO
+
+        query = InspectionTask.query
+        search = request.args.get('search', '').strip()
+        if search:
+            query = query.filter(db.or_(
+                InspectionTask.global_sn.like(f'%{search}%'),
+                InspectionTask.notes.like(f'%{search}%'),
+            ))
+        status_filter = request.args.get('status', '').strip()
+        if status_filter:
+            query = query.filter(InspectionTask.status == status_filter)
+        target_type = request.args.get('target_type', '').strip()
+        if target_type:
+            query = query.filter(InspectionTask.target_type == target_type)
+        inspector_id = request.args.get('inspector', '').strip()
+        if inspector_id.isdigit():
+            query = query.filter(InspectionTask.inspector_id == int(inspector_id))
+
+        rows = _task_export_rows(query)
+        df = pd.DataFrame(rows)
+        output = BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df.to_excel(writer, sheet_name='质检任务', index=False)
+        output.seek(0)
+
+        filename = f'质检任务_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
+        return send_file(
+            output,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name=filename,
+        )
+    except Exception as e:
+        current_app.logger.error(f'导出质检任务失败: {str(e)}')
+        flash('导出失败，请重试', 'danger')
+        return redirect(url_for('main.quality_tasks'))
+
+
+@bp.route('/api/quality/tasks/template', methods=['GET'])
+@login_required
+@require_capability('quality.export')
+def download_inspection_task_template():
+    """下载质检任务导入模板（列名与导入解析严格一致）。"""
+    try:
+        import pandas as pd
+        from io import BytesIO
+
+        df = pd.DataFrame([{
+            TASK_IMPORT_COL_TYPE: 'production_record',
+            TASK_IMPORT_COL_TARGET: 1,
+            TASK_IMPORT_COL_INSPECTOR: 'inspector01',
+            TASK_IMPORT_COL_PRIORITY: 0,
+            TASK_IMPORT_COL_DEADLINE: '',
+            TASK_IMPORT_COL_NOTES: '示例行：导入前请删除',
+        }])
+        output = BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df.to_excel(writer, sheet_name='质检任务导入模板', index=False)
+        output.seek(0)
+        return send_file(
+            output,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name='质检任务导入模板.xlsx',
+        )
+    except Exception as e:
+        current_app.logger.error(f'下载质检任务导入模板失败: {str(e)}')
+        flash('下载模板失败，请重试', 'danger')
+        return redirect(url_for('main.quality_tasks'))
+
+
+@bp.route('/api/quality/tasks/import', methods=['POST'])
+@login_required
+@require_capability('quality.task.manage')
+def import_inspection_tasks():
+    """从 xlsx 导入质检任务。
+
+    行级容错：坏行只记「第 N 行：…」并跳过，不整体 500（与 import_tasks 同一口径）；
+    文本日期用 pandas.to_datetime 兜底。
+    """
+    file = request.files.get('file')
+    if file is None or not file.filename:
+        flash('请选择要导入的 Excel 文件', 'warning')
+        return redirect(url_for('main.quality_tasks'))
+
+    try:
+        import pandas as pd
+    except Exception as e:
+        current_app.logger.error(f'导入质检任务时加载 pandas 失败: {str(e)}')
+        flash('导入失败：运行环境缺少 pandas 依赖', 'danger')
+        return redirect(url_for('main.quality_tasks'))
+
+    try:
+        df = pd.read_excel(file)
+    except Exception as e:
+        current_app.logger.error(f'质检任务导入文件解析失败: {str(e)}')
+        flash(f'文件解析失败：{str(e)}', 'danger')
+        return redirect(url_for('main.quality_tasks'))
+
+    required_cols = (TASK_IMPORT_COL_TYPE, TASK_IMPORT_COL_TARGET, TASK_IMPORT_COL_INSPECTOR)
+    missing = [c for c in required_cols if c not in df.columns]
+    if missing:
+        flash(f'文件缺少必需的列：{", ".join(missing)}（请先下载导入模板）', 'danger')
+        return redirect(url_for('main.quality_tasks'))
+
+    def _is_blank(value):
+        return value is None or (isinstance(value, float) and pd.isna(value))
+
+    created = 0
+    errors = []
+    try:
+        for idx, row in df.iterrows():
+            lineno = idx + 2  # 第 1 行是表头
+            target_type = str(row.get(TASK_IMPORT_COL_TYPE, '') or '').strip()
+            if target_type not in _VALID_TASK_TYPES:
+                errors.append(f'第 {lineno} 行：检验类型必须是 product / production_record / material')
+                continue
+
+            raw_target = row.get(TASK_IMPORT_COL_TARGET)
+            if _is_blank(raw_target):
+                errors.append(f'第 {lineno} 行：检验对象ID 不能为空')
+                continue
+            try:
+                target_id = int(raw_target)
+            except (TypeError, ValueError):
+                errors.append(f'第 {lineno} 行：检验对象ID 必须是整数')
+                continue
+
+            username = str(row.get(TASK_IMPORT_COL_INSPECTOR, '') or '').strip()
+            if not username:
+                errors.append(f'第 {lineno} 行：检验员用户名不能为空')
+                continue
+            inspector = User.query.filter_by(username=username).first()
+            if inspector is None:
+                errors.append(f'第 {lineno} 行：检验员用户名 {username} 不存在')
+                continue
+
+            deadline = None
+            if TASK_IMPORT_COL_DEADLINE in df.columns:
+                raw_deadline = row.get(TASK_IMPORT_COL_DEADLINE)
+                if not _is_blank(raw_deadline):
+                    text = str(raw_deadline).strip()
+                    if text:
+                        try:
+                            deadline = pd.to_datetime(text).to_pydatetime()
+                        except Exception:
+                            errors.append(f'第 {lineno} 行：截止时间格式错误（应为 YYYY-MM-DD）')
+                            continue
+
+            priority = 0
+            if TASK_IMPORT_COL_PRIORITY in df.columns:
+                raw_priority = row.get(TASK_IMPORT_COL_PRIORITY)
+                if not _is_blank(raw_priority):
+                    try:
+                        priority = int(raw_priority)
+                    except (TypeError, ValueError):
+                        priority = 0
+
+            notes = ''
+            if TASK_IMPORT_COL_NOTES in df.columns:
+                raw_notes = row.get(TASK_IMPORT_COL_NOTES)
+                if not _is_blank(raw_notes):
+                    notes = str(raw_notes).strip()
+
+            db.session.add(InspectionTask(
+                global_sn=SerialNumber.get_next_number(),
+                template_id=None,  # 模板由检验员开始检验时再选（沿用既有流程）
+                inspector_id=inspector.id,
+                target_type=target_type,
+                target_id=target_id,
+                status='pending',
+                priority=priority,
+                deadline=deadline,
+                notes=notes,
+                created_by=current_user.id,
+            ))
+            created += 1
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f'导入质检任务失败: {str(e)}')
+        flash(f'导入失败：{str(e)}', 'danger')
+        return redirect(url_for('main.quality_tasks'))
+
+    if created:
+        flash(f'成功导入 {created} 条质检任务' + (f'，{len(errors)} 行被跳过' if errors else ''), 'success')
+    else:
+        flash(f'没有导入任何数据（{len(errors)} 行被跳过）', 'warning')
+    for message in errors[:20]:
+        flash(message, 'warning')
+    if len(errors) > 20:
+        flash(f'另有 {len(errors) - 20} 行错误未逐条显示', 'warning')
+    return redirect(url_for('main.quality_tasks'))

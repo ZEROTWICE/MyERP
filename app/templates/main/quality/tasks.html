@@ -56,13 +56,14 @@
                     <button type="reset" class="btn btn-secondary">
                         <i class="fas fa-redo"></i> 重置
                     </button>
-                    {% if can('quality.task.manage') %}
-                    {# 后端未提供质检任务导出/导入接口（待实现，详见 t12 报告），控件禁用并显式标注 #}
-                    <button type="button" class="btn btn-success" disabled title="后端未提供该接口（待实现）">
-                        <i class="fas fa-file-export"></i> 导出 <span class="badge bg-secondary">待实现</span>
+                    {% if can('quality.export') %}
+                    <button type="button" class="btn btn-success" onclick="exportTasks()">
+                        <i class="fas fa-file-export"></i> 导出
                     </button>
-                    <button type="button" class="btn btn-info" disabled title="后端未提供该接口（待实现）">
-                        <i class="fas fa-file-import"></i> 导入 <span class="badge bg-secondary">待实现</span>
+                    {% endif %}
+                    {% if can('quality.task.manage') %}
+                    <button type="button" class="btn btn-info" onclick="importTasks()">
+                        <i class="fas fa-file-import"></i> 导入
                     </button>
                     {% endif %}
                 </div>
@@ -179,9 +180,9 @@
                         <input type="file" class="form-control" id="importFile" accept=".xlsx,.xls">
                     </div>
                     <div class="mb-3">
-                        <a href="#" onclick="downloadTemplate(); return false;"
-                           class="text-decoration-none text-muted" title="后端未提供该接口（待实现）">
-                            <i class="fas fa-download"></i> 下载导入模板 <span class="badge bg-secondary">待实现</span>
+                        <a href="{{ url_for('main.download_inspection_task_template') }}"
+                           class="text-decoration-none">
+                            <i class="fas fa-download"></i> 下载导入模板
                         </a>
                     </div>
                 </form>
@@ -641,9 +642,11 @@ function deleteTask(id) {
     });
 }
 
-// 导出任务：后端未提供该接口（原先调用的质检任务导出 API 不存在，实测 404），显式提示「待实现」
+// 导出质检任务：走后端 /api/quality/tasks/export，带上当前搜索表单的筛选条件
 function exportTasks() {
-    showToast('error', '后端未提供质检任务导出接口（待实现）');
+    const form = document.querySelector('form');
+    const query = form ? new URLSearchParams(new FormData(form)).toString() : '';
+    window.location.href = "{{ url_for('main.export_inspection_tasks') }}" + (query ? '?' + query : '');
 }
 
 // 显示导入模态框
@@ -652,14 +655,35 @@ function importTasks() {
     importModal.show();
 }
 
-// 下载导入模板：后端未提供该接口，显式提示「待实现」
+// 下载导入模板：后端 /api/quality/tasks/template
 function downloadTemplate() {
-    showToast('error', '后端未提供导入模板下载接口（待实现）');
+    window.location.href = "{{ url_for('main.download_inspection_task_template') }}";
 }
 
-// 提交导入：后端未提供该接口，显式提示「待实现」
+// 提交导入：POST 到 /api/quality/tasks/import（multipart，字段名 file）
 function submitImport() {
-    showToast('error', '后端未提供质检任务导入接口（待实现）');
+    const fileInput = document.getElementById('importFile');
+    if (!fileInput.files || fileInput.files.length === 0) {
+        showToast('error', '请选择要导入的 Excel 文件');
+        return;
+    }
+    const formData = new FormData();
+    formData.append('file', fileInput.files[0]);
+    formData.append('csrf_token', '{{ csrf_token() }}');
+    fetch("{{ url_for('main.import_inspection_tasks') }}", {
+        method: 'POST',
+        body: formData,
+        headers: { 'X-CSRFToken': '{{ csrf_token() }}' }
+    }).then(function (resp) {
+        if (resp.ok || resp.redirected) {
+            showToast('success', '导入已提交，正在刷新…');
+            setTimeout(function () { window.location.reload(); }, 800);
+        } else {
+            showToast('error', '导入失败（HTTP ' + resp.status + '）');
+        }
+    }).catch(function () {
+        showToast('error', '导入请求失败');
+    });
 }
 
 // 编辑任务

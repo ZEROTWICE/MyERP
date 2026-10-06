@@ -18,13 +18,13 @@ from app.main.forms import (
 )
 from sqlalchemy import desc, or_
 from app.utils.excel_generator import ExcelGenerator
+import io
 import os
 import time
 from werkzeug.utils import secure_filename
 from werkzeug.datastructures import FileStorage
 from werkzeug.exceptions import HTTPException
 from typing import Optional
-from flask import after_this_request
 from functools import wraps
 import tempfile
 from flask_paginate import Pagination
@@ -2216,33 +2216,19 @@ def export_employees():
         employees = query.all()
         wb = ExcelGenerator.export_employees(employees)
 
-        temp_path = None
         try:
-            fd, temp_path = tempfile.mkstemp(suffix='.xlsx')
-            os.close(fd)
-            wb.save(temp_path)
-
-            # 必须等响应发完再删，写在 finally 里会在 send_file 之前执行
-            @after_this_request
-            def remove_file(response):
-                try:
-                    os.remove(temp_path)
-                except OSError as e:
-                    current_app.logger.error(f'删除临时文件失败: {str(e)}')
-                return response
+            # 写入内存：避免 Windows 上 send_file 后临时文件被占用、删不掉而持续堆积
+            buf = io.BytesIO()
+            wb.save(buf)
+            buf.seek(0)
 
             return send_file(
-                temp_path,
+                buf,
                 mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
                 as_attachment=True,
                 download_name=f'employees_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
             )
         except Exception as e:
-            if temp_path and os.path.exists(temp_path):
-                try:
-                    os.remove(temp_path)
-                except OSError:
-                    pass
             current_app.logger.error(f'导出员工数据失败: {str(e)}')
             flash(f'导出失败：{str(e)}', 'danger')
             return redirect(url_for('main.manage_employees'))
@@ -2628,33 +2614,19 @@ def export_process_prices():
         processes = query.all()
         wb = ExcelGenerator.export_process_prices(processes)
 
-        temp_path = None
         try:
-            fd, temp_path = tempfile.mkstemp(suffix='.xlsx')
-            os.close(fd)
-            wb.save(temp_path)
-
-            # 必须等响应发完再删，写在 finally 里会在 send_file 之前执行
-            @after_this_request
-            def remove_file(response):
-                try:
-                    os.remove(temp_path)
-                except OSError as e:
-                    current_app.logger.error(f'删除临时文件失败: {str(e)}')
-                return response
+            # 写入内存：避免 Windows 上 send_file 后临时文件被占用、删不掉而持续堆积
+            buf = io.BytesIO()
+            wb.save(buf)
+            buf.seek(0)
 
             return send_file(
-                temp_path,
+                buf,
                 mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
                 as_attachment=True,
                 download_name=f'processes_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
             )
         except Exception as e:
-            if temp_path and os.path.exists(temp_path):
-                try:
-                    os.remove(temp_path)
-                except OSError:
-                    pass
             current_app.logger.error(f'导出工序数据失败: {str(e)}')
             flash(f'导出失败：{str(e)}', 'danger')
             return redirect(url_for('main.process_prices'))
@@ -4141,21 +4113,13 @@ def export_tasks():
             # 生成并返回 Excel
             excel_file = ExcelGenerator.export_tasks(tasks)
 
-            temp_dir = tempfile.mkdtemp()
-            temp_file = os.path.join(temp_dir, '生产任务数据.xlsx')
-            excel_file.save(temp_file)
-
-            @after_this_request
-            def remove_file(response):
-                try:
-                    os.remove(temp_file)
-                    os.rmdir(temp_dir)
-                except Exception as e:
-                    current_app.logger.error(f'删除临时文件失败: {str(e)}')
-                return response
+            # 写入内存：避免 Windows 上 send_file 后临时文件被占用、删不掉而持续堆积
+            buf = io.BytesIO()
+            excel_file.save(buf)
+            buf.seek(0)
 
             return send_file(
-                temp_file,
+                buf,
                 as_attachment=True,
                 download_name='生产任务数据.xlsx',
                 mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -4198,22 +4162,13 @@ def export_tasks():
             # 生成Excel文件
             excel_file = ExcelGenerator.export_tasks(tasks)
             
-            # 创建临时文件
-            temp_dir = tempfile.mkdtemp()
-            temp_file = os.path.join(temp_dir, '生产任务数据.xlsx')
-            excel_file.save(temp_file)
-            
-            @after_this_request
-            def remove_file(response):
-                try:
-                    os.remove(temp_file)
-                    os.rmdir(temp_dir)
-                except Exception as e:
-                    current_app.logger.error(f'删除临时文件失败: {str(e)}')
-                return response
-            
+            # 写入内存：避免 Windows 上 send_file 后临时文件被占用、删不掉而持续堆积
+            buf = io.BytesIO()
+            excel_file.save(buf)
+            buf.seek(0)
+
             return send_file(
-                temp_file,
+                buf,
                 as_attachment=True,
                 download_name='生产任务数据.xlsx',
                 mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -5130,110 +5085,6 @@ def save_temp_file(file: FileStorage) -> str:
     file.save(temp_path)
     return temp_path
 
-@bp.route('/upload/raw-materials', methods=['POST'])
-@login_required
-@require_capability('inventory.manage')
-def upload_raw_materials():
-    """处理原材料数据文件上传"""
-    try:
-        file = request.files.get('file')
-        error = validate_excel_file(file)
-        if error:
-            return jsonify({'success': False, 'message': error})
-
-        temp_path = save_temp_file(file)
-        
-        try:
-            df = pd.read_excel(temp_path)
-            required_columns = ['material_code', 'material_name', 'unit', 'unit_price']
-            
-            # 验证必需列是否存在
-            missing_columns = [col for col in required_columns if col not in df.columns]
-            if missing_columns:
-                return jsonify({
-                    'success': False,
-                    'message': f'文件缺少必需的列：{", ".join(missing_columns)}'
-                })
-            
-            # 开始数据导入事务
-            with db.session.begin_nested():
-                for _, row in df.iterrows():
-                    raw_material = RawMaterial(
-                        material_code=str(row['material_code']),
-                        material_name=str(row['material_name']),
-                        unit=str(row['unit']),
-                        unit_price=float(row['unit_price'])
-                    )
-                    db.session.add(raw_material)
-            
-            db.session.commit()
-            return jsonify({'success': True, 'message': '原材料数据导入成功'})
-            
-        except Exception as e:
-            db.session.rollback()
-            return jsonify({'success': False, 'message': f'数据处理错误：{str(e)}'})
-        
-        finally:
-            # 清理临时文件
-            if os.path.exists(temp_path):
-                os.remove(temp_path)
-            os.rmdir(os.path.dirname(temp_path))
-            
-    except Exception as e:
-        return jsonify({'success': False, 'message': f'上传处理错误：{str(e)}'})
-
-@bp.route('/upload/finished-products', methods=['POST'])
-@login_required
-@require_capability('inventory.manage')
-def upload_finished_products():
-    """处理成品数据文件上传"""
-    try:
-        file = request.files.get('file')
-        error = validate_excel_file(file)
-        if error:
-            return jsonify({'success': False, 'message': error})
-
-        temp_path = save_temp_file(file)
-        
-        try:
-            df = pd.read_excel(temp_path)
-            required_columns = ['product_code', 'product_name', 'specification', 'unit', 'unit_price']
-            
-            # 验证必需列是否存在
-            missing_columns = [col for col in required_columns if col not in df.columns]
-            if missing_columns:
-                return jsonify({
-                    'success': False,
-                    'message': f'文件缺少必需的列：{", ".join(missing_columns)}'
-                })
-            
-            # 开始数据导入事务
-            with db.session.begin_nested():
-                for _, row in df.iterrows():
-                    finished_product = FinishedProduct(
-                        product_code=str(row['product_code']),
-                        product_name=str(row['product_name']),
-                        specification=str(row['specification']),
-                        unit=str(row['unit']),
-                        unit_price=float(row['unit_price'])
-                    )
-                    db.session.add(finished_product)
-            
-            db.session.commit()
-            return jsonify({'success': True, 'message': '成品数据导入成功'})
-            
-        except Exception as e:
-            db.session.rollback()
-            return jsonify({'success': False, 'message': f'数据处理错误：{str(e)}'})
-        
-        finally:
-            # 清理临时文件
-            if os.path.exists(temp_path):
-                os.remove(temp_path)
-            os.rmdir(os.path.dirname(temp_path))
-            
-    except Exception as e:
-        return jsonify({'success': False, 'message': f'上传处理错误：{str(e)}'})
 
 @bp.route('/inventory/finished/add', methods=['POST'])
 @login_required
@@ -8082,20 +7933,10 @@ def export_products():
             # 创建Excel生成器
             wb = ExcelGenerator.export_products(products)
             filename = f'产品信息导出_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
-            temp_path = os.path.join(current_app.config['TEMP_FOLDER'], filename)
-            
-            # 保存工作簿到临时文件
-            wb.save(temp_path)
-            wb.close()
-            
-            @after_this_request
-            def remove_file(response):
-                try:
-                    if temp_path and os.path.exists(temp_path):
-                        os.remove(temp_path)
-                except Exception as e:
-                    current_app.logger.error(f'删除导出文件失败: {str(e)}')
-                return response
+            # 写入内存：避免 Windows 上 send_file 后临时文件被占用、删不掉而持续堆积
+            buf = io.BytesIO()
+            wb.save(buf)
+            buf.seek(0)
             
             # 记录审计日志
             log = AuditLog(
@@ -8108,7 +7949,7 @@ def export_products():
             db.session.commit()
             
             return send_file(
-                temp_path,
+                buf,
                 as_attachment=True,
                 download_name=filename,
                 mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'

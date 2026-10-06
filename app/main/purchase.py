@@ -133,7 +133,13 @@ def manage_purchase_requisitions():
         flash('完整请购流程未启用，可直接建采购单', 'info')
         return redirect(url_for('main.manage_purchase_orders'))
     items = PurchaseRequisition.query.order_by(PurchaseRequisition.id.desc()).all()
-    return render_template('main/purchase/requisitions.html', items=items)
+    # 转采购单需要选择供应商：仅启用中的供应商，按名称排序并限量，避免页面上下文过大
+    suppliers = (Supplier.query
+                 .filter_by(is_active=True)
+                 .order_by(Supplier.name)
+                 .limit(500)
+                 .all())
+    return render_template('main/purchase/requisitions.html', items=items, suppliers=suppliers)
 
 
 @bp.route('/purchase_requisitions/save', methods=['POST'])

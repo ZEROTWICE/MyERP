@@ -29,17 +29,23 @@
                     </form>
                     {% endif %}
                     {% if r.status in ('approved', 'converted') %}
-                    {# 已审批（或已转过）的请购单可转采购单；供应商下拉数据不在本页上下文里，故填供应商 ID（见供应商页） #}
+                    {% if suppliers %}
+                    {# 供应商下拉由视图 manage_purchase_requisitions 传入（仅启用中的供应商，按名称排序） #}
                     <form class="d-inline-flex align-items-center gap-1" method="post"
                           action="{{ url_for('main.convert_purchase_requisition', id=r.id) }}">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <input class="form-control form-control-sm w-auto" type="number" min="1" name="supplier_id"
-                               placeholder="供应商ID" required
-                               title="填供应商管理页里的供应商 ID，可点击右侧链接查看">
+                        <select class="form-select form-select-sm w-auto" name="supplier_id" required>
+                            <option value="">选择供应商</option>
+                            {% for s in suppliers %}
+                            <option value="{{ s.id }}">{{ s.name }}</option>
+                            {% endfor %}
+                        </select>
                         <button class="btn btn-sm btn-primary">转采购单</button>
                     </form>
+                    {% else %}
                     <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('main.manage_suppliers') }}"
-                       title="查看供应商 ID">供应商ID</a>
+                       title="先到供应商管理页新增并启用供应商">暂无启用供应商，去新增</a>
+                    {% endif %}
                     {% endif %}
                 </td>
             </tr>
