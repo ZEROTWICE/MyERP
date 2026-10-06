@@ -24,3 +24,9 @@ tmp_p01/
 # 测试套件每次运行都会重写的报告产物（permission_matrix.py / smoke_test.py）
 /_permission_matrix.json
 /_smoke_results.json
+
+# 运行时临时/导出目录：由 create_app() 的 os.makedirs(..., exist_ok=True) 自动创建，
+# 且 cleanup_temp_files()（@bp.before_request 钩子，routes.py:2196）会按 mtime>5min 清理。
+# 原 6 个 *_template.xlsx 是旧导出实现的遗留产物（导出已改 io.BytesIO 内存生成，无人读取），
+# 已取消跟踪并删除；不再入库。
+/uploads/temp/

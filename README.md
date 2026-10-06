@@ -1,12 +1,26 @@
-# 工资管理系统
+# 工资管理系统（MyERP）
 
 这是一个基于Flask的工资管理系统，用于管理企业员工的工资计算、工序管理、任务分配等功能。
+**范围已扩展为道岔产销一体**：在原有工资/工序/任务/库存之上，补齐了设备与炉次、工件溯源、质检门禁、分库入库（正品/半成品/未通过/报废）、组装发货与采购（供应商、请购、采购单、到货、来料检）等模块。
+
+## 文档导航
+
+> **开发前必读**：先看 [docs/开发进度与交接.md](docs/开发进度与交接.md)（跨会话交接：当前进度、Python 环境位置、数据库迁移与仓库卫生要点、本轮提交与门禁、遗留待办）。
+
+| 文档 | 用途 |
+| --- | --- |
+| [docs/开发进度与交接.md](docs/开发进度与交接.md) | **开发前必读**：交接说明、环境与操作要点、本轮提交与门禁、遗留待办 |
+| [docs/业务流程现状与缺口.md](docs/业务流程现状与缺口.md) | 全量功能盘点、端到端业务流程、缺口清单、业务口径 |
+| [docs/交付说明-P0P1.md](docs/交付说明-P0P1.md) | P0/P1 交付验收、迁移策略与老库升级路径、遗留项、复现命令、推送通道 |
+| [docs/继续开发准备报告.md](docs/继续开发准备报告.md) | P0→P1 路线图与逐任务证据索引、规模实测 |
+| [docs/测试报告-2026-08-11.md](docs/测试报告-2026-08-11.md) | 历史回归快照（2026-08-11），非当前状态 |
+| [AGENTS.md](AGENTS.md) | 项目级编码约束与可复用片段（导出/导入、权限、分页、Select2 等 Recipe） |
 
 ## 功能特性
 
 ### 1. 用户管理
-- 多角色支持（管理员、经理、普通用户）
-- 用户登录和权限控制
+- **7 个角色**：`admin`（系统管理员）、`manager`（经理）、`hr`（人事）、`accountant`（会计）、`inspector`（检验员）、`sales`（销售）、`user`（普通员工）
+- 用户登录和权限控制（能力表 `app/permissions.py` 的 44 个 capability，模板 `can()` / 路由 `@require_capability`）
 - 用户信息管理
 - 个人工资查询界面
 
@@ -82,7 +96,7 @@
 ## 技术栈
 
 - 后端：Python Flask
-- 数据库：SQLite/MySQL
+- 数据库：SQLite（本地开发/默认）/ PostgreSQL（两地或生产，Compose 一主一从）
 - 前端：Bootstrap 5 + jQuery
 - UI组件：Select2, DataTables, SweetAlert2, Toastr
 - 文件处理：openpyxl
@@ -110,9 +124,20 @@ pip install -r requirements.txt
 ```
 
 4. 初始化数据库
+
+**不要用 `flask db upgrade` / `flask db migrate`**。本项目的 schema 事实来源是
+`db.create_all()` + `app/__init__.py` 的 `_ensure_schema()` / `_ENSURED_COLUMNS` 启动自愈
+（31 张表不在迁移历史里，迁移链只有单一 head `p1nonctarget` 且**全链不可重放**）：
+
 ```bash
-flask db upgrade
+# 1) 先把 DATABASE_URL 指向目标库（否则启动自愈会写到当前配置的那个库上！）
+# 2) 直接启动应用即建全表并自愈补列
+python main.py
+# 3) 只把版本标记对齐到单一 head（不执行任何 DDL）
+flask db stamp p1nonctarget
 ```
+
+完整命令、警告与备选路径见 [docs/交付说明-P0P1.md](docs/交付说明-P0P1.md) §6.2 第 9 项。
 
 5. 运行项目
 ```bash
@@ -211,21 +236,11 @@ docker run -d -p 5000:5000 wage-system
 - 定期核对库存信息
 
 ### 数据迁移与故障排查
-- 初始化/升级迁移：
-```bash
-flask db upgrade
-```
-- 若出现“Multiple head revisions are present”：
-```bash
-flask db stamp heads
-flask db merge -m "merge heads"
-flask db upgrade
-```
-- 若出现“table ... already exists”且为历史表重复创建：
-```bash
-flask db stamp heads
-flask db upgrade
-```
+
+- **初始化/升级**：见上文「4. 初始化数据库」。**禁止 `flask db migrate`**（会把 `create_all()` 建出的表全部纳入，生成与线上库冲突的巨大脚本）；**不要假定迁移链可重放**（实测不可行）。统一走「启动自愈 + `flask db stamp p1nonctarget`」，细节见 [docs/交付说明-P0P1.md](docs/交付说明-P0P1.md) §6.2 第 9 项。
+- **历史做法（已废弃，勿再照做）**：过去文档里的 `flask db stamp heads` / `flask db merge -m "merge heads"` / `flask db upgrade` 是针对「多 head」时代写的；现在迁移链已是**单一 head**，再跑这些命令只会引入新的 head 或报错。
+- **⚠ 跑任何 `flask db *` 之前必须先把 `DATABASE_URL` 指向目标库**：该命令会先执行 `create_app()`，而它会跑启动自愈（`create_all` + `_ENSURED_COLUMNS`）；指错了就会写到你当前配置的那个库上——本项目已因此误写过一次真实 `app.db`。
+- **若出现「table ... already exists」**：这是 `create_all()` 已建表、而 `alembic_version` 停在旧修订的典型症状，属预期；按上文走 `stamp`，不要去加固历史修订。
 - 如需手动创建特定表（示例）：
 ```python
 # 正确写法是 __table__

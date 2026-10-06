@@ -11,9 +11,11 @@ Scope:
 ---
 
 开始开发前必读（跨会话交接）:
-- `docs/开发进度与交接.md` — 当前进度、批次1 交付内容、批次2 已确认的业务决策，以及 Python 环境位置、迁移链已分叉等操作要点。
+- `docs/开发进度与交接.md` — 当前进度、批次1 交付内容、批次2 已确认的业务决策，以及 Python 环境位置、迁移与仓库卫生等操作要点。
 - `docs/业务流程现状与缺口.md` — 全量功能盘点、端到端业务流程、缺口清单。
+- `docs/交付说明-P0P1.md` — P0/P1 交付验收、遗留项清单、**老库升级路径（启动自愈 + `flask db stamp`）与复现命令**。
 - 权限改动只在 `app/permissions.py` 的 CAPABILITIES 登记一次，模板用 `can()`、路由用 `@require_capability`；改完跑 `scripts/check_templates.py`。
+- **禁止 `flask db migrate`**：schema 事实来源是 `db.create_all()` + `app/__init__.py` 的 `_ENSURED_COLUMNS`/`_ensure_schema()` 启动自愈（31 张表不在迁移历史里），自动生成迁移会把它们全部纳入并产生与线上库冲突的脚本。新增表/列请**手写迁移 + 存在性判断 + 在 `_ENSURED_COLUMNS` 登记**。迁移链已收敛为单一 head `p1nonctarget`，但**全链重放不可行**，老库/新库统一走「启动自愈 + `flask db stamp p1nonctarget`」，细节见 `docs/交付说明-P0P1.md` §6.2 第 9 项。⚠ 跑任何 `flask db *` 前必须先把 `DATABASE_URL` 指向目标库，否则 `create_app()` 的启动自愈会写到当前库上（本项目已因此误写过真实 `app.db`）。
 - 新增路由默认加 `@require_capability`；确实所有角色都要用的，才只留 `@login_required`。未登录的 JSON 401 由 `app/__init__.py` 的 `login.unauthorized_handler` 统一处理，不要在端点里自己判断——注意 `@login_required` 是外层装饰器，未登录请求到不了它下面的 `@require_capability`。
 
 ---
@@ -22,7 +24,7 @@ Guidelines:
 - 架构与分层
   - 蓝图路由：`app/main/routes.py`（任务/生产/库存/销售/产品等）与 `app/main/quality.py`（质量）。模板/静态：`app/templates`, `app/static`。ORM：`app/models.py`。
   - 全局流水号：统一使用 `SerialNumber.get_next_number()`（Employee/Task/ProductionRecord/Inspection 等）。
-  - 权限：`Flask-Login` + `current_user.role`（admin/hr/manager/inspector/user）。模板菜单与后端路由均需校验。
+  - 权限：`Flask-Login` + `current_user.role`。系统内**实际只有 7 个角色**（`app/permissions.py` 的 `ROLES`）：`admin` / `manager` / `hr` / `accountant` / `inspector` / `sales` / `user`。模板菜单与后端路由均需校验；判断一律走 `can()` / `@require_capability`，不要新写 `role in [...]`。
 
 - 模块边界
   - 质量相关在 `app/main/quality.py`；任务/生产/库存/销售/产品等在 `app/main/routes.py`，同类功能就近归类并分段注释。
@@ -30,7 +32,7 @@ Guidelines:
 
 - 路由/端点规范
   - 必须通过 `url_for('main.xxx')` 生成链接；端点名与函数名保持一致；页面路由返回模板，JSON API 使用 `/api/...` 前缀。
-  - 导出/下载：`send_file` + `download_name`（可含中文）。用 `@after_this_request` 清理临时文件。
+  - 导出/下载：`send_file` + `download_name`（可含中文）。**优先用 `io.BytesIO` 内存生成**（`wb.save(buf)` + `buf.seek(0)` + `send_file(buf, ...)`），**不要**再写临时文件 + `@after_this_request` —— 仓库现有 13 处已是内存生成模式，且 `send_file` 之后临时文件在 Windows 上仍被占用，清理必然抛 `WinError 32` 并被静默吞掉（历史包袱）。
   - 任务模块端点保持既有：
     - GET/POST `/tasks`；GET `/tasks/<id>`；DELETE `/tasks/<id>`；POST `/tasks/<id>/edit`；POST `/tasks/<id>/update_status`
     - GET `/tasks/template`；POST `/tasks/import`；GET/POST `/export_tasks`（双支持，勿破坏）。
@@ -42,7 +44,10 @@ Guidelines:
   - 重要写操作记录 `AuditLog`（含 `can_rollback/rollback_type`），遵循现有模式。
 
 - Excel 导入/导出
-  - 逻辑封装在 `app/utils/excel_generator.py`；路由只负责查询与文件清理；临时文件放 `current_app.config['TEMP_FOLDER']`，处理完成删除。
+  - 逻辑封装在 `app/utils/excel_generator.py`；路由只负责查询与文件清理。
+  - **导出/模板下载：用 `io.BytesIO` 内存生成**，不落盘（见上「路由/端点规范」）。
+  - **仅上传解析必须落盘**：`ExcelGenerator.parse_*` / `pd.read_excel` 需要真实路径，因此导入端点才写 `current_app.config['TEMP_FOLDER']`（`file.save(temp_path)`），由 `cleanup_temp_files()` + `finally` 清理；辅助函数 `save_temp_file()`（`app/main/routes.py:5067`）用 `tempfile.mkdtemp()`。当前 `routes.py` 有 8 个导入端点属于这种形态。
+  - 导入必须**行级容错**：坏行只记「第 N 行：…」并跳过，绝不整体 500；文本日期用 `pd.to_datetime` 兜底（参考 `import_tasks`、`import_inspection_tasks`）。
 
 - 前端交互约定（模板/JS）
   - 依赖 `base.html`（Bootstrap 5、jQuery、Select2、SweetAlert2、Toastr），移动端优化 `mobile-optimization.js`、`mobile-components.css`。
@@ -65,7 +70,25 @@ Guidelines:
   - 配置优先 `config.py`/环境变量；上传/临时目录集中配置。
 
 - 提交前检查
-  - 路由与模板/JS 一致性；linter 通过；导出/下载验证文件名与临时文件清理；必要处补充审计日志。
+  - 路由与模板/JS 一致性；linter 通过；导出/下载验证文件名（导出**不应**再产生临时文件）；必要处补充审计日志。
+  - **必跑门禁**（Python：`F:\Miniconda\envs\wage\python.exe`，仓库根目录执行）：
+
+    | 命令 | 期望结果 |
+    | --- | --- |
+    | `python -B scripts/check_templates.py` | `87 templates / 44 declared / 40 used in templates / 44 used on routes / landing 5` → `RESULT: OK` |
+    | `python -B scripts/check_migration_heads.py` | `HEADS=['p1nonctarget']`，`head_count=1`，`revisions=35` → exit 0 |
+    | `python -B scripts/check_properties.py` | `已扫描 23 个文件，模型类 74 个` → `RESULT: OK`（**新增闸门**，专治第 5 次复发的「`@property`/不存在列当列用」） |
+    | `python -B scripts/route_inventory.py` | `total rules=271`，`duplicate (method,path) registrations=0` |
+
+    模板/权限/迁移/property 四项都要求 exit 0；有违规就必须先修，不要靠改期望值过关。
+  - **会发请求的脚本**：`smoke_test.py`、`permission_matrix.py`、`functional_test.py`。
+    它们会重写根目录 `_permission_matrix.json` / `_smoke_results.json`（已 gitignore，不影响 `git status`）。沙箱内需加垫片：`python -B scripts/_sandbox_compat.py scripts/smoke_test.py`。
+    ✅ **原「它们会删掉 `uploads/temp/` 下 6 个受跟踪的 Excel 模板」的警告已作废（2026-09-18 第 7 批，已修复）**：根因是 `cleanup_temp_files()` 作为 `@bp.before_request` 钩子（`app/main/routes.py:2196-2200`）在**每个请求**删除 `TEMP_FOLDER`（= `uploads/temp`，见 `app/__init__.py:161-163`）中 **mtime 超过 5 分钟**的文件，而该目录当时同时存放着 6 个**受跟踪**的模板文件——导出改内存生成（第 6 批）之后已没有任何代码重建它们。
+    第 7 批的修法：确认**全仓无任何代码读取** `uploads/temp/*.xlsx` 后，把这些 `*_template.xlsx` 当**旧导出实现的遗留产物**处理——取消跟踪并删除（`git ls-files uploads` 现为 **0**），`.gitignore` 增加 `/uploads/temp/`。
+    现状：`uploads/temp` 是**纯运行时临时目录**（只有导入端点把上传文件写进去，由 `finally` / 钩子清理），启动时由 `os.makedirs(..., exist_ok=True)`（`app/__init__.py:158/162`）自动重建；**「每个请求清理 mtime>5 分钟的文件」是预期行为，不再是缺陷**。
+    ⛔ **不再需要**「跑会发请求的脚本前备份、跑完 `git checkout -- uploads/temp/` 恢复」这套规避步骤——现在没有可恢复的对象，该命令会因路径不存在而报错。
+    只做静态检查时优先跑不发请求的 5 个脚本（`check_templates` / `check_migration_heads` / `check_properties` / `route_inventory` / `check_db_bootstrap`）。
+  - 一切验证都用 **`app.db` 副本**（`DATABASE_URL` 指向副本，或直接用 `scripts/_test_bootstrap.make_app()`）。跑完复核真实 `app.db` 的 SHA256 未变。
   - 回滚：重要数据写操作产生日志与回滚信息，遵循 `AuditLog`。
 
 - 禁止事项
@@ -101,20 +124,21 @@ def create_example_resource():
         return jsonify({'success': False, 'message': f'创建失败：{str(e)}'}), 500
 ```
 
-2) 导出（GET/POST 双支持 + 清理临时文件）
+2) 导出 / 模板下载（GET/POST 双支持 + **内存生成，不落盘**）
 
 ```python
-from flask import request, send_file, after_this_request, redirect, url_for, flash, current_app
+from io import BytesIO
+
+from flask import request, send_file, redirect, url_for, flash, current_app
+from flask_login import current_user
 from app import db
+from app.permissions import require_capability
 from app.utils.excel_generator import ExcelGenerator
-import os, tempfile
 
 @bp.route('/export_example', methods=['GET', 'POST'])
 @login_required
+@require_capability('your.capability')   # 能力已在 app/permissions.py 登记
 def export_example():
-    if current_user.role not in ['admin', 'hr']:
-        flash('权限不足', 'danger')
-        return redirect(url_for('main.index'))
     try:
         p = request.args if request.method == 'GET' else request.form
         query = db.session.query(YourModel)
@@ -126,21 +150,13 @@ def export_example():
         excel = ExcelGenerator()
         wb = excel.generate_your_excel(rows)  # 请在 utils 中实现
 
-        temp_dir = tempfile.mkdtemp()
-        temp_file = os.path.join(temp_dir, '导出示例.xlsx')
-        wb.save(temp_file)
-
-        @after_this_request
-        def cleanup(response):
-            try:
-                os.remove(temp_file)
-                os.rmdir(temp_dir)
-            except Exception as e:
-                current_app.logger.error(f'删除临时文件失败: {str(e)}')
-            return response
+        # 内存生成：不写临时文件，也就没有 Windows 上 WinError 32 的清理问题
+        buf = BytesIO()
+        wb.save(buf)
+        buf.seek(0)
 
         return send_file(
-            temp_file,
+            buf,
             as_attachment=True,
             download_name='导出示例.xlsx',
             mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -150,6 +166,11 @@ def export_example():
         flash('导出失败，请重试', 'danger')
         return redirect(url_for('main.index'))
 ```
+
+> 反例（**不要照抄**）：`tempfile.mkdtemp()` / `mkstemp()` 写盘 + `wb.save(temp_file)` +
+> `@after_this_request` 清理。`send_file` 返回后文件在 Windows 上仍被占用，`os.remove()`
+> 必然抛 `WinError 32` 并被 `except` 静默吞掉，临时文件永久残留；仓库已把 13 处导出
+> 全部改成上面的内存形态。
 
 3) 分页/筛选（与全局参数约定一致）
 
@@ -256,6 +277,44 @@ def example_select2():
     except Exception as e:
         return jsonify({'success': False, 'message': f'加载失败: {str(e)}'}), 500
 ```
+
+5) Excel 导入（**必须落盘** + 行级容错）
+
+```python
+@bp.route('/import_example', methods=['POST'])
+@login_required
+@require_capability('your.capability')
+def import_example():
+    """从 xlsx 导入。行级容错：坏行只记「第 N 行：…」并跳过，不整体 500。"""
+    file = request.files.get('file')
+    if file is None or not file.filename:
+        flash('请选择要导入的 Excel 文件', 'warning')
+        return redirect(url_for('main.example_list'))
+
+    # 解析器要真实路径，这里是唯一允许落盘的场景
+    temp_path = os.path.join(current_app.config['TEMP_FOLDER'], secure_filename(file.filename))
+    file.save(temp_path)
+    try:
+        rows = ExcelGenerator.parse_example_data(temp_path)  # 或 pd.read_excel(temp_path)
+        errors = []
+        for idx, row in enumerate(rows, start=2):   # 第 1 行是表头
+            try:
+                # TODO: 逐行校验 & db.session.add(...)
+                pass
+            except Exception as e:
+                errors.append(f'第 {idx} 行：{e}')
+        db.session.commit()
+    finally:
+        cleanup_temp_files()          # app/main/routes.py:2173
+    if errors:
+        flash('部分行未导入：' + '；'.join(errors[:5]), 'warning')
+    else:
+        flash('导入成功', 'success')
+    return redirect(url_for('main.example_list'))
+```
+
+> 也可以用辅助函数 `save_temp_file(file)`（`app/main/routes.py:5067`，内部 `tempfile.mkdtemp()`），
+> 但**必须**在 `finally` 里清掉，否则空目录会在系统 TEMP 下无限堆积。
 
 ---
 
