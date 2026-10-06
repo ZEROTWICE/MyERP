@@ -6224,17 +6224,18 @@ def auto_archive_inventory():
         cutoff_date = datetime.now() - timedelta(days=days)
         
         # 存档成品：已发货、报废、已使用状态且超过指定天数
+        # 未存档判定与发货路径同一口径（NULL 也视为「未存档」），否则历史 NULL 行永远不被自动归档
         finished_products = FinishedProduct.query.filter(
             FinishedProduct.status.in_(['shipped', 'scrapped', 'used']),
             FinishedProduct.created_at < cutoff_date,
-            FinishedProduct.is_archived == False
+            db.or_(FinishedProduct.is_archived.is_(False), FinishedProduct.is_archived.is_(None))
         ).all()
         
         # 存档原材料：数量为0且超过指定天数
         raw_materials = RawMaterial.query.filter(
             RawMaterial.quantity <= 0,
             RawMaterial.created_at < cutoff_date,
-            RawMaterial.is_archived == False
+            db.or_(RawMaterial.is_archived.is_(False), RawMaterial.is_archived.is_(None))
         ).all()
         
         archived_count = 0

@@ -30,3 +30,9 @@ tmp_p01/
 # 原 6 个 *_template.xlsx 是旧导出实现的遗留产物（导出已改 io.BytesIO 内存生成，无人读取），
 # 已取消跟踪并删除；不再入库。
 /uploads/temp/
+
+# 手工备份/临时副本（2026-09-18 第 8 批清理时发现仓库里混入了 7 个此类遗留备份，
+# 其中 routes.py.backup/.bak/.new 曾被跟踪；今后一律不入库）
+*.bak
+*.new
+*.backup

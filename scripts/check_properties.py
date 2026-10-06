@@ -33,8 +33,11 @@
 - 只认 `类名.属性名` 这种类级访问。`instance.property` 无法静态判定，不做检查。
 - 名字解析只看 `app/models.py` 里定义的类与项目内基类；SQLAlchemy/Flask-SQLAlchemy 提供的
   内部属性（`query`/`metadata`/`__table__` 等）在 `CLS_WHITELIST` 中放行。
-- 备份文件（`routes_backup.py`、`routes_original.py`、`routes_full.py`、
-  `routes_with_duplicates.py`、`*.bak`、`*.new`、`*.backup`）与 `__pycache__` 一律跳过。
+- 备份文件（`*.bak`、`*.new`、`*.backup`）与 `__pycache__` 一律跳过。
+- `SKIP_FILENAMES` 里保留的 4 个名字（`routes_backup.py`、`routes_original.py`、
+  `routes_full.py`、`routes_with_duplicates.py`）所指文件**已于 2026-09-18 从仓库删除**，
+  名字留作防御：这类超大遗留副本可能带语法错误，若被误恢复，跳过它们比让本脚本崩在
+  `ast.parse` 更好。
 """
 import argparse
 import ast

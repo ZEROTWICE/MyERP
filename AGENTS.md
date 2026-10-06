@@ -81,6 +81,7 @@ Guidelines:
     | `python -B scripts/route_inventory.py` | `total rules=271`，`duplicate (method,path) registrations=0` |
 
     模板/权限/迁移/property 四项都要求 exit 0；有违规就必须先修，不要靠改期望值过关。
+    > `check_properties.py` 的跳过表有**两类**：① `SKIP_FILENAMES` 里的 4 个名字（`routes_backup.py` / `routes_original.py` / `routes_full.py` / `routes_with_duplicates.py`）——这 4 个**遗留备份文件已于 2026-09-18 第 8 批从仓库删除**（约 1.99 MB，全仓引用 0 处），**名字保留作防御**（这类超大副本可能带语法错误，若被误恢复，跳过比让脚本崩在 `ast.parse` 更好）；② `SKIP_SUFFIXES`（`.bak` / `.new` / `.backup`），跳过 `app/main/routes.py.backup`、`routes.py.bak`、`routes.py.new` 这 3 个后缀型残留（**其实被 git 跟踪**，原记录有误；已于第 8 批一并删除）。**结论：`app/main` 下现只有 `routes.py` 一个路由模块；不要再按「包内有语法错误的备份文件」的说法去处理。**
   - **会发请求的脚本**：`smoke_test.py`、`permission_matrix.py`、`functional_test.py`。
     它们会重写根目录 `_permission_matrix.json` / `_smoke_results.json`（已 gitignore，不影响 `git status`）。沙箱内需加垫片：`python -B scripts/_sandbox_compat.py scripts/smoke_test.py`。
     ✅ **原「它们会删掉 `uploads/temp/` 下 6 个受跟踪的 Excel 模板」的警告已作废（2026-09-18 第 7 批，已修复）**：根因是 `cleanup_temp_files()` 作为 `@bp.before_request` 钩子（`app/main/routes.py:2196-2200`）在**每个请求**删除 `TEMP_FOLDER`（= `uploads/temp`，见 `app/__init__.py:161-163`）中 **mtime 超过 5 分钟**的文件，而该目录当时同时存放着 6 个**受跟踪**的模板文件——导出改内存生成（第 6 批）之后已没有任何代码重建它们。

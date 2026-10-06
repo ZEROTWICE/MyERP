@@ -709,9 +709,9 @@ def get_processes():
 def get_finished_products():
     """获取成品列表"""
     try:
-        # 获取未存档的成品
+        # 获取未存档的成品（与发货路径同一口径：NULL 也视为「未存档」，避免历史行被漏掉）
         products = FinishedProduct.query.filter(
-            FinishedProduct.is_archived == False
+            db.or_(FinishedProduct.is_archived.is_(False), FinishedProduct.is_archived.is_(None))
         ).order_by(FinishedProduct.created_at.desc()).all()
         
         return jsonify({
