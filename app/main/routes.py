@@ -1893,17 +1893,15 @@ def download_employee_template():
     try:
         wb = ExcelGenerator.create_employee_template()
         filename = 'employee_template.xlsx'
-        temp_path = os.path.join(current_app.config['TEMP_FOLDER'], filename)
-        
-        # 保存并关闭工作簿
-        wb.save(temp_path)
-        wb.close()
+        buf = io.BytesIO()
+        wb.save(buf)
+        buf.seek(0)
         
         # 确保文件写入完成
         time.sleep(0.1)
         
         return send_file(
-            temp_path,
+            buf,
             as_attachment=True,
             download_name=filename,
             mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -2245,17 +2243,15 @@ def download_process_price_template():
     try:
         wb = ExcelGenerator.create_process_price_template()
         filename = 'process_price_template.xlsx'
-        temp_path = os.path.join(current_app.config['TEMP_FOLDER'], filename)
-        
-        # 保存并关闭工作簿
-        wb.save(temp_path)
-        wb.close()
+        buf = io.BytesIO()
+        wb.save(buf)
+        buf.seek(0)
         
         # 确保文件写入完成
         time.sleep(0.1)
         
         return send_file(
-            temp_path,
+            buf,
             as_attachment=True,
             download_name=filename,
             mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -2643,17 +2639,15 @@ def download_production_record_template():
     try:
         wb = ExcelGenerator.create_production_record_template()
         filename = 'production_record_template.xlsx'
-        temp_path = os.path.join(current_app.config['TEMP_FOLDER'], filename)
-        
-        # 保存并关闭工作簿
-        wb.save(temp_path)
-        wb.close()
+        buf = io.BytesIO()
+        wb.save(buf)
+        buf.seek(0)
         
         # 确保文件写入完成
         time.sleep(0.1)
         
         return send_file(
-            temp_path,
+            buf,
             as_attachment=True,
             download_name=filename,
             mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -2782,14 +2776,12 @@ def export_production_records():
         temp_path = None
         try:
             # 创建临时文件
-            fd, temp_path = tempfile.mkstemp(suffix='.xlsx')
-            # 关闭文件描述符
-            os.close(fd)
-            # 保存Excel文件
-            wb.save(temp_path)
+            buf = io.BytesIO()
+            wb.save(buf)
+            buf.seek(0)
             # 发送文件
             return send_file(
-                temp_path,
+                buf,
                 mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
                 as_attachment=True,
                 download_name=f'production_records_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
@@ -2836,14 +2828,12 @@ def export_bonus_penalties():
         temp_path = None
         try:
             # 创建临时文件
-            fd, temp_path = tempfile.mkstemp(suffix='.xlsx')
-            # 关闭文件描述符
-            os.close(fd)
-            # 保存Excel文件
-            wb.save(temp_path)
+            buf = io.BytesIO()
+            wb.save(buf)
+            buf.seek(0)
             # 发送文件
             return send_file(
-                temp_path,
+                buf,
                 mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
                 as_attachment=True,
                 download_name=f'bonus_penalties_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
@@ -3824,17 +3814,15 @@ def download_bonus_penalty_template():
     try:
         wb = ExcelGenerator.create_bonus_penalty_template()
         filename = 'bonus_penalty_template.xlsx'
-        temp_path = os.path.join(current_app.config['TEMP_FOLDER'], filename)
-        
-        # 保存并关闭工作簿
-        wb.save(temp_path)
-        wb.close()
+        buf = io.BytesIO()
+        wb.save(buf)
+        buf.seek(0)
         
         # 确保文件写入完成
         time.sleep(0.1)
         
         return send_file(
-            temp_path,
+            buf,
             as_attachment=True,
             download_name=filename,
             mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -3952,17 +3940,15 @@ def download_task_template():
     try:
         wb = ExcelGenerator.create_task_template()
         filename = 'task_template.xlsx'
-        temp_path = os.path.join(current_app.config['TEMP_FOLDER'], filename)
-        
-        # 保存并关闭工作簿
-        wb.save(temp_path)
-        wb.close()
+        buf = io.BytesIO()
+        wb.save(buf)
+        buf.seek(0)
         
         # 确保文件写入完成
         time.sleep(0.1)
         
         return send_file(
-            temp_path,
+            buf,
             as_attachment=True,
             download_name=filename,
             mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -7636,17 +7622,15 @@ def download_product_template():
     try:
         wb = ExcelGenerator.create_product_template()
         filename = 'product_template.xlsx'
-        temp_path = os.path.join(current_app.config['TEMP_FOLDER'], filename)
-        
-        # 保存并关闭工作簿
-        wb.save(temp_path)
-        wb.close()
+        buf = io.BytesIO()
+        wb.save(buf)
+        buf.seek(0)
         
         # 确保文件写入完成
         time.sleep(0.1)
         
         return send_file(
-            temp_path,
+            buf,
             as_attachment=True,
             download_name=filename,
             mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
