@@ -361,7 +361,28 @@ for r in b:
 
 **必须报漂移的字段**（与 `coverage_drift.py` 的 8 条判据对齐）：
 
-`rules=271` · `templates=87` · `capabilities=44` · `head_count=1` · `revisions=35` · `rows=6712` · `accounts=64` · `functional_pass=109` · `anon_open=0` · `no_guard_views=5` · `non_get_rules=153` · `uncovered_writable=101` · `smoke_plan=148` · `duplicate=0`
+`rules=271` · `templates=87` · `capabilities=44` · `head_count=1` · `revisions=35` · `rows=6712` · `accounts=64` · `functional_pass=109` · `anon_open=0` · `no_guard_views=5` · `non_get_rules=153` · `method_level_non_get=155` · `writable_literal=108` · `writable_any=116` · `uncovered_writable=0` · `smoke_plan=148` · `duplicate=0`
+
+> ⚠ **V-16/N-1 同步（2026-10-07）**：上表三处是 **V-06/C-05 按 A-70 有意更新**后的值 ——
+> `writable_literal` `6 → 108`、`writable_any` `14 → 116`、`uncovered_writable` `101 → 0`。
+> 本轮之前的台账/报告若仍写 `6/14/101`，即为**陈旧口径**（差分时会被判为漂移，需按 A-70 三步处理）。
+
+**`coverage_drift.py` 的输入语义（N-1 处置，V-16 报出 / captain 裁定）**
+
+* 本工具**必须显式传 `--coverage <本次 run 产物>`**；**缺参 ⇒ `exit 2`（用法错误，不是回归）**，
+  stdout 明写该语义，并打印冻结锚点的留档读数（bytes/SHA256，仅历史留档、**不参与判据**）。
+* 为什么不能拿锚点当默认输入：`evidence/harness/coverage.json`（`29` §4 声明锚点、V-14 G1 判定 unchanged）
+  记录的是 **V-06 之前**的 `6/14/101`，而 `LOCKED` 已是 `108/116/0` ⇒ 两者语义互斥 ⇒
+  「直跑默认路径」必然假红（旧行为实测 = `判据 5/8 通过 => exit 1`，原始 stdout 见
+  `test-reports-2026-10/.tmp/r2t14/n1_before.txt`）。
+* 复算（三条，仓库根目录）：
+  ① 直跑（无参）⇒ **exit 2**；
+  ② `measure_coverage.py --no-request-probes --out <run>/coverage.json` 后
+     `coverage_drift.py --coverage <run>/coverage.json` ⇒ **exit 0**；
+  ③ 同 ② 加 `--probes-exclude r2_c05_write_probe`（回落稿）⇒ **exit 1**（判据仍敏感）。
+* 回退（A-70 三步）：把 `--coverage` 默认值改回 `DEFAULT_COVERAGE` + 删除 exit 2 分支 + 重跑 ①②③ 登记。
+* 受影响的历史引用（**未由本任务改动，需各自维护者同步**）：`reconcile_r2.py:555`（断言「漂移判据 exit 0」、
+  实为无参调用 ⇒ 今日已是红）与 `r2_v14_ledgerbook.py:259` 的 `criteria` 记录（写了无参命令 + `exit_code: 0`）。
 
 任一项变化 ⇒ **先判定「是有意变更还是回归」**，再继续；不做这一步的批次结论不得进 DoD。
 
