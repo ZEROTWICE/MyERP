@@ -8,10 +8,27 @@
 
 ## 两棵树的构造与「只差 t7」的证明
 - `tree-after` = 当前工作树副本（含 t6/t8 已完成修复 + t7 本次修复）；
-- `tree-before` = 同一副本，**只把 t7 的 5 处改动逐字回退**（`mes_service.py` 用 `git show HEAD:` 整 файл
-  回退——该文件在 t7 前与 HEAD 逐字节相同；`routes.py`/`models.py`/`stock.py` 用精确反向替换，保留
-  t6 的第 6 行导入与 t8 的 P-08/P-09/P-12/P-13 标记）。
+- `tree-before` = 同一副本，**只把 t7 的 5 处改动逐字回退**（`mes_service.py` 用
+  `git show <PRE_FIX_REV>:` 整文件回退——该文件在 t7 前与**钉死的修复前提交**逐字节相同；
+  `routes.py`/`models.py`/`stock.py` 用精确反向替换，保留 t6 的第 6 行导入与
+  t8 的 P-08/P-09/P-12/P-13 标记）。
 - 构造后**逐项断言**两棵树的 t6/t8 标记仍在位、t7 标记已消失（见 `--verify-only`），并把结论落证据。
+
+## ⚠ 为什么钉**显式提交号**（A-70：本类系统性资产缺陷的第 1 例）
+
+本脚本原先用 `git show HEAD:app/services/mes_service.py` 整文件回退 `mes_service.py`
+（当时成立的理由是「该文件在 t7 前与 `HEAD` 逐字节相同」）。**t7 的修复一旦被提交
+（`fd51023`）⇒ `HEAD` 就含 t7 的改动 ⇒ 回退变成 no-op ⇒ `tree-before` 与 `tree-after`
+在 `mes_service.py` 上完全相同 ⇒ 本 diff 的「修复前/修复后」判据**空转**且不可复算**
+（t9 F-3 实测登记）。
+
+**修正（只改「从哪个提交取回退源文件」，UD-0…UD-5 的期望值与 SPEC_DEFECTS/KNOWN_FLIPS
+一字未动）**：
+- `PRE_FIX_REV` = `2c6dbfd66a43aebf6733500b5579436f7e8d8da0`（= t7/阶段A 修复前最后一个提交；
+  `fd51023 == `修复提交` ⇒ `2c6dbfd == fd51023^`），可用 `WMS_PREFIX_REV` 覆盖；
+- 代码里不再出现 `HEAD:` 取回退源；
+- 新增**可复算性前置（precondition，不是新判据、不改口径）**：钉住的 `mes_service.py` blob
+  必须与 `HEAD` 的同名 blob **不同**，否则回退是 no-op、判据空转 ⇒ 该前置报红。
 
 ## 判据
 1. `tree-before` 的红链集合 == 冻结基线（`evidence/uat/uat_chains.json`）的红链集合（说明回退干净）；
@@ -25,8 +42,89 @@
     $env:HARNESS_RUN_ID='w2w3-uatdiff-1'
     python -B test-reports-2026-10/harness/w2w3_uatdiff.py
     python -B test-reports-2026-10/harness/w2w3_uatdiff.py --verify-only   # 只构造并验证两棵树
+    python -B test-reports-2026-10/harness/w2w3_uatdiff.py --baseline <PATH>  # 诊断：换基线来源（阴性对照）
+
+## ⚠ 冻结基线来源：「锚点与产物必须分离」（A-70 三步登记，触发项 V-15/F1）
+
+**旧来源（已废弃，本脚本自 V-18 起【不再读取】）**：`test-reports-2026-10/evidence/uat/uat_chains.json`
+
+- **病根**：该文件**既是**本判据的「冻结基线」**又是** `uat_chains.py` 会**原地写出**的活产物
+  （`uat_chains.py` 直接写该路径，不经 `_env.save_evidence`，A-58 已登记）。V-12 在本轮下游
+  复跑 uat_chains 时把它从 **33318 B / `360A8570…7DD23A`**（`run_id=t5-uat-final`，40 链
+  34 通过 / 6 红）覆盖成 **128432 B / `8BCF0150…`**（84 链全绿）。
+- **后果**：`frozen_reds` 变空 ⇒ `UD-0 / UD-1a / UD-1b / UD-3` 在**改前改后都红**，
+  「红链集合一致」「仍红者 == SPEC_DEFECTS」「预期翻转 == KNOWN_FLIPS」全部失去可比对象。
+  该缺陷与 A-70/A-79 的「修复前树钉显式提交号」修正**无关**（V-15/t16 报出）。
+- **通用纪律（captain 裁定）**：凡「既是冻结基线、又是会被脚本原地写出的活产物」的文件，
+  判据**必须从不可变归档快照读取**，不得从 live 路径读取。同族病史：A-89（归档自反馈环）、
+  A-110（`write_suite.py` 无 `--out`）、N-1（锚点与 `LOCKED` 语义互斥）。
+- **方案 (b) 已否决**：按新基线（84 链全绿）重写 `UD-0…UD-4` 期望值 = 让判据拿「新全绿状态」
+  比它自己 ⇒ 判据丧失意义、变相不可证伪（A-106/A-107 同族）。
+
+**新来源（唯一合法来源）**：不可变预冻结归档副本
+
+    test-reports-2026-10/evidence/_phaseB-prefreeze/20261007-220640/uat/uat_chains.json
+
+- **钉值（现场复算，A-91）**：`bytes == 33318` 且
+  `SHA256 == 360A8570BC0080A2984A59AD945B2C837AD96ACF7B55E6242AE7E2C6417DD23A`（= t1 锚点值）。
+- **可复算命令**：
+  `python -c "import hashlib;d=open(r'test-reports-2026-10/evidence/_phaseB-prefreeze/20261007-220640/uat/uat_chains.json','rb').read();print(len(d), hashlib.sha256(d).hexdigest().upper())"`
+- **回退步骤**（仅当 captain 重新裁定基线来源时）：
+  `git checkout -- test-reports-2026-10/harness/w2w3_uatdiff.py` 即可回到「读 live 路径」的旧行为；
+  回退后 `UD-0/UD-1a/UD-1b/UD-3/UD-4` 会重新变红（V-15/F1 复现），**不得**把红当作回归。
+- **不变量**：`UD-0/UD-1a/UD-1b/UD-3/UD-4` 的**期望值一字未改**（见下表）；本修正只改「基线从哪读」。
+
+### 改动前后：UD-0…UD-4 期望值逐条对照（证明只改了来源路径）
+
+| 判据 | 期望表达式（改动前 = 改动后，**逐字未变**） | 基线来源：改前 → 改后 |
+| --- | --- | --- |
+| `UD-0` | `before_reds == frozen_reds` | `evidence/uat/uat_chains.json`（live）→ 归档副本 |
+| `UD-1a` | `{'P0-1.7','P0-1.8','P0-4.2','P0-4.4'}.issubset(set(red_to_green))` | 同上 |
+| `UD-1b` | `set(still_red) == set(SPEC_DEFECTS) and not unexplained_reds` | 同上 |
+| `UD-3` | `set(green_to_red) == set(KNOWN_FLIPS)` | 同上 |
+| `UD-4` | `len(v_after) == len(frozen_v) == 40` | 同上（`frozen_v` 由该来源读出） |
+| `UD-PIN` | 「修复前树」取源 = 钉死提交（V-15 新增，非本次改动） | — |
+| `UD-BASE` | **本次新增的可复算性前置**：基线来源 = 归档副本且 bytes+SHA256 == t1 钉值 | — |
+
+> 说明：`UD-BASE` 是**前置**（precondition），不是新判据口径 —— 上述 5 条的期望值一字未动，
+> 它只保证这 5 条**不是拿无效基线在比**（基线缺失/哈希不符时前置报红，绝不静默回落 live）。
+
+## ⚠ 双跑一致性的判定口径（F3，方法纪律）
+
+`uat_chains.py` 会在产物里写入**自己的** `run_id` 与起止时间戳 ⇒ 同一命令两次跑出的
+`uat_chains.before.json / .after.json` **逐字节必然不同**。故「双跑一致」一律按
+**【红集 / 实质读数 / 判据集合】逐条比对**判定，**不得**用文件 SHA256 判「双跑不一致」。
+
+## ⚠ 已登记的残余局限（V-18 / F1b；**如实登记，不得伪装通过**）
+
+本脚本在 V-18 完成基线来源分离后，**仍有 4 条判据为红且结构性不可满足**：
+`UD-0`（`before_reds == frozen_reds`）、`UD-1b`（`still_red == SPEC_DEFECTS`）、
+`UD-3`（`green_to_red == KNOWN_FLIPS`）、`UD-4`（`len(v_after) == len(frozen_v) == 40`）。
+**退出码仍为 1** —— 这些红**不**被豁免、**不**自动通过（代码里没有任何「已知红 ⇒ 放行」的分支）。
+
+**根因 = 两条「已授权」的资产演进晚于冻结基线**（与 V-15 的钉修、与 V-18 的基线来源分离
+**均无关**）：
+
+| # | 演进 | 授权 | 对本脚本的影响 |
+| --- | --- | --- | --- |
+| ① | t9 重写 **15 处冻结断言**（含 uat 的 `P0-1.6`/`P0-3.1` 与 `P0-2.1`/`P0-2.5`/`P0-3.3`） | **A-66 / A-68** | 这 5 条在当前语料下**全部 `passed`** ⇒ `still_red` 变空、`green_to_red` 变空 ⇒ `UD-1b`/`UD-3` 的旧前提（「仍红」/「预期变红」）已不存在。**属进展，不是回归。** |
+| ② | V-12（t13/A-105）把语料由 **40 链扩到 84 链**（纯追加，既有 40 条期望值逐字节不变） | A-105 | 本次比较运行的是**当前语料**（after 84 / before 76），而基线记录的是 **40 链** ⇒ `UD-0` 的集合相等与 `UD-4` 的 `== 40` 不可满足（before 的 11 条红里有 **5 条在基线里根本不存在**：`APPEND.1`/`B7`/`FLIP.SUM`/`P0-3.ERR`/`V12-链B-ERR`）。 |
+
+**读法纪律（下游必须遵守）**：
+1. **不得**把 `UD-0/UD-1b/UD-3/UD-4` 当作绿；
+2. **不得**把其红点归因到 V-15（`UD-PIN` 钉修）或 V-18（`UD-BASE` 基线分离）的资产修正；
+3. 那两条修正的效果**可单独验证**：`UD-PIN`、`UD-BASE` 以及 `UD-1a`（本次由红转绿）均 PASS。
+
+**后续归属**：由 captain 另立任务处理（截至本次检查，`t20` 已用于 V-19/write_suite 白名单面，
+语料/UD-* 重定的后续任务 id 以 captain 指派为准）。候选方案：把**语料**也钉到同一不可变时代
+（A-70 式钉显式提交）；**不得**按新语料重写期望值（那会使判据不可证伪，A-106/A-107 同族）。
+
+**运行期如实标注**：当且仅当失败集恰为上述 4 条时，脚本会额外打印
+`[residual]` 一行并在证据里写 `residual_registered`（含实测根因读数），**仅作标注**——
+不改变任何判据的 `ok`、不改变退出码。
 """
 import argparse
+import hashlib
 import json
 import os
 import shutil
@@ -45,10 +143,36 @@ from _env import (  # noqa: E402
     sha256_file, tmp_dir,
 )
 
-FROZEN_UAT = os.path.join(REPORTS_ROOT, 'evidence', 'uat', 'uat_chains.json')
+#: ── 冻结基线来源：不可变归档副本（A-70 三步登记；触发项 V-15/F1，见模块 docstring）──────
+#: 旧来源（已废弃，**本脚本自 V-18 起不再读取**）：evidence/uat/uat_chains.json
+#:   —— 它既是冻结基线又是 uat_chains.py 原地写出的活产物 ⇒ 被下游覆盖后判据失去可比对象。
+FROZEN_UAT_LIVE_SUPERSEDED = os.path.join(REPORTS_ROOT, 'evidence', 'uat', 'uat_chains.json')
+FROZEN_UAT_ARCHIVE = os.path.join(REPORTS_ROOT, 'evidence', '_phaseB-prefreeze',
+                                  '20261007-220640', 'uat', 'uat_chains.json')
+#: 唯一合法来源 = 归档副本（`--baseline` 可换成诊断用路径，默认恒为归档副本）。
+#: 保留 `FROZEN_UAT` 这个名字只作 **compat 别名**，它现在指向归档副本（不再是 live 路径）。
+FROZEN_UAT = FROZEN_UAT_ARCHIVE
+#: 归档副本的钉值（现场复算；= t1 锚点值）。缺失/不符 ⇒ 前置 UD-BASE 报红，绝不回落 live。
+FROZEN_UAT_BYTES = 33318
+FROZEN_UAT_SHA256 = ('360A8570BC0080A2984A59AD945B2C837AD96ACF7B55E6242AE7E2C6417DD23A')
 TREES_ROOT = os.path.join(tmp_dir('trees'))
 TREE_BEFORE = os.path.join(TREES_ROOT, 'before')
 TREE_AFTER = os.path.join(TREES_ROOT, 'after')
+
+#: ── A-70：「修复前树」钉**显式提交号**，不得依赖移动的 HEAD ────────────────────────────
+#: 修复前最后一个提交 = 阶段A 一次性修复提交 fd51023 的唯一父提交（`fd51023^`）。
+#: 严禁改回 `HEAD:` —— t7 修复一旦被提交，`HEAD` 就含 t7，「修复前树」必失真（t9 F-3）。
+PRE_FIX_REV = '2c6dbfd66a43aebf6733500b5579436f7e8d8da0'
+PRE_FIX_REV_SHORT = PRE_FIX_REV[:7]
+FIX_COMMIT_REV = 'fd5102360b3777d8ec2a0fb2610b2abbc2119df6'
+PRE_FIX_REV_ENV = 'WMS_PREFIX_REV'
+#: 回退源文件（t7 前与钉死的修复前提交逐字节相同 ⇒ 可整文件回退）
+REVERT_SOURCE_FILE = 'app/services/mes_service.py'
+
+#: ── 已登记的残余局限（V-18/F1b）：「结构性不可满足」的判据集合 ───────────────────────────
+#: 仅用于**如实标注**（见模块 docstring 与 `residual_registered`）；**不参与判据、不改退出码**。
+#: 根因 = A-66/A-68 授权 t9 重写 15 处冻结断言 + V-12/A-105 授权语料 40→84 链（纯追加）。
+KNOWN_RESIDUAL = ('UD-0', 'UD-1b', 'UD-3', 'UD-4')
 
 KNOWN_FLIPS = {
     'P0-2.5': 'pending 无在办单据 ⇒ 改判为放行（DEC-1 §1.6 P1 / §1.4 序 3 / A-45）',
@@ -77,7 +201,7 @@ SPEC_DEFECTS = {
     },
 }
 
-#: t7 的改动（文件 → 反向替换对）；mes_service.py 用 git HEAD 整файл回退
+#: t7 的改动（文件 → 反向替换对）；mes_service.py 用**钉死的修复前提交**整文件回退（A-70）
 REVERSE_EDITS = {
     'app/main/routes.py': (
         (
@@ -167,15 +291,76 @@ def read(path):
         return fh.read()
 
 
+def baseline_guard(path, explicit=False):
+    """**可复算性前置**（A-70：锚点与产物分离；触发项 V-15/F1）。
+
+    基线来源必须是**不可变归档副本**，且现场复算的 bytes+SHA256 == 钉值。返回 `(ok, info)`：
+    `ok=False` ⇒ 前置报红（`UD-BASE`）。**绝不**静默回落到 live 路径。
+    """
+    rel = os.path.relpath(path, REPO_ROOT).replace('\\', '/')
+    info = {'path': rel, 'explicit': bool(explicit),
+            'expected_bytes': FROZEN_UAT_BYTES, 'expected_sha256': FROZEN_UAT_SHA256,
+            'default_source': os.path.relpath(FROZEN_UAT_ARCHIVE, REPO_ROOT).replace('\\', '/'),
+            'live_superseded': os.path.relpath(FROZEN_UAT_LIVE_SUPERSEDED,
+                                               REPO_ROOT).replace('\\', '/'),
+            'live_read': False, 'bytes': None, 'sha256': None, 'status': None}
+    if not os.path.exists(path):
+        info['status'] = 'missing'
+        return False, info
+    b = open(path, 'rb').read()
+    info['bytes'] = len(b)
+    info['sha256'] = hashlib.sha256(b).hexdigest().upper()
+    same_bytes = info['bytes'] == FROZEN_UAT_BYTES
+    same_hash = info['sha256'] == FROZEN_UAT_SHA256
+    info['status'] = 'ok' if (same_bytes and same_hash) else 'hash-mismatch'
+    if not (same_bytes and same_hash):
+        info['why'] = ('bytes %s != %s' % ('ok' if same_bytes else 'DIFF', FROZEN_UAT_BYTES))
+        info['why'] += ' ; sha256 %s' % ('ok' if same_hash else 'DIFF')
+    return (same_bytes and same_hash), info
+
+
+def live_superseded_info():
+    """记录 live 路径（已废弃来源）的**当前**状态 —— 仅作取证，**不参与**任何判据。"""
+    p = FROZEN_UAT_LIVE_SUPERSEDED
+    out = {'path': os.path.relpath(p, REPO_ROOT).replace('\\', '/'), 'read_as_baseline': False,
+           'role': '已废弃的旧基线来源（本脚本不再读取；若它再次被下游覆盖，本判据不受影响）'}
+    if os.path.exists(p):
+        b = open(p, 'rb').read()
+        out['bytes'] = len(b)
+        out['sha256'] = hashlib.sha256(b).hexdigest().upper()
+        out['t1_pin_bytes'] = FROZEN_UAT_BYTES
+        out['matches_t1_pin'] = (len(b) == FROZEN_UAT_BYTES
+                                 and out['sha256'] == FROZEN_UAT_SHA256)
+    else:
+        out['status'] = 'missing'
+    return out
+
+
 def write(path, text):
     with open(path, 'w', encoding='utf-8', newline='\n') as fh:
         fh.write(text)
 
 
-def git_show(rel, dest):
+def pre_fix_rev():
+    """「修复前树」要用的**显式提交号**（A-70）。默认 `PRE_FIX_REV`，可被 `WMS_PREFIX_REV` 覆盖。"""
+    rev = (os.environ.get(PRE_FIX_REV_ENV) or '').strip() or PRE_FIX_REV
+    return {'rev': rev,
+            'source': 'env:%s' % PRE_FIX_REV_ENV if os.environ.get(PRE_FIX_REV_ENV) else 'const'}
+
+
+def git_rev_parse(spec):
+    """`git rev-parse <spec>` ⇒ 对象名（用于「回退源与 HEAD 是否真有差异」的前置）。"""
+    proc = subprocess.run(['git', 'rev-parse', '--verify', spec], cwd=REPO_ROOT,
+                          capture_output=True, text=True)
+    return proc.stdout.strip() if proc.returncode == 0 else ''
+
+
+def git_show(rel, dest, rev=None):
+    """从**钉死的显式提交**取文件字节（A-70：绝不 `HEAD:`）。"""
+    rev = rev or pre_fix_rev()['rev']
     ensure_dir(os.path.dirname(dest))
     with open(dest, 'wb') as fh:
-        proc = subprocess.run(['git', 'show', 'HEAD:' + rel], cwd=REPO_ROOT, stdout=fh,
+        proc = subprocess.run(['git', 'show', '%s:%s' % (rev, rel)], cwd=REPO_ROOT, stdout=fh,
                               stderr=subprocess.DEVNULL)
     return proc.returncode
 
@@ -197,10 +382,29 @@ def build_tree(dest, revert_t7):
     ensure_dir(os.path.join(dest, 'test-reports-2026-10', '.tmp'))
     if not revert_t7:
         return {'tree': dest, 'reverted': False}
-    # mes_service.py：t7 前与 HEAD 逐字节相同 ⇒ 整文件回退
-    rc = git_show('app/services/mes_service.py',
-                  os.path.join(dest, 'app', 'services', 'mes_service.py'))
-    applied = {'app/services/mes_service.py': {'mode': 'git-show-HEAD', 'git_show_exit': rc}}
+    # mes_service.py：t7 前与**钉死的修复前提交**逐字节相同 ⇒ 整文件回退（A-70：不用 HEAD）
+    pin = pre_fix_rev()
+    rc = git_show(REVERT_SOURCE_FILE,
+                  os.path.join(dest, 'app', 'services', 'mes_service.py'), pin['rev'])
+    #: 可复算性前置：钉住的 blob 必须与 HEAD 的同名 blob **不同**，否则回退是 no-op、判据空转
+    pin_blob = git_rev_parse('%s:%s' % (pin['rev'], REVERT_SOURCE_FILE))
+    head_blob = git_rev_parse('HEAD:%s' % REVERT_SOURCE_FILE)
+    pin_distinct = bool(pin_blob) and bool(head_blob) and pin_blob != head_blob
+    applied = {REVERT_SOURCE_FILE: {
+        'mode': 'git-show-pinned-rev',
+        'mode_renamed_from': 'git-show-HEAD',
+        'rev': pin['rev'],
+        'rev_source': pin['source'],
+        'git_show_exit': rc,
+        'pinned_blob': pin_blob,
+        'head_blob': head_blob,
+        'pin_distinct_vs_head': pin_distinct}}
+    print('[tree-before] mes_service.py <- pinned rev %s (exit=%s) ; pin_distinct_vs_head=%s '
+          '(pinned blob=%s / HEAD blob=%s)'
+          % (pin['rev'][:12], rc, pin_distinct, (pin_blob or '?')[:12], (head_blob or '?')[:12]))
+    if not pin_distinct:
+        print('[tree-before] !!! 可复算性前置失败：钉住的 mes_service.py 与 HEAD 版本**相同** ⇒ '
+              '整文件回退是 no-op、UD-0/UD-5 空转（A-70 类缺陷复发）')
     for rel, pairs in REVERSE_EDITS.items():
         path = os.path.join(dest, rel)
         text = read(path)
@@ -255,17 +459,51 @@ def main(argv=None):
         pass
     parser = argparse.ArgumentParser(description='uat_chains 40-chain pre/post diff on tree copies')
     parser.add_argument('--verify-only', action='store_true')
+    parser.add_argument('--baseline', default=None,
+                        help='基线来源路径（默认 = 不可变归档副本 %s）。'
+                             '显式指定时进入**诊断模式**：前置 UD-BASE 会如实报红但仍继续评估，'
+                             '用于阴性对照（如喂 live 文件或篡改副本）。'
+                             % os.path.relpath(FROZEN_UAT_ARCHIVE, REPO_ROOT).replace('\\', '/'))
     args = parser.parse_args(argv)
+
+    baseline_path = os.path.abspath(args.baseline) if args.baseline else FROZEN_UAT_ARCHIVE
+    baseline_ok, baseline_info = baseline_guard(baseline_path, explicit=bool(args.baseline))
+    live_info = live_superseded_info()
 
     started = time.strftime('%Y-%m-%d %H:%M:%S')
     print('=' * 78)
     print('[uatdiff] RUN_ID=%s started=%s' % (RUN_ID, started))
-    print('[uatdiff] frozen baseline = %s (sha256=%s)'
-          % (os.path.relpath(FROZEN_UAT, REPO_ROOT).replace('\\', '/'), sha256_file(FROZEN_UAT)))
+    print('[uatdiff] frozen baseline = %s (%s bytes, sha256=%s)'
+          % (baseline_info['path'], baseline_info['bytes'],
+             (baseline_info['sha256'] or '-')[:16]))
+    print('[uatdiff] baseline pin      : %d bytes / %s'
+          % (FROZEN_UAT_BYTES, FROZEN_UAT_SHA256[:16] + '...'))
+    print('[uatdiff] baseline status   : %s (explicit=%s)'
+          % (baseline_info['status'], baseline_info['explicit']))
+    print('[uatdiff] live(旧来源,已废弃): %s %s bytes, read_as_baseline=%s'
+          % (live_info.get('bytes'), live_info.get('sha256', '-')[:16],
+             live_info.get('read_as_baseline')))
     print('[uatdiff] real db sha256 = %s' % sha256_file(REAL_DB))
     print('=' * 78)
 
-    with open(FROZEN_UAT, encoding='utf-8') as fh:
+    #: 默认来源失效（缺失/哈希不符）⇒ **如实报红并报错退出**，绝不静默回落到 live 路径。
+    if not baseline_ok and not baseline_info['explicit']:
+        print('[uatdiff] FAIL 基线来源不可用：%s（status=%s）' % (baseline_info['path'],
+                                                                 baseline_info['status']))
+        print('[uatdiff] A-70：锚点与产物必须分离 —— 归档副本缺失/被改 ⇒ 无有效基线，'
+              '拒绝运行（不得回落 live 路径 %s）' % live_info['path'])
+        save_evidence('w2w3-uatdiff-baseline-invalid.json',
+                      json.dumps({'run_id': RUN_ID, 'baseline': baseline_info,
+                                  'live_superseded': live_info,
+                                  'verdict': 'FAIL', 'reason': 'baseline-unavailable'},
+                                 ensure_ascii=False, indent=1, default=str))
+        print('[verdict] FAIL')
+        return 1
+    if not baseline_ok:
+        print('[uatdiff] WARN 诊断模式（--baseline 显式指定）：前置 UD-BASE 将报红 —— %s'
+              % baseline_info.get('why'))
+
+    with open(baseline_path, encoding='utf-8') as fh:
         frozen = json.load(fh)
     frozen_v = verdicts(frozen)
     frozen_summary = frozen.get('summary')
@@ -290,11 +528,41 @@ def main(argv=None):
               'before_markers': before_markers, 'after_markers': after_markers,
               'keep_markers_ok_in_before': keep_ok_before,
               't7_markers_gone_in_before': t7_gone_before}
+    #: A-70 可复算性前置（precondition）①：冻结基线来源 = 不可变归档副本（V-15/F1）
+    base_check = ('UD-BASE 冻结基线来源 = 不可变归档副本且 bytes+SHA256 == t1 钉值'
+                  '（缺失/不符即报红，不回落 live）',
+                  baseline_ok,
+                  'path=%s status=%s bytes=%s sha256=%s expected=%d/%s explicit=%s'
+                  % (baseline_info['path'], baseline_info['status'],
+                     baseline_info['bytes'],
+                     (baseline_info['sha256'] or '?')[:16],
+                     FROZEN_UAT_BYTES, FROZEN_UAT_SHA256[:16], baseline_info['explicit']))
+    result['baseline'] = {'info': baseline_info, 'check': base_check[0], 'ok': baseline_ok,
+                          'evidence': base_check[2], 'live_superseded': live_info}
+    print('  [%s] %s -- %s' % ('PASS' if baseline_ok else 'FAIL', base_check[0], base_check[2]))
+    #: A-70 可复算性前置（precondition）：回退源必须来自**钉死的显式提交**且与 HEAD 真有差异
+    pin_info = (before.get('applied') or {}).get(REVERT_SOURCE_FILE) or {}
+    pin_ok = bool(pin_info.get('pin_distinct_vs_head')) and pin_info.get('git_show_exit') == 0
+    pin_check = ('UD-PIN 「修复前树」回退源的取源 = %s（rev_source=%s）且与 HEAD 版本**不同**'
+                 % (pin_info.get('rev') or PRE_FIX_REV, pin_info.get('rev_source')),
+                 pin_ok,
+                 'rev=%s source=%s pinned_blob=%s head_blob=%s distinct=%s git_show_exit=%s'
+                 % ((pin_info.get('rev') or '?')[:12], pin_info.get('rev_source'),
+                    (pin_info.get('pinned_blob') or '?')[:12],
+                    (pin_info.get('head_blob') or '?')[:12],
+                    pin_info.get('pin_distinct_vs_head'), pin_info.get('git_show_exit')))
+    result['pin'] = {'rev': PRE_FIX_REV, 'rev_env': PRE_FIX_REV_ENV,
+                     'revert_source_file': REVERT_SOURCE_FILE, 'check': pin_check[0],
+                     'ok': pin_ok, 'evidence': pin_check[2]}
+    print('  [%s] %s -- %s' % ('PASS' if pin_ok else 'FAIL', pin_check[0], pin_check[2]))
     if args.verify_only:
+        result['checks'] = [{'id': base_check[0], 'ok': baseline_ok, 'evidence': base_check[2]},
+                            {'id': pin_check[0], 'ok': pin_ok, 'evidence': pin_check[2]}]
+        result['verdict'] = 'PASS' if (baseline_ok and pin_ok) else 'FAIL'
         save_evidence('w2w3-uatdiff-verify.json',
                       json.dumps(result, ensure_ascii=False, indent=1, default=str))
         print('[verify-only] 两棵树已构造并验证；未跑 uat_chains')
-        return 0
+        return 0 if (baseline_ok and pin_ok) else 1
 
     run_before = run_uat(TREE_BEFORE)
     run_after = run_uat(TREE_AFTER)
@@ -404,12 +672,45 @@ def main(argv=None):
          'after=%d frozen=%d' % (len(v_after), len(frozen_v))),
         ('UD-5 before 树不含 t7 改动、after 树含（t6/t8 标记两树都在位）',
          t7_gone_before and keep_ok_before, 't7_gone=%s keep_ok=%s' % (t7_gone_before, keep_ok_before)),
+        pin_check,
+        base_check,
     ]
     for cid, ok, ev in checks:
         print('  [%s] %s -- %s' % ('PASS' if ok else 'FAIL', cid, ev))
     result['checks'] = [{'id': cid, 'ok': bool(ok), 'evidence': ev} for cid, ok, ev in checks]
     failed = [cid for cid, ok, _ in checks if not ok]
     result['verdict'] = 'PASS' if not failed else 'FAIL'
+
+    #: ── 已登记的残余局限标注（V-18/F1b）──────────────────────────────────────────────
+    #: **仅作如实标注**：不改变任何判据的 ok、不改变退出码（下方仍 return 1）。当且仅当失败集
+    #: 恰为 KNOWN_RESIDUAL 时打印一行，并把实测根因读数写进证据，防止下游把红点误读成回归。
+    residual_hit = sorted(cid.split()[0] for cid in failed)
+    residual_expected = (set(residual_hit) == set(KNOWN_RESIDUAL))
+    aft_chains = len(v_after)
+    base_chains = len(frozen_v)
+    stale_chain_status = {k: v_after.get(k) for k in ('P0-1.6', 'P0-3.1', 'P0-2.1', 'P0-2.5',
+                                                      'P0-3.3')}
+    result['residual_registered'] = {
+        'expected_residual_set': list(KNOWN_RESIDUAL),
+        'observed_failed': residual_hit,
+        'matches': residual_expected,
+        'cause': '链语料漂移（同族更深缺陷）：A-66/A-68 授权 t9 重写 15 处冻结断言 + '
+                 'V-12/A-105 授权语料 40→84 链（纯追加）⇒ 本基线下这 4 条结构性不可满足',
+        'readings': {'baseline_chains': base_chains, 'after_chains': aft_chains,
+                     'before_reds_not_in_baseline':
+                         sorted(set(before_reds) - set(frozen_v)),
+                     'stale_expectation_chains_status_in_after': stale_chain_status},
+        'reading_discipline': ['不得把 UD-0/UD-1b/UD-3/UD-4 当作绿',
+                               '不得把其红点归因到 V-15（UD-PIN）或 V-18（UD-BASE）的资产修正',
+                               'UD-PIN / UD-BASE / UD-1a PASS 可单独证明上述两项修正已生效'],
+        'follow_up': 'captain 另立任务（方案：4 条按 A-70 标 superseded + 新立可证伪的替代判据集；'
+                     '明确否决「按新语料重写期望值」与「把语料钉回 t5 时代」）',
+    }
+    print('  [residual] 已登记的残余局限：observed_failed=%s matches_expected_set=%s '
+          '(baseline_chains=%d / after_chains=%d)' % (residual_hit, residual_expected,
+                                                      base_chains, aft_chains))
+    print('  [residual] 根因 = 链语料漂移（A-66/A-68 断言重写 + V-12/A-105 扩链）⇒ 退出码仍为 1；'
+          '**不得当绿、不得归因 V-15/V-18**，后续归属 = captain 另立任务')
 
     saved = [save_evidence('w2w3-uatdiff-result.json',
                            json.dumps(result, ensure_ascii=False, indent=1, default=str))]
