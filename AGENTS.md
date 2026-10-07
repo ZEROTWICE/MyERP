@@ -79,8 +79,15 @@ Guidelines:
     | `python -B scripts/check_migration_heads.py` | `HEADS=['p1nonctarget']`，`head_count=1`，`revisions=35` → exit 0 |
     | `python -B scripts/check_properties.py` | `已扫描 23 个文件，模型类 74 个` → `RESULT: OK`（**新增闸门**，专治第 5 次复发的「`@property`/不存在列当列用」） |
     | `python -B scripts/route_inventory.py` | `total rules=271`，`duplicate (method,path) registrations=0` |
+    | `python -B scripts/check_model_refs.py` | `scanned 23 files` / `name_query_refs`（计数勿钉，已漂移过 574/575/602）/ `violations 0` → `RESULT: OK`（**新增闸门**，专治 P-01 类「模型名未导入」NameError）；判据只钉 `violations 0` + `RESULT: OK` |
+    | `python -B test-reports-2026-10/harness/w4_http_contract.py --roots app --scope app --expect 10` | 10 个 P-12 站点（`get_json()` 维，具名登记见脚本 docstring）→ exit 0 |
 
-    模板/权限/迁移/property 四项都要求 exit 0；有违规就必须先修，不要靠改期望值过关。
+    模板/权限/迁移/property/模型引用/HTTP 契约六项都要求 exit 0；有违规就必须先修，不要靠改期望值过关。
+
+    **单一入口（推荐）**：以上各项已由 `python -B test-reports-2026-10/harness/ci_gates.py --phase first` 统一编排（当前 **14 步**：blocking 10 / report-only 4），退出码语义 `0=全部 blocking 通过 / 1=有 blocking 失败 / 2=仅 report-only 失败 / 3=入口缺失`。
+    > ⚠ 引用 `ci_gates` 的步骤数时必须带**「步骤数 + SHA256 + 时点」**：该文件在本战役期间从 11 步增至 14 步，「11 步」只能当阶段A 基线引用。
+    > ⚠ `route_inventory.py` 与 `harness/measure_coverage.py` 属**报告型**（stdout 全是度量值，无判据语义）⇒ **其退出码不进闸门链**，判据改由 `harness/coverage_drift.py` 消费其 JSON 产出。
+    > ⚠ `harness/run_gates.py` 内的 `route_inventory_native_probe` 属**环境依赖探针**：其退出码随沙箱环境态变化，**不得写入任何 blocking 判据**。
     > `check_properties.py` 的跳过表有**两类**：① `SKIP_FILENAMES` 里的 4 个名字（`routes_backup.py` / `routes_original.py` / `routes_full.py` / `routes_with_duplicates.py`）——这 4 个**遗留备份文件已于 2026-09-18 第 8 批从仓库删除**（约 1.99 MB，全仓引用 0 处），**名字保留作防御**（这类超大副本可能带语法错误，若被误恢复，跳过比让脚本崩在 `ast.parse` 更好）；② `SKIP_SUFFIXES`（`.bak` / `.new` / `.backup`），跳过 `app/main/routes.py.backup`、`routes.py.bak`、`routes.py.new` 这 3 个后缀型残留（**其实被 git 跟踪**，原记录有误；已于第 8 批一并删除）。**结论：`app/main` 下现只有 `routes.py` 一个路由模块；不要再按「包内有语法错误的备份文件」的说法去处理。**
   - **会发请求的脚本**：`smoke_test.py`、`permission_matrix.py`、`functional_test.py`。
     它们会重写根目录 `_permission_matrix.json` / `_smoke_results.json`（已 gitignore，不影响 `git status`）。沙箱内需加垫片：`python -B scripts/_sandbox_compat.py scripts/smoke_test.py`。
