@@ -98,6 +98,9 @@ Guidelines:
     ⛔ **不再需要**「跑会发请求的脚本前备份、跑完 `git checkout -- uploads/temp/` 恢复」这套规避步骤——现在没有可恢复的对象，该命令会因路径不存在而报错。
     只做静态检查时优先跑不发请求的 5 个脚本（`check_templates` / `check_migration_heads` / `check_properties` / `route_inventory` / `check_db_bootstrap`）。
   - 一切验证都用 **`app.db` 副本**（`DATABASE_URL` 指向副本，或直接用 `scripts/_test_bootstrap.make_app()`）。跑完复核真实 `app.db` 的 SHA256 未变。
+    ⚠ **`harness/coverage_drift.py` 必须显式传 `--coverage <本次 run 产物>`**：**缺参 = `exit 2`（用法错误），不是回归**（V-16/N-1，2026-10-07）。原因：默认路径指向的是一份**历史冻结锚点**，其读数（`6/14/101`）与 `LOCKED` 全局阈值（`108/116/0`，V-06 后）**语义互斥**；若静默用锚点当输入，直跑必得 `exit 1`，极易被误读成「回归」。退出码语义：`0` = 判据 8/8 通过；`1` = 判据失败（真敏感）；`2` = **未提供产物**；`9/9 --selftest` ⇒ `0`。已同步 `40-第2轮实测Runbook与台账规范.md` §4.5。
+    ⚠ **通用纪律（挂点与产物分离）**：凡「**既是冻结基线、又是会被脚本原地写出的活产物**」的文件（如 `evidence/uat/uat_chains.json`、`evidence/api/write_suite.json`），**判据必须从不可变归档快照读取，不得从 live 路径读取**。同族病史：A-89（preflight 归档进 `evidence/` 而 `evidence_hash` 索引 `evidence/` ⇒ 每跑一次就多一批未登记违规）、`write_suite.py` 无 `--out`（复跑与保锚点不可兼得）、N-1（锚点与 `LOCKED` 互斥）、F1（`uat_chains.json` 被下游覆盖 ⇒ `w2w3_uatdiff` 的 `UD-0/1a/1b/3/4` 改前改后都红）。
+
   - 回滚：重要数据写操作产生日志与回滚信息，遵循 `AuditLog`。
 
 - 禁止事项
