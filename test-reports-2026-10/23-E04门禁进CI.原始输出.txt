@@ -1,0 +1,1174 @@
+====================================================================================================
+## E-04-a 权威运行：ci_gates.py --phase first（run_id=w0-e04-t5-final，真实退出码 0）
+## 12 步：10 步 blocking（全绿）+ 2 步 report-only（route_inventory / measure_coverage）；run_gates 退出码=1 属 A-62 预期，其 blocking 判据取自 gates.json 的非环境依赖部分
+====================================================================================================
+========================================================================================
+[ci_gates] run_id=w0-e04-t5-final phase=first interpreter=F:\Miniconda\envs\wage\python.exe
+{
+ "harness": "ci_gates.py",
+ "run_id": "w0-e04-t5-final",
+ "phase": "first",
+ "interpreter": "F:\\Miniconda\\envs\\wage\\python.exe",
+ "repo_root": "D:\\workspace\\wage_management_system - bak",
+ "steps": [
+  {
+   "id": "check_templates",
+   "group": "blocking",
+   "command": "F:\\Miniconda\\envs\\wage\\python.exe -B -B scripts\\check_templates.py",
+   "exit_code": 0,
+   "expected_exit": 0,
+   "status": "passed",
+   "checks": [
+    {
+     "kind": "expects",
+     "needle": "[templates] parsed 87 files",
+     "status": "passed"
+    },
+    {
+     "kind": "expects",
+     "needle": "[permissions] 44 declared / 40 used in templates / 44 used on routes",
+     "status": "passed"
+    },
+    {
+     "kind": "expects",
+     "needle": "[landing] 5 role landing endpoints",
+     "status": "passed"
+    },
+    {
+     "kind": "expects",
+     "needle": "RESULT: OK",
+     "status": "passed"
+    },
+    {
+     "kind": "exit",
+     "needle": "exit == 0",
+     "status": "passed"
+    }
+   ],
+   "evidence_level": "原文可信",
+   "real_db_unchanged": true,
+   "stdout_tail": "[templates] parsed 87 files\n[permissions] 44 declared / 40 used in templates / 44 used on routes\n[landing] 5 role landing endpoints\nRESULT: OK",
+   "note": ""
+  },
+  {
+   "id": "check_migration_heads",
+   "group": "blocking",
+   "command": "F:\\Miniconda\\envs\\wage\\python.exe -B -B scripts\\check_migration_heads.py",
+   "exit_code": 0,
+   "expected_exit": 0,
+   "status": "passed",
+   "checks": [
+    {
+     "kind": "expects",
+     "needle": "HEADS=['p1nonctarget']",
+     "status": "passed"
+    },
+    {
+     "kind": "expects",
+     "needle": "head_count=1",
+     "status": "passed"
+    },
+    {
+     "kind": "expects",
+     "needle": "revisions=35",
+     "status": "passed"
+    },
+    {
+     "kind": "exit",
+     "needle": "exit == 0",
+     "status": "passed"
+    }
+   ],
+   "evidence_level": "原文可信",
+   "real_db_unchanged": true,
+   "stdout_tail": "HEADS=['p1nonctarget']\nhead_count=1  revisions=35\nOK: 单一 head p1nonctarget",
+   "note": ""
+  },
+  {
+   "id": "check_properties",
+   "group": "blocking",
+   "command": "F:\\Miniconda\\envs\\wage\\python.exe -B -B scripts\\check_properties.py",
+   "exit_code": 0,
+   "expected_exit": 0,
+   "status": "passed",
+   "checks": [
+    {
+     "kind": "expects",
+     "needle": "已扫描 23 个文件，模型类 74 个",
+     "status": "passed"
+    },
+    {
+     "kind": "expects",
+     "needle": "RESULT: OK",
+     "status": "passed"
+    },
+    {
+     "kind": "exit",
+     "needle": "exit == 0",
+     "status": "passed"
+    }
+   ],
+   "evidence_level": "原文可信",
+   "real_db_unchanged": true,
+   "stdout_tail": "已扫描 23 个文件，模型类 74 个\nRESULT: OK（未发现把 @property / 不存在的列当数据库列用）",
+   "note": ""
+  },
+  {
+   "id": "check_db_bootstrap",
+   "group": "blocking",
+   "command": "F:\\Miniconda\\envs\\wage\\python.exe -B -B scripts\\_sandbox_compat.py scripts\\check_db_bootstrap.py",
+   "exit_code": 0,
+   "expected_exit": 0,
+   "status": "passed",
+   "checks": [
+    {
+     "kind": "expects",
+     "needle": "种子库账号数（经自举导入到空库）= 64",
+     "status": "passed"
+    },
+    {
+     "kind": "expects",
+     "needle": "直接拷贝 6712 行，跳过 0 张表",
+     "status": "passed"
+    },
+    {
+     "kind": "expects",
+     "needle": "OK: 空库自举、幂等、无种子库跳过、整表无遗漏 均通过",
+     "status": "passed"
+    },
+    {
+     "kind": "exit",
+     "needle": "exit == 0",
+     "status": "passed"
+    }
+   ],
+   "evidence_level": "原文可信",
+   "real_db_unchanged": true,
+   "stdout_tail": "种子库账号数（经自举导入到空库）= 64\n首次启动导入 64 个账号，再次启动后 64 个\n无种子库时账号数 = 0\n直接拷贝 6712 行，跳过 0 张表\nOK: 空库自举、幂等、无种子库跳过、整表无遗漏 均通过\n[2026-10-07 13:50:40,392] WARNING in db_bootstrap: 目标库为空，开始从种子库初始化：C:\\Users\\RICHAR~1\\AppData\\Local\\Temp\\bootstrap_check_lhyfz43_\\seed.db\n[2026-10-07 13:50:40,731] WARNING in db_bootstrap: 初始化导入完成，共 6712 行；跳过 0 张表\n[2026-10-07 13:50:41,703] WARNING in db_bootstrap: 目标库为空，开始从种子库初始化：C:\\Users\\RICHAR~1\\AppData\\Local\\Temp\\bootstrap_check_lhyfz43_\\seed.db\n[2026-10-07 13:50:42,076] WARNING in db_bootstrap: 初始化导入完成，共 6712 行；跳过 0 张表",
+   "note": ""
+  },
+  {
+   "id": "run_gates",
+   "group": "blocking",
+   "command": "F:\\Miniconda\\envs\\wage\\python.exe -B -B test-reports-2026-10\\harness\\run_gates.py --out \"D:\\workspace\\wage_management_system - bak\\test-reports-2026-10\\evidence\\harness\\ci-w0-e04-t5-final\\gates.json\"",
+   "exit_code": 1,
+   "expected_exit": null,
+   "status": "passed",
+   "checks": [
+    {
+     "kind": "expects",
+     "needle": "[run_gates] probe_unexpected = ",
+     "status": "passed"
+    },
+    {
+     "kind": "gates_json",
+     "needle": "summary.fail == 0",
+     "status": "passed"
+    },
+    {
+     "kind": "gates_json",
+     "needle": "4 项进链门禁全 pass",
+     "status": "passed"
+    },
+    {
+     "kind": "gates_json",
+     "needle": "进链门禁逐项 checks 全过",
+     "status": "passed"
+    }
+   ],
+   "evidence_level": "原文可信",
+   "real_db_unchanged": true,
+   "stdout_tail": "[run_gates] run_id=w0-e04-t5-final  5/6 项 pass\n[run_gates] probe_unexpected = 1   (取证型探针与锁定期望值不一致的条数；>0 => 退出码 1)\n  OK   check_templates              exit=0 mode=native checks=5/5\n  OK   check_migration_heads        exit=0 mode=native checks=3/3\n  OK   check_properties             exit=0 mode=native checks=2/2\n  OK   route_inventory              exit=0 mode=shim   checks=5/5  [报告型：退出码无信息量]\n  FAIL route_inventory_native_probe exit=0 mode=native checks=0/0  [取证型：退出码与锁定期望值不一致 => 计入 probe_unexpected => 退出码 1]\n  OK   check_db_bootstrap           exit=0 mode=shim   checks=3/3\n[run_gates] real.db unchanged = True (F5DA2306BC31CBAB…)\n[run_gates] exit = 1  原因=['probe_unexpected=1']\n[run_gates] JSON -> D:\\workspace\\wage_management_system - bak\\test-reports-2026-10\\evidence\\harness\\ci-w0-e04-t5-final\\gates.json",
+   "note": "A-62：环境依赖探针留在 report-only；其 native_exit 与 expected 同时打印",
+   "gates_json": "test-reports-2026-10/evidence/harness/ci-w0-e04-t5-final/gates.json",
+   "summary": {
+    "total": 6,
+    "pass": 5,
+    "fail": 0,
+    "probe_only": 1,
+    "probe_unexpected": 1,
+    "exit_code_informative": 4,
+    "in_gate_chain": [
+     "check_templates",
+     "check_migration_heads",
+     "check_properties",
+     "check_db_bootstrap"
+    ],
+    "report_only": [
+     "route_inventory"
+    ],
+    "evidence_only": [
+     "route_inventory_native_probe"
+    ],
+    "sensitivity_ok": null
+   },
+   "exit_code_semantics": {
+    "code": 1,
+    "reasons": [
+     "probe_unexpected=1"
+    ],
+    "rule": "exit 0 ⟺ summary['fail']==0 ∧ summary['probe_unexpected']==0 ∧ (未跑 --self-test ∨ summary['sensitivity_ok'] is True)",
+    "inputs": {
+     "fail": 0,
+     "probe_unexpected": 1,
+     "sensitivity_ok": null
+    }
+   },
+   "in_chain": {
+    "check_templates": "pass",
+    "check_migration_heads": "pass",
+    "check_properties": "pass",
+    "check_db_bootstrap": "pass"
+   },
+   "probe_env_dependent": [
+    {
+     "gate": "route_inventory_native_probe",
+     "native_exit": 0,
+     "expected": 1,
+     "verdict": "unexpected"
+    }
+   ]
+  },
+  {
+   "id": "functional_test",
+   "group": "blocking",
+   "command": "F:\\Miniconda\\envs\\wage\\python.exe -B -B scripts\\_sandbox_compat.py scripts\\functional_test.py",
+   "exit_code": 0,
+   "expected_exit": 0,
+   "status": "passed",
+   "checks": [
+    {
+     "kind": "expects",
+     "needle": "结果：109 通过 / 0 失败",
+     "status": "passed"
+    },
+    {
+     "kind": "exit",
+     "needle": "exit == 0",
+     "status": "passed"
+    }
+   ],
+   "evidence_level": "原文可信",
+   "real_db_unchanged": true,
+   "stdout_tail": "  emp_row = Employee.query.get(emp_id)\n[2026-10-07 13:50:55,289] WARNING in mes_service: 报工扣料归集跳过：任务 19 未挂生产批次/批次实例\nD:\\workspace\\wage_management_system - bak\\scripts\\functional_test.py:276: LegacyAPIWarning: The Query.get() method is considered legacy as of the 1.x series of SQLAlchemy and becomes a legacy construct in 2.0. The method is now available as Session.get() (deprecated since: 2.0) (Background on SQLAlchemy 2.0 at: https://sqlalche.me/e/b8d9)\n  t = TaskAssignment.query.get(tid)\nD:\\workspace\\wage_management_system - bak\\scripts\\functional_test.py:371: LegacyAPIWarning: The Query.get() method is considered legacy as of the 1.x series of SQLAlchemy and becomes a legacy construct in 2.0. The method is now available as Session.get() (deprecated since: 2.0) (Background on SQLAlchemy 2.0 at: https://sqlalche.me/e/b8d9)\n  after = Consumable.query.get(mat_id).quantity\nD:\\workspace\\wage_management_system - bak\\scripts\\functional_test.py:372: LegacyAPIWarning: The Query.get() method is considered legacy as of the 1.x series of SQLAlchemy and becomes a legacy construct in 2.0. The method is now available as Session.get() (deprecated since: 2.0) (Background on SQLAlchemy 2.0 at: https://sqlalche.me/e/b8d9)\n  req = MaterialRequisition.query.get(rid)\nD:\\workspace\\wage_management_system - bak\\scripts\\functional_test.py:448: LegacyAPIWarning: The Query.get() method is considered legacy as of the 1.x series of SQLAlchemy and becomes a legacy construct in 2.0. The method is now available as Session.get() (deprecated since: 2.0) (Background on SQLAlchemy 2.0 at: https://sqlalche.me/e/b8d9)\n  after = Consumable.query.get(mat_id).quantity\nD:\\workspace\\wage_management_system - bak\\scripts\\functional_test.py:449: LegacyAPIWarning: The Query.get() method is considered legacy as of the 1.x series of SQLAlchemy and becomes a legacy construct in 2.0. The method is now available as Session.get() (deprecated since: 2.0) (Background on SQLAlchemy 2.0 at: https://sqlalche.me/e/b8d9)\n  count = InventoryCount.query.get(cid)",
+   "note": ""
+  },
+  {
+   "id": "permission_matrix",
+   "group": "blocking",
+   "command": "F:\\Miniconda\\envs\\wage\\python.exe -B -B scripts\\_sandbox_compat.py scripts\\permission_matrix.py --no-dump",
+   "exit_code": 0,
+   "expected_exit": 0,
+   "status": "passed",
+   "checks": [
+    {
+     "kind": "expects",
+     "needle": "[OK] 匿名可访问 = 0",
+     "status": "passed"
+    },
+    {
+     "kind": "expect_absent",
+     "needle": "[WARN] 落盘失败",
+     "status": "passed"
+    },
+    {
+     "kind": "exit",
+     "needle": "exit == 0",
+     "status": "passed"
+    }
+   ],
+   "evidence_level": "原文可信",
+   "real_db_unchanged": true,
+   "stdout_tail": "  /my_tasks [main.my_tasks]  guards=['NONE']\n  /notifications [main.manage_notifications]  guards=['NONE']\n  /user_dashboard [main.user_dashboard]  guards=['NONE']\n=== 源码上完全没有权限校验的视图（仅 login_required 或更少）===\n  api_notification_stats: ['NONE']\n  api_recent_notifications: ['NONE']\n  manage_notifications: ['NONE']\n  my_tasks: ['NONE']\n  user_dashboard: ['NONE']\n[--no-dump] 已跳过落盘（退出码只反映判据）\n[OK] 匿名可访问 = 0\n[e03] exit_code_semantics={\"script\": \"scripts/permission_matrix.py\", \"class\": \"有判据语义（原伪门禁，E-03 已补失败出口）\", \"rule\": \"anon_open == 0 -> exit 0; anon_open != 0 -> exit 1\", \"inputs\": {\"anon_open\": 0, \"routes_tested\": 146}, \"dump\": \"skipped\", \"code\": 0}",
+   "note": "A-63：判据单一确定（匿名可访问 = 0）=> 第一步即 blocking"
+  },
+  {
+   "id": "smoke_test",
+   "group": "report-only",
+   "command": "F:\\Miniconda\\envs\\wage\\python.exe -B -B scripts\\_sandbox_compat.py scripts\\smoke_test.py --no-dump",
+   "exit_code": 0,
+   "expected_exit": 0,
+   "status": "passed",
+   "checks": [
+    {
+     "kind": "expects",
+     "needle": "无 5xx / 异常 / 重定向死循环",
+     "status": "passed"
+    },
+    {
+     "kind": "expect_absent",
+     "needle": "[WARN] 落盘失败",
+     "status": "passed"
+    },
+    {
+     "kind": "exit",
+     "needle": "exit == 0",
+     "status": "passed"
+    }
+   ],
+   "evidence_level": "原文可信",
+   "real_db_unchanged": true,
+   "stdout_tail": "[done] admin: 148 条\n[done] manager: 148 条\n[done] hr: 148 条\n[done] accountant: 148 条\n[done] inspector: 148 条\n[done] sales: 148 条\n[done] user: 148 条\n================ 异常汇总 ================\n无 5xx / 异常 / 重定向死循环\n[--no-dump] 已跳过落盘（退出码只反映断言）\n[e03] 问题数 = 0 => exit 0\n[e03] exit_code_semantics={\"script\": \"scripts/smoke_test.py\", \"class\": \"有失败出口（写盘已解耦，E-03）\", \"rule\": \"errors == 0 -> exit 0; errors != 0 -> exit 1（写盘结果不参与）\", \"inputs\": {\"errors\": 0, \"actors\": 8, \"targets\": 148}, \"dump\": \"skipped\", \"code\": 0}",
+   "note": "smoke_test 自 <待晋升日期> 起升为 blocking（A-63 第二步：观测 1 轮构建后）"
+  },
+  {
+   "id": "route_inventory",
+   "group": "report-only",
+   "command": "F:\\Miniconda\\envs\\wage\\python.exe -B -B scripts\\_sandbox_compat.py scripts\\route_inventory.py",
+   "exit_code": 0,
+   "expected_exit": 0,
+   "status": "passed",
+   "checks": [
+    {
+     "kind": "expects",
+     "needle": "[routes] total rules=271",
+     "status": "passed"
+    },
+    {
+     "kind": "expects",
+     "needle": "duplicate (method,path) registrations=0",
+     "status": "passed"
+    },
+    {
+     "kind": "exit",
+     "needle": "exit == 0",
+     "status": "passed"
+    }
+   ],
+   "evidence_level": "原文可信",
+   "real_db_unchanged": true,
+   "stdout_tail": "  ---  /shipments/<int:id>/add_item\n  ---  /shipments/<int:id>/ship\n  ---  /shipments/<int:id>/sign\n  ---  /shipments/create\n  ---  /suppliers/save\n  ---  /tasks/<int:id>\n  ---  /tasks/<int:id>/edit\n  ---  /tasks/<int:id>/update_status\n  ---  /tasks/add\n  ---  /tasks/import\n  ---  /work_centers/save\n[e03] exit_code_semantics={\"script\": \"scripts/route_inventory.py\", \"class\": \"报告型（无判据语义 => 恒 exit 0，E-03/A-30）\", \"in_gate_chain\": false, \"consumer\": \"test-reports-2026-10/harness/coverage_drift.py（解析 stdout/JSON 做漂移检测）\", \"code\": 0}",
+   "note": "报告型（A-30）：退出码不作为判据；stdout 交给 coverage_drift 的 D-8"
+  },
+  {
+   "id": "measure_coverage",
+   "group": "report-only",
+   "command": "F:\\Miniconda\\envs\\wage\\python.exe -B -B test-reports-2026-10\\harness\\measure_coverage.py --no-request-probes --out \"D:\\workspace\\wage_management_system - bak\\test-reports-2026-10\\evidence\\harness\\ci-w0-e04-t5-final\\coverage.json\"",
+   "exit_code": 0,
+   "expected_exit": 0,
+   "status": "passed",
+   "checks": [
+    {
+     "kind": "exit",
+     "needle": "exit == 0",
+     "status": "passed"
+    }
+   ],
+   "evidence_level": "原文可信",
+   "real_db_unchanged": true,
+   "stdout_tail": "[coverage] 路由（url_map 重算）：271 条规则 = GET 无参 104 + GET 带参 56 + 非 GET 110 + static 1\n[coverage] 方法级：GET 161（08 记 160）/ POST 123 / DELETE 20 / PUT 12；非 GET 计数A=155 计数B=155（08 记 155，matchesA=True matchesB=True）\n[coverage] 写端点（非 GET 规则）153 条；functional_test 字面量覆盖 6 条 （3.9%）；全部探针字面量覆盖 6 条；含动态命中 14 条\n[coverage] 只读端点（仅 GET 规则）117 条；AST 字面量/动态命中 3 条；smoke_test 实跑计划覆盖 None 条（静态复现 148 条，跳过 9 条）\n[coverage] 未被任何 AST 命中的写端点 101 条，仅 GET 端点 115 条，GET+其他方法端点 38 条\n[coverage] JSON -> D:\\workspace\\wage_management_system - bak\\test-reports-2026-10\\evidence\\harness\\ci-w0-e04-t5-final\\coverage.json；real.db unchanged = True",
+   "note": "报告型（T-09/A-30）：退出码不作为判据；产出 coverage.json 给 coverage_drift"
+  },
+  {
+   "id": "coverage_drift",
+   "group": "blocking",
+   "command": "F:\\Miniconda\\envs\\wage\\python.exe -B -B test-reports-2026-10\\harness\\coverage_drift.py --coverage \"D:\\workspace\\wage_management_system - bak\\test-reports-2026-10\\evidence\\harness\\ci-w0-e04-t5-final\\coverage.json\" --routes-stdout \"D:\\workspace\\wage_management_system - bak\\test-reports-2026-10\\evidence\\harness\\ci-w0-e04-t5-final\\route_inventory.stdout.txt\"",
+   "exit_code": 0,
+   "expected_exit": 0,
+   "status": "passed",
+   "checks": [
+    {
+     "kind": "expects",
+     "needle": "判据 8/8 通过",
+     "status": "passed"
+    },
+    {
+     "kind": "exit",
+     "needle": "exit == 0",
+     "status": "passed"
+    }
+   ],
+   "evidence_level": "原文可信",
+   "real_db_unchanged": true,
+   "stdout_tail": "[coverage_drift] coverage=D:\\workspace\\wage_management_system - bak\\test-reports-2026-10\\evidence\\harness\\ci-w0-e04-t5-final\\coverage.json\n[coverage_drift] routes_stdout=D:\\workspace\\wage_management_system - bak\\test-reports-2026-10\\evidence\\harness\\ci-w0-e04-t5-final\\route_inventory.stdout.txt\n  [OK  ] D-1 summary.rules_total == 271  实际=271\n  [OK  ] D-2 summary.method_level_non_get_total >= 155  实际=155\n  [OK  ] D-3 summary.writable_rules_non_get == 153  实际=153\n  [OK  ] D-4 summary.writable_literal_covered_by_all >= 6  实际=6\n  [OK  ] D-5 summary.writable_any_covered_by_all >= 14  实际=14\n  [OK  ] D-6 len(uncovered_writable) <= 101  实际=101\n  [OK  ] D-7 smoke_test_plan 静态复现 148 / 未解析 9  实际=148 / 9\n  [OK  ] D-8 route_inventory: total rules == 271 且 duplicate == 0  实际=271 / 0\n[coverage_drift] 判据 8/8 通过  => exit 0  原因=无（全绿）\n[e03] exit_code_semantics={\"script\": \"test-reports-2026-10/harness/coverage_drift.py\", \"class\": \"真闸门（报告型产物的判据层，TL-03 雏形）\", \"rule\": \"all checks passed -> exit 0; any failed -> exit 1\", \"inputs\": {\"failed_checks\": [], \"coverage\": \"D:\\\\workspace\\\\wage_management_system - bak\\\\test-reports-2026-10\\\\evidence\\\\harness\\\\ci-w0-e04-t5-final\\\\coverage.json\", \"routes_stdout\": \"D:\\\\workspace\\\\wage_management_system - bak\\\\test-reports-2026-10\\\\evidence\\\\harness\\\\ci-w0-e04-t5-final\\\\route_inventory.stdout.txt\"}, \"code\": 0}",
+   "note": "报告型脚本产物的判据层（A-63：直接进 blocking）",
+   "coverage_json": "test-reports-2026-10/evidence/harness/ci-w0-e04-t5-final/coverage.json"
+  }
+ ],
+ "blocking_failed": [],
+ "report_only_failed": [],
+ "root_json_untouched": {
+  "ok": true,
+  "before": {
+   "_smoke_results.json": {
+    "exists": true,
+    "sha256": "D301835F077D2EDFFCB5DA4469C87A23C594D1E9EC75010594C3A812466A9762"
+   },
+   "_permission_matrix.json": {
+    "exists": true,
+    "sha256": "999A01209A8A56BBE7CF1FB5842FE4991762A91683DF97621650B11068B67C19"
+   }
+  },
+  "after": {
+   "_smoke_results.json": {
+    "exists": true,
+    "sha256": "D301835F077D2EDFFCB5DA4469C87A23C594D1E9EC75010594C3A812466A9762"
+   },
+   "_permission_matrix.json": {
+    "exists": true,
+    "sha256": "999A01209A8A56BBE7CF1FB5842FE4991762A91683DF97621650B11068B67C19"
+   }
+  },
+  "frozen_reference": {
+   "_smoke_results.json": "D301835F077D2EDFFCB5DA4469C87A23C594D1E9EC75010594C3A812466A9762",
+   "_permission_matrix.json": "999A01209A8A56BBE7CF1FB5842FE4991762A91683DF97621650B11068B67C19"
+  },
+  "note": "A-11：CI 里禁止跑会写仓库根 JSON 的形态；请求型步骤一律 --no-dump"
+ },
+ "exit_code_semantics": {
+  "code": 0,
+  "rule": "0 = 全部 blocking 通过; 1 = 有 blocking 失败（或仓库根 JSON 被写）; 2 = 仅 report-only 失败",
+  "inputs": {
+   "blocking_failed": [],
+   "report_only_failed": [],
+   "root_json_untouched": true
+  }
+ },
+ "promotion_note": "smoke_test 自 <待晋升日期> 起升为 blocking（A-63 第二步：观测 1 轮构建后）"
+}
+
+====================================================================================================
+## E-04-a 同版本 --phase second（smoke_test 晋升为 blocking）
+## run_id=w0-e04-t5-second；真实退出码 0
+====================================================================================================
+[ci_gates] OK   check_templates        group=blocking    exit=0 checks 5/5
+[ci_gates] OK   check_migration_heads  group=blocking    exit=0 checks 4/4
+[ci_gates] OK   check_properties       group=blocking    exit=0 checks 3/3
+[ci_gates] OK   check_db_bootstrap     group=blocking    exit=0 checks 4/4
+[ci_gates]   run_gates exit=1（A-62：环境依赖探针不匹配时为 1，属预期）
+[ci_gates]   env-probe route_inventory_native_probe: native_exit=0 expected=1 verdict=unexpected
+[ci_gates] OK   run_gates              group=blocking    exit=1 checks 4/4
+[ci_gates] OK   functional_test        group=blocking    exit=0 checks 2/2
+[ci_gates] OK   permission_matrix      group=blocking    exit=0 checks 3/3
+[ci_gates] OK   smoke_test             group=blocking    exit=0 checks 3/3
+[ci_gates] OK   route_inventory        group=report-only exit=0 checks 3/3
+[ci_gates] OK   measure_coverage       group=report-only exit=0 checks 1/1
+[ci_gates] OK   coverage_drift         group=blocking    exit=0 checks 2/2
+[ci_gates] blocking 失败 = 无
+[ci_gates] report-only 失败 = 无
+[ci_gates] 仓库根两 JSON 未被触碰 = True（A-11）
+[ci_gates] exit = 0  phase=second
+[ci_gates] exit_code_semantics={"code": 0, "rule": "0 = 全部 blocking 通过; 1 = 有 blocking 失败（或仓库根 JSON 被写）; 2 = 仅 report-only 失败", "inputs": {"blocking_failed": [], "report_only_failed": [], "root_json_untouched": true}}
+[ci_gates] JSON -> test-reports-2026-10\evidence\harness\ci-w0-e04-t5-second\ci_gates.json
+[ci_gates] 原始输出已落盘（写入守卫 + 台账）-> D:\workspace\wage_management_system - bak\test-reports-2026-10\evidence\harness\ci-w0-e04-t5-second\ci_gates_second.console.txt
+
+====================================================================================================
+## E-04-b 破坏实验：合成坏树（模板使用未登记 capability）
+## 不改生产代码/模板：合成树 = app/permissions.py + app/main/routes.py + app/templates/** 的真实副本 + 注入 __e04_undeclared_probe.html；check_templates 副本置于 <树>/scripts/ 使其 ROOT=合成树
+====================================================================================================
+========================================================================================
+[e04-b] run_id=ci-w0-e04-t5-broken  合成坏树 = D:\workspace\wage_management_system - bak\test-reports-2026-10\.tmp\ci-w0-e04-t5-broken\broken_tree
+[e04-b] 注入：app/templates/__e04_undeclared_probe.html 使用未登记 capability __e04_undeclared_capability__
+----------------------------------------------------------------------------------------
+[e04-b] 1) check_templates（合成坏树）exit=1
+--- stdout ---
+[templates] parsed 88 files
+[permissions] 44 declared / 41 used in templates / 35 used on routes
+  UNKNOWN CAPABILITY  __e04_undeclared_capability__  <- __e04_undeclared_probe.html:2
+[landing] 5 role landing endpoints
+  BROKEN ENDPOINT  inspector -> main.quality_management (未找到视图函数 quality_management)
+RESULT: FAIL
+--- stderr ---
+
+----------------------------------------------------------------------------------------
+[e04-b] 2) CI 入口（ci_gates.py --only check_templates）exit=1  <== 期望 1
+--- stdout ---
+[ci_gates] FAIL check_templates        group=blocking    exit=1 checks 1/5
+[ci_gates]      !! expects [templates] parsed 87 files
+[ci_gates]      !! expects [permissions] 44 declared / 40 used in templates / 44 used on routes
+[ci_gates]      !! expects RESULT: OK
+[ci_gates]      !! exit exit == 0
+[ci_gates] blocking 失败 = ['check_templates']
+[ci_gates] report-only 失败 = 无
+[ci_gates] 仓库根两 JSON 未被触碰 = True（A-11）
+[ci_gates] exit = 1  phase=first
+[ci_gates] exit_code_semantics={"code": 1, "rule": "0 = 全部 blocking 通过; 1 = 有 blocking 失败（或仓库根 JSON 被写）; 2 = 仅 report-only 失败", "inputs": {"blocking_failed": ["check_templates"], "report_only_failed": [], "root_json_untouched": true}}
+[ci_gates] JSON -> D:\workspace\wage_management_system - bak\test-reports-2026-10\evidence\harness\ci-w0-e04-t5-broken\ci_gates_broken.json
+[ci_gates] 原始输出已落盘（写入守卫 + 台账）-> D:\workspace\wage_management_system - bak\test-reports-2026-10\evidence\harness\ci-w0-e04-t5-broken\ci_gates_first.console.txt
+--- ci_gates.json 关键字段 ---
+{
+ "blocking_failed": [
+  "check_templates"
+ ],
+ "report_only_failed": [],
+ "exit_code_semantics": {
+  "code": 1,
+  "rule": "0 = 全部 blocking 通过; 1 = 有 blocking 失败（或仓库根 JSON 被写）; 2 = 仅 report-only 失败",
+  "inputs": {
+   "blocking_failed": [
+    "check_templates"
+   ],
+   "report_only_failed": [],
+   "root_json_untouched": true
+  }
+ },
+ "step_status": {
+  "check_templates": "failed"
+ }
+}
+[e04-b] 定位断言：
+   - 合成树 check_templates exit != 0: True
+   - 输出指名注入的 capability: True
+   - CI 入口红灯（exit 1）: True
+   - CI 入口定位到 check_templates: True
+[e04-b] 原始输出已落盘（写入守卫 + 台账）-> D:\workspace\wage_management_system - bak\test-reports-2026-10\evidence\harness\ci-w0-e04-t5-broken\e04b_broken_tree.txt
+[e04-b] 破坏实验判决 = PASS
+
+====================================================================================================
+## E-04-c workflow YAML：yaml.safe_load（PyYAML 6.0.3，临时装入 .tmp，未改环境）
+====================================================================================================
+[ci_lint] workflow = .github/workflows/docker-deploy.yml
+[ci_lint] YAML 校验手段 = yaml.safe_load (PyYAML 6.0.3)
+[ci_lint] Jenkinsfile = Jenkinsfile（本机无 Groovy/JVM => 结构化 lint；真解析限制已登记）
+  [OK  ] L-W1 yaml.safe_load 解析成功且含 name/on/jobs  -- jobs=['gate', 'build-and-push']
+  [OK  ] L-W2 gate job 调用 ci_gates.py  -- run='\n\npython -m pip install --upgrade pip && python -m pip install -r requirements.txt\nif [ ! -f test-reports-2026-10/harness/ci_gates.py ]; then\n  echo "::warning:'
+  [OK  ] L-W3 gate job 上传 ci_gates.json 产物  -- steps=7
+  [OK  ] L-W4 第一阶段：build-and-push 无 needs（gate 不阻塞发布）  -- needs=None
+  [OK  ] L-W5 第一阶段：gate 为 continue-on-error: true（report-only）  -- continue-on-error=True
+  [OK  ] L-J1 括号/引号/注释配平（结构化 lint）  -- 括号/引号配平
+  [OK  ] L-J2 声明式必需块齐备（pipeline/agent/stages/post）
+  [OK  ] L-J3 无制表符
+  [OK  ] L-J4 存在 E-04 门禁 stage  -- stages=['准备工作', '代码检出', '代码质量检查', '门禁检查(E-04)', '停止现有服务', '备份数据', '部署应用', '安装依赖', '数据库迁移', '配置环境', '启动服务', '健康检查', '清理工作']
+  [OK  ] L-J5 解释器变量 PY_EXE 已声明且为绝对路径
+  [OK  ] L-J6 E-04 stage 调用 ci_gates.py 且带 --phase/--json  -- len(e04)=2456
+  [OK  ] L-J7 E-04 stage 使用绝对路径解释器（A-7）
+  [OK  ] L-J8 E-04 stage 解释评分支（0/1/2）并归档 JSON
+  [OK  ] L-J9 第一阶段：blocking 失败记 UNSTABLE 且 error() 在注释中（第二阶段启用位）
+  [OK  ] L-J10 E-04 stage 不写仓库根 JSON（A-11）
+  [OK  ] L-P1 清单里每个仓库相对脚本都存在（13 个）  -- 缺失=无
+  [OK  ] L-P2 三处配置真引用的相对路径都存在（2 个）  -- 缺失=无
+  [OK  ] L-P4 预留接入位（W7：check_model_refs/check_http_contract）以注释形式登记在 ci_gates.py  -- found=['check_model_refs', 'check_http_contract']
+  [OK  ] L-P3 t4 已提供 --no-dump（permission_matrix / smoke_test）  -- {'permission_matrix.py': True, 'smoke_test.py': True}
+[ci_lint] 判定 = OK（19/19 项通过）
+[ci_lint] exit_code_semantics={"script": "test-reports-2026-10/harness/ci_lint.py", "rule": "all checks passed -> exit 0; any failed -> exit 1", "inputs": {"failed_checks": [], "phase": "first", "yaml_validator": "yaml.safe_load (PyYAML 6.0.3)"}, "code": 0}
+
+====================================================================================================
+## E-04-c 兜底：本机无 PyYAML 时的子集 lint（同一 19 项检查）
+====================================================================================================
+[ci_lint] workflow = .github/workflows/docker-deploy.yml
+[ci_lint] YAML 校验手段 = subset-lint（本机未安装 PyYAML，A-6 环境事实）
+[ci_lint] Jenkinsfile = Jenkinsfile（本机无 Groovy/JVM => 结构化 lint；真解析限制已登记）
+  [OK  ] L-W1 子集 lint（无 PyYAML 兜底）  -- ok
+  [OK  ] L-W2 gate job 调用 ci_gates.py
+  [OK  ] L-W3 gate job 上传 ci_gates.json 产物
+  [OK  ] L-W4 第一阶段：build-and-push 无 needs
+  [OK  ] L-W5 第一阶段：gate 为 continue-on-error: true
+  [OK  ] L-J1 括号/引号/注释配平（结构化 lint）  -- 括号/引号配平
+  [OK  ] L-J2 声明式必需块齐备（pipeline/agent/stages/post）
+  [OK  ] L-J3 无制表符
+  [OK  ] L-J4 存在 E-04 门禁 stage  -- stages=['准备工作', '代码检出', '代码质量检查', '门禁检查(E-04)', '停止现有服务', '备份数据', '部署应用', '安装依赖', '数据库迁移', '配置环境', '启动服务', '健康检查', '清理工作']
+  [OK  ] L-J5 解释器变量 PY_EXE 已声明且为绝对路径
+  [OK  ] L-J6 E-04 stage 调用 ci_gates.py 且带 --phase/--json  -- len(e04)=2456
+  [OK  ] L-J7 E-04 stage 使用绝对路径解释器（A-7）
+  [OK  ] L-J8 E-04 stage 解释评分支（0/1/2）并归档 JSON
+  [OK  ] L-J9 第一阶段：blocking 失败记 UNSTABLE 且 error() 在注释中（第二阶段启用位）
+  [OK  ] L-J10 E-04 stage 不写仓库根 JSON（A-11）
+  [OK  ] L-P1 清单里每个仓库相对脚本都存在（13 个）  -- 缺失=无
+  [OK  ] L-P2 三处配置真引用的相对路径都存在（2 个）  -- 缺失=无
+  [OK  ] L-P4 预留接入位（W7：check_model_refs/check_http_contract）以注释形式登记在 ci_gates.py  -- found=['check_model_refs', 'check_http_contract']
+  [OK  ] L-P3 t4 已提供 --no-dump（permission_matrix / smoke_test）  -- {'permission_matrix.py': True, 'smoke_test.py': True}
+[ci_lint] 判定 = OK（19/19 项通过）
+[ci_lint] exit_code_semantics={"script": "test-reports-2026-10/harness/ci_lint.py", "rule": "all checks passed -> exit 0; any failed -> exit 1", "inputs": {"failed_checks": [], "phase": "first", "yaml_validator": "subset-lint（本机未安装 PyYAML，A-6 环境事实）"}, "code": 0}
+
+====================================================================================================
+## E-04-c 第二阶段核对：phase second 未生效项（= 晋升待办清单）
+## 退出码 1 属预期：L-W4/L-W5/L-J9 是第二阶段的改动项，第一阶段应当"未生效"
+====================================================================================================
+[ci_lint] workflow = .github/workflows/docker-deploy.yml
+[ci_lint] YAML 校验手段 = yaml.safe_load (PyYAML 6.0.3)
+[ci_lint] Jenkinsfile = Jenkinsfile（本机无 Groovy/JVM => 结构化 lint；真解析限制已登记）
+  [OK  ] L-W1 yaml.safe_load 解析成功且含 name/on/jobs  -- jobs=['gate', 'build-and-push']
+  [OK  ] L-W2 gate job 调用 ci_gates.py  -- run='\n\npython -m pip install --upgrade pip && python -m pip install -r requirements.txt\nif [ ! -f test-reports-2026-10/harness/ci_gates.py ]; then\n  echo "::warning:'
+  [OK  ] L-W3 gate job 上传 ci_gates.json 产物  -- steps=7
+  [FAIL] L-W4 第二阶段：build-and-push needs gate  -- needs=None
+  [FAIL] L-W5 第二阶段：gate 不 continue-on-error  -- continue-on-error=True
+  [OK  ] L-J1 括号/引号/注释配平（结构化 lint）  -- 括号/引号配平
+  [OK  ] L-J2 声明式必需块齐备（pipeline/agent/stages/post）
+  [OK  ] L-J3 无制表符
+  [OK  ] L-J4 存在 E-04 门禁 stage  -- stages=['准备工作', '代码检出', '代码质量检查', '门禁检查(E-04)', '停止现有服务', '备份数据', '部署应用', '安装依赖', '数据库迁移', '配置环境', '启动服务', '健康检查', '清理工作']
+  [OK  ] L-J5 解释器变量 PY_EXE 已声明且为绝对路径
+  [OK  ] L-J6 E-04 stage 调用 ci_gates.py 且带 --phase/--json  -- len(e04)=2456
+  [OK  ] L-J7 E-04 stage 使用绝对路径解释器（A-7）
+  [OK  ] L-J8 E-04 stage 解释评分支（0/1/2）并归档 JSON
+  [FAIL] L-J9 第二阶段：blocking 失败即 error()（阻塞构建）
+  [OK  ] L-J10 E-04 stage 不写仓库根 JSON（A-11）
+  [OK  ] L-P1 清单里每个仓库相对脚本都存在（13 个）  -- 缺失=无
+  [OK  ] L-P2 三处配置真引用的相对路径都存在（2 个）  -- 缺失=无
+  [OK  ] L-P4 预留接入位（W7：check_model_refs/check_http_contract）以注释形式登记在 ci_gates.py  -- found=['check_model_refs', 'check_http_contract']
+  [OK  ] L-P3 t4 已提供 --no-dump（permission_matrix / smoke_test）  -- {'permission_matrix.py': True, 'smoke_test.py': True}
+[ci_lint] 判定 = FAIL（16/19 项通过）
+[ci_lint] exit_code_semantics={"script": "test-reports-2026-10/harness/ci_lint.py", "rule": "all checks passed -> exit 0; any failed -> exit 1", "inputs": {"failed_checks": ["L-W4", "L-W5", "L-J9"], "phase": "second", "yaml_validator": "yaml.safe_load (PyYAML 6.0.3)"}, "code": 1}
+
+====================================================================================================
+## E-04-b 前置：门禁入口缺失守卫（cmd 实测；Jenkins bat 分支）
+====================================================================================================
+--- 入口存在（应 errorlevel 0 = 继续）---
+
+--- 入口缺失（应 errorlevel 3 = 由 Groovy 记 UNSTABLE，第二阶段改 error()）---
+[E-04] missing
+
+====================================================================================================
+## ci_gates.json 关键字段 · ci-w0-e04-t5-final
+====================================================================================================
+{
+ "run": "ci-w0-e04-t5-final",
+ "phase": "first",
+ "exit_code": 0,
+ "blocking_failed": [],
+ "report_only_failed": [],
+ "root_json_untouched": true,
+ "exit_code_semantics": {
+  "code": 0,
+  "rule": "0 = 全部 blocking 通过; 1 = 有 blocking 失败（或仓库根 JSON 被写）; 2 = 仅 report-only 失败",
+  "inputs": {
+   "blocking_failed": [],
+   "report_only_failed": [],
+   "root_json_untouched": true
+  }
+ },
+ "promotion_note": "smoke_test 自 <待晋升日期> 起升为 blocking（A-63 第二步：观测 1 轮构建后）",
+ "steps": {
+  "check_templates": {
+   "group": "blocking",
+   "exit": 0,
+   "status": "passed",
+   "checks_passed": 5,
+   "checks_total": 5
+  },
+  "check_migration_heads": {
+   "group": "blocking",
+   "exit": 0,
+   "status": "passed",
+   "checks_passed": 4,
+   "checks_total": 4
+  },
+  "check_properties": {
+   "group": "blocking",
+   "exit": 0,
+   "status": "passed",
+   "checks_passed": 3,
+   "checks_total": 3
+  },
+  "check_db_bootstrap": {
+   "group": "blocking",
+   "exit": 0,
+   "status": "passed",
+   "checks_passed": 4,
+   "checks_total": 4
+  },
+  "run_gates": {
+   "group": "blocking",
+   "exit": 1,
+   "status": "passed",
+   "checks_passed": 4,
+   "checks_total": 4
+  },
+  "functional_test": {
+   "group": "blocking",
+   "exit": 0,
+   "status": "passed",
+   "checks_passed": 2,
+   "checks_total": 2
+  },
+  "permission_matrix": {
+   "group": "blocking",
+   "exit": 0,
+   "status": "passed",
+   "checks_passed": 3,
+   "checks_total": 3
+  },
+  "smoke_test": {
+   "group": "report-only",
+   "exit": 0,
+   "status": "passed",
+   "checks_passed": 3,
+   "checks_total": 3
+  },
+  "route_inventory": {
+   "group": "report-only",
+   "exit": 0,
+   "status": "passed",
+   "checks_passed": 3,
+   "checks_total": 3
+  },
+  "measure_coverage": {
+   "group": "report-only",
+   "exit": 0,
+   "status": "passed",
+   "checks_passed": 1,
+   "checks_total": 1
+  },
+  "coverage_drift": {
+   "group": "blocking",
+   "exit": 0,
+   "status": "passed",
+   "checks_passed": 2,
+   "checks_total": 2
+  }
+ }
+}
+
+====================================================================================================
+## ci_gates.json 关键字段 · ci-w0-e04-t5-second
+====================================================================================================
+{
+ "run": "ci-w0-e04-t5-second",
+ "phase": "second",
+ "exit_code": 0,
+ "blocking_failed": [],
+ "report_only_failed": [],
+ "root_json_untouched": true,
+ "exit_code_semantics": {
+  "code": 0,
+  "rule": "0 = 全部 blocking 通过; 1 = 有 blocking 失败（或仓库根 JSON 被写）; 2 = 仅 report-only 失败",
+  "inputs": {
+   "blocking_failed": [],
+   "report_only_failed": [],
+   "root_json_untouched": true
+  }
+ },
+ "promotion_note": "smoke_test 自 <待晋升日期> 起升为 blocking（A-63 第二步：观测 1 轮构建后）",
+ "steps": {
+  "check_templates": {
+   "group": "blocking",
+   "exit": 0,
+   "status": "passed",
+   "checks_passed": 5,
+   "checks_total": 5
+  },
+  "check_migration_heads": {
+   "group": "blocking",
+   "exit": 0,
+   "status": "passed",
+   "checks_passed": 4,
+   "checks_total": 4
+  },
+  "check_properties": {
+   "group": "blocking",
+   "exit": 0,
+   "status": "passed",
+   "checks_passed": 3,
+   "checks_total": 3
+  },
+  "check_db_bootstrap": {
+   "group": "blocking",
+   "exit": 0,
+   "status": "passed",
+   "checks_passed": 4,
+   "checks_total": 4
+  },
+  "run_gates": {
+   "group": "blocking",
+   "exit": 1,
+   "status": "passed",
+   "checks_passed": 4,
+   "checks_total": 4
+  },
+  "functional_test": {
+   "group": "blocking",
+   "exit": 0,
+   "status": "passed",
+   "checks_passed": 2,
+   "checks_total": 2
+  },
+  "permission_matrix": {
+   "group": "blocking",
+   "exit": 0,
+   "status": "passed",
+   "checks_passed": 3,
+   "checks_total": 3
+  },
+  "smoke_test": {
+   "group": "blocking",
+   "exit": 0,
+   "status": "passed",
+   "checks_passed": 3,
+   "checks_total": 3
+  },
+  "route_inventory": {
+   "group": "report-only",
+   "exit": 0,
+   "status": "passed",
+   "checks_passed": 3,
+   "checks_total": 3
+  },
+  "measure_coverage": {
+   "group": "report-only",
+   "exit": 0,
+   "status": "passed",
+   "checks_passed": 1,
+   "checks_total": 1
+  },
+  "coverage_drift": {
+   "group": "blocking",
+   "exit": 0,
+   "status": "passed",
+   "checks_passed": 2,
+   "checks_total": 2
+  }
+ }
+}
+
+====================================================================================================
+## ci_gates.json 关键字段 · ci-w0-e04-t5-broken
+====================================================================================================
+{
+ "run": "ci-w0-e04-t5-broken",
+ "phase": "first",
+ "exit_code": 1,
+ "blocking_failed": [
+  "check_templates"
+ ],
+ "report_only_failed": [],
+ "root_json_untouched": true,
+ "exit_code_semantics": {
+  "code": 1,
+  "rule": "0 = 全部 blocking 通过; 1 = 有 blocking 失败（或仓库根 JSON 被写）; 2 = 仅 report-only 失败",
+  "inputs": {
+   "blocking_failed": [
+    "check_templates"
+   ],
+   "report_only_failed": [],
+   "root_json_untouched": true
+  }
+ },
+ "promotion_note": "smoke_test 自 <待晋升日期> 起升为 blocking（A-63 第二步：观测 1 轮构建后）",
+ "steps": {
+  "check_templates": {
+   "group": "blocking",
+   "exit": 1,
+   "status": "failed",
+   "checks_passed": 1,
+   "checks_total": 5
+  }
+ }
+}
+
+====================================================================================================
+## AGENTS.md 四项静态门禁（exit 0 x4）
+====================================================================================================
+--- scripts/check_templates.py ---
+[templates] parsed 87 files
+[permissions] 44 declared / 40 used in templates / 44 used on routes
+[landing] 5 role landing endpoints
+RESULT: OK
+--- scripts/check_migration_heads.py ---
+HEADS=['p1nonctarget']
+head_count=1  revisions=35
+OK: 单一 head p1nonctarget
+--- scripts/check_properties.py ---
+已扫描 23 个文件，模型类 74 个
+RESULT: OK（未发现把 @property / 不存在的列当数据库列用）
+--- scripts/route_inventory.py ---
+[routes] total rules=271
+[routes] duplicate (method,path) registrations=0
+[routes] GET no-arg=104 GET with-arg=56 non-GET=110
+  GET  /
+  GET  /add_process_price
+  GET  /api/chart-data/department
+  GET  /api/chart-data/production
+  GET  /api/chart-data/salary
+  GET  /api/chart-data/task
+  GET  /api/consumable-categories
+  GET  /api/customers/search
+  GET  /api/inventory/consumables
+  GET  /api/inventory/finished-products
+  GET  /api/inventory/raw-materials
+  GET  /api/materials/search
+  GET  /api/notifications/recent
+  GET  /api/notifications/stats
+  GET  /api/process_assignment
+  GET  /api/products/drawings-by-name
+  GET  /api/products/names
+  GET  /api/products/search
+  GET  /api/quality/finished-products
+  GET  /api/quality/inspectors
+  GET  /api/quality/processes
+  GET  /api/quality/production-records
+  GET  /api/quality/records
+  GET  /api/quality/records/export
+  GET  /api/quality/tasks
+  GET  /api/quality/tasks/export
+  GET  /api/quality/tasks/template
+  GET  /api/quality/templates
+  GET  /api/raw-material-categories
+  GET  /api/sales_orders/search
+  GET  /api/search/suggestions
+  GET  /assembly
+  GET  /audit_logs
+  GET  /auth/
+  GET  /auth/login
+  GET  /auth/logout
+  GET  /auth/register
+  GET  /bonus_penalties
+  GET  /bonus_penalties/export
+  GET  /bonus_penalties/template
+  GET  /code_rules
+  GET  /code_rules/add
+  GET  /code_rules/available/material
+  GET  /code_rules/available/product
+  GET  /consumables
+  GET  /consumables/categories
+  GET  /consumables/inbound
+  GET  /customer/add
+  GET  /customers
+  GET  /employee/add
+  GET  /employees
+  GET  /employees/export
+  GET  /employees/template
+  GET  /equipment
+  GET  /export_tasks
+  GET  /heat_lots
+  GET  /inventory
+  GET  /inventory/finished-product/inbound
+  GET  /inventory/inbound
+  GET  /inventory/raw-material/categories
+  GET  /inventory/raw-material/inbound
+  GET  /inventory/template
+  GET  /inventory_counts
+  GET  /inventory_counts/add
+  GET  /material_requisitions
+  GET  /material_requisitions/add
+  GET  /material_returns
+  GET  /material_returns/add
+  GET  /my_tasks
+  GET  /notification_rules
+  GET  /notification_rules/add
+  GET  /notifications
+  GET  /process_assignment
+  GET  /process_prices
+  GET  /process_prices/export
+  GET  /process_prices/template
+  GET  /production_center
+  GET  /production_orders
+  GET  /production_records
+  GET  /production_records/export
+  GET  /production_records/template
+  GET  /products
+  GET  /products/export
+  GET  /products/template
+  GET  /purchase_orders
+  GET  /purchase_requisitions
+  GET  /quality
+  GET  /quality/nonconformities
+  GET  /quality/records
+  GET  /quality/tasks
+  GET  /quality/templates
+  GET  /salary_calculation
+  GET  /sales_order/add
+  GET  /sales_orders
+  GET  /search
+  GET  /search/advanced
+  GET  /shipments
+  GET  /suppliers
+  GET  /system_configs
+  GET  /tasks
+  GET  /tasks/template
+  GET  /user_dashboard
+  GET  /work_centers
+  GET  /workpieces
+--- GET with args ---
+  GET  /api/customers/<int:customer_id>/addresses <- ['customer_id']
+  GET  /api/material_requisitions/<int:id>/issued-items <- ['id']
+  GET  /api/process_assignment/<int:process_id> <- ['process_id']
+  GET  /api/production_center/items/<int:item_id>/detail <- ['item_id']
+  GET  /api/quality/records/<int:record_id> <- ['record_id']
+  GET  /api/quality/records/<int:record_id>/print <- ['record_id']
+  GET  /api/quality/tasks/<int:task_id> <- ['task_id']
+  GET  /api/quality/templates/<int:template_id> <- ['template_id']
+  GET  /api/sales_orders/<int:order_id>/customer_addresses <- ['order_id']
+  GET  /assembly/<int:product_id> <- ['product_id']
+  GET  /bonus_penalties/<int:id> <- ['id']
+  GET  /bootstrap/static/<path:filename> <- ['filename']
+  GET  /code_rules/<int:rule_id>/edit <- ['rule_id']
+  GET  /consumables/<int:id> <- ['id']
+  GET  /consumables/categories/<int:category_id> <- ['category_id']
+  GET  /customer/<int:customer_id> <- ['customer_id']
+  GET  /customer/<int:customer_id>/address/<int:address_id>/edit <- ['address_id', 'customer_id']
+  GET  /customer/<int:customer_id>/address/add <- ['customer_id']
+  GET  /customer/<int:customer_id>/edit <- ['customer_id']
+  GET  /employee_salary_changes/<int:employee_id> <- ['employee_id']
+  GET  /employees/<int:id>/edit <- ['id']
+  GET  /equipment/<int:id>/layout <- ['id']
+  GET  /heat_lots/<int:id> <- ['id']
+  GET  /inventory/finished/<int:id> <- ['id']
+  GET  /inventory/raw-material/categories/<int:category_id> <- ['category_id']
+  GET  /inventory/raw/<int:id> <- ['id']
+  GET  /inventory_counts/<int:id> <- ['id']
+  GET  /material_requisitions/<int:id> <- ['id']
+  GET  /material_returns/<int:id> <- ['id']
+  GET  /process_prices/<int:id> <- ['id']
+  GET  /process_prices/<int:id>/edit <- ['id']
+  GET  /production_batches/<int:batch_id> <- ['batch_id']
+  GET  /production_center/items/<int:item_id> <- ['item_id']
+  GET  /production_orders/<int:order_id> <- ['order_id']
+  GET  /production_orders/<int:order_id>/edit <- ['order_id']
+  GET  /products/<int:id> <- ['id']
+  GET  /products/<int:id>/bom <- ['id']
+  GET  /products/<int:product_id>/bom/<int:bom_item_id> <- ['bom_item_id', 'product_id']
+  GET  /products/<int:product_id>/processes <- ['product_id']
+  GET  /products/<int:product_id>/processes/<int:process_item_id> <- ['process_item_id', 'product_id']
+  GET  /purchase_orders/<int:id> <- ['id']
+  GET  /quality/inspection/<int:record_id> <- ['record_id']
+  GET  /quality/tasks/<int:task_id> <- ['task_id']
+  GET  /salary/<int:employee_id> <- ['employee_id']
+  GET  /sales_order/<int:order_id> <- ['order_id']
+  GET  /sales_order/<int:order_id>/edit <- ['order_id']
+  GET  /sales_order/<int:order_id>/item/add <- ['order_id']
+  GET  /sales_order_item/<int:item_id>/delivery_batches <- ['item_id']
+  GET  /sales_order_item/<int:item_id>/delivery_batches/manage <- ['item_id']
+  GET  /sales_order_item/<int:item_id>/edit <- ['item_id']
+  GET  /shipments/<int:id> <- ['id']
+  GET  /stock/<kind> <- ['kind']
+  GET  /tasks/<int:id> <- ['id']
+  GET  /tasks/<int:id>/get <- ['id']
+  GET  /tasks/assignment/<int:id> <- ['id']
+  GET  /workpieces/<int:id> <- ['id']
+--- non-GET ---
+  ---  /add_salary_change
+  ---  /api/process_assignment/<int:process_id>
+  ---  /api/process_assignment/bulk
+  ---  /api/production/generate-codes
+  ---  /api/production_center/create_instances
+  ---  /api/production_center/items/<int:item_id>/execute_operation
+  ---  /api/production_center/items/<int:item_id>/tech_decomposition
+  ---  /api/quality/nonconformities/<int:id>/dispose
+  ---  /api/quality/records/<int:record_id>/submit
+  ---  /api/quality/tasks
+  ---  /api/quality/tasks/<int:task_id>
+  ---  /api/quality/tasks/<int:task_id>/start-inspection
+  ---  /api/quality/tasks/import
+  ---  /api/quality/templates
+  ---  /api/quality/templates/<int:template_id>
+  ---  /audit_logs/rollback/<int:log_id>
+  ---  /bonus_penalties/<int:id>/edit
+  ---  /bonus_penalties/<int:id>/update
+  ---  /bonus_penalties/add
+  ---  /bonus_penalties/import
+  ---  /bonus_penalty/<int:id>
+  ---  /code_rules/<int:rule_id>/delete
+  ---  /code_rules/<int:rule_id>/generate
+  ---  /consumables/<int:id>
+  ---  /consumables/<int:id>
+  ---  /consumables/<int:id>/use
+  ---  /consumables/categories/<int:category_id>
+  ---  /consumables/categories/<int:category_id>
+  ---  /consumables/categories/add
+  ---  /customer/<int:customer_id>/address/<int:address_id>/delete
+  ---  /customer/<int:customer_id>/address/<int:address_id>/set_primary
+  ---  /customer/<int:customer_id>/delete
+  ---  /delete_production_record/<int:id>
+  ---  /delete_salary_change
+  ---  /employee/<int:id>
+  ---  /employees/import
+  ---  /equipment/<int:id>/downtime
+  ---  /equipment/<int:id>/resume
+  ---  /equipment/save
+  ---  /goods_receipts/<int:id>/nonconformity
+  ---  /goods_receipts/<int:id>/putaway
+  ---  /heat_lots/<int:id>/charge
+  ---  /heat_lots/<int:id>/fire
+  ---  /heat_lots/<int:id>/unload
+  ---  /heat_lots/create
+  ---  /inventory/auto-archive
+  ---  /inventory/finished/<int:id>
+  ---  /inventory/finished/<int:id>
+  ---  /inventory/finished/<int:id>/archive
+  ---  /inventory/finished/add
+  ---  /inventory/finished/import
+  ---  /inventory/raw-material/categories/<int:category_id>
+  ---  /inventory/raw-material/categories/<int:category_id>
+  ---  /inventory/raw-material/categories/add
+  ---  /inventory/raw/<int:id>
+  ---  /inventory/raw/<int:id>
+  ---  /inventory/raw/<int:id>/archive
+  ---  /inventory/raw/add
+  ---  /inventory/raw/import
+  ---  /inventory_counts/<int:id>/cancel
+  ---  /inventory_counts/<int:id>/complete
+  ---  /inventory_counts/<int:id>/record
+  ---  /inventory_counts/<int:id>/start
+  ---  /material_requisitions/<int:id>/approve
+  ---  /material_requisitions/<int:id>/cancel
+  ---  /material_requisitions/<int:id>/issue
+  ---  /material_requisitions/<int:id>/reject
+  ---  /material_returns/<int:id>/confirm
+  ---  /material_returns/<int:id>/reject
+  ---  /notifications/<int:notification_id>/read
+  ---  /process_price/<int:id>
+  ---  /process_prices/import
+  ---  /production_batch_items/<int:item_id>/update
+  ---  /production_batches/<int:batch_id>/status
+  ---  /production_orders/<int:order_id>
+  ---  /production_orders/<int:order_id>/batches/add
+  ---  /production_orders/add
+  ---  /production_records/import
+  ---  /products/<int:id>
+  ---  /products/<int:id>
+  ---  /products/<int:product_id>/bom/<int:bom_item_id>
+  ---  /products/<int:product_id>/bom/<int:bom_item_id>
+  ---  /products/<int:product_id>/bom/add
+  ---  /products/<int:product_id>/processes/<int:process_item_id>
+  ---  /products/<int:product_id>/processes/<int:process_item_id>
+  ---  /products/<int:product_id>/processes/add
+  ---  /products/add
+  ---  /products/import
+  ---  /purchase_orders/<int:id>/receive
+  ---  /purchase_orders/<int:id>/settle
+  ---  /purchase_orders/save
+  ---  /purchase_requisitions/<int:id>/approve
+  ---  /purchase_requisitions/<int:id>/convert
+  ---  /purchase_requisitions/save
+  ---  /sales_order/<int:order_id>/create_production_order
+  ---  /sales_order/<int:order_id>/delete
+  ---  /sales_order_item/<int:item_id>/create_production_order
+  ---  /sales_order_item/<int:item_id>/delete
+  ---  /search/quick
+  ---  /shipments/<int:id>/add_item
+  ---  /shipments/<int:id>/ship
+  ---  /shipments/<int:id>/sign
+  ---  /shipments/create
+  ---  /suppliers/save
+  ---  /tasks/<int:id>
+  ---  /tasks/<int:id>/edit
+  ---  /tasks/<int:id>/update_status
+  ---  /tasks/add
+  ---  /tasks/import
+  ---  /work_centers/save
+[e03] exit_code_semantics={"script": "scripts/route_inventory.py", "class": "报告型（无判据语义 => 恒 exit 0，E-03/A-30）", "in_gate_chain": false, "consumer": "test-reports-2026-10/harness/coverage_drift.py（解析 stdout/JSON 做漂移检测）", "code": 0}
+
+====================================================================================================
+## 真实库复核
+====================================================================================================
+F5DA2306BC31CBAB098AAD3774016D320A9B9AA3546F93418196AE9900E0F065  app.db（ci_gates 的每个子进程跑前跑后亦复核 real_db_unchanged=True）
+
+====================================================================================================
+## evidence_hash.py --freeze / --strict-index（终验）· 汇总行
+====================================================================================================
+[evidence_hash] 解释器 F:\Miniconda\envs\wage\python.exe
+[evidence_hash] 仓库根 D:\workspace\wage_management_system - bak
+[evidence_hash] run_id=w0-e04-t5-freeze  模式=freeze
+[evidence_hash] strict_coverage=on（A-50 判据：索引快照未覆盖本目录文件 ⇒ 违规）
+[evidence_hash] 模式=verify run_id=w0-e04-t5-freeze
+[evidence_hash] 证据根 D:\workspace\wage_management_system - bak\test-reports-2026-10\evidence
+[evidence_hash] 基线文件数=806  当前文件数=796  改写=4  删除=10  流水损坏=0  新增(允许)=0  覆盖缺项=0  幽灵条目=2
+[evidence_hash] 每目录索引自检：114/114 目录「快照并集」覆盖本目录全部非索引文件
+[evidence_hash] 判定 = VIOLATION（退出码 1）
+[evidence_hash] 解释器 F:\Miniconda\envs\wage\python.exe
+[evidence_hash] 仓库根 D:\workspace\wage_management_system - bak
+[evidence_hash] run_id=w0-e04-t5-verify  模式=verify
+[evidence_hash] strict_coverage=on（A-50 判据：索引快照未覆盖本目录文件 ⇒ 违规）
+[evidence_hash] 模式=verify run_id=w0-e04-t5-verify
+[evidence_hash] 证据根 D:\workspace\wage_management_system - bak\test-reports-2026-10\evidence
+[evidence_hash] 基线文件数=806  当前文件数=796  改写=4  删除=10  流水损坏=0  新增(允许)=0  覆盖缺项=0  幽灵条目=2
+[evidence_hash] 每目录索引自检：114/114 目录「快照并集」覆盖本目录全部非索引文件
+[evidence_hash] 判定 = VIOLATION（退出码 1）
+
+====================================================================================================
+## 交付物指纹（SHA256）
+====================================================================================================
+Jenkinsfile                                                bytes= 19181 lines= 461 sha256=C9F9C8937CE58D2DE89D19DF9546CD1D89313562DCF1531BB20B24AB5028D4A6
+.github/workflows/docker-deploy.yml                        bytes=  2797 lines=  83 sha256=75AE67B8391944671E4E5266BF5ADE6F681B2895AE7DB6EB89DEFE253E03A5E5
+test-reports-2026-10/harness/ci_gates.py                   bytes= 18045 lines= 319 sha256=A86AF0DECF9858730A74908622633EAF939550F562FBD66DA18C915A93E0AC62
+test-reports-2026-10/harness/ci_lint.py                    bytes= 15506 lines= 332 sha256=792756FBD079EAEABC5E5373D98480792222B15397A6E217605C41965008D4D3
+

@@ -1,0 +1,1018 @@
+================================================================================
+24 - P-01 fix + TL-01 gate (check_model_refs) : RAW CONSOLE OUTPUT
+repo   : D:\workspace\wage_management_system - bak
+hint   : commands are listed in 24-P01修复说明.md section 10
+note   : all console lines of the new scripts are ASCII-safe (A-14/A-60);
+         Chinese appears only in files written as UTF-8 (evidence/report).
+================================================================================
+
+
+================================================================================
+### probe round 3 -- A/B (git HEAD tree vs worktree) + gate four groups
+### source: test-reports-2026-10/evidence/harness/w1-p01-t6-final3/w1-p01-transcript.txt
+================================================================================
+
+==============================================================================
+[w1_p01_probe] RUN_ID=w1-p01-t6-final3 scenario=all started=2026-10-07 13:57:36
+[w1_p01_probe] repo=D:\workspace\wage_management_system - bak
+[w1_p01_probe] interpreter=F:\Miniconda\envs\wage\python.exe
+[real-db] sha256 before = F5DA2306BC31CBAB098AAD3774016D320A9B9AA3546F93418196AE9900E0F065
+==============================================================================
+[prefix] git show exit=0 rev=17e4bf0209a8 bytes=506769 sha256=3A8BCE99D827FD4D6971198252DAE44986A45E4F15F6378A36D7254FBC02D4FF
+[prefix] head  line6 tail = ...ProcessAssignmentMember, SystemConfig, RawMaterialCategory, WorkCenter
+[prefix] worktree line6 tail = ...onfig, RawMaterialCategory, WorkCenter, Consumable, ConsumableCategory (sha256=21E75B282115E824D90EF59A910D19ACE1A7CBC6C6B61655255836EDD9A121EF)
+[inject] synthetic tree = test-reports-2026-10/.tmp/w1-p01-t6-final3/inject/app (1 file, >=1 violation expected)
+
+--- TL-01 gate criteria ---
+  [PASS] TL-01-a pre-fix gate (git HEAD routes.py) -> exit 1 with exactly 2 hits
+         exit=1 violations=2
+  [PASS] TL-01-a pre-fix hits are routes.py:10891 and :10943
+         lines=[10891, 10943]
+  [PASS] TL-01-a after fix gate -> exit 0 with 0 hits
+         exit=0 violations=0
+  [PASS] TL-01-b synthetic injection tree -> exit 1 with >=1 hit (gate goes red)
+         exit=1 violations=1
+  [PASS] TL-01-c --selftest -> exit 0 and 13/13
+         exit=0
+
+[gate:prefix] exit=1 violations=2
+[model_refs] scanned 23 files, name_query_refs 574, violations 2
+found 2 violation(s):
+  test-reports-2026-10\.tmp\w1-p01-t6-final3\prefix\app\main\routes.py:10891  [delete_consumable]  Consumable.query -- no binding for "Consumable" in this module (not a module-level import/assignment/def, not a parameter, not bound inside the function)
+        source: consumable = Consumable.query.get_or_404(id)
+  test-reports-2026-10\.tmp\w1-p01-t6-final3\prefix\app\main\routes.py:10943  [use_consumable]  Consumable.query -- no binding for "Consumable" in this module (not a module-level import/assignment/def, not a parameter, not bound inside the function)
+        source: consumable = Consumable.query.get_or_404(id)
+RESULT: FAIL
+__JSON__{"root": "test-reports-2026-10/.tmp/w1-p01-t6-final3/prefix/app", "scanned_files": 23, "name_query_refs": 574, "violation_count": 2, "violations": [{"file": "D:\\workspace\\wage_management_system - bak\\test-reports-2026-10\\.tmp\\w1-p01-t6-final3\\prefix\\app\\main\\routes.py", "line": 10891, "func": "delete_consumable", "name": "Consumable", "text": "consumable = Consumable.query.get_or_404(id)", "reason": "no binding for \"Consumable\" in this module (not a module-level import/assignment/def, not a parameter, not bound inside the function)"}, {"file": "D:\\workspace\\wage_management_system - bak\\test-reports-2026-10\\.tmp\\w1-p01-t6-final3\\prefix\\app\\main\\routes.py", "line": 10943, "func": "use_consumable", "name": "Consumable", "text": "consumable = Consumable.query.get_or_404(id)", "reason": "no binding for \"Consumable\" in this module (not a module-level import/assignment/def, not a parameter, not bound inside the function)"}], "exit_code": 1}
+
+[gate:fixed] exit=0 violations=0
+[model_refs] scanned 23 files, name_query_refs 574, violations 0
+RESULT: OK
+__JSON__{"root": "app", "scanned_files": 23, "name_query_refs": 574, "violation_count": 0, "violations": [], "exit_code": 0}
+
+[gate:inject] exit=1 violations=1
+[model_refs] scanned 1 files, name_query_refs 1, violations 1
+found 1 violation(s):
+  test-reports-2026-10\.tmp\w1-p01-t6-final3\inject\app\main\injected_missing_name.py:5  [injected_missing_name]  Widget.query -- no binding for "Widget" in this module (not a module-level import/assignment/def, not a parameter, not bound inside the function)
+        source: return Widget.query.get_or_404(oid)
+RESULT: FAIL
+__JSON__{"root": "test-reports-2026-10/.tmp/w1-p01-t6-final3/inject/app", "scanned_files": 1, "name_query_refs": 1, "violation_count": 1, "violations": [{"file": "D:\\workspace\\wage_management_system - bak\\test-reports-2026-10\\.tmp\\w1-p01-t6-final3\\inject\\app\\main\\injected_missing_name.py", "line": 5, "func": "injected_missing_name", "name": "Widget", "text": "return Widget.query.get_or_404(oid)", "reason": "no binding for \"Widget\" in this module (not a module-level import/assignment/def, not a parameter, not bound inside the function)"}], "exit_code": 1}
+
+[gate:selftest] exit=0
+[selftest] synthetic cases (in-memory sources, no filesystem writes): 13
+  [PASS] P1 missing-binding (P-01 original form) -- expected 1 / got 1
+  [PASS] P2 class method with unbound capitalized name -- expected 1 / got 1
+  [PASS] N1 module-level import binds the name -- expected 0 / got 0
+  [PASS] N2 function-level import (existing precedent form) -- expected 0 / got 0
+  [PASS] N3 parameter binding -- expected 0 / got 0
+  [PASS] N4 local assignment binding -- expected 0 / got 0
+  [PASS] N5 module-level assignment binding -- expected 0 / got 0
+  [PASS] N6 module-level class name binding -- expected 0 / got 0
+  [PASS] N7 module-level try/except fallback import -- expected 0 / got 0
+  [PASS] N8 aliased import (as C) -- expected 0 / got 0
+  [PASS] N9 attribute chain M.Consumable.query (not a Name ref) -- expected 0 / got 0
+  [PASS] N10 lowercase name x.query (rule is capitalized only) -- expected 0 / got 0
+  [PASS] N11 nested def name is a local binding -- expected 0 / got 0
+[selftest] result 13/13 all passed
+[request:prefix] tree=D:\workspace\wage_management_system - bak\test-reports-2026-10\.tmp\w1-p01-t6-final3\prefix db_copy_samefile_real=False child_exit=0
+[request:fixed] tree=<repo> db_copy_samefile_real=False child_exit=0
+
+--- P-01 request criteria (pre-fix tree, EXPECTED to show the defect) ---
+  [PASS] (probe self-check) prefix tree really imported: routes module == prefix copy and it has NO module-level Consumable
+         routes_module_file=D:\workspace/wage_management_system - bak/test-reports-2026-10/.tmp/w1-p01-t6-final3/prefix\app\main\routes.py has_Consumable=False
+  [PASS] P-01-r1 (pre-fix) POST use existing -> 500 (or NameError raised)
+         status=500 raised=None body=<!doctype html> | <html lang=en> | <title>500 Internal Server Error</title> | <h1>Internal Server Error</h1> | <p>The se
+  [PASS] P-01-r1 (pre-fix) DELETE existing -> 500 with "not defined" in body
+         status=500 body={"message":"\u5220\u9664\u5931\u8d25\uff1aname 'Consumable' is not defined","success":false} | 
+  [PASS] P-01-r1 (pre-fix) child stderr contains the root cause NameError
+         stderr_has_name_error=True
+  [PASS] P-01-r2 (pre-fix) quantity unchanged 10.0 -> 10.0
+         qty 10.0 -> 10.0
+  [PASS] P-01-r2 (pre-fix) missing id also fails (500 / raised, name lookup first)
+         status=500 raised=None
+  [PASS] P-01-r2 (pre-fix) row NOT deleted (row_after_delete=True)
+         row_after_delete=True
+
+--- P-01 request criteria (after-fix tree) ---
+  [PASS] (probe self-check) worktree app/ imported and module HAS Consumable/ConsumableCategory
+         routes_module_file=D:\workspace\wage_management_system - bak\app\main\routes.py has_Consumable=True has_ConsumableCategory=True
+  [PASS] P-01-a1 POST use existing -> 200 and quantity 10.0 -> 9.0
+         status=200 raised=None qty 10.0 -> 9.0 body={"message":"\u4f7f\u7528\u8bb0\u5f55\u6210\u529f","success":true} | 
+  [PASS] P-01-a2 DELETE existing -> 200 and row gone
+         status=200 raised=None row_after_delete=False body={"message":"\u5220\u9664\u6210\u529f","success":true} | 
+  [PASS] P-01-a3 over-stock (9999 > 10) -> 400 business check, not 5xx
+         status=400 body={"message":"\u4f7f\u7528\u6570\u91cf\u4e0d\u80fd\u8d85\u8fc7\u5e93\u5b58\u6570\u91cf","success":false} | 
+  [PASS] P-01-b use missing id -> 404
+         status=404 body={"message":"\u8d44\u6e90\u4e0d\u5b58\u5728","success":false} | 
+  [PASS] P-01-b delete missing id -> 404
+         status=404 body={"message":"\u8d44\u6e90\u4e0d\u5b58\u5728","success":false} | 
+  [PASS] no NameError text in any fixed-tree response body
+         five bodies checked
+
+[request:prefix] payload={"OK": true, "P01a1_use_existing": {"body_head": "<!doctype html> | <html lang=en> | <title>500 Internal Server Error</title> | <h1>Internal Server Error</h1> | <p>The server encountered an internal error and was unable to complete your request. Either the server is overloaded or there is an error", "method": "POST", "path": "/consumables/1/use", "probe": "P01a1-use-existing", "raised": null, "status": 500}, "P01a2_delete_existing": {"body_head": "{\"message\":\"\\u5220\\u9664\\u5931\\u8d25\\uff1aname 'Consumable' is not defined\",\"success\":false} | ", "method": "DELETE", "path": "/consumables/1", "probe": "P01a2-delete-existing", "raised": null, "status": 500}, "P01a3_use_over_stock": {"body_head": "<!doctype html> | <html lang=en> | <title>500 Internal Server Error</title> | <h1>Internal Server Error</h1> | <p>The server encountered an internal error and was unable to complete your request. Either the server is overloaded or there is an error", "method": "POST", "path": "/consumables/1/use", "probe": "P01a3-use-over-stock", "raised": null, "status": 500}, "P01b_delete_missing": {"body_head": "{\"message\":\"\\u5220\\u9664\\u5931\\u8d25\\uff1aname 'Consumable' is not defined\",\"success\":false} | ", "method": "DELETE", "path": "/consumables/900000002", "probe": "P01b-delete-missing-id", "raised": null, "status": 500}, "P01b_use_missing": {"body_head": "<!doctype html> | <html lang=en> | <title>500 Internal Server Error</title> | <h1>Internal Server Error</h1> | <p>The server encountered an internal error and was unable to complete your request. Either the server is overloaded or there is an error", "method": "POST", "path": "/consumables/900000001/use", "probe": "P01b-use-missing-id", "raised": null, "status": 500}, "consumable_id": 1, "db_copy": "D:/workspace/wage_management_system - bak/test-reports-2026-10/.tmp/w1-p01-t6-final3/db/app_prefix_w1-p01-t6-final3.db", "db_uri": "sqlite:///D:/workspace/wage_management_system - bak/test-reports-2026-10/.tmp/w1-p01-t6-final3/db/app_prefix_w1-p01-t6-final3.db", "login_status": 302, "module_has_Consumable": false, "module_has_ConsumableCategory": false, "qty_after_use": 10.0, "qty_initial": 10.0, "routes_module_file": "D:\\workspace/wage_management_system - bak/test-reports-2026-10/.tmp/w1-p01-t6-final3/prefix\\app\\main\\routes.py", "row_after_delete": true, "tag": "prefix", "tree": "D:/workspace/wage_management_system - bak/test-reports-2026-10/.tmp/w1-p01-t6-final3/prefix"}
+
+[request:fixed]  payload={"OK": true, "P01a1_use_existing": {"body_head": "{\"message\":\"\\u4f7f\\u7528\\u8bb0\\u5f55\\u6210\\u529f\",\"success\":true} | ", "method": "POST", "path": "/consumables/1/use", "probe": "P01a1-use-existing", "raised": null, "status": 200}, "P01a2_delete_existing": {"body_head": "{\"message\":\"\\u5220\\u9664\\u6210\\u529f\",\"success\":true} | ", "method": "DELETE", "path": "/consumables/1", "probe": "P01a2-delete-existing", "raised": null, "status": 200}, "P01a3_use_over_stock": {"body_head": "{\"message\":\"\\u4f7f\\u7528\\u6570\\u91cf\\u4e0d\\u80fd\\u8d85\\u8fc7\\u5e93\\u5b58\\u6570\\u91cf\",\"success\":false} | ", "method": "POST", "path": "/consumables/1/use", "probe": "P01a3-use-over-stock", "raised": null, "status": 400}, "P01b_delete_missing": {"body_head": "{\"message\":\"\\u8d44\\u6e90\\u4e0d\\u5b58\\u5728\",\"success\":false} | ", "method": "DELETE", "path": "/consumables/900000002", "probe": "P01b-delete-missing-id", "raised": null, "status": 404}, "P01b_use_missing": {"body_head": "{\"message\":\"\\u8d44\\u6e90\\u4e0d\\u5b58\\u5728\",\"success\":false} | ", "method": "POST", "path": "/consumables/900000001/use", "probe": "P01b-use-missing-id", "raised": null, "status": 404}, "consumable_id": 1, "db_copy": "D:/workspace/wage_management_system - bak/test-reports-2026-10/.tmp/w1-p01-t6-final3/db/app_fixed_w1-p01-t6-final3.db", "db_uri": "sqlite:///D:/workspace/wage_management_system - bak/test-reports-2026-10/.tmp/w1-p01-t6-final3/db/app_fixed_w1-p01-t6-final3.db", "login_status": 302, "module_has_Consumable": true, "module_has_ConsumableCategory": true, "qty_after_use": 9.0, "qty_initial": 10.0, "routes_module_file": "D:\\workspace\\wage_management_system - bak\\app\\main\\routes.py", "row_after_delete": false, "tag": "fixed", "tree": "<repo worktree>"}
+
+[real-db] sha256 after  = F5DA2306BC31CBAB098AAD3774016D320A9B9AA3546F93418196AE9900E0F065 (unchanged=True)
+
+[verdict] criteria=19 failed=0 => PASS
+
+
+================================================================================
+### probe final round -- three trees (git HEAD / worktree with ONLY line 6 reverted / worktree)
+### source: test-reports-2026-10/evidence/harness/w1-p01-t6-reverify2/w1-p01-transcript.txt
+================================================================================
+
+==============================================================================
+[w1_p01_probe] RUN_ID=w1-p01-t6-reverify2 scenario=all started=2026-10-07 14:01:56
+[w1_p01_probe] repo=D:\workspace\wage_management_system - bak
+[w1_p01_probe] interpreter=F:\Miniconda\envs\wage\python.exe
+[real-db] sha256 before = F5DA2306BC31CBAB098AAD3774016D320A9B9AA3546F93418196AE9900E0F065
+==============================================================================
+[worktree] git HEAD = 17e4bf0209a87f3bb7152f637267027489afbec2
+[worktree] routes.py sha256 = 474143DB4DBE577687930B6B7A4C29DF1682B815F8F2ECDF77614E3ECDD4FCC3
+[worktree] git status --porcelain (18 rows, concurrent writers may appear):
+     M app/__init__.py
+     M app/main/production_center.py
+     M app/main/quality.py
+     M app/main/routes.py
+     M "test-reports-2026-10/00b-\350\243\201\345\256\232\344\270\216\347\272\252\345\276\213\345\242\236\350\241\245.md"
+    ?? docs/test-reports/
+    ?? "docs/\344\272\244\346\216\245\346\217\220\347\244\272\350\257\215-\346\211\271\346\254\2413\345\274\200\345\267\245-2026-10-06.md"
+    ?? "docs/\345\274\200\345\217\221\344\270\216\346\265\213\350\257\225\350\247\204\345\210\222-2026-10-06.md"
+    ?? scripts/check_model_refs.py
+    ?? "test-reports-2026-10/09-W0\345\217\257\344\277\241\345\272\246\345\212\240\345\233\272\350\257\264\346\230\216.\345\216\237\345\247\213\350\276\223\345\207\272.txt"
+    ?? "test-reports-2026-10/18-E02\351\227\250\347\246\201\351\200\200\345\207\272\347\240\201\345\217\257\344\277\241\345\214\226.\345\216\237\345\247\213\350\276\223\345\207\272.txt"
+    ?? "test-reports-2026-10/22-E03\344\270\211\347\261\273\351\200\200\345\207\272\347\240\201\345\210\206\346\265\201.\345\216\237\345\247\213\350\276\223\345\207\272.txt"
+    ?? "test-reports-2026-10/23-E04\351\227\250\347\246\201\350\277\233CI.\345\216\237\345\247\213\350\276\223\345\207\272.txt"
+    ?? "test-reports-2026-10/24-W4\350\275\275\344\275\223\347\231\273\350\256\260\345\206\214.json"
+    ?? test-reports-2026-10/harness/w1_p01_probe.py
+    ?? test-reports-2026-10/harness/w1_p01_regress.py
+    ?? test-reports-2026-10/harness/w4_http_contract.py
+    ?? test-reports-2026-10/harness/w4_probe.py
+[prefix] git show exit=0 rev=17e4bf0209a8 bytes=506769 sha256=3A8BCE99D827FD4D6971198252DAE44986A45E4F15F6378A36D7254FBC02D4FF
+[prefix] head  line6 tail = ...ProcessAssignmentMember, SystemConfig, RawMaterialCategory, WorkCenter
+[prefix] worktree line6 tail = ...onfig, RawMaterialCategory, WorkCenter, Consumable, ConsumableCategory (sha256=474143DB4DBE577687930B6B7A4C29DF1682B815F8F2ECDF77614E3ECDD4FCC3)
+[line6] tree=test-reports-2026-10/.tmp/w1-p01-t6-reverify2/line6 only_line6_differs=True bytes_removed=32
+[line6] worktree tail = ...onfig, RawMaterialCategory, WorkCenter, Consumable, ConsumableCategory
+[line6] reverted tail = ...ProcessAssignmentMember, SystemConfig, RawMaterialCategory, WorkCenter
+[inject] synthetic tree = test-reports-2026-10/.tmp/w1-p01-t6-reverify2/inject/app (1 file, >=1 violation expected)
+
+--- TL-01 gate criteria ---
+  [PASS] TL-01-a pre-fix gate (git HEAD routes.py) -> exit 1 with exactly 2 hits
+         exit=1 violations=2
+  [PASS] TL-01-a pre-fix hits are routes.py:10891 and :10943
+         lines=[10891, 10943]
+  [PASS] TL-01-a (current worktree, only line 6 reverted) gate -> exit 1 with exactly 2 hits in delete_consumable/use_consumable
+         exit=1 violations=2 funcs=['delete_consumable', 'use_consumable'] lines=[10911, 10963]
+  [PASS] TL-01-a after fix gate -> exit 0 with 0 hits
+         exit=0 violations=0
+  [PASS] TL-01-b synthetic injection tree -> exit 1 with >=1 hit (gate goes red)
+         exit=1 violations=1
+  [PASS] TL-01-c --selftest -> exit 0 and 13/13
+         exit=0
+
+[gate:prefix] exit=1 violations=2
+[model_refs] scanned 23 files, name_query_refs 575, violations 2
+found 2 violation(s):
+  test-reports-2026-10\.tmp\w1-p01-t6-reverify2\prefix\app\main\routes.py:10891  [delete_consumable]  Consumable.query -- no binding for "Consumable" in this module (not a module-level import/assignment/def, not a parameter, not bound inside the function)
+        source: consumable = Consumable.query.get_or_404(id)
+  test-reports-2026-10\.tmp\w1-p01-t6-reverify2\prefix\app\main\routes.py:10943  [use_consumable]  Consumable.query -- no binding for "Consumable" in this module (not a module-level import/assignment/def, not a parameter, not bound inside the function)
+        source: consumable = Consumable.query.get_or_404(id)
+RESULT: FAIL
+__JSON__{"root": "test-reports-2026-10/.tmp/w1-p01-t6-reverify2/prefix/app", "scanned_files": 23, "name_query_refs": 575, "violation_count": 2, "violations": [{"file": "D:\\workspace\\wage_management_system - bak\\test-reports-2026-10\\.tmp\\w1-p01-t6-reverify2\\prefix\\app\\main\\routes.py", "line": 10891, "func": "delete_consumable", "name": "Consumable", "text": "consumable = Consumable.query.get_or_404(id)", "reason": "no binding for \"Consumable\" in this module (not a module-level import/assignment/def, not a parameter, not bound inside the function)"}, {"file": "D:\\workspace\\wage_management_system - bak\\test-reports-2026-10\\.tmp\\w1-p01-t6-reverify2\\prefix\\app\\main\\routes.py", "line": 10943, "func": "use_consumable", "name": "Consumable", "text": "consumable = Consumable.query.get_or_404(id)", "reason": "no binding for \"Consumable\" in this module (not a module-level import/assignment/def, not a parameter, not bound inside the function)"}], "exit_code": 1}
+
+[gate:line6] exit=1 violations=2
+[model_refs] scanned 23 files, name_query_refs 575, violations 2
+found 2 violation(s):
+  test-reports-2026-10\.tmp\w1-p01-t6-reverify2\line6\app\main\routes.py:10911  [delete_consumable]  Consumable.query -- no binding for "Consumable" in this module (not a module-level import/assignment/def, not a parameter, not bound inside the function)
+        source: consumable = Consumable.query.get_or_404(id)
+  test-reports-2026-10\.tmp\w1-p01-t6-reverify2\line6\app\main\routes.py:10963  [use_consumable]  Consumable.query -- no binding for "Consumable" in this module (not a module-level import/assignment/def, not a parameter, not bound inside the function)
+        source: consumable = Consumable.query.get_or_404(id)
+RESULT: FAIL
+__JSON__{"root": "test-reports-2026-10/.tmp/w1-p01-t6-reverify2/line6/app", "scanned_files": 23, "name_query_refs": 575, "violation_count": 2, "violations": [{"file": "D:\\workspace\\wage_management_system - bak\\test-reports-2026-10\\.tmp\\w1-p01-t6-reverify2\\line6\\app\\main\\routes.py", "line": 10911, "func": "delete_consumable", "name": "Consumable", "text": "consumable = Consumable.query.get_or_404(id)", "reason": "no binding for \"Consumable\" in this module (not a module-level import/assignment/def, not a parameter, not bound inside the function)"}, {"file": "D:\\workspace\\wage_management_system - bak\\test-reports-2026-10\\.tmp\\w1-p01-t6-reverify2\\line6\\app\\main\\routes.py", "line": 10963, "func": "use_consumable", "name": "Consumable", "text": "consumable = Consumable.query.get_or_404(id)", "reason": "no binding for \"Consumable\" in this module (not a module-level import/assignment/def, not a parameter, not bound inside the function)"}], "exit_code": 1}
+
+[gate:fixed] exit=0 violations=0
+[model_refs] scanned 23 files, name_query_refs 575, violations 0
+RESULT: OK
+__JSON__{"root": "app", "scanned_files": 23, "name_query_refs": 575, "violation_count": 0, "violations": [], "exit_code": 0}
+
+[gate:inject] exit=1 violations=1
+[model_refs] scanned 1 files, name_query_refs 1, violations 1
+found 1 violation(s):
+  test-reports-2026-10\.tmp\w1-p01-t6-reverify2\inject\app\main\injected_missing_name.py:5  [injected_missing_name]  Widget.query -- no binding for "Widget" in this module (not a module-level import/assignment/def, not a parameter, not bound inside the function)
+        source: return Widget.query.get_or_404(oid)
+RESULT: FAIL
+__JSON__{"root": "test-reports-2026-10/.tmp/w1-p01-t6-reverify2/inject/app", "scanned_files": 1, "name_query_refs": 1, "violation_count": 1, "violations": [{"file": "D:\\workspace\\wage_management_system - bak\\test-reports-2026-10\\.tmp\\w1-p01-t6-reverify2\\inject\\app\\main\\injected_missing_name.py", "line": 5, "func": "injected_missing_name", "name": "Widget", "text": "return Widget.query.get_or_404(oid)", "reason": "no binding for \"Widget\" in this module (not a module-level import/assignment/def, not a parameter, not bound inside the function)"}], "exit_code": 1}
+
+[gate:selftest] exit=0
+[selftest] synthetic cases (in-memory sources, no filesystem writes): 13
+  [PASS] P1 missing-binding (P-01 original form) -- expected 1 / got 1
+  [PASS] P2 class method with unbound capitalized name -- expected 1 / got 1
+  [PASS] N1 module-level import binds the name -- expected 0 / got 0
+  [PASS] N2 function-level import (existing precedent form) -- expected 0 / got 0
+  [PASS] N3 parameter binding -- expected 0 / got 0
+  [PASS] N4 local assignment binding -- expected 0 / got 0
+  [PASS] N5 module-level assignment binding -- expected 0 / got 0
+  [PASS] N6 module-level class name binding -- expected 0 / got 0
+  [PASS] N7 module-level try/except fallback import -- expected 0 / got 0
+  [PASS] N8 aliased import (as C) -- expected 0 / got 0
+  [PASS] N9 attribute chain M.Consumable.query (not a Name ref) -- expected 0 / got 0
+  [PASS] N10 lowercase name x.query (rule is capitalized only) -- expected 0 / got 0
+  [PASS] N11 nested def name is a local binding -- expected 0 / got 0
+[selftest] result 13/13 all passed
+[request:prefix] tree=D:\workspace\wage_management_system - bak\test-reports-2026-10\.tmp\w1-p01-t6-reverify2\prefix db_copy_samefile_real=False child_exit=0
+[request:line6] tree=D:\workspace\wage_management_system - bak\test-reports-2026-10\.tmp\w1-p01-t6-reverify2\line6 db_copy_samefile_real=False child_exit=0
+[request:fixed] tree=<repo> db_copy_samefile_real=False child_exit=0
+
+--- P-01 request criteria (pre-fix tree = git HEAD routes.py) ---
+  [PASS] (probe self-check) (pre-fix tree = git HEAD routes.py) tree really imported: routes module under that tree and it has NO module-level Consumable
+         routes_module_file=D:\workspace/wage_management_system - bak/test-reports-2026-10/.tmp/w1-p01-t6-reverify2/prefix\app\main\routes.py has_Consumable=False
+  [PASS] P-01-r1 (pre-fix tree = git HEAD routes.py): POST use existing -> 500 (or NameError raised)
+         status=500 raised=None body={"message":"The server encountered an internal error and was unable to complete your request. Either the server is overl
+  [PASS] P-01-r1 (pre-fix tree = git HEAD routes.py): DELETE existing -> 500 (root cause in body)
+         status=500 body={"message":"\u5220\u9664\u5931\u8d25\uff1aname 'Consumable' is not defined","success":false} | 
+  [PASS] P-01-r1 (pre-fix tree = git HEAD routes.py): child stderr contains the root cause NameError
+         stderr_has_name_error=True
+  [PASS] P-01-r2 (pre-fix tree = git HEAD routes.py): quantity unchanged 10.0 -> 10.0
+         qty 10.0 -> 10.0
+  [PASS] P-01-r2 (pre-fix tree = git HEAD routes.py): missing id also fails (500 / raised, name lookup first)
+         status=500 raised=None
+  [PASS] P-01-r2 (pre-fix tree = git HEAD routes.py): row NOT deleted (row_after_delete=True)
+         row_after_delete=True
+
+--- P-01 request criteria (current worktree, ONLY line 6 reverted) ---
+  [PASS] (probe self-check) (current worktree with ONLY line 6 reverted) tree really imported: routes module under that tree and it has NO module-level Consumable
+         routes_module_file=D:\workspace/wage_management_system - bak/test-reports-2026-10/.tmp/w1-p01-t6-reverify2/line6\app\main\routes.py has_Consumable=False
+  [PASS] P-01-r1 (current worktree with ONLY line 6 reverted): POST use existing -> 500 (or NameError raised)
+         status=500 raised=None body={"message":"The server encountered an internal error and was unable to complete your request. Either the server is overl
+  [PASS] P-01-r1 (current worktree with ONLY line 6 reverted): DELETE existing -> 500 (root cause in body, or masked with root cause logged)
+         status=500 body={"message":"\u5220\u9664\u5931\u8d25\uff0c\u8bf7\u7a0d\u540e\u91cd\u8bd5\u6216\u8054\u7cfb\u7ba1\u7406\u5458","success":false} | 
+  [PASS] P-01-r1 (current worktree with ONLY line 6 reverted): child stderr contains the root cause NameError
+         stderr_has_name_error=True
+  [PASS] P-01-r2 (current worktree with ONLY line 6 reverted): quantity unchanged 10.0 -> 10.0
+         qty 10.0 -> 10.0
+  [PASS] P-01-r2 (current worktree with ONLY line 6 reverted): missing id also fails (500 / raised, name lookup first)
+         status=500 raised=None
+  [PASS] P-01-r2 (current worktree with ONLY line 6 reverted): row NOT deleted (row_after_delete=True)
+         row_after_delete=True
+
+--- P-01 request criteria (after-fix tree = current worktree) ---
+  [PASS] (probe self-check) worktree app/ imported and module HAS Consumable/ConsumableCategory
+         routes_module_file=D:\workspace\wage_management_system - bak\app\main\routes.py has_Consumable=True has_ConsumableCategory=True
+  [PASS] P-01-a1 POST use existing -> 200 and quantity 10.0 -> 9.0
+         status=200 raised=None qty 10.0 -> 9.0 body={"message":"\u4f7f\u7528\u8bb0\u5f55\u6210\u529f","success":true} | 
+  [PASS] P-01-a2 DELETE existing -> 200 and row gone
+         status=200 raised=None row_after_delete=False body={"message":"\u5220\u9664\u6210\u529f","success":true} | 
+  [PASS] P-01-a3 over-stock (9999 > 10) -> 400 business check, not 5xx
+         status=400 body={"message":"\u4f7f\u7528\u6570\u91cf\u4e0d\u80fd\u8d85\u8fc7\u5e93\u5b58\u6570\u91cf","success":false} | 
+  [PASS] P-01-b use missing id -> 404
+         status=404 body={"message":"\u8d44\u6e90\u4e0d\u5b58\u5728","success":false} | 
+  [PASS] P-01-b delete missing id -> 404
+         status=404 body={"message":"\u8d44\u6e90\u4e0d\u5b58\u5728","success":false} | 
+  [PASS] no NameError text in any fixed-tree response body
+         five bodies checked
+
+[request:prefix] payload={"OK": true, "P01a1_use_existing": {"body_head": "{\"message\":\"The server encountered an internal error and was unable to complete your request. Either the server is overloaded or there is an error in the application.\",\"success\":false} | ", "method": "POST", "path": "/consumables/1/use", "probe": "P01a1-use-existing", "raised": null, "status": 500}, "P01a2_delete_existing": {"body_head": "{\"message\":\"\\u5220\\u9664\\u5931\\u8d25\\uff1aname 'Consumable' is not defined\",\"success\":false} | ", "method": "DELETE", "path": "/consumables/1", "probe": "P01a2-delete-existing", "raised": null, "status": 500}, "P01a3_use_over_stock": {"body_head": "{\"message\":\"The server encountered an internal error and was unable to complete your request. Either the server is overloaded or there is an error in the application.\",\"success\":false} | ", "method": "POST", "path": "/consumables/1/use", "probe": "P01a3-use-over-stock", "raised": null, "status": 500}, "P01b_delete_missing": {"body_head": "{\"message\":\"\\u5220\\u9664\\u5931\\u8d25\\uff1aname 'Consumable' is not defined\",\"success\":false} | ", "method": "DELETE", "path": "/consumables/900000002", "probe": "P01b-delete-missing-id", "raised": null, "status": 500}, "P01b_use_missing": {"body_head": "{\"message\":\"The server encountered an internal error and was unable to complete your request. Either the server is overloaded or there is an error in the application.\",\"success\":false} | ", "method": "POST", "path": "/consumables/900000001/use", "probe": "P01b-use-missing-id", "raised": null, "status": 500}, "consumable_id": 1, "db_copy": "D:/workspace/wage_management_system - bak/test-reports-2026-10/.tmp/w1-p01-t6-reverify2/db/app_prefix_w1-p01-t6-reverify2.db", "db_uri": "sqlite:///D:/workspace/wage_management_system - bak/test-reports-2026-10/.tmp/w1-p01-t6-reverify2/db/app_prefix_w1-p01-t6-reverify2.db", "login_status": 302, "module_has_Consumable": false, "module_has_ConsumableCategory": false, "qty_after_use": 10.0, "qty_initial": 10.0, "routes_module_file": "D:\\workspace/wage_management_system - bak/test-reports-2026-10/.tmp/w1-p01-t6-reverify2/prefix\\app\\main\\routes.py", "row_after_delete": true, "tag": "prefix", "tree": "D:/workspace/wage_management_system - bak/test-reports-2026-10/.tmp/w1-p01-t6-reverify2/prefix"}
+
+[request:line6]  payload={"OK": true, "P01a1_use_existing": {"body_head": "{\"message\":\"The server encountered an internal error and was unable to complete your request. Either the server is overloaded or there is an error in the application.\",\"success\":false} | ", "method": "POST", "path": "/consumables/1/use", "probe": "P01a1-use-existing", "raised": null, "status": 500}, "P01a2_delete_existing": {"body_head": "{\"message\":\"\\u5220\\u9664\\u5931\\u8d25\\uff0c\\u8bf7\\u7a0d\\u540e\\u91cd\\u8bd5\\u6216\\u8054\\u7cfb\\u7ba1\\u7406\\u5458\",\"success\":false} | ", "method": "DELETE", "path": "/consumables/1", "probe": "P01a2-delete-existing", "raised": null, "status": 500}, "P01a3_use_over_stock": {"body_head": "{\"message\":\"The server encountered an internal error and was unable to complete your request. Either the server is overloaded or there is an error in the application.\",\"success\":false} | ", "method": "POST", "path": "/consumables/1/use", "probe": "P01a3-use-over-stock", "raised": null, "status": 500}, "P01b_delete_missing": {"body_head": "{\"message\":\"\\u5220\\u9664\\u5931\\u8d25\\uff0c\\u8bf7\\u7a0d\\u540e\\u91cd\\u8bd5\\u6216\\u8054\\u7cfb\\u7ba1\\u7406\\u5458\",\"success\":false} | ", "method": "DELETE", "path": "/consumables/900000002", "probe": "P01b-delete-missing-id", "raised": null, "status": 500}, "P01b_use_missing": {"body_head": "{\"message\":\"The server encountered an internal error and was unable to complete your request. Either the server is overloaded or there is an error in the application.\",\"success\":false} | ", "method": "POST", "path": "/consumables/900000001/use", "probe": "P01b-use-missing-id", "raised": null, "status": 500}, "consumable_id": 1, "db_copy": "D:/workspace/wage_management_system - bak/test-reports-2026-10/.tmp/w1-p01-t6-reverify2/db/app_line6_w1-p01-t6-reverify2.db", "db_uri": "sqlite:///D:/workspace/wage_management_system - bak/test-reports-2026-10/.tmp/w1-p01-t6-reverify2/db/app_line6_w1-p01-t6-reverify2.db", "login_status": 302, "module_has_Consumable": false, "module_has_ConsumableCategory": false, "qty_after_use": 10.0, "qty_initial": 10.0, "routes_module_file": "D:\\workspace/wage_management_system - bak/test-reports-2026-10/.tmp/w1-p01-t6-reverify2/line6\\app\\main\\routes.py", "row_after_delete": true, "tag": "line6", "tree": "D:/workspace/wage_management_system - bak/test-reports-2026-10/.tmp/w1-p01-t6-reverify2/line6"}
+
+[request:fixed]  payload={"OK": true, "P01a1_use_existing": {"body_head": "{\"message\":\"\\u4f7f\\u7528\\u8bb0\\u5f55\\u6210\\u529f\",\"success\":true} | ", "method": "POST", "path": "/consumables/1/use", "probe": "P01a1-use-existing", "raised": null, "status": 200}, "P01a2_delete_existing": {"body_head": "{\"message\":\"\\u5220\\u9664\\u6210\\u529f\",\"success\":true} | ", "method": "DELETE", "path": "/consumables/1", "probe": "P01a2-delete-existing", "raised": null, "status": 200}, "P01a3_use_over_stock": {"body_head": "{\"message\":\"\\u4f7f\\u7528\\u6570\\u91cf\\u4e0d\\u80fd\\u8d85\\u8fc7\\u5e93\\u5b58\\u6570\\u91cf\",\"success\":false} | ", "method": "POST", "path": "/consumables/1/use", "probe": "P01a3-use-over-stock", "raised": null, "status": 400}, "P01b_delete_missing": {"body_head": "{\"message\":\"\\u8d44\\u6e90\\u4e0d\\u5b58\\u5728\",\"success\":false} | ", "method": "DELETE", "path": "/consumables/900000002", "probe": "P01b-delete-missing-id", "raised": null, "status": 404}, "P01b_use_missing": {"body_head": "{\"message\":\"\\u8d44\\u6e90\\u4e0d\\u5b58\\u5728\",\"success\":false} | ", "method": "POST", "path": "/consumables/900000001/use", "probe": "P01b-use-missing-id", "raised": null, "status": 404}, "consumable_id": 1, "db_copy": "D:/workspace/wage_management_system - bak/test-reports-2026-10/.tmp/w1-p01-t6-reverify2/db/app_fixed_w1-p01-t6-reverify2.db", "db_uri": "sqlite:///D:/workspace/wage_management_system - bak/test-reports-2026-10/.tmp/w1-p01-t6-reverify2/db/app_fixed_w1-p01-t6-reverify2.db", "login_status": 302, "module_has_Consumable": true, "module_has_ConsumableCategory": true, "qty_after_use": 9.0, "qty_initial": 10.0, "routes_module_file": "D:\\workspace\\wage_management_system - bak\\app\\main\\routes.py", "row_after_delete": false, "tag": "fixed", "tree": "<repo worktree>"}
+
+[real-db] sha256 after  = F5DA2306BC31CBAB098AAD3774016D320A9B9AA3546F93418196AE9900E0F065 (unchanged=True)
+
+[verdict] criteria=27 failed=0 => PASS
+
+
+================================================================================
+### regressions (six captain requirements, --run-heavy, current worktree)
+### source: test-reports-2026-10/evidence/harness/w1-p01-t6-regress3/w1-p01-regress-transcript.txt
+================================================================================
+
+==============================================================================
+[w1_p01_regress] RUN_ID=w1-p01-t6-regress3 run_heavy=True
+[w1_p01_regress] real db sha256 before = F5DA2306BC31CBAB098AAD3774016D320A9B9AA3546F93418196AE9900E0F065
+==============================================================================
+
+[static:check_templates] exit=0 ok=True missing=[]
+[templates] parsed 87 files
+[permissions] 44 declared / 40 used in templates / 44 used on routes
+[landing] 5 role landing endpoints
+RESULT: OK
+
+[static:check_migration_heads] exit=0 ok=True missing=[]
+HEADS=['p1nonctarget']
+head_count=1  revisions=35
+OK: 单一 head p1nonctarget
+
+[static:check_properties] exit=0 ok=True missing=[]
+已扫描 23 个文件，模型类 74 个
+RESULT: OK（未发现把 @property / 不存在的列当数据库列用）
+
+[static:check_model_refs] exit=0 ok=True missing=[]
+[model_refs] scanned 23 files, name_query_refs 575, violations 0
+RESULT: OK
+
+[static:route_inventory] exit=0 ok=True missing=[]
+id>
+  ---  /inventory/raw-material/categories/<int:category_id>
+  ---  /inventory/raw-material/categories/add
+  ---  /inventory/raw/<int:id>
+  ---  /inventory/raw/<int:id>
+  ---  /inventory/raw/<int:id>/archive
+  ---  /inventory/raw/add
+  ---  /inventory/raw/import
+  ---  /inventory_counts/<int:id>/cancel
+  ---  /inventory_counts/<int:id>/complete
+  ---  /inventory_counts/<int:id>/record
+  ---  /inventory_counts/<int:id>/start
+  ---  /material_requisitions/<int:id>/approve
+  ---  /material_requisitions/<int:id>/cancel
+  ---  /material_requisitions/<int:id>/issue
+  ---  /material_requisitions/<int:id>/reject
+  ---  /material_returns/<int:id>/confirm
+  ---  /material_returns/<int:id>/reject
+  ---  /notifications/<int:notification_id>/read
+  ---  /process_price/<int:id>
+  ---  /process_prices/import
+  ---  /production_batch_items/<int:item_id>/update
+  ---  /production_batches/<int:batch_id>/status
+  ---  /production_orders/<int:order_id>
+  ---  /production_orders/<int:order_id>/batches/add
+  ---  /production_orders/add
+  ---  /production_records/import
+  ---  /products/<int:id>
+  ---  /products/<int:id>
+  ---  /products/<int:product_id>/bom/<int:bom_item_id>
+  ---  /products/<int:product_id>/bom/<int:bom_item_id>
+  ---  /products/<int:product_id>/bom/add
+  ---  /products/<int:product_id>/processes/<int:process_item_id>
+  ---  /products/<int:product_id>/processes/<int:process_item_id>
+  ---  /products/<int:product_id>/processes/add
+  ---  /products/add
+  ---  /products/import
+  ---  /purchase_orders/<int:id>/receive
+  ---  /purchase_orders/<int:id>/settle
+  ---  /purchase_orders/save
+  ---  /purchase_requisitions/<int:id>/approve
+  ---  /purchase_requisitions/<int:id>/convert
+  ---  /purchase_requisitions/save
+  ---  /sales_order/<int:order_id>/create_production_order
+  ---  /sales_order/<int:order_id>/delete
+  ---  /sales_order_item/<int:item_id>/create_production_order
+  ---  /sales_order_item/<int:item_id>/delete
+  ---  /search/quick
+  ---  /shipments/<int:id>/add_item
+  ---  /shipments/<int:id>/ship
+  ---  /shipments/<int:id>/sign
+  ---  /shipments/create
+  ---  /suppliers/save
+  ---  /tasks/<int:id>
+  ---  /tasks/<int:id>/edit
+  ---  /tasks/<int:id>/update_status
+  ---  /tasks/add
+  ---  /tasks/import
+  ---  /work_centers/save
+[e03] exit_code_semantics={"script": "scripts/route_inventory.py", "class": "报告型（无判据语义 => 恒 exit 0，E-03/A-30）", "in_gate_chain": false, "consumer": "test-reports-2026-10/harness/coverage_drift.py（解析 stdout/JSON 做漂移检测）", "code": 0}
+
+[static:check_db_bootstrap] exit=0 ok=True missing=[]
+种子库账号数（经自举导入到空库）= 64
+首次启动导入 64 个账号，再次启动后 64 个
+无种子库时账号数 = 0
+直接拷贝 6712 行，跳过 0 张表
+OK: 空库自举、幂等、无种子库跳过、整表无遗漏 均通过
+
+[run_gates] summary={"evidence_only": ["route_inventory_native_probe"], "exit_code_informative": 4, "fail": 0, "in_gate_chain": ["check_templates", "check_migration_heads", "check_properties", "check_db_bootstrap"], "pass": 5, "probe_only": 1, "probe_unexpected": 1, "report_only": ["route_inventory"], "sensitivity_ok": null, "total": 6}
+  check_templates                exit=0  verdict=pass       checks=5 identical_to_golden=True
+  check_migration_heads          exit=0  verdict=pass       checks=3 identical_to_golden=True
+  check_properties               exit=0  verdict=pass       checks=2 identical_to_golden=True
+  route_inventory                exit=0  verdict=pass       checks=5 identical_to_golden=True
+  route_inventory_native_probe   exit=0  verdict=unexpected checks=0 identical_to_golden=True
+  check_db_bootstrap             exit=0  verdict=pass       checks=3 identical_to_golden=True
+
+--- regression criteria ---
+  [PASS] R1 functional_test: exit 0 and "109 通过 / 0 失败"
+         source=run-now exit=0 tail=  count = InventoryCount.query.get(cid)
+  [PASS] R static gate check_templates: exit 0 and all expected lines
+         exit=0 missing=[]
+  [PASS] R static gate check_migration_heads: exit 0 and all expected lines
+         exit=0 missing=[]
+  [PASS] R static gate check_properties: exit 0 and all expected lines
+         exit=0 missing=[]
+  [PASS] R static gate check_model_refs: exit 0 and all expected lines
+         exit=0 missing=[]
+  [PASS] R static gate route_inventory: exit 0 and all expected lines
+         exit=0 missing=[]
+  [PASS] R static gate check_db_bootstrap: exit 0 and all expected lines
+         exit=0 missing=[]
+  [PASS] R8 run_gates expected_lock/summary/per-gate checks identical to golden
+         expected_lock=True summary=True semantics=True per_gate=True
+  [PASS] R9 real app.db unchanged and repo-root JSONs byte-identical
+         db F5DA2306BC31 -> F5DA2306BC31 ; root_json_same=True
+
+[verdict] criteria=9 failed=0 => PASS
+
+
+================================================================================
+### regression evidence -- raw stdout of each static gate (utf-8)
+### source: test-reports-2026-10/evidence/harness/w1-p01-t6-regress3/gate_check_templates_native.txt
+================================================================================
+
+# gate=check_templates mode=native exit_code=0 verdict=pass evidence_level=原文可信
+# command: F:\Miniconda\envs\wage\python.exe -B scripts\check_templates.py
+# cwd: D:\workspace\wage_management_system - bak
+# real_db unchanged: True
+--- stdout ---
+[templates] parsed 87 files
+[permissions] 44 declared / 40 used in templates / 44 used on routes
+[landing] 5 role landing endpoints
+RESULT: OK
+
+--- stderr ---
+
+
+================================================================================
+### regression evidence -- check_migration_heads
+### source: test-reports-2026-10/evidence/harness/w1-p01-t6-regress3/gate_check_migration_heads_native.txt
+================================================================================
+
+# gate=check_migration_heads mode=native exit_code=0 verdict=pass evidence_level=原文可信
+# command: F:\Miniconda\envs\wage\python.exe -B scripts\check_migration_heads.py
+# cwd: D:\workspace\wage_management_system - bak
+# real_db unchanged: True
+--- stdout ---
+HEADS=['p1nonctarget']
+head_count=1  revisions=35
+OK: 单一 head p1nonctarget
+
+--- stderr ---
+
+
+================================================================================
+### regression evidence -- check_properties
+### source: test-reports-2026-10/evidence/harness/w1-p01-t6-regress3/gate_check_properties_native.txt
+================================================================================
+
+# gate=check_properties mode=native exit_code=0 verdict=pass evidence_level=原文可信
+# command: F:\Miniconda\envs\wage\python.exe -B scripts\check_properties.py
+# cwd: D:\workspace\wage_management_system - bak
+# real_db unchanged: True
+--- stdout ---
+已扫描 23 个文件，模型类 74 个
+RESULT: OK（未发现把 @property / 不存在的列当数据库列用）
+
+--- stderr ---
+
+
+================================================================================
+### regression evidence -- route_inventory (shim)
+### source: test-reports-2026-10/evidence/harness/w1-p01-t6-regress3/gate_route_inventory_shim.txt
+================================================================================
+
+# gate=route_inventory mode=shim exit_code=0 verdict=pass evidence_level=原文可信
+# command: F:\Miniconda\envs\wage\python.exe -B _sandbox_compat.py route_inventory.py
+# cwd: D:\workspace\wage_management_system - bak\scripts
+# real_db unchanged: True
+--- stdout ---
+[routes] total rules=271
+[routes] duplicate (method,path) registrations=0
+[routes] GET no-arg=104 GET with-arg=56 non-GET=110
+  GET  /
+  GET  /add_process_price
+  GET  /api/chart-data/department
+  GET  /api/chart-data/production
+  GET  /api/chart-data/salary
+  GET  /api/chart-data/task
+  GET  /api/consumable-categories
+  GET  /api/customers/search
+  GET  /api/inventory/consumables
+  GET  /api/inventory/finished-products
+  GET  /api/inventory/raw-materials
+  GET  /api/materials/search
+  GET  /api/notifications/recent
+  GET  /api/notifications/stats
+  GET  /api/process_assignment
+  GET  /api/products/drawings-by-name
+  GET  /api/products/names
+  GET  /api/products/search
+  GET  /api/quality/finished-products
+  GET  /api/quality/inspectors
+  GET  /api/quality/processes
+  GET  /api/quality/production-records
+  GET  /api/quality/records
+  GET  /api/quality/records/export
+  GET  /api/quality/tasks
+  GET  /api/quality/tasks/export
+  GET  /api/quality/tasks/template
+  GET  /api/quality/templates
+  GET  /api/raw-material-categories
+  GET  /api/sales_orders/search
+  GET  /api/search/suggestions
+  GET  /assembly
+  GET  /audit_logs
+  GET  /auth/
+  GET  /auth/login
+  GET  /auth/logout
+  GET  /auth/register
+  GET  /bonus_penalties
+  GET  /bonus_penalties/export
+  GET  /bonus_penalties/template
+  GET  /code_rules
+  GET  /code_rules/add
+  GET  /code_rules/available/material
+  GET  /code_rules/available/product
+  GET  /consumables
+  GET  /consumables/categories
+  GET  /consumables/inbound
+  GET  /customer/add
+  GET  /customers
+  GET  /employee/add
+  GET  /employees
+  GET  /employees/export
+  GET  /employees/template
+  GET  /equipment
+  GET  /export_tasks
+  GET  /heat_lots
+  GET  /inventory
+  GET  /inventory/finished-product/inbound
+  GET  /inventory/inbound
+  GET  /inventory/raw-material/categories
+  GET  /inventory/raw-material/inbound
+  GET  /inventory/template
+  GET  /inventory_counts
+  GET  /inventory_counts/add
+  GET  /material_requisitions
+  GET  /material_requisitions/add
+  GET  /material_returns
+  GET  /material_returns/add
+  GET  /my_tasks
+  GET  /notification_rules
+  GET  /notification_rules/add
+  GET  /notifications
+  GET  /process_assignment
+  GET  /process_prices
+  GET  /process_prices/export
+  GET  /process_prices/template
+  GET  /production_center
+  GET  /production_orders
+  GET  /production_records
+  GET  /production_records/export
+  GET  /production_records/template
+  GET  /products
+  GET  /products/export
+  GET  /products/template
+  GET  /purchase_orders
+  GET  /purchase_requisitions
+  GET  /quality
+  GET  /quality/nonconformities
+  GET  /quality/records
+  GET  /quality/tasks
+  GET  /quality/templates
+  GET  /salary_calculation
+  GET  /sales_order/add
+  GET  /sales_orders
+  GET  /search
+  GET  /search/advanced
+  GET  /shipments
+  GET  /suppliers
+  GET  /system_configs
+  GET  /tasks
+  GET  /tasks/template
+  GET  /user_dashboard
+  GET  /work_centers
+  GET  /workpieces
+--- GET with args ---
+  GET  /api/customers/<int:customer_id>/addresses <- ['customer_id']
+  GET  /api/material_requisitions/<int:id>/issued-items <- ['id']
+  GET  /api/process_assignment/<int:process_id> <- ['process_id']
+  GET  /api/production_center/items/<int:item_id>/detail <- ['item_id']
+  GET  /api/quality/records/<int:record_id> <- ['record_id']
+  GET  /api/quality/records/<int:record_id>/print <- ['record_id']
+  GET  /api/quality/tasks/<int:task_id> <- ['task_id']
+  GET  /api/quality/templates/<int:template_id> <- ['template_id']
+  GET  /api/sales_orders/<int:order_id>/customer_addresses <- ['order_id']
+  GET  /assembly/<int:product_id> <- ['product_id']
+  GET  /bonus_penalties/<int:id> <- ['id']
+  GET  /bootstrap/static/<path:filename> <- ['filename']
+  GET  /code_rules/<int:rule_id>/edit <- ['rule_id']
+  GET  /consumables/<int:id> <- ['id']
+  GET  /consumables/categories/<int:category_id> <- ['category_id']
+  GET  /customer/<int:customer_id> <- ['customer_id']
+  GET  /customer/<int:customer_id>/address/<int:address_id>/edit <- ['address_id', 'customer_id']
+  GET  /customer/<int:customer_id>/address/add <- ['customer_id']
+  GET  /customer/<int:customer_id>/edit <- ['customer_id']
+  GET  /employee_salary_changes/<int:employee_id> <- ['employee_id']
+  GET  /employees/<int:id>/edit <- ['id']
+  GET  /equipment/<int:id>/layout <- ['id']
+  GET  /heat_lots/<int:id> <- ['id']
+  GET  /inventory/finished/<int:id> <- ['id']
+  GET  /inventory/raw-material/categories/<int:category_id> <- ['category_id']
+  GET  /inventory/raw/<int:id> <- ['id']
+  GET  /inventory_counts/<int:id> <- ['id']
+  GET  /material_requisitions/<int:id> <- ['id']
+  GET  /material_returns/<int:id> <- ['id']
+  GET  /process_prices/<int:id> <- ['id']
+  GET  /process_prices/<int:id>/edit <- ['id']
+  GET  /production_batches/<int:batch_id> <- ['batch_id']
+  GET  /production_center/items/<int:item_id> <- ['item_id']
+  GET  /production_orders/<int:order_id> <- ['order_id']
+  GET  /production_orders/<int:order_id>/edit <- ['order_id']
+  GET  /products/<int:id> <- ['id']
+  GET  /products/<int:id>/bom <- ['id']
+  GET  /products/<int:product_id>/bom/<int:bom_item_id> <- ['bom_item_id', 'product_id']
+  GET  /products/<int:product_id>/processes <- ['product_id']
+  GET  /products/<int:product_id>/processes/<int:process_item_id> <- ['process_item_id', 'product_id']
+  GET  /purchase_orders/<int:id> <- ['id']
+  GET  /quality/inspection/<int:record_id> <- ['record_id']
+  GET  /quality/tasks/<int:task_id> <- ['task_id']
+  GET  /salary/<int:employee_id> <- ['employee_id']
+  GET  /sales_order/<int:order_id> <- ['order_id']
+  GET  /sales_order/<int:order_id>/edit <- ['order_id']
+  GET  /sales_order/<int:order_id>/item/add <- ['order_id']
+  GET  /sales_order_item/<int:item_id>/delivery_batches <- ['item_id']
+  GET  /sales_order_item/<int:item_id>/delivery_batches/manage <- ['item_id']
+  GET  /sales_order_item/<int:item_id>/edit <- ['item_id']
+  GET  /shipments/<int:id> <- ['id']
+  GET  /stock/<kind> <- ['kind']
+  GET  /tasks/<int:id> <- ['id']
+  GET  /tasks/<int:id>/get <- ['id']
+  GET  /tasks/assignment/<int:id> <- ['id']
+  GET  /workpieces/<int:id> <- ['id']
+--- non-GET ---
+  ---  /add_salary_change
+  ---  /api/process_assignment/<int:process_id>
+  ---  /api/process_assignment/bulk
+  ---  /api/production/generate-codes
+  ---  /api/production_center/create_instances
+  ---  /api/production_center/items/<int:item_id>/execute_operation
+  ---  /api/production_center/items/<int:item_id>/tech_decomposition
+  ---  /api/quality/nonconformities/<int:id>/dispose
+  ---  /api/quality/records/<int:record_id>/submit
+  ---  /api/quality/tasks
+  ---  /api/quality/tasks/<int:task_id>
+  ---  /api/quality/tasks/<int:task_id>/start-inspection
+  ---  /api/quality/tasks/import
+  ---  /api/quality/templates
+  ---  /api/quality/templates/<int:template_id>
+  ---  /audit_logs/rollback/<int:log_id>
+  ---  /bonus_penalties/<int:id>/edit
+  ---  /bonus_penalties/<int:id>/update
+  ---  /bonus_penalties/add
+  ---  /bonus_penalties/import
+  ---  /bonus_penalty/<int:id>
+  ---  /code_rules/<int:rule_id>/delete
+  ---  /code_rules/<int:rule_id>/generate
+  ---  /consumables/<int:id>
+  ---  /consumables/<int:id>
+  ---  /consumables/<int:id>/use
+  ---  /consumables/categories/<int:category_id>
+  ---  /consumables/categories/<int:category_id>
+  ---  /consumables/categories/add
+  ---  /customer/<int:customer_id>/address/<int:address_id>/delete
+  ---  /customer/<int:customer_id>/address/<int:address_id>/set_primary
+  ---  /customer/<int:customer_id>/delete
+  ---  /delete_production_record/<int:id>
+  ---  /delete_salary_change
+  ---  /employee/<int:id>
+  ---  /employees/import
+  ---  /equipment/<int:id>/downtime
+  ---  /equipment/<int:id>/resume
+  ---  /equipment/save
+  ---  /goods_receipts/<int:id>/nonconformity
+  ---  /goods_receipts/<int:id>/putaway
+  ---  /heat_lots/<int:id>/charge
+  ---  /heat_lots/<int:id>/fire
+  ---  /heat_lots/<int:id>/unload
+  ---  /heat_lots/create
+  ---  /inventory/auto-archive
+  ---  /inventory/finished/<int:id>
+  ---  /inventory/finished/<int:id>
+  ---  /inventory/finished/<int:id>/archive
+  ---  /inventory/finished/add
+  ---  /inventory/finished/import
+  ---  /inventory/raw-material/categories/<int:category_id>
+  ---  /inventory/raw-material/categories/<int:category_id>
+  ---  /inventory/raw-material/categories/add
+  ---  /inventory/raw/<int:id>
+  ---  /inventory/raw/<int:id>
+  ---  /inventory/raw/<int:id>/archive
+  ---  /inventory/raw/add
+  ---  /inventory/raw/import
+  ---  /inventory_counts/<int:id>/cancel
+  ---  /inventory_counts/<int:id>/complete
+  ---  /inventory_counts/<int:id>/record
+  ---  /inventory_counts/<int:id>/start
+  ---  /material_requisitions/<int:id>/approve
+  ---  /material_requisitions/<int:id>/cancel
+  ---  /material_requisitions/<int:id>/issue
+  ---  /material_requisitions/<int:id>/reject
+  ---  /material_returns/<int:id>/confirm
+  ---  /material_returns/<int:id>/reject
+  ---  /notifications/<int:notification_id>/read
+  ---  /process_price/<int:id>
+  ---  /process_prices/import
+  ---  /production_batch_items/<int:item_id>/update
+  ---  /production_batches/<int:batch_id>/status
+  ---  /production_orders/<int:order_id>
+  ---  /production_orders/<int:order_id>/batches/add
+  ---  /production_orders/add
+  ---  /production_records/import
+  ---  /products/<int:id>
+  ---  /products/<int:id>
+  ---  /products/<int:product_id>/bom/<int:bom_item_id>
+  ---  /products/<int:product_id>/bom/<int:bom_item_id>
+  ---  /products/<int:product_id>/bom/add
+  ---  /products/<int:product_id>/processes/<int:process_item_id>
+  ---  /products/<int:product_id>/processes/<int:process_item_id>
+  ---  /products/<int:product_id>/processes/add
+  ---  /products/add
+  ---  /products/import
+  ---  /purchase_orders/<int:id>/receive
+  ---  /purchase_orders/<int:id>/settle
+  ---  /purchase_orders/save
+  ---  /purchase_requisitions/<int:id>/approve
+  ---  /purchase_requisitions/<int:id>/convert
+  ---  /purchase_requisitions/save
+  ---  /sales_order/<int:order_id>/create_production_order
+  ---  /sales_order/<int:order_id>/delete
+  ---  /sales_order_item/<int:item_id>/create_production_order
+  ---  /sales_order_item/<int:item_id>/delete
+  ---  /search/quick
+  ---  /shipments/<int:id>/add_item
+  ---  /shipments/<int:id>/ship
+  ---  /shipments/<int:id>/sign
+  ---  /shipments/create
+  ---  /suppliers/save
+  ---  /tasks/<int:id>
+  ---  /tasks/<int:id>/edit
+  ---  /tasks/<int:id>/update_status
+  ---  /tasks/add
+  ---  /tasks/import
+  ---  /work_centers/save
+[e03] exit_code_semantics={"script": "scripts/route_inventory.py", "class": "报告型（无判据语义 => 恒 exit 0，E-03/A-30）", "in_gate_chain": false, "consumer": "test-reports-2026-10/harness/coverage_drift.py（解析 stdout/JSON 做漂移检测）", "code": 0}
+
+--- stderr ---
+
+
+================================================================================
+### regression evidence -- check_db_bootstrap (shim)
+### source: test-reports-2026-10/evidence/harness/w1-p01-t6-regress3/gate_check_db_bootstrap_shim.txt
+================================================================================
+
+# gate=check_db_bootstrap mode=shim exit_code=0 verdict=pass evidence_level=原文可信
+# command: F:\Miniconda\envs\wage\python.exe -B _sandbox_compat.py check_db_bootstrap.py
+# cwd: D:\workspace\wage_management_system - bak\scripts
+# real_db unchanged: True
+--- stdout ---
+种子库账号数（经自举导入到空库）= 64
+首次启动导入 64 个账号，再次启动后 64 个
+无种子库时账号数 = 0
+直接拷贝 6712 行，跳过 0 张表
+OK: 空库自举、幂等、无种子库跳过、整表无遗漏 均通过
+
+--- stderr ---
+[2026-10-07 14:02:19,863] WARNING in db_bootstrap: 目标库为空，开始从种子库初始化：C:\Users\RICHAR~1\AppData\Local\Temp\bootstrap_check_9mbjp6qf\seed.db
+[2026-10-07 14:02:20,202] WARNING in db_bootstrap: 初始化导入完成，共 6712 行；跳过 0 张表
+[2026-10-07 14:02:21,223] WARNING in db_bootstrap: 目标库为空，开始从种子库初始化：C:\Users\RICHAR~1\AppData\Local\Temp\bootstrap_check_9mbjp6qf\seed.db
+[2026-10-07 14:02:21,596] WARNING in db_bootstrap: 初始化导入完成，共 6712 行；跳过 0 张表
+
+
+================================================================================
+### run_gates comparison vs E-04 golden (ci-w0-e04-t5-final/gates.json)
+### source: test-reports-2026-10/evidence/harness/w1-p01-t6-regress3/w1-p01-run-gates-comparison.json
+================================================================================
+
+{
+ "golden": "test-reports-2026-10/evidence/harness/ci-w0-e04-t5-final/gates.json",
+ "new": "test-reports-2026-10/.tmp/w1-p01-t6-regress3/gates.json",
+ "expected_lock_identical": true,
+ "summary_identical": true,
+ "exit_code_semantics_identical": true,
+ "summary": {
+  "total": 6,
+  "pass": 5,
+  "fail": 0,
+  "probe_only": 1,
+  "probe_unexpected": 1,
+  "exit_code_informative": 4,
+  "in_gate_chain": [
+   "check_templates",
+   "check_migration_heads",
+   "check_properties",
+   "check_db_bootstrap"
+  ],
+  "report_only": [
+   "route_inventory"
+  ],
+  "evidence_only": [
+   "route_inventory_native_probe"
+  ],
+  "sensitivity_ok": null
+ },
+ "new_exit_code": null,
+ "gates": {
+  "check_templates": {
+   "exit_code": 0,
+   "verdict": "pass",
+   "checks": [
+    {
+     "fact": "templates_files",
+     "expected": 87,
+     "actual": 87,
+     "status": "passed"
+    },
+    {
+     "fact": "capabilities_declared",
+     "expected": 44,
+     "actual": 44,
+     "status": "passed"
+    },
+    {
+     "fact": "capabilities_used_templates",
+     "expected": 40,
+     "actual": 40,
+     "status": "passed"
+    },
+    {
+     "fact": "capabilities_used_routes",
+     "expected": 44,
+     "actual": 44,
+     "status": "passed"
+    },
+    {
+     "fact": "landing_endpoints",
+     "expected": 5,
+     "actual": 5,
+     "status": "passed"
+    }
+   ],
+   "identical_to_golden": true
+  },
+  "check_migration_heads": {
+   "exit_code": 0,
+   "verdict": "pass",
+   "checks": [
+    {
+     "fact": "migration_heads",
+     "expected": [
+      "p1nonctarget"
+     ],
+     "actual": [
+      "p1nonctarget"
+     ],
+     "status": "passed"
+    },
+    {
+     "fact": "migration_head_count",
+     "expected": 1,
+     "actual": 1,
+     "status": "passed"
+    },
+    {
+     "fact": "migration_revisions",
+     "expected": 35,
+     "actual": 35,
+     "status": "passed"
+    }
+   ],
+   "identical_to_golden": true
+  },
+  "check_properties": {
+   "exit_code": 0,
+   "verdict": "pass",
+   "checks": [
+    {
+     "fact": "properties_files",
+     "expected": 23,
+     "actual": 23,
+     "status": "passed"
+    },
+    {
+     "fact": "model_classes",
+     "expected": 74,
+     "actual": 74,
+     "status": "passed"
+    }
+   ],
+   "identical_to_golden": true
+  },
+  "route_inventory": {
+   "exit_code": 0,
+   "verdict": "pass",
+   "checks": [
+    {
+     "fact": "routes_total_rules",
+     "expected": 271,
+     "actual": 271,
+     "status": "passed"
+    },
+    {
+     "fact": "routes_dup_method_path",
+     "expected": 0,
+     "actual": 0,
+     "status": "passed"
+    },
+    {
+     "fact": "routes_get_no_arg",
+     "expected": 104,
+     "actual": 104,
+     "status": "passed"
+    },
+    {
+     "fact": "routes_get_with_arg",
+     "expected": 56,
+     "actual": 56,
+     "status": "passed"
+    },
+    {
+     "fact": "routes_non_get",
+     "expected": 110,
+     "actual": 110,
+     "status": "passed"
+    }
+   ],
+   "identical_to_golden": true
+  },
+  "route_inventory_native_probe": {
+   "exit_code": 0,
+   "verdict": "unexpected",
+   "checks": [],
+   "identical_to_golden": true
+  },
+  "check_db_bootstrap": {
+   "exit_code": 0,
+   "verdict": "pass",
+   "checks": [
+    {
+     "fact": "bootstrap_accounts",
+     "expected": 64,
+     "actual": 64,
+     "status": "passed"
+    },
+    {
+     "fact": "bootstrap_copied_rows",
+     "expected": 6712,
+     "actual": 6712,
+     "status": "passed"
+    },
+    {
+     "fact": "bootstrap_skipped_tables",
+     "expected": 0,
+     "actual": 0,
+     "status": "passed"
+    }
+   ],
+   "identical_to_golden": true
+  }
+ },
+ "all_gates_identical": true,
+ "verdict": "pass"
+}
+
+
+================================================================================
+### E-01 audit -- evidence_hash.py --strict-index (pre-freeze)
+### source: test-reports-2026-10/.tmp/t6-scratch/h_strict_pre.txt
+================================================================================
+
+��[ e v i d e n c e _ h a s h ]   �ʑhV  F : \ M i n i c o n d a \ e n v s \ w a g e \ p y t h o n . e x e 
+ 
+ [ e v i d e n c e _ h a s h ]   �N�^9h  D : \ w o r k s p a c e \ w a g e _ m a n a g e m e n t _ s y s t e m   -   b a k 
+ 
+ [ e v i d e n c e _ h a s h ]   r u n _ i d = w 1 - p 0 1 - t 6 - v e r i f y     !j_= v e r i f y 
+ 
+ [ e v i d e n c e _ h a s h ]   s t r i c t _ c o v e r a g e = o n �A - 5 0   $Rnc�"}_�_gq*g���v,g�vU_�e�N  �!  ݏĉ	�
+ 
+... [371 lines total; per-directory [OK] rows omitted -- full output is regenerable with the command in 24-P01修复说明.md section 10]
+
+
+================================================================================
+### E-01 audit -- evidence_hash.py --freeze (append-only snapshots)
+### source: test-reports-2026-10/.tmp/t6-scratch/h_freeze2.txt
+================================================================================
+
+��[ e v i d e n c e _ h a s h ]   �ʑhV  F : \ M i n i c o n d a \ e n v s \ w a g e \ p y t h o n . e x e 
+ 
+ [ e v i d e n c e _ h a s h ]   �N�^9h  D : \ w o r k s p a c e \ w a g e _ m a n a g e m e n t _ s y s t e m   -   b a k 
+ 
+ [ e v i d e n c e _ h a s h ]   r u n _ i d = w 1 - p 0 1 - t 6 - f r e e z e 2     !j_= f r e e z e 
+ 
+ [ e v i d e n c e _ h a s h ]   s t r i c t _ c o v e r a g e = o n �A - 5 0   $Rnc�"}_�_gq*g���v,g�vU_�e�N  �!  ݏĉ	�
+ 
+... [724 lines total; per-directory [OK] rows omitted -- full output is regenerable with the command in 24-P01修复说明.md section 10]
+
+
+================================================================================
+### E-01 audit -- evidence_hash.py --strict-index (post-freeze, final)
+### source: test-reports-2026-10/.tmp/t6-scratch/h_strict_post2.txt
+================================================================================
+
+��[ e v i d e n c e _ h a s h ]   �ʑhV  F : \ M i n i c o n d a \ e n v s \ w a g e \ p y t h o n . e x e 
+ 
+ [ e v i d e n c e _ h a s h ]   �N�^9h  D : \ w o r k s p a c e \ w a g e _ m a n a g e m e n t _ s y s t e m   -   b a k 
+ 
+ [ e v i d e n c e _ h a s h ]   r u n _ i d = w 1 - p 0 1 - t 6 - v e r i f y 3     !j_= v e r i f y 
+ 
+ [ e v i d e n c e _ h a s h ]   s t r i c t _ c o v e r a g e = o n �A - 5 0   $Rnc�"}_�_gq*g���v,g�vU_�e�N  �!  ݏĉ	�
+ 
+... [331 lines total; per-directory [OK] rows omitted -- full output is regenerable with the command in 24-P01修复说明.md section 10]

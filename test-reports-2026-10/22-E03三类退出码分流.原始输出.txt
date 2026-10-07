@@ -1,0 +1,1377 @@
+====================================================================================================
+## 修复前 A/B（逐字节 = git HEAD） · prefix_permx_anon_inject.out.txt
+## 脚本：scripts/permission_matrix.py / scripts/smoke_test.py 的 HEAD 副本；cwd 隔离 ⇒ `../<name>.json` 只落隔离目录，仓库根历史 JSON 未被触碰
+====================================================================================================
+# label: prefix_permx_anon_inject
+# module: scripts/_e03_prefix_permission_matrix.py (pre-fix, byte-identical)
+# 注入：进程内给 app 加一个无校验 GET 路由 /__e03_anon_probe__
+# run() 返回: 0
+--- stdout ---
+=== 匿名可访问（应为 0，登录页/静态资源除外）===
+  /__e03_anon_probe__ [_e03_anon_probe]  guards=None
+
+=== 所有登录角色（含 user/accountant/sales）均可访问 ===
+  / [main.index]  guards=['inline_role_check']
+  /api/notifications/recent [main.api_recent_notifications]  guards=['NONE']
+  /api/notifications/stats [main.api_notification_stats]  guards=['NONE']
+  /my_tasks [main.my_tasks]  guards=['NONE']
+  /notifications [main.manage_notifications]  guards=['NONE']
+  /user_dashboard [main.user_dashboard]  guards=['NONE']
+
+=== 源码上完全没有权限校验的视图（仅 login_required 或更少）===
+  api_notification_stats: ['NONE']
+  api_recent_notifications: ['NONE']
+  manage_notifications: ['NONE']
+  my_tasks: ['NONE']
+  user_dashboard: ['NONE']
+
+完整矩阵已写入 _permission_matrix.json
+
+====================================================================================================
+## 修复前 A/B（逐字节 = git HEAD） · prefix_permx_baseline.out.txt
+## 脚本：scripts/permission_matrix.py / scripts/smoke_test.py 的 HEAD 副本；cwd 隔离 ⇒ `../<name>.json` 只落隔离目录，仓库根历史 JSON 未被触碰
+====================================================================================================
+# label: prefix_permx_baseline
+# script: scripts/_e03_prefix_permission_matrix.py (pre-fix, byte-identical)
+# cwd: D:\workspace\wage_management_system - bak\test-reports-2026-10\.tmp\w0-e03-t4\prefix-ab\fakeroot
+# exit_code: 0
+# duration_s: 8.26
+# real_db_unchanged: True
+# evidence_level: 原文可信
+--- stdout ---
+=== 匿名可访问（应为 0，登录页/静态资源除外）===
+  无
+
+=== 所有登录角色（含 user/accountant/sales）均可访问 ===
+  / [main.index]  guards=['inline_role_check']
+  /api/notifications/recent [main.api_recent_notifications]  guards=['NONE']
+  /api/notifications/stats [main.api_notification_stats]  guards=['NONE']
+  /my_tasks [main.my_tasks]  guards=['NONE']
+  /notifications [main.manage_notifications]  guards=['NONE']
+  /user_dashboard [main.user_dashboard]  guards=['NONE']
+
+=== 源码上完全没有权限校验的视图（仅 login_required 或更少）===
+  api_notification_stats: ['NONE']
+  api_recent_notifications: ['NONE']
+  manage_notifications: ['NONE']
+  my_tasks: ['NONE']
+  user_dashboard: ['NONE']
+
+完整矩阵已写入 _permission_matrix.json
+
+--- stderr ---
+
+====================================================================================================
+## 修复前 A/B（逐字节 = git HEAD） · prefix_permx_write_denied.out.txt
+## 脚本：scripts/permission_matrix.py / scripts/smoke_test.py 的 HEAD 副本；cwd 隔离 ⇒ `../<name>.json` 只落隔离目录，仓库根历史 JSON 未被触碰
+====================================================================================================
+# label: prefix_permx_write_denied
+# script: scripts/_e03_prefix_permission_matrix.py (pre-fix, byte-identical)
+# cwd: D:\workspace\wage_management_system - bak\test-reports-2026-10\.tmp\w0-e03-t4\prefix-ab\fakeroot
+# exit_code: 1
+# duration_s: 8.23
+# real_db_unchanged: True
+# evidence_level: 原文可信
+--- stdout ---
+=== 匿名可访问（应为 0，登录页/静态资源除外）===
+  无
+
+=== 所有登录角色（含 user/accountant/sales）均可访问 ===
+  / [main.index]  guards=['inline_role_check']
+  /api/notifications/recent [main.api_recent_notifications]  guards=['NONE']
+  /api/notifications/stats [main.api_notification_stats]  guards=['NONE']
+  /my_tasks [main.my_tasks]  guards=['NONE']
+  /notifications [main.manage_notifications]  guards=['NONE']
+  /user_dashboard [main.user_dashboard]  guards=['NONE']
+
+=== 源码上完全没有权限校验的视图（仅 login_required 或更少）===
+  api_notification_stats: ['NONE']
+  api_recent_notifications: ['NONE']
+  manage_notifications: ['NONE']
+  my_tasks: ['NONE']
+  user_dashboard: ['NONE']
+
+--- stderr ---
+Traceback (most recent call last):
+  File "D:\workspace\wage_management_system - bak\scripts\_e03_prefix_permission_matrix.py", line 136, in <module>
+    sys.exit(run())
+  File "D:\workspace\wage_management_system - bak\scripts\_e03_prefix_permission_matrix.py", line 129, in run
+    with open('../_permission_matrix.json', 'w', encoding='utf-8') as f:
+PermissionError: [Errno 13] Permission denied: '../_permission_matrix.json'
+
+====================================================================================================
+## 修复前 A/B（逐字节 = git HEAD） · prefix_smoke_baseline.out.txt
+## 脚本：scripts/permission_matrix.py / scripts/smoke_test.py 的 HEAD 副本；cwd 隔离 ⇒ `../<name>.json` 只落隔离目录，仓库根历史 JSON 未被触碰
+====================================================================================================
+# label: prefix_smoke_baseline
+# script: scripts/_e03_prefix_smoke_test.py (pre-fix, byte-identical)
+# cwd: D:\workspace\wage_management_system - bak\test-reports-2026-10\.tmp\w0-e03-t4\prefix-ab\fakeroot
+# exit_code: 0
+# duration_s: 8.2
+# real_db_unchanged: True
+# evidence_level: 原文可信
+--- stdout ---
+[seed] 补齐样本数据: {'ConsumableCategory': 1, 'Consumable': 1, 'CustomerAddress': 1, 'BonusPenalty': 1, 'MaterialRequisition': 1, 'ProductBOM': 1, 'InspectionTemplate': 1, 'InspectionTask': 1, 'InspectionRecord': 1}
+[ids] 参数取值来源:
+   AuditLog                   ok               id=1
+   BonusPenalty               ok               id=1
+   CodeRule                   ok               id=1
+   Consumable                 ok               id=1
+   ConsumableCategory         ok               id=1
+   Customer                   ok               id=1
+   CustomerAddress            ok               id=1
+   Employee                   ok               id=1
+   FinishedProduct            ok               id=1
+   InspectionRecord           ok               id=1
+   InspectionTask             ok               id=1
+   InspectionTemplate         ok               id=1
+   MaterialRequisition        ok               id=1
+   Notification               ok               id=1
+   ProcessPrice               ok               id=1
+   Product                    ok               id=1
+   ProductBOM                 ok               id=1
+   ProductProcess             ok               id=1
+   ProductionBatch            ok               id=1
+   ProductionBatchItem        ok               id=1
+   ProductionOrder            ok               id=1
+   RawMaterial                ok               id=1
+   RawMaterialCategory        ok               id=1
+   SalesOrder                 ok               id=1
+   SalesOrderItem             ok               id=1
+   TaskAssignment             ok               id=1
+
+[plan] 可测 GET 路由 148 条，跳过 9 条
+   SKIP /api/material_requisitions/<int:id>/issued-items  (无法确定 id 的模型)
+   SKIP /equipment/<int:id>/layout  (无法确定 id 的模型)
+   SKIP /heat_lots/<int:id>  (无法确定 id 的模型)
+   SKIP /inventory_counts/<int:id>  (无法确定 id 的模型)
+   SKIP /material_returns/<int:id>  (无法确定 id 的模型)
+   SKIP /purchase_orders/<int:id>  (无法确定 id 的模型)
+   SKIP /shipments/<int:id>  (无法确定 id 的模型)
+   SKIP /stock/<kind>  (无法确定 kind 的模型)
+   SKIP /workpieces/<int:id>  (无法确定 id 的模型)
+[done] anonymous: 148 条
+[done] admin: 148 条
+[done] manager: 148 条
+[done] hr: 148 条
+[done] accountant: 148 条
+[done] inspector: 148 条
+[done] sales: 148 条
+[done] user: 148 条
+
+================ 异常汇总 ================
+无 5xx / 异常 / 重定向死循环
+
+明细已写入 _smoke_results.json（0 个问题）
+
+--- stderr ---
+
+====================================================================================================
+## 修复前 A/B（逐字节 = git HEAD） · prefix_smoke_write_denied.out.txt
+## 脚本：scripts/permission_matrix.py / scripts/smoke_test.py 的 HEAD 副本；cwd 隔离 ⇒ `../<name>.json` 只落隔离目录，仓库根历史 JSON 未被触碰
+====================================================================================================
+# label: prefix_smoke_write_denied
+# script: scripts/_e03_prefix_smoke_test.py (pre-fix, byte-identical)
+# cwd: D:\workspace\wage_management_system - bak\test-reports-2026-10\.tmp\w0-e03-t4\prefix-ab\fakeroot
+# exit_code: 1
+# duration_s: 8.24
+# real_db_unchanged: True
+# evidence_level: 原文可信
+--- stdout ---
+[seed] 补齐样本数据: {'ConsumableCategory': 1, 'Consumable': 1, 'CustomerAddress': 1, 'BonusPenalty': 1, 'MaterialRequisition': 1, 'ProductBOM': 1, 'InspectionTemplate': 1, 'InspectionTask': 1, 'InspectionRecord': 1}
+[ids] 参数取值来源:
+   AuditLog                   ok               id=1
+   BonusPenalty               ok               id=1
+   CodeRule                   ok               id=1
+   Consumable                 ok               id=1
+   ConsumableCategory         ok               id=1
+   Customer                   ok               id=1
+   CustomerAddress            ok               id=1
+   Employee                   ok               id=1
+   FinishedProduct            ok               id=1
+   InspectionRecord           ok               id=1
+   InspectionTask             ok               id=1
+   InspectionTemplate         ok               id=1
+   MaterialRequisition        ok               id=1
+   Notification               ok               id=1
+   ProcessPrice               ok               id=1
+   Product                    ok               id=1
+   ProductBOM                 ok               id=1
+   ProductProcess             ok               id=1
+   ProductionBatch            ok               id=1
+   ProductionBatchItem        ok               id=1
+   ProductionOrder            ok               id=1
+   RawMaterial                ok               id=1
+   RawMaterialCategory        ok               id=1
+   SalesOrder                 ok               id=1
+   SalesOrderItem             ok               id=1
+   TaskAssignment             ok               id=1
+
+[plan] 可测 GET 路由 148 条，跳过 9 条
+   SKIP /api/material_requisitions/<int:id>/issued-items  (无法确定 id 的模型)
+   SKIP /equipment/<int:id>/layout  (无法确定 id 的模型)
+   SKIP /heat_lots/<int:id>  (无法确定 id 的模型)
+   SKIP /inventory_counts/<int:id>  (无法确定 id 的模型)
+   SKIP /material_returns/<int:id>  (无法确定 id 的模型)
+   SKIP /purchase_orders/<int:id>  (无法确定 id 的模型)
+   SKIP /shipments/<int:id>  (无法确定 id 的模型)
+   SKIP /stock/<kind>  (无法确定 kind 的模型)
+   SKIP /workpieces/<int:id>  (无法确定 id 的模型)
+[done] anonymous: 148 条
+[done] admin: 148 条
+[done] manager: 148 条
+[done] hr: 148 条
+[done] accountant: 148 条
+[done] inspector: 148 条
+[done] sales: 148 条
+[done] user: 148 条
+
+================ 异常汇总 ================
+无 5xx / 异常 / 重定向死循环
+
+--- stderr ---
+Traceback (most recent call last):
+  File "D:\workspace\wage_management_system - bak\scripts\_e03_prefix_smoke_test.py", line 194, in <module>
+    sys.exit(run())
+  File "D:\workspace\wage_management_system - bak\scripts\_e03_prefix_smoke_test.py", line 186, in run
+    with open('../_smoke_results.json', 'w', encoding='utf-8') as f:
+PermissionError: [Errno 13] Permission denied: '../_smoke_results.json'
+
+====================================================================================================
+## 修复后 · 场景 permx_normal
+## 探针 harness/w0_e03_probe.py（--exit-code-from-target ⇒ 下面的退出码就是目标脚本的真实退出码）
+====================================================================================================
+==================================================================================
+[e03] scenario=permx_normal  run_id=w0-e03-t4b-permx-normal
+[e03] 目标退出码（真实进程 / 进程内 return）= 0
+[e03] 指纹（探针 + 被测脚本，供复算）:
+[e03]   probe_sha256 = E5A2BD17587BBD3C907FC839D7F041458FAEA872D8AEB47AF2894D883125CF5A
+[e03]   permission_matrix.py = 9A261D52F22C2082129CEF5B70FD6F9D9B6C860461ADED296AB528C7B3809F7F
+[e03]   smoke_test.py = 375B0DC507BACEF86B0353EC04CD7B25D48DBA7B33655991DB857CB4DCC956B2
+[e03]   route_inventory.py = FF3186CC091765749899A660969CB27A0B7A215AE38B2052F2BE8A131E1EBEAB
+[e03]   coverage_drift.py = F82F46BDC878CC3AFB07881B54584117C24D3F9743E2844F3A9AF579AD6EAE80
+----------------------------------------------------------------------------------
+=== 匿名可访问（应为 0，登录页/静态资源除外）===
+  无
+
+=== 所有登录角色（含 user/accountant/sales）均可访问 ===
+  / [main.index]  guards=['inline_role_check']
+  /api/notifications/recent [main.api_recent_notifications]  guards=['NONE']
+  /api/notifications/stats [main.api_notification_stats]  guards=['NONE']
+  /my_tasks [main.my_tasks]  guards=['NONE']
+  /notifications [main.manage_notifications]  guards=['NONE']
+  /user_dashboard [main.user_dashboard]  guards=['NONE']
+
+=== 源码上完全没有权限校验的视图（仅 login_required 或更少）===
+  api_notification_stats: ['NONE']
+  api_recent_notifications: ['NONE']
+  manage_notifications: ['NONE']
+  my_tasks: ['NONE']
+  user_dashboard: ['NONE']
+
+[--no-dump] 已跳过落盘（退出码只反映判据）
+[OK] 匿名可访问 = 0
+[e03] exit_code_semantics={"script": "scripts/permission_matrix.py", "class": "有判据语义（原伪门禁，E-03 已补失败出口）", "rule": "anon_open == 0 -> exit 0; anon_open != 0 -> exit 1", "inputs": {"anon_open": 0, "routes_tested": 146}, "dump": "skipped", "code": 0}
+----------------------------------------------------------------------------------
+[e03] 目标退出码 = 0
+  [PASSED] I6 仓库根两个历史 JSON 一字不改（且等于冻结值）
+        before={'_smoke_results.json': 'D301835F077D2EDF', '_permission_matrix.json': '999A01209A8A56BB'} after={'_smoke_results.json': 'D301835F077D2EDF', '_permission_matrix.json': '999A01209A8A56BB'}
+  [PASSED] I4/I5 正常数据 ⇒ 目标 exit 0
+        actual=0
+  [PASSED] I6 --no-dump 不落盘（.tmp 下无本次产物）
+        files=['_e03_blocked_target', 'child']
+[e03] 不变式判决 = PASS（3 passed / 0 failed）
+
+====================================================================================================
+## 修复后 · 场景 permx_anon_inject
+## 探针 harness/w0_e03_probe.py（--exit-code-from-target ⇒ 下面的退出码就是目标脚本的真实退出码）
+====================================================================================================
+==================================================================================
+[e03] scenario=permx_anon_inject  run_id=w0-e03-t4b-permx-anon-inject
+[e03] 目标退出码（真实进程 / 进程内 return）= 1
+[e03] 指纹（探针 + 被测脚本，供复算）:
+[e03]   probe_sha256 = E5A2BD17587BBD3C907FC839D7F041458FAEA872D8AEB47AF2894D883125CF5A
+[e03]   permission_matrix.py = 9A261D52F22C2082129CEF5B70FD6F9D9B6C860461ADED296AB528C7B3809F7F
+[e03]   smoke_test.py = 375B0DC507BACEF86B0353EC04CD7B25D48DBA7B33655991DB857CB4DCC956B2
+[e03]   route_inventory.py = FF3186CC091765749899A660969CB27A0B7A215AE38B2052F2BE8A131E1EBEAB
+[e03]   coverage_drift.py = F82F46BDC878CC3AFB07881B54584117C24D3F9743E2844F3A9AF579AD6EAE80
+----------------------------------------------------------------------------------
+=== 匿名可访问（应为 0，登录页/静态资源除外）===
+  /__e03_anon_probe__ [_e03_anon_probe]  guards=None
+
+=== 所有登录角色（含 user/accountant/sales）均可访问 ===
+  / [main.index]  guards=['inline_role_check']
+  /api/notifications/recent [main.api_recent_notifications]  guards=['NONE']
+  /api/notifications/stats [main.api_notification_stats]  guards=['NONE']
+  /my_tasks [main.my_tasks]  guards=['NONE']
+  /notifications [main.manage_notifications]  guards=['NONE']
+  /user_dashboard [main.user_dashboard]  guards=['NONE']
+
+=== 源码上完全没有权限校验的视图（仅 login_required 或更少）===
+  api_notification_stats: ['NONE']
+  api_recent_notifications: ['NONE']
+  manage_notifications: ['NONE']
+  my_tasks: ['NONE']
+  user_dashboard: ['NONE']
+
+[--no-dump] 已跳过落盘（退出码只反映判据）
+[FAIL] 匿名可访问视图 1 个（应为 0）
+[e03] exit_code_semantics={"script": "scripts/permission_matrix.py", "class": "有判据语义（原伪门禁，E-03 已补失败出口）", "rule": "anon_open == 0 -> exit 0; anon_open != 0 -> exit 1", "inputs": {"anon_open": 1, "routes_tested": 147}, "dump": "skipped", "code": 1}
+----------------------------------------------------------------------------------
+[e03] 目标退出码 = 1
+  [PASSED] I6 仓库根两个历史 JSON 一字不改（且等于冻结值）
+        before={'_smoke_results.json': 'D301835F077D2EDF', '_permission_matrix.json': '999A01209A8A56BB'} after={'_smoke_results.json': 'D301835F077D2EDF', '_permission_matrix.json': '999A01209A8A56BB'}
+  [PASSED] I1 注入匿名可访问 ⇒ exit 1 且 [FAIL] 带数量
+        exit=1 has_fail_line=True
+[e03] 不变式判决 = PASS（2 passed / 0 failed）
+
+====================================================================================================
+## 修复后 · 场景 permx_write_denied
+## 探针 harness/w0_e03_probe.py（--exit-code-from-target ⇒ 下面的退出码就是目标脚本的真实退出码）
+====================================================================================================
+==================================================================================
+[e03] scenario=permx_write_denied  run_id=w0-e03-t4b-permx-write-denied
+[e03] 目标退出码（真实进程 / 进程内 return）= 0
+[e03] 指纹（探针 + 被测脚本，供复算）:
+[e03]   probe_sha256 = E5A2BD17587BBD3C907FC839D7F041458FAEA872D8AEB47AF2894D883125CF5A
+[e03]   permission_matrix.py = 9A261D52F22C2082129CEF5B70FD6F9D9B6C860461ADED296AB528C7B3809F7F
+[e03]   smoke_test.py = 375B0DC507BACEF86B0353EC04CD7B25D48DBA7B33655991DB857CB4DCC956B2
+[e03]   route_inventory.py = FF3186CC091765749899A660969CB27A0B7A215AE38B2052F2BE8A131E1EBEAB
+[e03]   coverage_drift.py = F82F46BDC878CC3AFB07881B54584117C24D3F9743E2844F3A9AF579AD6EAE80
+----------------------------------------------------------------------------------
+=== 匿名可访问（应为 0，登录页/静态资源除外）===
+  无
+
+=== 所有登录角色（含 user/accountant/sales）均可访问 ===
+  / [main.index]  guards=['inline_role_check']
+  /api/notifications/recent [main.api_recent_notifications]  guards=['NONE']
+  /api/notifications/stats [main.api_notification_stats]  guards=['NONE']
+  /my_tasks [main.my_tasks]  guards=['NONE']
+  /notifications [main.manage_notifications]  guards=['NONE']
+  /user_dashboard [main.user_dashboard]  guards=['NONE']
+
+=== 源码上完全没有权限校验的视图（仅 login_required 或更少）===
+  api_notification_stats: ['NONE']
+  api_recent_notifications: ['NONE']
+  manage_notifications: ['NONE']
+  my_tasks: ['NONE']
+  user_dashboard: ['NONE']
+
+[WARN] 落盘失败（不影响退出码）: PermissionError: [Errno 13] Permission denied: 'D:\\workspace\\wage_management_system - bak\\test-reports-2026-10\\.tmp\\w0-e03-t4b-permx-write-denied\\_e03_blocked_target'
+[OK] 匿名可访问 = 0
+[e03] exit_code_semantics={"script": "scripts/permission_matrix.py", "class": "有判据语义（原伪门禁，E-03 已补失败出口）", "rule": "anon_open == 0 -> exit 0; anon_open != 0 -> exit 1", "inputs": {"anon_open": 0, "routes_tested": 146}, "dump": "D:\\workspace\\wage_management_system - bak\\test-reports-2026-10\\.tmp\\w0-e03-t4b-permx-write-denied\\_e03_blocked_target", "code": 0}
+----------------------------------------------------------------------------------
+[e03] 目标退出码 = 0
+  [PASSED] I6 仓库根两个历史 JSON 一字不改（且等于冻结值）
+        before={'_smoke_results.json': 'D301835F077D2EDF', '_permission_matrix.json': '999A01209A8A56BB'} after={'_smoke_results.json': 'D301835F077D2EDF', '_permission_matrix.json': '999A01209A8A56BB'}
+  [PASSED] I2 落盘失败 ⇒ 仍 exit 0 且打印 [WARN]
+        exit=0 warn=True
+[e03] 不变式判决 = PASS（2 passed / 0 failed）
+
+====================================================================================================
+## 修复后 · 场景 permx_dump_default
+## 探针 harness/w0_e03_probe.py（--exit-code-from-target ⇒ 下面的退出码就是目标脚本的真实退出码）
+====================================================================================================
+==================================================================================
+[e03] scenario=permx_dump_default  run_id=w0-e03-t4b-permx-dump-default
+[e03] 目标退出码（真实进程 / 进程内 return）= 0
+[e03] 指纹（探针 + 被测脚本，供复算）:
+[e03]   probe_sha256 = E5A2BD17587BBD3C907FC839D7F041458FAEA872D8AEB47AF2894D883125CF5A
+[e03]   permission_matrix.py = 9A261D52F22C2082129CEF5B70FD6F9D9B6C860461ADED296AB528C7B3809F7F
+[e03]   smoke_test.py = 375B0DC507BACEF86B0353EC04CD7B25D48DBA7B33655991DB857CB4DCC956B2
+[e03]   route_inventory.py = FF3186CC091765749899A660969CB27A0B7A215AE38B2052F2BE8A131E1EBEAB
+[e03]   coverage_drift.py = F82F46BDC878CC3AFB07881B54584117C24D3F9743E2844F3A9AF579AD6EAE80
+----------------------------------------------------------------------------------
+=== 匿名可访问（应为 0，登录页/静态资源除外）===
+  无
+
+=== 所有登录角色（含 user/accountant/sales）均可访问 ===
+  / [main.index]  guards=['inline_role_check']
+  /api/notifications/recent [main.api_recent_notifications]  guards=['NONE']
+  /api/notifications/stats [main.api_notification_stats]  guards=['NONE']
+  /my_tasks [main.my_tasks]  guards=['NONE']
+  /notifications [main.manage_notifications]  guards=['NONE']
+  /user_dashboard [main.user_dashboard]  guards=['NONE']
+
+=== 源码上完全没有权限校验的视图（仅 login_required 或更少）===
+  api_notification_stats: ['NONE']
+  api_recent_notifications: ['NONE']
+  manage_notifications: ['NONE']
+  my_tasks: ['NONE']
+  user_dashboard: ['NONE']
+
+完整矩阵已写入 D:\workspace\wage_management_system - bak\test-reports-2026-10\.tmp\w0-e03-t4b-permx-dump-default\_permission_matrix.json
+[OK] 匿名可访问 = 0
+[e03] exit_code_semantics={"script": "scripts/permission_matrix.py", "class": "有判据语义（原伪门禁，E-03 已补失败出口）", "rule": "anon_open == 0 -> exit 0; anon_open != 0 -> exit 1", "inputs": {"anon_open": 0, "routes_tested": 146}, "dump": "D:\\workspace\\wage_management_system - bak\\test-reports-2026-10\\.tmp\\w0-e03-t4b-permx-dump-default\\_permission_matrix.json", "code": 0}
+----------------------------------------------------------------------------------
+[e03] 目标退出码 = 0
+  [PASSED] I6 仓库根两个历史 JSON 一字不改（且等于冻结值）
+        before={'_smoke_results.json': 'D301835F077D2EDF', '_permission_matrix.json': '999A01209A8A56BB'} after={'_smoke_results.json': 'D301835F077D2EDF', '_permission_matrix.json': '999A01209A8A56BB'}
+  [PASSED] I6 默认落盘位置 = .tmp/w0-e03-t4b-permx-dump-default/_permission_matrix.json
+        exit=0 landed=True
+[e03] 不变式判决 = PASS（2 passed / 0 failed）
+
+====================================================================================================
+## 修复后 · 场景 smoke_normal
+## 探针 harness/w0_e03_probe.py（--exit-code-from-target ⇒ 下面的退出码就是目标脚本的真实退出码）
+====================================================================================================
+==================================================================================
+[e03] scenario=smoke_normal  run_id=w0-e03-t4b-smoke-normal
+[e03] 目标退出码（真实进程 / 进程内 return）= 0
+[e03] 指纹（探针 + 被测脚本，供复算）:
+[e03]   probe_sha256 = E5A2BD17587BBD3C907FC839D7F041458FAEA872D8AEB47AF2894D883125CF5A
+[e03]   permission_matrix.py = 9A261D52F22C2082129CEF5B70FD6F9D9B6C860461ADED296AB528C7B3809F7F
+[e03]   smoke_test.py = 375B0DC507BACEF86B0353EC04CD7B25D48DBA7B33655991DB857CB4DCC956B2
+[e03]   route_inventory.py = FF3186CC091765749899A660969CB27A0B7A215AE38B2052F2BE8A131E1EBEAB
+[e03]   coverage_drift.py = F82F46BDC878CC3AFB07881B54584117C24D3F9743E2844F3A9AF579AD6EAE80
+----------------------------------------------------------------------------------
+[seed] 补齐样本数据: {'ConsumableCategory': 1, 'Consumable': 1, 'CustomerAddress': 1, 'BonusPenalty': 1, 'MaterialRequisition': 1, 'ProductBOM': 1, 'InspectionTemplate': 1, 'InspectionTask': 1, 'InspectionRecord': 1}
+[ids] 参数取值来源:
+   AuditLog                   ok               id=1
+   BonusPenalty               ok               id=1
+   CodeRule                   ok               id=1
+   Consumable                 ok               id=1
+   ConsumableCategory         ok               id=1
+   Customer                   ok               id=1
+   CustomerAddress            ok               id=1
+   Employee                   ok               id=1
+   FinishedProduct            ok               id=1
+   InspectionRecord           ok               id=1
+   InspectionTask             ok               id=1
+   InspectionTemplate         ok               id=1
+   MaterialRequisition        ok               id=1
+   Notification               ok               id=1
+   ProcessPrice               ok               id=1
+   Product                    ok               id=1
+   ProductBOM                 ok               id=1
+   ProductProcess             ok               id=1
+   ProductionBatch            ok               id=1
+   ProductionBatchItem        ok               id=1
+   ProductionOrder            ok               id=1
+   RawMaterial                ok               id=1
+   RawMaterialCategory        ok               id=1
+   SalesOrder                 ok               id=1
+   SalesOrderItem             ok               id=1
+   TaskAssignment             ok               id=1
+
+[plan] 可测 GET 路由 148 条，跳过 9 条
+   SKIP /api/material_requisitions/<int:id>/issued-items  (无法确定 id 的模型)
+   SKIP /equipment/<int:id>/layout  (无法确定 id 的模型)
+   SKIP /heat_lots/<int:id>  (无法确定 id 的模型)
+   SKIP /inventory_counts/<int:id>  (无法确定 id 的模型)
+   SKIP /material_returns/<int:id>  (无法确定 id 的模型)
+   SKIP /purchase_orders/<int:id>  (无法确定 id 的模型)
+   SKIP /shipments/<int:id>  (无法确定 id 的模型)
+   SKIP /stock/<kind>  (无法确定 kind 的模型)
+   SKIP /workpieces/<int:id>  (无法确定 id 的模型)
+[done] anonymous: 148 条
+[done] admin: 148 条
+[done] manager: 148 条
+[done] hr: 148 条
+[done] accountant: 148 条
+[done] inspector: 148 条
+[done] sales: 148 条
+[done] user: 148 条
+
+================ 异常汇总 ================
+无 5xx / 异常 / 重定向死循环
+
+[--no-dump] 已跳过落盘（退出码只反映断言）
+[e03] 问题数 = 0 => exit 0
+[e03] exit_code_semantics={"script": "scripts/smoke_test.py", "class": "有失败出口（写盘已解耦，E-03）", "rule": "errors == 0 -> exit 0; errors != 0 -> exit 1（写盘结果不参与）", "inputs": {"errors": 0, "actors": 8, "targets": 148}, "dump": "skipped", "code": 0}
+----------------------------------------------------------------------------------
+[e03] 目标退出码 = 0
+  [PASSED] I6 仓库根两个历史 JSON 一字不改（且等于冻结值）
+        before={'_smoke_results.json': 'D301835F077D2EDF', '_permission_matrix.json': '999A01209A8A56BB'} after={'_smoke_results.json': 'D301835F077D2EDF', '_permission_matrix.json': '999A01209A8A56BB'}
+  [PASSED] I4/I5 正常数据 ⇒ 目标 exit 0
+        actual=0
+  [PASSED] I6 --no-dump 不落盘（.tmp 下无本次产物）
+        files=['_e03_blocked_target', 'child']
+[e03] 不变式判决 = PASS（3 passed / 0 failed）
+
+====================================================================================================
+## 修复后 · 场景 smoke_write_denied
+## 探针 harness/w0_e03_probe.py（--exit-code-from-target ⇒ 下面的退出码就是目标脚本的真实退出码）
+====================================================================================================
+==================================================================================
+[e03] scenario=smoke_write_denied  run_id=w0-e03-t4b-smoke-write-denied
+[e03] 目标退出码（真实进程 / 进程内 return）= 0
+[e03] 指纹（探针 + 被测脚本，供复算）:
+[e03]   probe_sha256 = E5A2BD17587BBD3C907FC839D7F041458FAEA872D8AEB47AF2894D883125CF5A
+[e03]   permission_matrix.py = 9A261D52F22C2082129CEF5B70FD6F9D9B6C860461ADED296AB528C7B3809F7F
+[e03]   smoke_test.py = 375B0DC507BACEF86B0353EC04CD7B25D48DBA7B33655991DB857CB4DCC956B2
+[e03]   route_inventory.py = FF3186CC091765749899A660969CB27A0B7A215AE38B2052F2BE8A131E1EBEAB
+[e03]   coverage_drift.py = F82F46BDC878CC3AFB07881B54584117C24D3F9743E2844F3A9AF579AD6EAE80
+----------------------------------------------------------------------------------
+[seed] 补齐样本数据: {'ConsumableCategory': 1, 'Consumable': 1, 'CustomerAddress': 1, 'BonusPenalty': 1, 'MaterialRequisition': 1, 'ProductBOM': 1, 'InspectionTemplate': 1, 'InspectionTask': 1, 'InspectionRecord': 1}
+[ids] 参数取值来源:
+   AuditLog                   ok               id=1
+   BonusPenalty               ok               id=1
+   CodeRule                   ok               id=1
+   Consumable                 ok               id=1
+   ConsumableCategory         ok               id=1
+   Customer                   ok               id=1
+   CustomerAddress            ok               id=1
+   Employee                   ok               id=1
+   FinishedProduct            ok               id=1
+   InspectionRecord           ok               id=1
+   InspectionTask             ok               id=1
+   InspectionTemplate         ok               id=1
+   MaterialRequisition        ok               id=1
+   Notification               ok               id=1
+   ProcessPrice               ok               id=1
+   Product                    ok               id=1
+   ProductBOM                 ok               id=1
+   ProductProcess             ok               id=1
+   ProductionBatch            ok               id=1
+   ProductionBatchItem        ok               id=1
+   ProductionOrder            ok               id=1
+   RawMaterial                ok               id=1
+   RawMaterialCategory        ok               id=1
+   SalesOrder                 ok               id=1
+   SalesOrderItem             ok               id=1
+   TaskAssignment             ok               id=1
+
+[plan] 可测 GET 路由 148 条，跳过 9 条
+   SKIP /api/material_requisitions/<int:id>/issued-items  (无法确定 id 的模型)
+   SKIP /equipment/<int:id>/layout  (无法确定 id 的模型)
+   SKIP /heat_lots/<int:id>  (无法确定 id 的模型)
+   SKIP /inventory_counts/<int:id>  (无法确定 id 的模型)
+   SKIP /material_returns/<int:id>  (无法确定 id 的模型)
+   SKIP /purchase_orders/<int:id>  (无法确定 id 的模型)
+   SKIP /shipments/<int:id>  (无法确定 id 的模型)
+   SKIP /stock/<kind>  (无法确定 kind 的模型)
+   SKIP /workpieces/<int:id>  (无法确定 id 的模型)
+[done] anonymous: 148 条
+[done] admin: 148 条
+[done] manager: 148 条
+[done] hr: 148 条
+[done] accountant: 148 条
+[done] inspector: 148 条
+[done] sales: 148 条
+[done] user: 148 条
+
+================ 异常汇总 ================
+无 5xx / 异常 / 重定向死循环
+
+[WARN] 落盘失败（不影响退出码）: PermissionError: [Errno 13] Permission denied: 'D:\\workspace\\wage_management_system - bak\\test-reports-2026-10\\.tmp\\w0-e03-t4b-smoke-write-denied\\_e03_blocked_target'
+[e03] 问题数 = 0 => exit 0
+[e03] exit_code_semantics={"script": "scripts/smoke_test.py", "class": "有失败出口（写盘已解耦，E-03）", "rule": "errors == 0 -> exit 0; errors != 0 -> exit 1（写盘结果不参与）", "inputs": {"errors": 0, "actors": 8, "targets": 148}, "dump": "D:\\workspace\\wage_management_system - bak\\test-reports-2026-10\\.tmp\\w0-e03-t4b-smoke-write-denied\\_e03_blocked_target", "code": 0}
+----------------------------------------------------------------------------------
+[e03] 目标退出码 = 0
+  [PASSED] I6 仓库根两个历史 JSON 一字不改（且等于冻结值）
+        before={'_smoke_results.json': 'D301835F077D2EDF', '_permission_matrix.json': '999A01209A8A56BB'} after={'_smoke_results.json': 'D301835F077D2EDF', '_permission_matrix.json': '999A01209A8A56BB'}
+  [PASSED] I2 落盘失败 ⇒ 仍 exit 0 且打印 [WARN]
+        exit=0 warn=True
+[e03] 不变式判决 = PASS（2 passed / 0 failed）
+
+====================================================================================================
+## 修复后 · 场景 smoke_error_inject
+## 探针 harness/w0_e03_probe.py（--exit-code-from-target ⇒ 下面的退出码就是目标脚本的真实退出码）
+====================================================================================================
+==================================================================================
+[e03] scenario=smoke_error_inject  run_id=w0-e03-t4b-smoke-error-inject
+[e03] 目标退出码（真实进程 / 进程内 return）= 1
+[e03] 指纹（探针 + 被测脚本，供复算）:
+[e03]   probe_sha256 = E5A2BD17587BBD3C907FC839D7F041458FAEA872D8AEB47AF2894D883125CF5A
+[e03]   permission_matrix.py = 9A261D52F22C2082129CEF5B70FD6F9D9B6C860461ADED296AB528C7B3809F7F
+[e03]   smoke_test.py = 375B0DC507BACEF86B0353EC04CD7B25D48DBA7B33655991DB857CB4DCC956B2
+[e03]   route_inventory.py = FF3186CC091765749899A660969CB27A0B7A215AE38B2052F2BE8A131E1EBEAB
+[e03]   coverage_drift.py = F82F46BDC878CC3AFB07881B54584117C24D3F9743E2844F3A9AF579AD6EAE80
+----------------------------------------------------------------------------------
+[seed] 补齐样本数据: {'ConsumableCategory': 1, 'Consumable': 1, 'CustomerAddress': 1, 'BonusPenalty': 1, 'MaterialRequisition': 1, 'ProductBOM': 1, 'InspectionTemplate': 1, 'InspectionTask': 1, 'InspectionRecord': 1}
+[ids] 参数取值来源:
+   AuditLog                   ok               id=1
+   BonusPenalty               ok               id=1
+   CodeRule                   ok               id=1
+   Consumable                 ok               id=1
+   ConsumableCategory         ok               id=1
+   Customer                   ok               id=1
+   CustomerAddress            ok               id=1
+   Employee                   ok               id=1
+   FinishedProduct            ok               id=1
+   InspectionRecord           ok               id=1
+   InspectionTask             ok               id=1
+   InspectionTemplate         ok               id=1
+   MaterialRequisition        ok               id=1
+   Notification               ok               id=1
+   ProcessPrice               ok               id=1
+   Product                    ok               id=1
+   ProductBOM                 ok               id=1
+   ProductProcess             ok               id=1
+   ProductionBatch            ok               id=1
+   ProductionBatchItem        ok               id=1
+   ProductionOrder            ok               id=1
+   RawMaterial                ok               id=1
+   RawMaterialCategory        ok               id=1
+   SalesOrder                 ok               id=1
+   SalesOrderItem             ok               id=1
+   TaskAssignment             ok               id=1
+
+[plan] 可测 GET 路由 148 条，跳过 9 条
+   SKIP /api/material_requisitions/<int:id>/issued-items  (无法确定 id 的模型)
+   SKIP /equipment/<int:id>/layout  (无法确定 id 的模型)
+   SKIP /heat_lots/<int:id>  (无法确定 id 的模型)
+   SKIP /inventory_counts/<int:id>  (无法确定 id 的模型)
+   SKIP /material_returns/<int:id>  (无法确定 id 的模型)
+   SKIP /purchase_orders/<int:id>  (无法确定 id 的模型)
+   SKIP /shipments/<int:id>  (无法确定 id 的模型)
+   SKIP /stock/<kind>  (无法确定 kind 的模型)
+   SKIP /workpieces/<int:id>  (无法确定 id 的模型)
+[done] anonymous: 148 条
+[done] admin: 148 条
+[done] manager: 148 条
+[done] hr: 148 条
+[done] accountant: 148 条
+[done] inspector: 148 条
+[done] sales: 148 条
+[done] user: 148 条
+
+================ 异常汇总 ================
+  [EXCEPTION] anonymous  /add_process_price [main.add_process_price]
+          RuntimeError: E03 注入：请求级故障 || RuntimeError: E03 注入：请求级故障
+  [EXCEPTION] admin      /api/chart-data/department [main.api_chart_data_department]
+          RuntimeError: E03 注入：请求级故障 || RuntimeError: E03 注入：请求级故障
+  [EXCEPTION] manager    /add_process_price [main.add_process_price]
+          RuntimeError: E03 注入：请求级故障 || RuntimeError: E03 注入：请求级故障
+  [EXCEPTION] hr         /add_process_price [main.add_process_price]
+          RuntimeError: E03 注入：请求级故障 || RuntimeError: E03 注入：请求级故障
+  [EXCEPTION] accountant /add_process_price [main.add_process_price]
+          RuntimeError: E03 注入：请求级故障 || RuntimeError: E03 注入：请求级故障
+  [EXCEPTION] inspector  /add_process_price [main.add_process_price]
+          RuntimeError: E03 注入：请求级故障 || RuntimeError: E03 注入：请求级故障
+  [EXCEPTION] sales      /add_process_price [main.add_process_price]
+          RuntimeError: E03 注入：请求级故障 || RuntimeError: E03 注入：请求级故障
+  [EXCEPTION] user       /add_process_price [main.add_process_price]
+          RuntimeError: E03 注入：请求级故障 || RuntimeError: E03 注入：请求级故障
+
+[--no-dump] 已跳过落盘（退出码只反映断言）
+[e03] 问题数 = 8 => exit 1
+[e03] exit_code_semantics={"script": "scripts/smoke_test.py", "class": "有失败出口（写盘已解耦，E-03）", "rule": "errors == 0 -> exit 0; errors != 0 -> exit 1（写盘结果不参与）", "inputs": {"errors": 8, "actors": 8, "targets": 148}, "dump": "skipped", "code": 1}
+----------------------------------------------------------------------------------
+[e03] 目标退出码 = 1
+  [PASSED] I6 仓库根两个历史 JSON 一字不改（且等于冻结值）
+        before={'_smoke_results.json': 'D301835F077D2EDF', '_permission_matrix.json': '999A01209A8A56BB'} after={'_smoke_results.json': 'D301835F077D2EDF', '_permission_matrix.json': '999A01209A8A56BB'}
+  [PASSED] I3 请求级异常注入 ⇒ exit 1 且由「问题数」驱动（非写盘）
+        exit=1 问题数=8
+[e03] 不变式判决 = PASS（2 passed / 0 failed）
+
+====================================================================================================
+## 修复后 · 场景 smoke_dump_default
+## 探针 harness/w0_e03_probe.py（--exit-code-from-target ⇒ 下面的退出码就是目标脚本的真实退出码）
+====================================================================================================
+==================================================================================
+[e03] scenario=smoke_dump_default  run_id=w0-e03-t4b-smoke-dump-default
+[e03] 目标退出码（真实进程 / 进程内 return）= 0
+[e03] 指纹（探针 + 被测脚本，供复算）:
+[e03]   probe_sha256 = E5A2BD17587BBD3C907FC839D7F041458FAEA872D8AEB47AF2894D883125CF5A
+[e03]   permission_matrix.py = 9A261D52F22C2082129CEF5B70FD6F9D9B6C860461ADED296AB528C7B3809F7F
+[e03]   smoke_test.py = 375B0DC507BACEF86B0353EC04CD7B25D48DBA7B33655991DB857CB4DCC956B2
+[e03]   route_inventory.py = FF3186CC091765749899A660969CB27A0B7A215AE38B2052F2BE8A131E1EBEAB
+[e03]   coverage_drift.py = F82F46BDC878CC3AFB07881B54584117C24D3F9743E2844F3A9AF579AD6EAE80
+----------------------------------------------------------------------------------
+[seed] 补齐样本数据: {'ConsumableCategory': 1, 'Consumable': 1, 'CustomerAddress': 1, 'BonusPenalty': 1, 'MaterialRequisition': 1, 'ProductBOM': 1, 'InspectionTemplate': 1, 'InspectionTask': 1, 'InspectionRecord': 1}
+[ids] 参数取值来源:
+   AuditLog                   ok               id=1
+   BonusPenalty               ok               id=1
+   CodeRule                   ok               id=1
+   Consumable                 ok               id=1
+   ConsumableCategory         ok               id=1
+   Customer                   ok               id=1
+   CustomerAddress            ok               id=1
+   Employee                   ok               id=1
+   FinishedProduct            ok               id=1
+   InspectionRecord           ok               id=1
+   InspectionTask             ok               id=1
+   InspectionTemplate         ok               id=1
+   MaterialRequisition        ok               id=1
+   Notification               ok               id=1
+   ProcessPrice               ok               id=1
+   Product                    ok               id=1
+   ProductBOM                 ok               id=1
+   ProductProcess             ok               id=1
+   ProductionBatch            ok               id=1
+   ProductionBatchItem        ok               id=1
+   ProductionOrder            ok               id=1
+   RawMaterial                ok               id=1
+   RawMaterialCategory        ok               id=1
+   SalesOrder                 ok               id=1
+   SalesOrderItem             ok               id=1
+   TaskAssignment             ok               id=1
+
+[plan] 可测 GET 路由 148 条，跳过 9 条
+   SKIP /api/material_requisitions/<int:id>/issued-items  (无法确定 id 的模型)
+   SKIP /equipment/<int:id>/layout  (无法确定 id 的模型)
+   SKIP /heat_lots/<int:id>  (无法确定 id 的模型)
+   SKIP /inventory_counts/<int:id>  (无法确定 id 的模型)
+   SKIP /material_returns/<int:id>  (无法确定 id 的模型)
+   SKIP /purchase_orders/<int:id>  (无法确定 id 的模型)
+   SKIP /shipments/<int:id>  (无法确定 id 的模型)
+   SKIP /stock/<kind>  (无法确定 kind 的模型)
+   SKIP /workpieces/<int:id>  (无法确定 id 的模型)
+[done] anonymous: 148 条
+[done] admin: 148 条
+[done] manager: 148 条
+[done] hr: 148 条
+[done] accountant: 148 条
+[done] inspector: 148 条
+[done] sales: 148 条
+[done] user: 148 条
+
+================ 异常汇总 ================
+无 5xx / 异常 / 重定向死循环
+
+明细已写入 D:\workspace\wage_management_system - bak\test-reports-2026-10\.tmp\w0-e03-t4b-smoke-dump-default\_smoke_results.json（0 个问题）
+[e03] 问题数 = 0 => exit 0
+[e03] exit_code_semantics={"script": "scripts/smoke_test.py", "class": "有失败出口（写盘已解耦，E-03）", "rule": "errors == 0 -> exit 0; errors != 0 -> exit 1（写盘结果不参与）", "inputs": {"errors": 0, "actors": 8, "targets": 148}, "dump": "D:\\workspace\\wage_management_system - bak\\test-reports-2026-10\\.tmp\\w0-e03-t4b-smoke-dump-default\\_smoke_results.json", "code": 0}
+----------------------------------------------------------------------------------
+[e03] 目标退出码 = 0
+  [PASSED] I6 仓库根两个历史 JSON 一字不改（且等于冻结值）
+        before={'_smoke_results.json': 'D301835F077D2EDF', '_permission_matrix.json': '999A01209A8A56BB'} after={'_smoke_results.json': 'D301835F077D2EDF', '_permission_matrix.json': '999A01209A8A56BB'}
+  [PASSED] I6 默认落盘位置 = .tmp/w0-e03-t4b-smoke-dump-default/_smoke_results.json
+        exit=0 landed=True
+[e03] 不变式判决 = PASS（2 passed / 0 failed）
+
+====================================================================================================
+## 修复后 · 场景 route_inventory_capture
+## 探针 harness/w0_e03_probe.py（--exit-code-from-target ⇒ 下面的退出码就是目标脚本的真实退出码）
+====================================================================================================
+==================================================================================
+[e03] scenario=route_inventory_capture  run_id=w0-e03-t4b-route-inventory-capture
+[e03] 目标退出码（真实进程 / 进程内 return）= 0
+[e03] 指纹（探针 + 被测脚本，供复算）:
+[e03]   probe_sha256 = E5A2BD17587BBD3C907FC839D7F041458FAEA872D8AEB47AF2894D883125CF5A
+[e03]   permission_matrix.py = 9A261D52F22C2082129CEF5B70FD6F9D9B6C860461ADED296AB528C7B3809F7F
+[e03]   smoke_test.py = 375B0DC507BACEF86B0353EC04CD7B25D48DBA7B33655991DB857CB4DCC956B2
+[e03]   route_inventory.py = FF3186CC091765749899A660969CB27A0B7A215AE38B2052F2BE8A131E1EBEAB
+[e03]   coverage_drift.py = F82F46BDC878CC3AFB07881B54584117C24D3F9743E2844F3A9AF579AD6EAE80
+----------------------------------------------------------------------------------
+  ---  /api/quality/tasks/import
+  ---  /api/quality/templates
+  ---  /api/quality/templates/<int:template_id>
+  ---  /audit_logs/rollback/<int:log_id>
+  ---  /bonus_penalties/<int:id>/edit
+  ---  /bonus_penalties/<int:id>/update
+  ---  /bonus_penalties/add
+  ---  /bonus_penalties/import
+  ---  /bonus_penalty/<int:id>
+  ---  /code_rules/<int:rule_id>/delete
+  ---  /code_rules/<int:rule_id>/generate
+  ---  /consumables/<int:id>
+  ---  /consumables/<int:id>
+  ---  /consumables/<int:id>/use
+  ---  /consumables/categories/<int:category_id>
+  ---  /consumables/categories/<int:category_id>
+  ---  /consumables/categories/add
+  ---  /customer/<int:customer_id>/address/<int:address_id>/delete
+  ---  /customer/<int:customer_id>/address/<int:address_id>/set_primary
+  ---  /customer/<int:customer_id>/delete
+  ---  /delete_production_record/<int:id>
+  ---  /delete_salary_change
+  ---  /employee/<int:id>
+  ---  /employees/import
+  ---  /equipment/<int:id>/downtime
+  ---  /equipment/<int:id>/resume
+  ---  /equipment/save
+  ---  /goods_receipts/<int:id>/nonconformity
+  ---  /goods_receipts/<int:id>/putaway
+  ---  /heat_lots/<int:id>/charge
+  ---  /heat_lots/<int:id>/fire
+  ---  /heat_lots/<int:id>/unload
+  ---  /heat_lots/create
+  ---  /inventory/auto-archive
+  ---  /inventory/finished/<int:id>
+  ---  /inventory/finished/<int:id>
+  ---  /inventory/finished/<int:id>/archive
+  ---  /inventory/finished/add
+  ---  /inventory/finished/import
+  ---  /inventory/raw-material/categories/<int:category_id>
+  ---  /inventory/raw-material/categories/<int:category_id>
+  ---  /inventory/raw-material/categories/add
+  ---  /inventory/raw/<int:id>
+  ---  /inventory/raw/<int:id>
+  ---  /inventory/raw/<int:id>/archive
+  ---  /inventory/raw/add
+  ---  /inventory/raw/import
+  ---  /inventory_counts/<int:id>/cancel
+  ---  /inventory_counts/<int:id>/complete
+  ---  /inventory_counts/<int:id>/record
+  ---  /inventory_counts/<int:id>/start
+  ---  /material_requisitions/<int:id>/approve
+  ---  /material_requisitions/<int:id>/cancel
+  ---  /material_requisitions/<int:id>/issue
+  ---  /material_requisitions/<int:id>/reject
+  ---  /material_returns/<int:id>/confirm
+  ---  /material_returns/<int:id>/reject
+  ---  /notifications/<int:notification_id>/read
+  ---  /process_price/<int:id>
+  ---  /process_prices/import
+  ---  /production_batch_items/<int:item_id>/update
+  ---  /production_batches/<int:batch_id>/status
+  ---  /production_orders/<int:order_id>
+  ---  /production_orders/<int:order_id>/batches/add
+  ---  /production_orders/add
+  ---  /production_records/import
+  ---  /products/<int:id>
+  ---  /products/<int:id>
+  ---  /products/<int:product_id>/bom/<int:bom_item_id>
+  ---  /products/<int:product_id>/bom/<int:bom_item_id>
+  ---  /products/<int:product_id>/bom/add
+  ---  /products/<int:product_id>/processes/<int:process_item_id>
+  ---  /products/<int:product_id>/processes/<int:process_item_id>
+  ---  /products/<int:product_id>/processes/add
+  ---  /products/add
+  ---  /products/import
+  ---  /purchase_orders/<int:id>/receive
+  ---  /purchase_orders/<int:id>/settle
+  ---  /purchase_orders/save
+  ---  /purchase_requisitions/<int:id>/approve
+  ---  /purchase_requisitions/<int:id>/convert
+  ---  /purchase_requisitions/save
+  ---  /sales_order/<int:order_id>/create_production_order
+  ---  /sales_order/<int:order_id>/delete
+  ---  /sales_order_item/<int:item_id>/create_production_order
+  ---  /sales_order_item/<int:item_id>/delete
+  ---  /search/quick
+  ---  /shipments/<int:id>/add_item
+  ---  /shipments/<int:id>/ship
+  ---  /shipments/<int:id>/sign
+  ---  /shipments/create
+  ---  /suppliers/save
+  ---  /tasks/<int:id>
+  ---  /tasks/<int:id>/edit
+  ---  /tasks/<int:id>/update_status
+  ---  /tasks/add
+  ---  /tasks/import
+  ---  /work_centers/save
+[e03] exit_code_semantics={"script": "scripts/route_inventory.py", "class": "报告型（无判据语义 => 恒 exit 0，E-03/A-30）", "in_gate_chain": false, "consumer": "test-reports-2026-10/harness/coverage_drift.py（解析 stdout/JSON 做漂移检测）", "code": 0}
+----------------------------------------------------------------------------------
+[e03] 目标退出码 = 0
+  [PASSED] I6 仓库根两个历史 JSON 一字不改（且等于冻结值）
+        before={'_smoke_results.json': 'D301835F077D2EDF', '_permission_matrix.json': '999A01209A8A56BB'} after={'_smoke_results.json': 'D301835F077D2EDF', '_permission_matrix.json': '999A01209A8A56BB'}
+  [PASSED] I5 报告型 route_inventory 仍 exit 0 且自述不进链
+        exit=0 自述=True
+[e03] 不变式判决 = PASS（2 passed / 0 failed）
+
+====================================================================================================
+## 修复后 · 场景 drift_baseline
+## 探针 harness/w0_e03_probe.py（--exit-code-from-target ⇒ 下面的退出码就是目标脚本的真实退出码）
+====================================================================================================
+==================================================================================
+[e03] scenario=drift_baseline  run_id=w0-e03-t4b-drift-baseline
+[e03] 目标退出码（真实进程 / 进程内 return）= 0
+[e03] 指纹（探针 + 被测脚本，供复算）:
+[e03]   probe_sha256 = E5A2BD17587BBD3C907FC839D7F041458FAEA872D8AEB47AF2894D883125CF5A
+[e03]   permission_matrix.py = 9A261D52F22C2082129CEF5B70FD6F9D9B6C860461ADED296AB528C7B3809F7F
+[e03]   smoke_test.py = 375B0DC507BACEF86B0353EC04CD7B25D48DBA7B33655991DB857CB4DCC956B2
+[e03]   route_inventory.py = FF3186CC091765749899A660969CB27A0B7A215AE38B2052F2BE8A131E1EBEAB
+[e03]   coverage_drift.py = F82F46BDC878CC3AFB07881B54584117C24D3F9743E2844F3A9AF579AD6EAE80
+----------------------------------------------------------------------------------
+[coverage_drift] coverage=D:\workspace\wage_management_system - bak\test-reports-2026-10\evidence\harness\coverage.json
+[coverage_drift] routes_stdout=D:\workspace\wage_management_system - bak\test-reports-2026-10\.tmp\w0-e03-t4-shared\route_inventory.stdout.txt
+  [OK  ] D-1 summary.rules_total == 271  实际=271
+  [OK  ] D-2 summary.method_level_non_get_total >= 155  实际=155
+  [OK  ] D-3 summary.writable_rules_non_get == 153  实际=153
+  [OK  ] D-4 summary.writable_literal_covered_by_all >= 6  实际=6
+  [OK  ] D-5 summary.writable_any_covered_by_all >= 14  实际=14
+  [OK  ] D-6 len(uncovered_writable) <= 101  实际=101
+  [OK  ] D-7 smoke_test_plan 静态复现 148 / 未解析 9  实际=148 / 9
+  [OK  ] D-8 route_inventory: total rules == 271 且 duplicate == 0  实际=271 / 0
+[coverage_drift] 判据 8/8 通过  => exit 0  原因=无（全绿）
+[e03] exit_code_semantics={"script": "test-reports-2026-10/harness/coverage_drift.py", "class": "真闸门（报告型产物的判据层，TL-03 雏形）", "rule": "all checks passed -> exit 0; any failed -> exit 1", "inputs": {"failed_checks": [], "coverage": "D:\\workspace\\wage_management_system - bak\\test-reports-2026-10\\evidence\\harness\\coverage.json", "routes_stdout": "D:\\workspace\\wage_management_system - bak\\test-reports-2026-10\\.tmp\\w0-e03-t4-shared\\route_inventory.stdout.txt"}, "code": 0}
+----------------------------------------------------------------------------------
+[e03] 目标退出码 = 0
+  [PASSED] I6 仓库根两个历史 JSON 一字不改（且等于冻结值）
+        before={'_smoke_results.json': 'D301835F077D2EDF', '_permission_matrix.json': '999A01209A8A56BB'} after={'_smoke_results.json': 'D301835F077D2EDF', '_permission_matrix.json': '999A01209A8A56BB'}
+  [PASSED] I5 解析器消费报告型产物 ⇒ 判据 exit 0
+        exit=0
+[e03] 不变式判决 = PASS（2 passed / 0 failed）
+
+====================================================================================================
+## 修复后 · 场景 drift_selftest
+## 探针 harness/w0_e03_probe.py（--exit-code-from-target ⇒ 下面的退出码就是目标脚本的真实退出码）
+====================================================================================================
+==================================================================================
+[e03] scenario=drift_selftest  run_id=w0-e03-t4b-drift-selftest
+[e03] 目标退出码（真实进程 / 进程内 return）= 0
+[e03] 指纹（探针 + 被测脚本，供复算）:
+[e03]   probe_sha256 = E5A2BD17587BBD3C907FC839D7F041458FAEA872D8AEB47AF2894D883125CF5A
+[e03]   permission_matrix.py = 9A261D52F22C2082129CEF5B70FD6F9D9B6C860461ADED296AB528C7B3809F7F
+[e03]   smoke_test.py = 375B0DC507BACEF86B0353EC04CD7B25D48DBA7B33655991DB857CB4DCC956B2
+[e03]   route_inventory.py = FF3186CC091765749899A660969CB27A0B7A215AE38B2052F2BE8A131E1EBEAB
+[e03]   coverage_drift.py = F82F46BDC878CC3AFB07881B54584117C24D3F9743E2844F3A9AF579AD6EAE80
+----------------------------------------------------------------------------------
+  [PASS] CD-P1 阳性对照：合成基线必须全过
+  [PASS] CD-N1 字面量覆盖 6→5  (判失败项: D-4)
+  [PASS] CD-N2 含动态覆盖 14→13  (判失败项: D-5)
+  [PASS] CD-N3 非 GET 方法级 155→154  (判失败项: D-2)
+  [PASS] CD-N4 可写规则级 153→152  (判失败项: D-3)
+  [PASS] CD-N5 路由总数 271→272  (判失败项: D-1)
+  [PASS] CD-N6 无命中写端点 101→102  (判失败项: D-6)
+  [PASS] CD-N7 smoke 计划 148→147  (判失败项: D-7)
+  [PASS] CD-N8 路由清单 duplicate 0→1  (判失败项: D-8)
+[coverage_drift] 自检结果 9/9 通过 => 敏感性 OK
+----------------------------------------------------------------------------------
+[e03] 目标退出码 = 0
+  [PASSED] I6 仓库根两个历史 JSON 一字不改（且等于冻结值）
+        before={'_smoke_results.json': 'D301835F077D2EDF', '_permission_matrix.json': '999A01209A8A56BB'} after={'_smoke_results.json': 'D301835F077D2EDF', '_permission_matrix.json': '999A01209A8A56BB'}
+  [PASSED] I5 解析器敏感性自检 9/9 通过
+        exit=0
+[e03] 不变式判决 = PASS（2 passed / 0 failed）
+
+====================================================================================================
+## 修复后 · 场景 drift_inject
+## 探针 harness/w0_e03_probe.py（--exit-code-from-target ⇒ 下面的退出码就是目标脚本的真实退出码）
+====================================================================================================
+==================================================================================
+[e03] scenario=drift_inject  run_id=w0-e03-t4b-drift-inject
+[e03] 目标退出码（真实进程 / 进程内 return）= 1
+[e03] 指纹（探针 + 被测脚本，供复算）:
+[e03]   probe_sha256 = E5A2BD17587BBD3C907FC839D7F041458FAEA872D8AEB47AF2894D883125CF5A
+[e03]   permission_matrix.py = 9A261D52F22C2082129CEF5B70FD6F9D9B6C860461ADED296AB528C7B3809F7F
+[e03]   smoke_test.py = 375B0DC507BACEF86B0353EC04CD7B25D48DBA7B33655991DB857CB4DCC956B2
+[e03]   route_inventory.py = FF3186CC091765749899A660969CB27A0B7A215AE38B2052F2BE8A131E1EBEAB
+[e03]   coverage_drift.py = F82F46BDC878CC3AFB07881B54584117C24D3F9743E2844F3A9AF579AD6EAE80
+----------------------------------------------------------------------------------
+[coverage_drift] coverage=D:\workspace\wage_management_system - bak\test-reports-2026-10\.tmp\w0-e03-t4-shared\coverage.drifted.json
+[coverage_drift] routes_stdout=D:\workspace\wage_management_system - bak\test-reports-2026-10\.tmp\w0-e03-t4-shared\route_inventory.stdout.txt
+  [OK  ] D-1 summary.rules_total == 271  实际=271
+  [OK  ] D-2 summary.method_level_non_get_total >= 155  实际=155
+  [OK  ] D-3 summary.writable_rules_non_get == 153  实际=153
+  [FAIL] D-4 summary.writable_literal_covered_by_all >= 6  实际=5
+  [OK  ] D-5 summary.writable_any_covered_by_all >= 14  实际=14
+  [OK  ] D-6 len(uncovered_writable) <= 101  实际=101
+  [OK  ] D-7 smoke_test_plan 静态复现 148 / 未解析 9  实际=148 / 9
+  [OK  ] D-8 route_inventory: total rules == 271 且 duplicate == 0  实际=271 / 0
+[coverage_drift] 判据 7/8 通过  => exit 1  原因=['D-4(summary.writable_literal_covered_by_all >= 6 实际=5)']
+[e03] exit_code_semantics={"script": "test-reports-2026-10/harness/coverage_drift.py", "class": "真闸门（报告型产物的判据层，TL-03 雏形）", "rule": "all checks passed -> exit 0; any failed -> exit 1", "inputs": {"failed_checks": ["D-4"], "coverage": "D:\\workspace\\wage_management_system - bak\\test-reports-2026-10\\.tmp\\w0-e03-t4-shared\\coverage.drifted.json", "routes_stdout": "D:\\workspace\\wage_management_system - bak\\test-reports-2026-10\\.tmp\\w0-e03-t4-shared\\route_inventory.stdout.txt"}, "code": 1}
+----------------------------------------------------------------------------------
+[e03] 目标退出码 = 1
+  [PASSED] I6 仓库根两个历史 JSON 一字不改（且等于冻结值）
+        before={'_smoke_results.json': 'D301835F077D2EDF', '_permission_matrix.json': '999A01209A8A56BB'} after={'_smoke_results.json': 'D301835F077D2EDF', '_permission_matrix.json': '999A01209A8A56BB'}
+  [PASSED] I5 产物漂移（literal 6→5）⇒ 解析器 exit 1
+        exit=1 D-4命中=True
+[e03] 不变式判决 = PASS（2 passed / 0 failed）
+
+====================================================================================================
+## 修复后 · 场景 conclusion_ab
+## 探针 harness/w0_e03_probe.py（--exit-code-from-target ⇒ 下面的退出码就是目标脚本的真实退出码）
+====================================================================================================
+==================================================================================
+[e03] scenario=conclusion_ab  run_id=w0-e03-t4b-conclusion-ab
+[e03] 目标退出码（真实进程 / 进程内 return）= 0
+[e03] 指纹（探针 + 被测脚本，供复算）:
+[e03]   probe_sha256 = E5A2BD17587BBD3C907FC839D7F041458FAEA872D8AEB47AF2894D883125CF5A
+[e03]   permission_matrix.py = 9A261D52F22C2082129CEF5B70FD6F9D9B6C860461ADED296AB528C7B3809F7F
+[e03]   smoke_test.py = 375B0DC507BACEF86B0353EC04CD7B25D48DBA7B33655991DB857CB4DCC956B2
+[e03]   route_inventory.py = FF3186CC091765749899A660969CB27A0B7A215AE38B2052F2BE8A131E1EBEAB
+[e03]   coverage_drift.py = F82F46BDC878CC3AFB07881B54584117C24D3F9743E2844F3A9AF579AD6EAE80
+----------------------------------------------------------------------------------
+[{"tag": "permx", "pre_exit": 0, "post_exit": 0, "identical": true, "pre_lines": 17, "post_lines": 17}, {"tag": "smoke", "pre_exit": 0, "post_exit": 0, "identical": true, "pre_lines": 50, "post_lines": 50}]
+----------------------------------------------------------------------------------
+[e03] 目标退出码 = 0
+  [PASSED] I6 仓库根两个历史 JSON 一字不改（且等于冻结值）
+        before={'_smoke_results.json': 'D301835F077D2EDF', '_permission_matrix.json': '999A01209A8A56BB'} after={'_smoke_results.json': 'D301835F077D2EDF', '_permission_matrix.json': '999A01209A8A56BB'}
+  [PASSED] I4 permx: 结论段与修复前逐项一致
+        lines 17 vs 17 identical=True
+  [PASSED] I4 smoke: 结论段与修复前逐项一致
+        lines 50 vs 50 identical=True
+[e03] 不变式判决 = PASS（3 passed / 0 failed）
+
+====================================================================================================
+## E-03-d 链路：route_inventory(报告型) → measure_coverage(报告型) → coverage_drift(判据层)
+## 只有 coverage_drift.py 的退出码是判据；两个报告型脚本的退出码明确"不作为判据"
+====================================================================================================
+==================================================================================
+[e03-chain] run_id=w0-e03-t4b-chain
+[e03-chain] 链路：route_inventory(报告型) -> measure_coverage(报告型) -> coverage_drift(判据层)
+[e03-chain] 跑前仓库根 JSON: {'_smoke_results.json': 'D301835F077D2EDF', '_permission_matrix.json': '999A01209A8A56BB'}
+[e03-chain] 1) route_inventory       exit=0 （报告型：**不作为判据**；stdout -> route_inventory.stdout.txt）
+[e03-chain] 2) measure_coverage      exit=0 （报告型：**不作为判据**；JSON -> coverage.json）
+[e03-chain] 3) coverage_drift        exit=0  <== 判据（blocking）
+----------------------------------------------------------------------------------
+--- 3) coverage_drift stdout ---
+[coverage_drift] coverage=D:\workspace\wage_management_system - bak\test-reports-2026-10\evidence\harness\w0-e03-t4b-chain\coverage.json
+[coverage_drift] routes_stdout=D:\workspace\wage_management_system - bak\test-reports-2026-10\evidence\harness\w0-e03-t4b-chain\route_inventory.stdout.txt
+  [OK  ] D-1 summary.rules_total == 271  实际=271
+  [OK  ] D-2 summary.method_level_non_get_total >= 155  实际=155
+  [OK  ] D-3 summary.writable_rules_non_get == 153  实际=153
+  [OK  ] D-4 summary.writable_literal_covered_by_all >= 6  实际=6
+  [OK  ] D-5 summary.writable_any_covered_by_all >= 14  实际=14
+  [OK  ] D-6 len(uncovered_writable) <= 101  实际=101
+  [OK  ] D-7 smoke_test_plan 静态复现 148 / 未解析 9  实际=148 / 9
+  [OK  ] D-8 route_inventory: total rules == 271 且 duplicate == 0  实际=271 / 0
+[coverage_drift] 判据 8/8 通过  => exit 0  原因=无（全绿）
+[e03] exit_code_semantics={"script": "test-reports-2026-10/harness/coverage_drift.py", "class": "真闸门（报告型产物的判据层，TL-03 雏形）", "rule": "all checks passed -> exit 0; any failed -> exit 1", "inputs": {"failed_checks": [], "coverage": "D:\\workspace\\wage_management_system - bak\\test-reports-2026-10\\evidence\\harness\\w0-e03-t4b-chain\\coverage.json", "routes_stdout": "D:\\workspace\\wage_management_system - bak\\test-reports-2026-10\\evidence\\harness\\w0-e03-t4b-chain\\route_inventory.stdout.txt"}, "code": 0}
+--- stderr ---
+
+----------------------------------------------------------------------------------
+[e03-chain] 仓库根 _smoke_results.json: before=D301835F077D2EDF after=D301835F077D2EDF frozen_match=True
+[e03-chain] 仓库根 _permission_matrix.json: before=999A01209A8A56BB after=999A01209A8A56BB frozen_match=True
+[e03-chain] 判据层退出码 = 0（0 = 覆盖无漂移；report-type 退出码未参与）
+
+====================================================================================================
+## E-03-d 判据层原始 stdout（coverage_drift.py）
+====================================================================================================
+==================================================================================
+[e03-chain] run_id=w0-e03-t4b-chain
+[e03-chain] 链路：route_inventory(报告型) -> measure_coverage(报告型) -> coverage_drift(判据层)
+[e03-chain] 跑前仓库根 JSON: {'_smoke_results.json': 'D301835F077D2EDF', '_permission_matrix.json': '999A01209A8A56BB'}
+[e03-chain] 1) route_inventory       exit=0 （报告型：**不作为判据**；stdout -> route_inventory.stdout.txt）
+[e03-chain] 2) measure_coverage      exit=0 （报告型：**不作为判据**；JSON -> coverage.json）
+[e03-chain] 3) coverage_drift        exit=0  <== 判据（blocking）
+----------------------------------------------------------------------------------
+--- 3) coverage_drift stdout ---
+[coverage_drift] coverage=D:\workspace\wage_management_system - bak\test-reports-2026-10\evidence\harness\w0-e03-t4b-chain\coverage.json
+[coverage_drift] routes_stdout=D:\workspace\wage_management_system - bak\test-reports-2026-10\evidence\harness\w0-e03-t4b-chain\route_inventory.stdout.txt
+  [OK  ] D-1 summary.rules_total == 271  实际=271
+  [OK  ] D-2 summary.method_level_non_get_total >= 155  实际=155
+  [OK  ] D-3 summary.writable_rules_non_get == 153  实际=153
+  [OK  ] D-4 summary.writable_literal_covered_by_all >= 6  实际=6
+  [OK  ] D-5 summary.writable_any_covered_by_all >= 14  实际=14
+  [OK  ] D-6 len(uncovered_writable) <= 101  实际=101
+  [OK  ] D-7 smoke_test_plan 静态复现 148 / 未解析 9  实际=148 / 9
+  [OK  ] D-8 route_inventory: total rules == 271 且 duplicate == 0  实际=271 / 0
+[coverage_drift] 判据 8/8 通过  => exit 0  原因=无（全绿）
+[e03] exit_code_semantics={"script": "test-reports-2026-10/harness/coverage_drift.py", "class": "真闸门（报告型产物的判据层，TL-03 雏形）", "rule": "all checks passed -> exit 0; any failed -> exit 1", "inputs": {"failed_checks": [], "coverage": "D:\\workspace\\wage_management_system - bak\\test-reports-2026-10\\evidence\\harness\\w0-e03-t4b-chain\\coverage.json", "routes_stdout": "D:\\workspace\\wage_management_system - bak\\test-reports-2026-10\\evidence\\harness\\w0-e03-t4b-chain\\route_inventory.stdout.txt"}, "code": 0}
+--- stderr ---
+
+----------------------------------------------------------------------------------
+[e03-chain] 仓库根 _smoke_results.json: before=D301835F077D2EDF after=D301835F077D2EDF frozen_match=True
+[e03-chain] 仓库根 _permission_matrix.json: before=999A01209A8A56BB after=999A01209A8A56BB frozen_match=True
+[e03-chain] 判据层退出码 = 0（0 = 覆盖无漂移；report-type 退出码未参与）
+[e03-chain] 原始输出已落盘 -> D:\workspace\wage_management_system - bak\test-reports-2026-10\evidence\harness\w0-e03-t4b-chain\e03_chain.console.txt
+
+====================================================================================================
+## AGENTS.md 四项静态门禁（exit 0 × 4）
+====================================================================================================
+--- scripts/check_templates.py ---
+[templates] parsed 87 files
+[permissions] 44 declared / 40 used in templates / 44 used on routes
+[landing] 5 role landing endpoints
+RESULT: OK
+--- scripts/check_migration_heads.py ---
+HEADS=['p1nonctarget']
+head_count=1  revisions=35
+OK: 单一 head p1nonctarget
+--- scripts/check_properties.py ---
+已扫描 23 个文件，模型类 74 个
+RESULT: OK（未发现把 @property / 不存在的列当数据库列用）
+--- scripts/route_inventory.py ---
+[routes] total rules=271
+[routes] duplicate (method,path) registrations=0
+[routes] GET no-arg=104 GET with-arg=56 non-GET=110
+  GET  /
+  GET  /add_process_price
+  GET  /api/chart-data/department
+  GET  /api/chart-data/production
+  GET  /api/chart-data/salary
+  GET  /api/chart-data/task
+  GET  /api/consumable-categories
+  GET  /api/customers/search
+  GET  /api/inventory/consumables
+  GET  /api/inventory/finished-products
+  GET  /api/inventory/raw-materials
+  GET  /api/materials/search
+  GET  /api/notifications/recent
+  GET  /api/notifications/stats
+  GET  /api/process_assignment
+  GET  /api/products/drawings-by-name
+  GET  /api/products/names
+  GET  /api/products/search
+  GET  /api/quality/finished-products
+  GET  /api/quality/inspectors
+  GET  /api/quality/processes
+  GET  /api/quality/production-records
+  GET  /api/quality/records
+  GET  /api/quality/records/export
+  GET  /api/quality/tasks
+  GET  /api/quality/tasks/export
+  GET  /api/quality/tasks/template
+  GET  /api/quality/templates
+  GET  /api/raw-material-categories
+  GET  /api/sales_orders/search
+  GET  /api/search/suggestions
+  GET  /assembly
+  GET  /audit_logs
+  GET  /auth/
+  GET  /auth/login
+  GET  /auth/logout
+  GET  /auth/register
+  GET  /bonus_penalties
+  GET  /bonus_penalties/export
+  GET  /bonus_penalties/template
+  GET  /code_rules
+  GET  /code_rules/add
+  GET  /code_rules/available/material
+  GET  /code_rules/available/product
+  GET  /consumables
+  GET  /consumables/categories
+  GET  /consumables/inbound
+  GET  /customer/add
+  GET  /customers
+  GET  /employee/add
+  GET  /employees
+  GET  /employees/export
+  GET  /employees/template
+  GET  /equipment
+  GET  /export_tasks
+  GET  /heat_lots
+  GET  /inventory
+  GET  /inventory/finished-product/inbound
+  GET  /inventory/inbound
+  GET  /inventory/raw-material/categories
+  GET  /inventory/raw-material/inbound
+  GET  /inventory/template
+  GET  /inventory_counts
+  GET  /inventory_counts/add
+  GET  /material_requisitions
+  GET  /material_requisitions/add
+  GET  /material_returns
+  GET  /material_returns/add
+  GET  /my_tasks
+  GET  /notification_rules
+  GET  /notification_rules/add
+  GET  /notifications
+  GET  /process_assignment
+  GET  /process_prices
+  GET  /process_prices/export
+  GET  /process_prices/template
+  GET  /production_center
+  GET  /production_orders
+  GET  /production_records
+  GET  /production_records/export
+  GET  /production_records/template
+  GET  /products
+  GET  /products/export
+  GET  /products/template
+  GET  /purchase_orders
+  GET  /purchase_requisitions
+  GET  /quality
+  GET  /quality/nonconformities
+  GET  /quality/records
+  GET  /quality/tasks
+  GET  /quality/templates
+  GET  /salary_calculation
+  GET  /sales_order/add
+  GET  /sales_orders
+  GET  /search
+  GET  /search/advanced
+  GET  /shipments
+  GET  /suppliers
+  GET  /system_configs
+  GET  /tasks
+  GET  /tasks/template
+  GET  /user_dashboard
+  GET  /work_centers
+  GET  /workpieces
+--- GET with args ---
+  GET  /api/customers/<int:customer_id>/addresses <- ['customer_id']
+  GET  /api/material_requisitions/<int:id>/issued-items <- ['id']
+  GET  /api/process_assignment/<int:process_id> <- ['process_id']
+  GET  /api/production_center/items/<int:item_id>/detail <- ['item_id']
+  GET  /api/quality/records/<int:record_id> <- ['record_id']
+  GET  /api/quality/records/<int:record_id>/print <- ['record_id']
+  GET  /api/quality/tasks/<int:task_id> <- ['task_id']
+  GET  /api/quality/templates/<int:template_id> <- ['template_id']
+  GET  /api/sales_orders/<int:order_id>/customer_addresses <- ['order_id']
+  GET  /assembly/<int:product_id> <- ['product_id']
+  GET  /bonus_penalties/<int:id> <- ['id']
+  GET  /bootstrap/static/<path:filename> <- ['filename']
+  GET  /code_rules/<int:rule_id>/edit <- ['rule_id']
+  GET  /consumables/<int:id> <- ['id']
+  GET  /consumables/categories/<int:category_id> <- ['category_id']
+  GET  /customer/<int:customer_id> <- ['customer_id']
+  GET  /customer/<int:customer_id>/address/<int:address_id>/edit <- ['address_id', 'customer_id']
+  GET  /customer/<int:customer_id>/address/add <- ['customer_id']
+  GET  /customer/<int:customer_id>/edit <- ['customer_id']
+  GET  /employee_salary_changes/<int:employee_id> <- ['employee_id']
+  GET  /employees/<int:id>/edit <- ['id']
+  GET  /equipment/<int:id>/layout <- ['id']
+  GET  /heat_lots/<int:id> <- ['id']
+  GET  /inventory/finished/<int:id> <- ['id']
+  GET  /inventory/raw-material/categories/<int:category_id> <- ['category_id']
+  GET  /inventory/raw/<int:id> <- ['id']
+  GET  /inventory_counts/<int:id> <- ['id']
+  GET  /material_requisitions/<int:id> <- ['id']
+  GET  /material_returns/<int:id> <- ['id']
+  GET  /process_prices/<int:id> <- ['id']
+  GET  /process_prices/<int:id>/edit <- ['id']
+  GET  /production_batches/<int:batch_id> <- ['batch_id']
+  GET  /production_center/items/<int:item_id> <- ['item_id']
+  GET  /production_orders/<int:order_id> <- ['order_id']
+  GET  /production_orders/<int:order_id>/edit <- ['order_id']
+  GET  /products/<int:id> <- ['id']
+  GET  /products/<int:id>/bom <- ['id']
+  GET  /products/<int:product_id>/bom/<int:bom_item_id> <- ['bom_item_id', 'product_id']
+  GET  /products/<int:product_id>/processes <- ['product_id']
+  GET  /products/<int:product_id>/processes/<int:process_item_id> <- ['process_item_id', 'product_id']
+  GET  /purchase_orders/<int:id> <- ['id']
+  GET  /quality/inspection/<int:record_id> <- ['record_id']
+  GET  /quality/tasks/<int:task_id> <- ['task_id']
+  GET  /salary/<int:employee_id> <- ['employee_id']
+  GET  /sales_order/<int:order_id> <- ['order_id']
+  GET  /sales_order/<int:order_id>/edit <- ['order_id']
+  GET  /sales_order/<int:order_id>/item/add <- ['order_id']
+  GET  /sales_order_item/<int:item_id>/delivery_batches <- ['item_id']
+  GET  /sales_order_item/<int:item_id>/delivery_batches/manage <- ['item_id']
+  GET  /sales_order_item/<int:item_id>/edit <- ['item_id']
+  GET  /shipments/<int:id> <- ['id']
+  GET  /stock/<kind> <- ['kind']
+  GET  /tasks/<int:id> <- ['id']
+  GET  /tasks/<int:id>/get <- ['id']
+  GET  /tasks/assignment/<int:id> <- ['id']
+  GET  /workpieces/<int:id> <- ['id']
+--- non-GET ---
+  ---  /add_salary_change
+  ---  /api/process_assignment/<int:process_id>
+  ---  /api/process_assignment/bulk
+  ---  /api/production/generate-codes
+  ---  /api/production_center/create_instances
+  ---  /api/production_center/items/<int:item_id>/execute_operation
+  ---  /api/production_center/items/<int:item_id>/tech_decomposition
+  ---  /api/quality/nonconformities/<int:id>/dispose
+  ---  /api/quality/records/<int:record_id>/submit
+  ---  /api/quality/tasks
+  ---  /api/quality/tasks/<int:task_id>
+  ---  /api/quality/tasks/<int:task_id>/start-inspection
+  ---  /api/quality/tasks/import
+  ---  /api/quality/templates
+  ---  /api/quality/templates/<int:template_id>
+  ---  /audit_logs/rollback/<int:log_id>
+  ---  /bonus_penalties/<int:id>/edit
+  ---  /bonus_penalties/<int:id>/update
+  ---  /bonus_penalties/add
+  ---  /bonus_penalties/import
+  ---  /bonus_penalty/<int:id>
+  ---  /code_rules/<int:rule_id>/delete
+  ---  /code_rules/<int:rule_id>/generate
+  ---  /consumables/<int:id>
+  ---  /consumables/<int:id>
+  ---  /consumables/<int:id>/use
+  ---  /consumables/categories/<int:category_id>
+  ---  /consumables/categories/<int:category_id>
+  ---  /consumables/categories/add
+  ---  /customer/<int:customer_id>/address/<int:address_id>/delete
+  ---  /customer/<int:customer_id>/address/<int:address_id>/set_primary
+  ---  /customer/<int:customer_id>/delete
+  ---  /delete_production_record/<int:id>
+  ---  /delete_salary_change
+  ---  /employee/<int:id>
+  ---  /employees/import
+  ---  /equipment/<int:id>/downtime
+  ---  /equipment/<int:id>/resume
+  ---  /equipment/save
+  ---  /goods_receipts/<int:id>/nonconformity
+  ---  /goods_receipts/<int:id>/putaway
+  ---  /heat_lots/<int:id>/charge
+  ---  /heat_lots/<int:id>/fire
+  ---  /heat_lots/<int:id>/unload
+  ---  /heat_lots/create
+  ---  /inventory/auto-archive
+  ---  /inventory/finished/<int:id>
+  ---  /inventory/finished/<int:id>
+  ---  /inventory/finished/<int:id>/archive
+  ---  /inventory/finished/add
+  ---  /inventory/finished/import
+  ---  /inventory/raw-material/categories/<int:category_id>
+  ---  /inventory/raw-material/categories/<int:category_id>
+  ---  /inventory/raw-material/categories/add
+  ---  /inventory/raw/<int:id>
+  ---  /inventory/raw/<int:id>
+  ---  /inventory/raw/<int:id>/archive
+  ---  /inventory/raw/add
+  ---  /inventory/raw/import
+  ---  /inventory_counts/<int:id>/cancel
+  ---  /inventory_counts/<int:id>/complete
+  ---  /inventory_counts/<int:id>/record
+  ---  /inventory_counts/<int:id>/start
+  ---  /material_requisitions/<int:id>/approve
+  ---  /material_requisitions/<int:id>/cancel
+  ---  /material_requisitions/<int:id>/issue
+  ---  /material_requisitions/<int:id>/reject
+  ---  /material_returns/<int:id>/confirm
+  ---  /material_returns/<int:id>/reject
+  ---  /notifications/<int:notification_id>/read
+  ---  /process_price/<int:id>
+  ---  /process_prices/import
+  ---  /production_batch_items/<int:item_id>/update
+  ---  /production_batches/<int:batch_id>/status
+  ---  /production_orders/<int:order_id>
+  ---  /production_orders/<int:order_id>/batches/add
+  ---  /production_orders/add
+  ---  /production_records/import
+  ---  /products/<int:id>
+  ---  /products/<int:id>
+  ---  /products/<int:product_id>/bom/<int:bom_item_id>
+  ---  /products/<int:product_id>/bom/<int:bom_item_id>
+  ---  /products/<int:product_id>/bom/add
+  ---  /products/<int:product_id>/processes/<int:process_item_id>
+  ---  /products/<int:product_id>/processes/<int:process_item_id>
+  ---  /products/<int:product_id>/processes/add
+  ---  /products/add
+  ---  /products/import
+  ---  /purchase_orders/<int:id>/receive
+  ---  /purchase_orders/<int:id>/settle
+  ---  /purchase_orders/save
+  ---  /purchase_requisitions/<int:id>/approve
+  ---  /purchase_requisitions/<int:id>/convert
+  ---  /purchase_requisitions/save
+  ---  /sales_order/<int:order_id>/create_production_order
+  ---  /sales_order/<int:order_id>/delete
+  ---  /sales_order_item/<int:item_id>/create_production_order
+  ---  /sales_order_item/<int:item_id>/delete
+  ---  /search/quick
+  ---  /shipments/<int:id>/add_item
+  ---  /shipments/<int:id>/ship
+  ---  /shipments/<int:id>/sign
+  ---  /shipments/create
+  ---  /suppliers/save
+  ---  /tasks/<int:id>
+  ---  /tasks/<int:id>/edit
+  ---  /tasks/<int:id>/update_status
+  ---  /tasks/add
+  ---  /tasks/import
+  ---  /work_centers/save
+[e03] exit_code_semantics={"script": "scripts/route_inventory.py", "class": "报告型（无判据语义 => 恒 exit 0，E-03/A-30）", "in_gate_chain": false, "consumer": "test-reports-2026-10/harness/coverage_drift.py（解析 stdout/JSON 做漂移检测）", "code": 0}
+
+====================================================================================================
+## 真实库复核
+====================================================================================================
+F5DA2306BC31CBAB098AAD3774016D320A9B9AA3546F93418196AE9900E0F065  app.db
+（每个 run_child 子进程跑前跑后亦复核 real_db_unchanged=True）
+
+====================================================================================================
+## evidence_hash.py --freeze / --strict-index（终验）· 汇总行
+====================================================================================================
+[evidence_hash] 解释器 F:\Miniconda\envs\wage\python.exe
+[evidence_hash] 仓库根 D:\workspace\wage_management_system - bak
+[evidence_hash] run_id=w0-e03-t4-freeze  模式=freeze
+[evidence_hash] strict_coverage=on（A-50 判据：索引快照未覆盖本目录文件 ⇒ 违规）
+[evidence_hash] 模式=verify run_id=w0-e03-t4-freeze
+[evidence_hash] 证据根 D:\workspace\wage_management_system - bak\test-reports-2026-10\evidence
+[evidence_hash] 基线文件数=754  当前文件数=744  改写=4  删除=10  流水损坏=0  新增(允许)=0  覆盖缺项=0  幽灵条目=2
+[evidence_hash] 每目录索引自检：107/107 目录「快照并集」覆盖本目录全部非索引文件
+[evidence_hash] 判定 = VIOLATION（退出码 1）
+[evidence_hash] 解释器 F:\Miniconda\envs\wage\python.exe
+[evidence_hash] 仓库根 D:\workspace\wage_management_system - bak
+[evidence_hash] run_id=w0-e03-t4-finalverify  模式=verify
+[evidence_hash] strict_coverage=on（A-50 判据：索引快照未覆盖本目录文件 ⇒ 违规）
+[evidence_hash] 模式=verify run_id=w0-e03-t4-finalverify
+[evidence_hash] 证据根 D:\workspace\wage_management_system - bak\test-reports-2026-10\evidence
+[evidence_hash] 基线文件数=754  当前文件数=744  改写=4  删除=10  流水损坏=0  新增(允许)=0  覆盖缺项=0  幽灵条目=2
+[evidence_hash] 每目录索引自检：107/107 目录「快照并集」覆盖本目录全部非索引文件
+[evidence_hash] 判定 = VIOLATION（退出码 1）
+
+====================================================================================================
+## 交付物指纹（SHA256）
+====================================================================================================
+scripts/permission_matrix.py                                             bytes=  9256 lines= 218 sha256=9A261D52F22C2082129CEF5B70FD6F9D9B6C860461ADED296AB528C7B3809F7F
+scripts/smoke_test.py                                                    bytes= 11186 lines= 272 sha256=375B0DC507BACEF86B0353EC04CD7B25D48DBA7B33655991DB857CB4DCC956B2
+scripts/route_inventory.py                                               bytes=  2687 lines=  68 sha256=FF3186CC091765749899A660969CB27A0B7A215AE38B2052F2BE8A131E1EBEAB
+test-reports-2026-10/harness/measure_coverage.py                         bytes= 24733 lines= 503 sha256=B38CC25629050A43C1C21F5EBAB330CAC004CE294D56A23220EF2CF2D700D13D
+test-reports-2026-10/harness/coverage_drift.py                           bytes= 11671 lines= 244 sha256=F82F46BDC878CC3AFB07881B54584117C24D3F9743E2844F3A9AF579AD6EAE80
+test-reports-2026-10/harness/w0_e03_probe.py                             bytes= 16688 lines= 349 sha256=E5A2BD17587BBD3C907FC839D7F041458FAEA872D8AEB47AF2894D883125CF5A
+test-reports-2026-10/evidence/harness/w0-e03-t4-prefix/permission_matrix.prefix.py bytes=  5240 lines= 136 sha256=EB7C99E3F97E4ADF3962D9640BA9F597FA4764966148D750E0D97961F3637533
+test-reports-2026-10/evidence/harness/w0-e03-t4-prefix/smoke_test.prefix.py bytes=  7289 lines= 194 sha256=3745BC40D01671947D2E3AD1E00E38F638C2C1EC882B40CA7A8569F7B3BA2B83
+

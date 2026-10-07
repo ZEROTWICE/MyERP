@@ -1,0 +1,575 @@
+====================================================================================================
+## A/B 修复前 · natural（真实锁定期望值，原生 route_inventory 居然成功）· D-6 自然复现
+## run_id=w0-e02-t3d-prefix-natural  module_sha256=4D946FCEA4A6644E…  （修复前副本留档）
+====================================================================================================
+==============================================================================
+[e02] scenario=natural  run_id=w0-e02-t3d-prefix-natural
+[e02] module=D:\workspace\wage_management_system - bak\test-reports-2026-10\evidence\harness\w0-e02-t3-prefix\run_gates.prefix.py
+[e02] module_sha256=4D946FCEA4A6644ECBCEBDD4C872E59AF3D9F282CEB0C896FF76C5BC66527E4D
+[e02] 注入：未注入（原样）
+[e02] gates.json -> D:\workspace\wage_management_system - bak\test-reports-2026-10\evidence\harness\w0-e02-t3d-prefix-natural\gates.json
+------------------------------------------------------------------------------
+[run_gates] run_id=w0-e02-t3d-prefix-natural  5/6 项 pass
+  OK   check_templates              exit=0 mode=native checks=5/5
+  OK   check_migration_heads        exit=0 mode=native checks=3/3
+  OK   check_properties             exit=0 mode=native checks=2/2
+  OK   route_inventory              exit=0 mode=shim   checks=5/5  [报告型：退出码无信息量]
+  FAIL route_inventory_native_probe exit=0 mode=native checks=0/0  [取证型：只记录退出码与原文，不参与判定]
+  OK   check_db_bootstrap           exit=0 mode=shim   checks=3/3
+[run_gates] real.db unchanged = True (F5DA2306BC31CBAB…)
+[run_gates] JSON -> D:\workspace\wage_management_system - bak\test-reports-2026-10\evidence\harness\w0-e02-t3d-prefix-natural\gates.json
+------------------------------------------------------------------------------
+[e02] run_gates 退出码 = 0
+[e02] summary = {"total": 6, "pass": 5, "fail": 0, "probe_only": 1, "probe_unexpected": 1, "exit_code_informative": 4, "in_gate_chain": ["check_templates", "check_migration_heads", "check_properties", "check_db_bootstrap"], "report_only": ["route_inventory"], "evidence_only": ["route_inventory_native_probe"]}
+[e02] sensitivity = {"probe_exit_code": 0, "injections_all_nonzero": true, "baselines_all_zero": true, "evidence_level": "原文可信"}
+[e02] sensitivity.parsed = {"check_templates_inject_unknown_capability": {"exit_code": 1, "expected_nonzero": true, "stdout_tail": "[templates] parsed 87 files\n[permissions] 44 declared / 1 used in templates / 44 used on routes\n  UNKNOWN CAPABILITY  __hv_unknown_capability__  <- <injected>:1\n[landing] 5 role landing endpoints\nRESULT: FAIL\n"}, "check_templates_baseline": {"exit_code": 0, "expected_nonzero": false, "stdout_tail": "[templates] parsed 87 files\n[permissions] 44 declared / 40 used in templates / 44 used on routes\n[landing] 5 role landing endpoints\nRESULT: OK\n"}, "check_properties_planted_violation": {"exit_code": 1, "expected_nonzero": true, "stdout_tail": "发现 2 处违规：\n  test-reports-2026-10\\.tmp\\w0-e02-t3d-prefix-natural\\sensitivity_plant\\planted\\planted_violation.py:6  [把 @property 当列用]  RawMaterial.material_name —— 该类上 material_name 是 @property，不是数据库列\n  test-reports-2026-10\\.tmp\\w0-e02-t3d-prefix-natural\\sensitivity_plant\\planted\\planted_violation.py:8  [访问了该类不存在的属性]  FinishedProduct.current_stock —— 该类及其项目内基类都没有 current_stock\nRESULT: FAIL\n"}, "check_properties_planted_violation_with_bak_suffix_skipped": {"exit_code": 0, "expected_nonzero": false, "stdout_tail": "已扫描 0 个文件，模型类 74 个\nRESULT: OK（未发现把 @property / 不存在的列当数据库列用）\n", "note": "SKIP_SUFFIXES 口径：.bak 一律跳过（既有约定，非本次新增）"}, "check_properties_baseline": {"exit_code": 0, "expected_nonzero": false, "stdout_tail": "已扫描 23 个文件，模型类 74 个\nRESULT: OK（未发现把 @property / 不存在的列当数据库列用）\n"}, "check_migration_heads_inject_two_heads": {"exit_code": 1, "expected_nonzero": true, "stdout_tail": "HEADS=['__hv_fake_a__', '__hv_fake_b__']\nhead_count=2  revisions=35\nFAIL: 期望单一 head，实际 2 个：['__hv_fake_a__', '__hv_fake_b__']\n"}, "check_migration_heads_baseline": {"exit_code": 0, "expected_nonzero": false, "stdout_tail": "HEADS=['p1nonctarget']\nhead_count=1  revisions=35\nOK: 单一 head p1nonctarget\n"}}
+  [FAILED] I1 exit==0 iff fail==0 and probe_unexpected==0 and 敏感性真值通过
+        expected_exit=1 actual_exit=0 fail=0 probe_unexpected(真值)=1 sensitivity_truth_ok=True
+  [PASSED] I2 summary.probe_unexpected == verdict=="unexpected" 条数
+        summary=1 真值=1 unexpected_gates=['route_inventory_native_probe'] 方向异常=[]
+  [FAILED] I3 probe_unexpected 在 stdout 显式一行且与 JSON 相等
+        stdout_match=None json=1
+  [FAILED] I4 非 int 退出码（EXC）计入未通过并单列
+        非 int 退出码=[] injections_all_nonzero=True/True baselines_all_zero=True/True 问题=缺少 injections_errored 键; 缺少 baselines_errored 键
+  [PASSED] I5 4 项真闸门与 expected_lock 相对 golden 不变
+        一致
+  [PASSED] I6 sensitivity 结构 probe_exit_code/parsed 保持
+        键齐全
+[e02] 不变式判决 = FAIL（3 passed / 3 failed / 0 skipped）
+
+====================================================================================================
+## A/B 修复前 · exc（探针期望值对齐 + 敏感性自检注入「一跑就崩」的门禁）· T-03/F3
+## run_id=w0-e02-t3d-prefix-exc  module_sha256=4D946FCEA4A6644E…  （修复前副本留档）
+====================================================================================================
+==============================================================================
+[e02] scenario=exc  run_id=w0-e02-t3d-prefix-exc
+[e02] module=D:\workspace\wage_management_system - bak\test-reports-2026-10\evidence\harness\w0-e02-t3-prefix\run_gates.prefix.py
+[e02] module_sha256=4D946FCEA4A6644ECBCEBDD4C872E59AF3D9F282CEB0C896FF76C5BC66527E4D
+[e02] 注入：内存内把 route_inventory_native_probe 的 expect_exit 改为实际退出码 0（不动仓库文件） + 敏感性自检追加「一跑就崩」门禁注入
+[e02] gates.json -> D:\workspace\wage_management_system - bak\test-reports-2026-10\evidence\harness\w0-e02-t3d-prefix-exc\gates.json
+------------------------------------------------------------------------------
+[run_gates] run_id=w0-e02-t3d-prefix-exc  5/6 项 pass
+  OK   check_templates              exit=0 mode=native checks=5/5
+  OK   check_migration_heads        exit=0 mode=native checks=3/3
+  OK   check_properties             exit=0 mode=native checks=2/2
+  OK   route_inventory              exit=0 mode=shim   checks=5/5  [报告型：退出码无信息量]
+  EVID route_inventory_native_probe exit=0 mode=native checks=0/0  [取证型：只记录退出码与原文，不参与判定]
+  OK   check_db_bootstrap           exit=0 mode=shim   checks=3/3
+[run_gates] real.db unchanged = True (F5DA2306BC31CBAB…)
+[run_gates] JSON -> D:\workspace\wage_management_system - bak\test-reports-2026-10\evidence\harness\w0-e02-t3d-prefix-exc\gates.json
+------------------------------------------------------------------------------
+[e02] run_gates 退出码 = 0
+[e02] summary = {"total": 6, "pass": 5, "fail": 0, "probe_only": 1, "probe_unexpected": 0, "exit_code_informative": 4, "in_gate_chain": ["check_templates", "check_migration_heads", "check_properties", "check_db_bootstrap"], "report_only": ["route_inventory"], "evidence_only": ["route_inventory_native_probe"]}
+[e02] sensitivity = {"probe_exit_code": 0, "injections_all_nonzero": true, "baselines_all_zero": true, "evidence_level": "原文可信"}
+[e02] sensitivity.parsed = {"check_templates_inject_unknown_capability": {"exit_code": 1, "expected_nonzero": true, "stdout_tail": "[templates] parsed 87 files\n[permissions] 44 declared / 1 used in templates / 44 used on routes\n  UNKNOWN CAPABILITY  __hv_unknown_capability__  <- <injected>:1\n[landing] 5 role landing endpoints\nRESULT: FAIL\n"}, "check_templates_baseline": {"exit_code": 0, "expected_nonzero": false, "stdout_tail": "[templates] parsed 87 files\n[permissions] 44 declared / 40 used in templates / 44 used on routes\n[landing] 5 role landing endpoints\nRESULT: OK\n"}, "check_properties_planted_violation": {"exit_code": 1, "expected_nonzero": true, "stdout_tail": "发现 2 处违规：\n  test-reports-2026-10\\.tmp\\w0-e02-t3d-prefix-exc\\sensitivity_plant\\planted\\planted_violation.py:6  [把 @property 当列用]  RawMaterial.material_name —— 该类上 material_name 是 @property，不是数据库列\n  test-reports-2026-10\\.tmp\\w0-e02-t3d-prefix-exc\\sensitivity_plant\\planted\\planted_violation.py:8  [访问了该类不存在的属性]  FinishedProduct.current_stock —— 该类及其项目内基类都没有 current_stock\nRESULT: FAIL\n"}, "check_properties_planted_violation_with_bak_suffix_skipped": {"exit_code": 0, "expected_nonzero": false, "stdout_tail": "已扫描 0 个文件，模型类 74 个\nRESULT: OK（未发现把 @property / 不存在的列当数据库列用）\n", "note": "SKIP_SUFFIXES 口径：.bak 一律跳过（既有约定，非本次新增）"}, "check_properties_baseline": {"exit_code": 0, "expected_nonzero": false, "stdout_tail": "已扫描 23 个文件，模型类 74 个\nRESULT: OK（未发现把 @property / 不存在的列当数据库列用）\n"}, "check_migration_heads_inject_two_heads": {"exit_code": 1, "expected_nonzero": true, "stdout_tail": "HEADS=['__hv_fake_a__', '__hv_fake_b__']\nhead_count=2  revisions=35\nFAIL: 期望单一 head，实际 2 个：['__hv_fake_a__', '__hv_fake_b__']\n"}, "check_migration_heads_baseline": {"exit_code": 0, "expected_nonzero": false, "stdout_tail": "HEADS=['p1nonctarget']\nhead_count=1  revisions=35\nOK: 单一 head p1nonctarget\n"}, "injected_crashing_gate": {"exit_code": "EXC RuntimeError: hv_injected_crashing_gate", "expected_nonzero": true, "note": "E-02 注入：门禁自身抛异常", "stdout_tail": ""}}
+  [FAILED] I1 exit==0 iff fail==0 and probe_unexpected==0 and 敏感性真值通过
+        expected_exit=1 actual_exit=0 fail=0 probe_unexpected(真值)=0 sensitivity_truth_ok=False
+  [PASSED] I2 summary.probe_unexpected == verdict=="unexpected" 条数
+        summary=0 真值=0 unexpected_gates=[] 方向异常=[]
+  [FAILED] I3 probe_unexpected 在 stdout 显式一行且与 JSON 相等
+        stdout_match=None json=0
+  [FAILED] I4 非 int 退出码（EXC）计入未通过并单列
+        非 int 退出码=['injected_crashing_gate'] injections_all_nonzero=True/False baselines_all_zero=True/True 问题=injections_all_nonzero 报 True 真值 False; injections_errored 未单列 ['injected_crashing_gate']; 缺少 injections_errored 键; 缺少 baselines_errored 键
+  [PASSED] I5 4 项真闸门与 expected_lock 相对 golden 不变
+        一致
+  [PASSED] I6 sensitivity 结构 probe_exit_code/parsed 保持
+        键齐全
+[e02] 不变式判决 = FAIL（3 passed / 3 failed / 0 skipped）
+
+====================================================================================================
+## 判据① 注入 probe_unexpected（锁定期望值 -999 ⇒ 必然不匹配）⇒ 真实 exit 1
+## run_id=w0-e02-t3c-c1-inject  module_sha256=46A5D182F3FE463C…  真实进程退出码=1
+====================================================================================================
+==============================================================================
+[e02] scenario=mismatch  run_id=w0-e02-t3c-c1-inject
+[e02] module=D:\workspace\wage_management_system - bak\test-reports-2026-10\harness\run_gates.py
+[e02] module_sha256=46A5D182F3FE463CA6862A440BC2F165884A980945E57CB88FA17F032C7DF706
+[e02] 注入：内存内把 route_inventory_native_probe 的 expect_exit 改为 -999（子进程不可能返回该值 => 等价于「锁定期望值与实际观察值不匹配」）
+[e02] gates.json -> D:\workspace\wage_management_system - bak\test-reports-2026-10\evidence\harness\w0-e02-t3c-c1-inject\gates.json
+------------------------------------------------------------------------------
+[run_gates] run_id=w0-e02-t3c-c1-inject  5/6 项 pass
+[run_gates] probe_unexpected = 1   (取证型探针与锁定期望值不一致的条数；>0 => 退出码 1)
+[run_gates] sensitivity: injections_all_nonzero=True baselines_all_zero=True errored=[]
+  OK   check_templates              exit=0 mode=native checks=5/5
+  OK   check_migration_heads        exit=0 mode=native checks=3/3
+  OK   check_properties             exit=0 mode=native checks=2/2
+  OK   route_inventory              exit=0 mode=shim   checks=5/5  [报告型：退出码无信息量]
+  FAIL route_inventory_native_probe exit=0 mode=native checks=0/0  [取证型：退出码与锁定期望值不一致 => 计入 probe_unexpected => 退出码 1]
+  OK   check_db_bootstrap           exit=0 mode=shim   checks=3/3
+[run_gates] real.db unchanged = True (F5DA2306BC31CBAB…)
+[run_gates] exit = 1  原因=['probe_unexpected=1']
+[run_gates] JSON -> D:\workspace\wage_management_system - bak\test-reports-2026-10\evidence\harness\w0-e02-t3c-c1-inject\gates.json
+------------------------------------------------------------------------------
+[e02] run_gates 退出码 = 1
+[e02] summary = {"total": 6, "pass": 5, "fail": 0, "probe_only": 1, "probe_unexpected": 1, "exit_code_informative": 4, "in_gate_chain": ["check_templates", "check_migration_heads", "check_properties", "check_db_bootstrap"], "report_only": ["route_inventory"], "evidence_only": ["route_inventory_native_probe"], "sensitivity_ok": true}
+[e02] sensitivity = {"probe_exit_code": 0, "injections_all_nonzero": true, "baselines_all_zero": true, "injections_errored": [], "baselines_errored": [], "evidence_level": "原文可信"}
+[e02] sensitivity.parsed = {"check_templates_inject_unknown_capability": {"exit_code": 1, "expected_nonzero": true, "stdout_tail": "[templates] parsed 87 files\n[permissions] 44 declared / 1 used in templates / 44 used on routes\n  UNKNOWN CAPABILITY  __hv_unknown_capability__  <- <injected>:1\n[landing] 5 role landing endpoints\nRESULT: FAIL\n"}, "check_templates_baseline": {"exit_code": 0, "expected_nonzero": false, "stdout_tail": "[templates] parsed 87 files\n[permissions] 44 declared / 40 used in templates / 44 used on routes\n[landing] 5 role landing endpoints\nRESULT: OK\n"}, "check_properties_planted_violation": {"exit_code": 1, "expected_nonzero": true, "stdout_tail": "发现 2 处违规：\n  test-reports-2026-10\\.tmp\\w0-e02-t3c-c1-inject\\sensitivity_plant\\planted\\planted_violation.py:6  [把 @property 当列用]  RawMaterial.material_name —— 该类上 material_name 是 @property，不是数据库列\n  test-reports-2026-10\\.tmp\\w0-e02-t3c-c1-inject\\sensitivity_plant\\planted\\planted_violation.py:8  [访问了该类不存在的属性]  FinishedProduct.current_stock —— 该类及其项目内基类都没有 current_stock\nRESULT: FAIL\n"}, "check_properties_planted_violation_with_bak_suffix_skipped": {"exit_code": 0, "expected_nonzero": false, "stdout_tail": "已扫描 0 个文件，模型类 74 个\nRESULT: OK（未发现把 @property / 不存在的列当数据库列用）\n", "note": "SKIP_SUFFIXES 口径：.bak 一律跳过（既有约定，非本次新增）"}, "check_properties_baseline": {"exit_code": 0, "expected_nonzero": false, "stdout_tail": "已扫描 23 个文件，模型类 74 个\nRESULT: OK（未发现把 @property / 不存在的列当数据库列用）\n"}, "check_migration_heads_inject_two_heads": {"exit_code": 1, "expected_nonzero": true, "stdout_tail": "HEADS=['__hv_fake_a__', '__hv_fake_b__']\nhead_count=2  revisions=35\nFAIL: 期望单一 head，实际 2 个：['__hv_fake_a__', '__hv_fake_b__']\n"}, "check_migration_heads_baseline": {"exit_code": 0, "expected_nonzero": false, "stdout_tail": "HEADS=['p1nonctarget']\nhead_count=1  revisions=35\nOK: 单一 head p1nonctarget\n"}}
+  [PASSED] I1 exit==0 iff fail==0 and probe_unexpected==0 and 敏感性真值通过
+        expected_exit=1 actual_exit=1 fail=0 probe_unexpected(真值)=1 sensitivity_truth_ok=True
+  [PASSED] I2 summary.probe_unexpected == verdict=="unexpected" 条数
+        summary=1 真值=1 unexpected_gates=['route_inventory_native_probe'] 方向异常=[]
+  [PASSED] I3 probe_unexpected 在 stdout 显式一行且与 JSON 相等
+        stdout_match=probe_unexpected = 1 json=1
+  [PASSED] I4 非 int 退出码（EXC）计入未通过并单列
+        非 int 退出码=[] injections_all_nonzero=True/True baselines_all_zero=True/True 无问题
+  [PASSED] I5 4 项真闸门与 expected_lock 相对 golden 不变
+        一致
+  [PASSED] I6 sensitivity 结构 probe_exit_code/parsed 保持
+        键齐全
+[e02] 不变式判决 = PASS（6 passed / 0 failed / 0 skipped）
+
+====================================================================================================
+## 判据② 门禁抛异常（EXC RuntimeError）⇒ 敏感性判未通过、真实 exit 1
+## run_id=w0-e02-t3c-c2-exc  module_sha256=46A5D182F3FE463C…  真实进程退出码=1
+====================================================================================================
+==============================================================================
+[e02] scenario=exc  run_id=w0-e02-t3c-c2-exc
+[e02] module=D:\workspace\wage_management_system - bak\test-reports-2026-10\harness\run_gates.py
+[e02] module_sha256=46A5D182F3FE463CA6862A440BC2F165884A980945E57CB88FA17F032C7DF706
+[e02] 注入：内存内把 route_inventory_native_probe 的 expect_exit 改为实际退出码 0（不动仓库文件） + 敏感性自检追加「一跑就崩」门禁注入
+[e02] gates.json -> D:\workspace\wage_management_system - bak\test-reports-2026-10\evidence\harness\w0-e02-t3c-c2-exc\gates.json
+------------------------------------------------------------------------------
+[run_gates] run_id=w0-e02-t3c-c2-exc  5/6 项 pass
+[run_gates] probe_unexpected = 0   (取证型探针与锁定期望值不一致的条数；>0 => 退出码 1)
+[run_gates] sensitivity: injections_all_nonzero=False baselines_all_zero=True errored=['injected_crashing_gate']
+  OK   check_templates              exit=0 mode=native checks=5/5
+  OK   check_migration_heads        exit=0 mode=native checks=3/3
+  OK   check_properties             exit=0 mode=native checks=2/2
+  OK   route_inventory              exit=0 mode=shim   checks=5/5  [报告型：退出码无信息量]
+  EVID route_inventory_native_probe exit=0 mode=native checks=0/0  [取证型：退出码与锁定期望值一致 => 记 probe，不计失败]
+  OK   check_db_bootstrap           exit=0 mode=shim   checks=3/3
+[run_gates] real.db unchanged = True (F5DA2306BC31CBAB…)
+[run_gates] exit = 1  原因=['sensitivity 未通过']
+[run_gates] JSON -> D:\workspace\wage_management_system - bak\test-reports-2026-10\evidence\harness\w0-e02-t3c-c2-exc\gates.json
+------------------------------------------------------------------------------
+[e02] run_gates 退出码 = 1
+[e02] summary = {"total": 6, "pass": 5, "fail": 0, "probe_only": 1, "probe_unexpected": 0, "exit_code_informative": 4, "in_gate_chain": ["check_templates", "check_migration_heads", "check_properties", "check_db_bootstrap"], "report_only": ["route_inventory"], "evidence_only": ["route_inventory_native_probe"], "sensitivity_ok": false}
+[e02] sensitivity = {"probe_exit_code": 0, "injections_all_nonzero": false, "baselines_all_zero": true, "injections_errored": ["injected_crashing_gate"], "baselines_errored": [], "evidence_level": "原文可信"}
+[e02] sensitivity.parsed = {"check_templates_inject_unknown_capability": {"exit_code": 1, "expected_nonzero": true, "stdout_tail": "[templates] parsed 87 files\n[permissions] 44 declared / 1 used in templates / 44 used on routes\n  UNKNOWN CAPABILITY  __hv_unknown_capability__  <- <injected>:1\n[landing] 5 role landing endpoints\nRESULT: FAIL\n"}, "check_templates_baseline": {"exit_code": 0, "expected_nonzero": false, "stdout_tail": "[templates] parsed 87 files\n[permissions] 44 declared / 40 used in templates / 44 used on routes\n[landing] 5 role landing endpoints\nRESULT: OK\n"}, "check_properties_planted_violation": {"exit_code": 1, "expected_nonzero": true, "stdout_tail": "发现 2 处违规：\n  test-reports-2026-10\\.tmp\\w0-e02-t3c-c2-exc\\sensitivity_plant\\planted\\planted_violation.py:6  [把 @property 当列用]  RawMaterial.material_name —— 该类上 material_name 是 @property，不是数据库列\n  test-reports-2026-10\\.tmp\\w0-e02-t3c-c2-exc\\sensitivity_plant\\planted\\planted_violation.py:8  [访问了该类不存在的属性]  FinishedProduct.current_stock —— 该类及其项目内基类都没有 current_stock\nRESULT: FAIL\n"}, "check_properties_planted_violation_with_bak_suffix_skipped": {"exit_code": 0, "expected_nonzero": false, "stdout_tail": "已扫描 0 个文件，模型类 74 个\nRESULT: OK（未发现把 @property / 不存在的列当数据库列用）\n", "note": "SKIP_SUFFIXES 口径：.bak 一律跳过（既有约定，非本次新增）"}, "check_properties_baseline": {"exit_code": 0, "expected_nonzero": false, "stdout_tail": "已扫描 23 个文件，模型类 74 个\nRESULT: OK（未发现把 @property / 不存在的列当数据库列用）\n"}, "check_migration_heads_inject_two_heads": {"exit_code": 1, "expected_nonzero": true, "stdout_tail": "HEADS=['__hv_fake_a__', '__hv_fake_b__']\nhead_count=2  revisions=35\nFAIL: 期望单一 head，实际 2 个：['__hv_fake_a__', '__hv_fake_b__']\n"}, "check_migration_heads_baseline": {"exit_code": 0, "expected_nonzero": false, "stdout_tail": "HEADS=['p1nonctarget']\nhead_count=1  revisions=35\nOK: 单一 head p1nonctarget\n"}, "injected_crashing_gate": {"exit_code": "EXC RuntimeError: hv_injected_crashing_gate", "expected_nonzero": true, "note": "E-02 注入：门禁自身抛异常", "stdout_tail": ""}}
+  [PASSED] I1 exit==0 iff fail==0 and probe_unexpected==0 and 敏感性真值通过
+        expected_exit=1 actual_exit=1 fail=0 probe_unexpected(真值)=0 sensitivity_truth_ok=False
+  [PASSED] I2 summary.probe_unexpected == verdict=="unexpected" 条数
+        summary=0 真值=0 unexpected_gates=[] 方向异常=[]
+  [PASSED] I3 probe_unexpected 在 stdout 显式一行且与 JSON 相等
+        stdout_match=probe_unexpected = 0 json=0
+  [PASSED] I4 非 int 退出码（EXC）计入未通过并单列
+        非 int 退出码=['injected_crashing_gate'] injections_all_nonzero=False/False baselines_all_zero=True/True 无问题
+  [PASSED] I5 4 项真闸门与 expected_lock 相对 golden 不变
+        一致
+  [PASSED] I6 sensitivity 结构 probe_exit_code/parsed 保持
+        键齐全
+[e02] 不变式判决 = PASS（6 passed / 0 failed / 0 skipped）
+
+====================================================================================================
+## 判据③ 改回（探针期望值=实际退出码，全绿）⇒ 真实 exit 0（证明不是无条件失败）
+## run_id=w0-e02-t3c-c3-control  module_sha256=46A5D182F3FE463C…  真实进程退出码=0
+====================================================================================================
+==============================================================================
+[e02] scenario=matched  run_id=w0-e02-t3c-c3-control
+[e02] module=D:\workspace\wage_management_system - bak\test-reports-2026-10\harness\run_gates.py
+[e02] module_sha256=46A5D182F3FE463CA6862A440BC2F165884A980945E57CB88FA17F032C7DF706
+[e02] 注入：内存内把 route_inventory_native_probe 的 expect_exit 改为实际退出码 0（不动仓库文件）
+[e02] gates.json -> D:\workspace\wage_management_system - bak\test-reports-2026-10\evidence\harness\w0-e02-t3c-c3-control\gates.json
+------------------------------------------------------------------------------
+[run_gates] run_id=w0-e02-t3c-c3-control  5/6 项 pass
+[run_gates] probe_unexpected = 0   (取证型探针与锁定期望值不一致的条数；>0 => 退出码 1)
+[run_gates] sensitivity: injections_all_nonzero=True baselines_all_zero=True errored=[]
+  OK   check_templates              exit=0 mode=native checks=5/5
+  OK   check_migration_heads        exit=0 mode=native checks=3/3
+  OK   check_properties             exit=0 mode=native checks=2/2
+  OK   route_inventory              exit=0 mode=shim   checks=5/5  [报告型：退出码无信息量]
+  EVID route_inventory_native_probe exit=0 mode=native checks=0/0  [取证型：退出码与锁定期望值一致 => 记 probe，不计失败]
+  OK   check_db_bootstrap           exit=0 mode=shim   checks=3/3
+[run_gates] real.db unchanged = True (F5DA2306BC31CBAB…)
+[run_gates] exit = 0  原因=无（全绿）
+[run_gates] JSON -> D:\workspace\wage_management_system - bak\test-reports-2026-10\evidence\harness\w0-e02-t3c-c3-control\gates.json
+------------------------------------------------------------------------------
+[e02] run_gates 退出码 = 0
+[e02] summary = {"total": 6, "pass": 5, "fail": 0, "probe_only": 1, "probe_unexpected": 0, "exit_code_informative": 4, "in_gate_chain": ["check_templates", "check_migration_heads", "check_properties", "check_db_bootstrap"], "report_only": ["route_inventory"], "evidence_only": ["route_inventory_native_probe"], "sensitivity_ok": true}
+[e02] sensitivity = {"probe_exit_code": 0, "injections_all_nonzero": true, "baselines_all_zero": true, "injections_errored": [], "baselines_errored": [], "evidence_level": "原文可信"}
+[e02] sensitivity.parsed = {"check_templates_inject_unknown_capability": {"exit_code": 1, "expected_nonzero": true, "stdout_tail": "[templates] parsed 87 files\n[permissions] 44 declared / 1 used in templates / 44 used on routes\n  UNKNOWN CAPABILITY  __hv_unknown_capability__  <- <injected>:1\n[landing] 5 role landing endpoints\nRESULT: FAIL\n"}, "check_templates_baseline": {"exit_code": 0, "expected_nonzero": false, "stdout_tail": "[templates] parsed 87 files\n[permissions] 44 declared / 40 used in templates / 44 used on routes\n[landing] 5 role landing endpoints\nRESULT: OK\n"}, "check_properties_planted_violation": {"exit_code": 1, "expected_nonzero": true, "stdout_tail": "发现 2 处违规：\n  test-reports-2026-10\\.tmp\\w0-e02-t3c-c3-control\\sensitivity_plant\\planted\\planted_violation.py:6  [把 @property 当列用]  RawMaterial.material_name —— 该类上 material_name 是 @property，不是数据库列\n  test-reports-2026-10\\.tmp\\w0-e02-t3c-c3-control\\sensitivity_plant\\planted\\planted_violation.py:8  [访问了该类不存在的属性]  FinishedProduct.current_stock —— 该类及其项目内基类都没有 current_stock\nRESULT: FAIL\n"}, "check_properties_planted_violation_with_bak_suffix_skipped": {"exit_code": 0, "expected_nonzero": false, "stdout_tail": "已扫描 0 个文件，模型类 74 个\nRESULT: OK（未发现把 @property / 不存在的列当数据库列用）\n", "note": "SKIP_SUFFIXES 口径：.bak 一律跳过（既有约定，非本次新增）"}, "check_properties_baseline": {"exit_code": 0, "expected_nonzero": false, "stdout_tail": "已扫描 23 个文件，模型类 74 个\nRESULT: OK（未发现把 @property / 不存在的列当数据库列用）\n"}, "check_migration_heads_inject_two_heads": {"exit_code": 1, "expected_nonzero": true, "stdout_tail": "HEADS=['__hv_fake_a__', '__hv_fake_b__']\nhead_count=2  revisions=35\nFAIL: 期望单一 head，实际 2 个：['__hv_fake_a__', '__hv_fake_b__']\n"}, "check_migration_heads_baseline": {"exit_code": 0, "expected_nonzero": false, "stdout_tail": "HEADS=['p1nonctarget']\nhead_count=1  revisions=35\nOK: 单一 head p1nonctarget\n"}}
+  [PASSED] I1 exit==0 iff fail==0 and probe_unexpected==0 and 敏感性真值通过
+        expected_exit=0 actual_exit=0 fail=0 probe_unexpected(真值)=0 sensitivity_truth_ok=True
+  [PASSED] I2 summary.probe_unexpected == verdict=="unexpected" 条数
+        summary=0 真值=0 unexpected_gates=[] 方向异常=[]
+  [PASSED] I3 probe_unexpected 在 stdout 显式一行且与 JSON 相等
+        stdout_match=probe_unexpected = 0 json=0
+  [PASSED] I4 非 int 退出码（EXC）计入未通过并单列
+        非 int 退出码=[] injections_all_nonzero=True/True baselines_all_zero=True/True 无问题
+  [PASSED] I5 4 项真闸门与 expected_lock 相对 golden 不变
+        一致
+  [PASSED] I6 sensitivity 结构 probe_exit_code/parsed 保持
+        键齐全
+[e02] 不变式判决 = PASS（6 passed / 0 failed / 0 skipped）
+
+====================================================================================================
+## 修复后 · 控制台 GBK（sys.stdout.encoding=gbk）直跑 run_gates.py --self-test
+## run_id=w0-e02-t3b-direct2  真实进程退出码=1（判据生效，非崩溃：Traceback/UnicodeEncodeError 计数=0）
+====================================================================================================
+--- 解释器 stdout 编码 ---
+stdout_encoding=gbk
+
+--- 子进程原始字节 = GBK（5B 72 75 6E… 非 UTF-16）·Start-Process 重定向原文 ---
+[run_gates] run_id=w0-e02-t3b-direct2  5/6 项 pass
+[run_gates] probe_unexpected = 1   (取证型探针与锁定期望值不一致的条数；>0 => 退出码 1)
+[run_gates] sensitivity: injections_all_nonzero=True baselines_all_zero=True errored=[]
+  OK   check_templates              exit=0 mode=native checks=5/5
+  OK   check_migration_heads        exit=0 mode=native checks=3/3
+  OK   check_properties             exit=0 mode=native checks=2/2
+  OK   route_inventory              exit=0 mode=shim   checks=5/5  [报告型：退出码无信息量]
+  FAIL route_inventory_native_probe exit=0 mode=native checks=0/0  [取证型：退出码与锁定期望值不一致 => 计入 probe_unexpected => 退出码 1]
+  OK   check_db_bootstrap           exit=0 mode=shim   checks=3/3
+[run_gates] real.db unchanged = True (F5DA2306BC31CBAB…)
+[run_gates] exit = 1  原因=['probe_unexpected=1']
+[run_gates] JSON -> test-reports-2026-10\.tmp\w0-e02-t3\console\direct2-gates.json
+
+====================================================================================================
+## AGENTS.md 四项静态门禁（exit 0 × 4）
+====================================================================================================
+--- scripts/check_templates.py ---
+[templates] parsed 87 files
+[permissions] 44 declared / 40 used in templates / 44 used on routes
+[landing] 5 role landing endpoints
+RESULT: OK
+--- scripts/check_migration_heads.py ---
+HEADS=['p1nonctarget']
+head_count=1  revisions=35
+OK: 单一 head p1nonctarget
+--- scripts/check_properties.py ---
+已扫描 23 个文件，模型类 74 个
+RESULT: OK（未发现把 @property / 不存在的列当数据库列用）
+--- scripts/route_inventory.py ---
+[routes] total rules=271
+[routes] duplicate (method,path) registrations=0
+[routes] GET no-arg=104 GET with-arg=56 non-GET=110
+  GET  /
+  GET  /add_process_price
+  GET  /api/chart-data/department
+  GET  /api/chart-data/production
+  GET  /api/chart-data/salary
+  GET  /api/chart-data/task
+  GET  /api/consumable-categories
+  GET  /api/customers/search
+  GET  /api/inventory/consumables
+  GET  /api/inventory/finished-products
+  GET  /api/inventory/raw-materials
+  GET  /api/materials/search
+  GET  /api/notifications/recent
+  GET  /api/notifications/stats
+  GET  /api/process_assignment
+  GET  /api/products/drawings-by-name
+  GET  /api/products/names
+  GET  /api/products/search
+  GET  /api/quality/finished-products
+  GET  /api/quality/inspectors
+  GET  /api/quality/processes
+  GET  /api/quality/production-records
+  GET  /api/quality/records
+  GET  /api/quality/records/export
+  GET  /api/quality/tasks
+  GET  /api/quality/tasks/export
+  GET  /api/quality/tasks/template
+  GET  /api/quality/templates
+  GET  /api/raw-material-categories
+  GET  /api/sales_orders/search
+  GET  /api/search/suggestions
+  GET  /assembly
+  GET  /audit_logs
+  GET  /auth/
+  GET  /auth/login
+  GET  /auth/logout
+  GET  /auth/register
+  GET  /bonus_penalties
+  GET  /bonus_penalties/export
+  GET  /bonus_penalties/template
+  GET  /code_rules
+  GET  /code_rules/add
+  GET  /code_rules/available/material
+  GET  /code_rules/available/product
+  GET  /consumables
+  GET  /consumables/categories
+  GET  /consumables/inbound
+  GET  /customer/add
+  GET  /customers
+  GET  /employee/add
+  GET  /employees
+  GET  /employees/export
+  GET  /employees/template
+  GET  /equipment
+  GET  /export_tasks
+  GET  /heat_lots
+  GET  /inventory
+  GET  /inventory/finished-product/inbound
+  GET  /inventory/inbound
+  GET  /inventory/raw-material/categories
+  GET  /inventory/raw-material/inbound
+  GET  /inventory/template
+  GET  /inventory_counts
+  GET  /inventory_counts/add
+  GET  /material_requisitions
+  GET  /material_requisitions/add
+  GET  /material_returns
+  GET  /material_returns/add
+  GET  /my_tasks
+  GET  /notification_rules
+  GET  /notification_rules/add
+  GET  /notifications
+  GET  /process_assignment
+  GET  /process_prices
+  GET  /process_prices/export
+  GET  /process_prices/template
+  GET  /production_center
+  GET  /production_orders
+  GET  /production_records
+  GET  /production_records/export
+  GET  /production_records/template
+  GET  /products
+  GET  /products/export
+  GET  /products/template
+  GET  /purchase_orders
+  GET  /purchase_requisitions
+  GET  /quality
+  GET  /quality/nonconformities
+  GET  /quality/records
+  GET  /quality/tasks
+  GET  /quality/templates
+  GET  /salary_calculation
+  GET  /sales_order/add
+  GET  /sales_orders
+  GET  /search
+  GET  /search/advanced
+  GET  /shipments
+  GET  /suppliers
+  GET  /system_configs
+  GET  /tasks
+  GET  /tasks/template
+  GET  /user_dashboard
+  GET  /work_centers
+  GET  /workpieces
+--- GET with args ---
+  GET  /api/customers/<int:customer_id>/addresses <- ['customer_id']
+  GET  /api/material_requisitions/<int:id>/issued-items <- ['id']
+  GET  /api/process_assignment/<int:process_id> <- ['process_id']
+  GET  /api/production_center/items/<int:item_id>/detail <- ['item_id']
+  GET  /api/quality/records/<int:record_id> <- ['record_id']
+  GET  /api/quality/records/<int:record_id>/print <- ['record_id']
+  GET  /api/quality/tasks/<int:task_id> <- ['task_id']
+  GET  /api/quality/templates/<int:template_id> <- ['template_id']
+  GET  /api/sales_orders/<int:order_id>/customer_addresses <- ['order_id']
+  GET  /assembly/<int:product_id> <- ['product_id']
+  GET  /bonus_penalties/<int:id> <- ['id']
+  GET  /bootstrap/static/<path:filename> <- ['filename']
+  GET  /code_rules/<int:rule_id>/edit <- ['rule_id']
+  GET  /consumables/<int:id> <- ['id']
+  GET  /consumables/categories/<int:category_id> <- ['category_id']
+  GET  /customer/<int:customer_id> <- ['customer_id']
+  GET  /customer/<int:customer_id>/address/<int:address_id>/edit <- ['address_id', 'customer_id']
+  GET  /customer/<int:customer_id>/address/add <- ['customer_id']
+  GET  /customer/<int:customer_id>/edit <- ['customer_id']
+  GET  /employee_salary_changes/<int:employee_id> <- ['employee_id']
+  GET  /employees/<int:id>/edit <- ['id']
+  GET  /equipment/<int:id>/layout <- ['id']
+  GET  /heat_lots/<int:id> <- ['id']
+  GET  /inventory/finished/<int:id> <- ['id']
+  GET  /inventory/raw-material/categories/<int:category_id> <- ['category_id']
+  GET  /inventory/raw/<int:id> <- ['id']
+  GET  /inventory_counts/<int:id> <- ['id']
+  GET  /material_requisitions/<int:id> <- ['id']
+  GET  /material_returns/<int:id> <- ['id']
+  GET  /process_prices/<int:id> <- ['id']
+  GET  /process_prices/<int:id>/edit <- ['id']
+  GET  /production_batches/<int:batch_id> <- ['batch_id']
+  GET  /production_center/items/<int:item_id> <- ['item_id']
+  GET  /production_orders/<int:order_id> <- ['order_id']
+  GET  /production_orders/<int:order_id>/edit <- ['order_id']
+  GET  /products/<int:id> <- ['id']
+  GET  /products/<int:id>/bom <- ['id']
+  GET  /products/<int:product_id>/bom/<int:bom_item_id> <- ['bom_item_id', 'product_id']
+  GET  /products/<int:product_id>/processes <- ['product_id']
+  GET  /products/<int:product_id>/processes/<int:process_item_id> <- ['process_item_id', 'product_id']
+  GET  /purchase_orders/<int:id> <- ['id']
+  GET  /quality/inspection/<int:record_id> <- ['record_id']
+  GET  /quality/tasks/<int:task_id> <- ['task_id']
+  GET  /salary/<int:employee_id> <- ['employee_id']
+  GET  /sales_order/<int:order_id> <- ['order_id']
+  GET  /sales_order/<int:order_id>/edit <- ['order_id']
+  GET  /sales_order/<int:order_id>/item/add <- ['order_id']
+  GET  /sales_order_item/<int:item_id>/delivery_batches <- ['item_id']
+  GET  /sales_order_item/<int:item_id>/delivery_batches/manage <- ['item_id']
+  GET  /sales_order_item/<int:item_id>/edit <- ['item_id']
+  GET  /shipments/<int:id> <- ['id']
+  GET  /stock/<kind> <- ['kind']
+  GET  /tasks/<int:id> <- ['id']
+  GET  /tasks/<int:id>/get <- ['id']
+  GET  /tasks/assignment/<int:id> <- ['id']
+  GET  /workpieces/<int:id> <- ['id']
+--- non-GET ---
+  ---  /add_salary_change
+  ---  /api/process_assignment/<int:process_id>
+  ---  /api/process_assignment/bulk
+  ---  /api/production/generate-codes
+  ---  /api/production_center/create_instances
+  ---  /api/production_center/items/<int:item_id>/execute_operation
+  ---  /api/production_center/items/<int:item_id>/tech_decomposition
+  ---  /api/quality/nonconformities/<int:id>/dispose
+  ---  /api/quality/records/<int:record_id>/submit
+  ---  /api/quality/tasks
+  ---  /api/quality/tasks/<int:task_id>
+  ---  /api/quality/tasks/<int:task_id>/start-inspection
+  ---  /api/quality/tasks/import
+  ---  /api/quality/templates
+  ---  /api/quality/templates/<int:template_id>
+  ---  /audit_logs/rollback/<int:log_id>
+  ---  /bonus_penalties/<int:id>/edit
+  ---  /bonus_penalties/<int:id>/update
+  ---  /bonus_penalties/add
+  ---  /bonus_penalties/import
+  ---  /bonus_penalty/<int:id>
+  ---  /code_rules/<int:rule_id>/delete
+  ---  /code_rules/<int:rule_id>/generate
+  ---  /consumables/<int:id>
+  ---  /consumables/<int:id>
+  ---  /consumables/<int:id>/use
+  ---  /consumables/categories/<int:category_id>
+  ---  /consumables/categories/<int:category_id>
+  ---  /consumables/categories/add
+  ---  /customer/<int:customer_id>/address/<int:address_id>/delete
+  ---  /customer/<int:customer_id>/address/<int:address_id>/set_primary
+  ---  /customer/<int:customer_id>/delete
+  ---  /delete_production_record/<int:id>
+  ---  /delete_salary_change
+  ---  /employee/<int:id>
+  ---  /employees/import
+  ---  /equipment/<int:id>/downtime
+  ---  /equipment/<int:id>/resume
+  ---  /equipment/save
+  ---  /goods_receipts/<int:id>/nonconformity
+  ---  /goods_receipts/<int:id>/putaway
+  ---  /heat_lots/<int:id>/charge
+  ---  /heat_lots/<int:id>/fire
+  ---  /heat_lots/<int:id>/unload
+  ---  /heat_lots/create
+  ---  /inventory/auto-archive
+  ---  /inventory/finished/<int:id>
+  ---  /inventory/finished/<int:id>
+  ---  /inventory/finished/<int:id>/archive
+  ---  /inventory/finished/add
+  ---  /inventory/finished/import
+  ---  /inventory/raw-material/categories/<int:category_id>
+  ---  /inventory/raw-material/categories/<int:category_id>
+  ---  /inventory/raw-material/categories/add
+  ---  /inventory/raw/<int:id>
+  ---  /inventory/raw/<int:id>
+  ---  /inventory/raw/<int:id>/archive
+  ---  /inventory/raw/add
+  ---  /inventory/raw/import
+  ---  /inventory_counts/<int:id>/cancel
+  ---  /inventory_counts/<int:id>/complete
+  ---  /inventory_counts/<int:id>/record
+  ---  /inventory_counts/<int:id>/start
+  ---  /material_requisitions/<int:id>/approve
+  ---  /material_requisitions/<int:id>/cancel
+  ---  /material_requisitions/<int:id>/issue
+  ---  /material_requisitions/<int:id>/reject
+  ---  /material_returns/<int:id>/confirm
+  ---  /material_returns/<int:id>/reject
+  ---  /notifications/<int:notification_id>/read
+  ---  /process_price/<int:id>
+  ---  /process_prices/import
+  ---  /production_batch_items/<int:item_id>/update
+  ---  /production_batches/<int:batch_id>/status
+  ---  /production_orders/<int:order_id>
+  ---  /production_orders/<int:order_id>/batches/add
+  ---  /production_orders/add
+  ---  /production_records/import
+  ---  /products/<int:id>
+  ---  /products/<int:id>
+  ---  /products/<int:product_id>/bom/<int:bom_item_id>
+  ---  /products/<int:product_id>/bom/<int:bom_item_id>
+  ---  /products/<int:product_id>/bom/add
+  ---  /products/<int:product_id>/processes/<int:process_item_id>
+  ---  /products/<int:product_id>/processes/<int:process_item_id>
+  ---  /products/<int:product_id>/processes/add
+  ---  /products/add
+  ---  /products/import
+  ---  /purchase_orders/<int:id>/receive
+  ---  /purchase_orders/<int:id>/settle
+  ---  /purchase_orders/save
+  ---  /purchase_requisitions/<int:id>/approve
+  ---  /purchase_requisitions/<int:id>/convert
+  ---  /purchase_requisitions/save
+  ---  /sales_order/<int:order_id>/create_production_order
+  ---  /sales_order/<int:order_id>/delete
+  ---  /sales_order_item/<int:item_id>/create_production_order
+  ---  /sales_order_item/<int:item_id>/delete
+  ---  /search/quick
+  ---  /shipments/<int:id>/add_item
+  ---  /shipments/<int:id>/ship
+  ---  /shipments/<int:id>/sign
+  ---  /shipments/create
+  ---  /suppliers/save
+  ---  /tasks/<int:id>
+  ---  /tasks/<int:id>/edit
+  ---  /tasks/<int:id>/update_status
+  ---  /tasks/add
+  ---  /tasks/import
+  ---  /work_centers/save
+
+====================================================================================================
+## 真实库复核（开工/收尾一致）
+====================================================================================================
+F5DA2306BC31CBAB098AAD3774016D320A9B9AA3546F93418196AE9900E0F065  app.db
+2531328 B  （run_gates 每项门禁跑前跑后亦复核 real_db_unchanged=True）
+
+====================================================================================================
+## evidence_hash.py --freeze（登记新 run 目录；只追加）
+====================================================================================================
+[evidence_hash] 解释器 F:\Miniconda\envs\wage\python.exe
+[evidence_hash] 仓库根 D:\workspace\wage_management_system - bak
+[evidence_hash] run_id=w0-e02-t3e-freeze  模式=freeze
+[evidence_hash] strict_coverage=on（A-50 判据：索引快照未覆盖本目录文件 ⇒ 违规）
+[evidence_hash] 模式=verify run_id=w0-e02-t3e-freeze
+[evidence_hash] 证据根 D:\workspace\wage_management_system - bak\test-reports-2026-10\evidence
+[evidence_hash] 基线文件数=682  当前文件数=672  改写=4  删除=10  流水损坏=0  新增(允许)=0  覆盖缺项=0  幽灵条目=2
+[evidence_hash] 每目录索引自检：78/78 目录「快照并集」覆盖本目录全部非索引文件
+[evidence_hash] 判定 = VIOLATION（退出码 1）
+
+====================================================================================================
+## evidence_hash.py --strict-index（零写入终验）· 汇总行 + 全部 w0-e02 目录一致性
+====================================================================================================
+[evidence_hash] 解释器 F:\Miniconda\envs\wage\python.exe
+[evidence_hash] 仓库根 D:\workspace\wage_management_system - bak
+[evidence_hash] run_id=w0-e02-t3e-finalverify  模式=verify
+[evidence_hash] strict_coverage=on（A-50 判据：索引快照未覆盖本目录文件 ⇒ 违规）
+[evidence_hash] 模式=verify run_id=w0-e02-t3e-finalverify
+[evidence_hash] 证据根 D:\workspace\wage_management_system - bak\test-reports-2026-10\evidence
+[evidence_hash] 基线文件数=682  当前文件数=672  改写=4  删除=10  流水损坏=0  新增(允许)=0  覆盖缺项=0  幽灵条目=2
+[evidence_hash] 每目录索引自检：78/78 目录「快照并集」覆盖本目录全部非索引文件
+[evidence_hash] 判定 = VIOLATION（退出码 1）
+  [OK ] _phaseB-prefreeze/20261007-132253/harness/w0-e02-t3-prefix-natural: 权威快照=_phaseB-prefreeze/20261007-132253/harness/w0-e02-t3-prefix-natural/artifact_hashes.json(9) 快照=['_phaseB-prefreeze/20261007-132253/harness/w0-e02-t3-prefix-natural/artifact_hashes.json'] 覆盖=9/9
+  [OK ] harness/w0-e02-t3-exc: 权威快照=harness/w0-e02-t3-exc/artifact_hashes.json(9) 快照=['harness/w0-e02-t3-exc/artifact_hashes.json'] 覆盖=9/9
+  [OK ] harness/w0-e02-t3-matched: 权威快照=harness/w0-e02-t3-matched/artifact_hashes.json(9) 快照=['harness/w0-e02-t3-matched/artifact_hashes.json'] 覆盖=9/9
+  [OK ] harness/w0-e02-t3-mismatch: 权威快照=harness/w0-e02-t3-mismatch/artifact_hashes.json(9) 快照=['harness/w0-e02-t3-mismatch/artifact_hashes.json'] 覆盖=9/9
+  [OK ] harness/w0-e02-t3-natural: 权威快照=harness/w0-e02-t3-natural/artifact_hashes.json(9) 快照=['harness/w0-e02-t3-natural/artifact_hashes.json'] 覆盖=9/9
+  [OK ] harness/w0-e02-t3-prefix: 权威快照=harness/w0-e02-t3-prefix/artifact_hashes.json(2) 快照=['harness/w0-e02-t3-prefix/artifact_hashes.json'] 覆盖=2/2
+  [OK ] harness/w0-e02-t3-prefix-exc: 权威快照=harness/w0-e02-t3-prefix-exc/artifact_hashes.json(9) 快照=['harness/w0-e02-t3-prefix-exc/artifact_hashes.json'] 覆盖=9/9
+  [OK ] harness/w0-e02-t3-prefix-natural: 权威快照=harness/w0-e02-t3-prefix-natural/artifact_hashes.json(9) 快照=['harness/w0-e02-t3-prefix-natural/artifact_hashes.json'] 覆盖=9/9
+  [OK ] harness/w0-e02-t3b-direct: 权威快照=harness/w0-e02-t3b-direct/artifact_hashes.json(8) 快照=['harness/w0-e02-t3b-direct/artifact_hashes.json'] 覆盖=8/8
+  [OK ] harness/w0-e02-t3b-exc: 权威快照=harness/w0-e02-t3b-exc/artifact_hashes.json(9) 快照=['harness/w0-e02-t3b-exc/artifact_hashes.json'] 覆盖=9/9
+  [OK ] harness/w0-e02-t3b-matched: 权威快照=harness/w0-e02-t3b-matched/artifact_hashes.json(9) 快照=['harness/w0-e02-t3b-matched/artifact_hashes.json'] 覆盖=9/9
+  [OK ] harness/w0-e02-t3b-mismatch: 权威快照=harness/w0-e02-t3b-mismatch/artifact_hashes.json(9) 快照=['harness/w0-e02-t3b-mismatch/artifact_hashes.json'] 覆盖=9/9
+  [OK ] harness/w0-e02-t3b-natural: 权威快照=harness/w0-e02-t3b-natural/artifact_hashes.json(9) 快照=['harness/w0-e02-t3b-natural/artifact_hashes.json'] 覆盖=9/9
+  [OK ] harness/w0-e02-t3c-c1-inject: 权威快照=harness/w0-e02-t3c-c1-inject/artifact_hashes.json(9) 快照=['harness/w0-e02-t3c-c1-inject/artifact_hashes.json'] 覆盖=9/9
+  [OK ] harness/w0-e02-t3c-c2-exc: 权威快照=harness/w0-e02-t3c-c2-exc/artifact_hashes.json(9) 快照=['harness/w0-e02-t3c-c2-exc/artifact_hashes.json'] 覆盖=9/9
+  [OK ] harness/w0-e02-t3c-c3-control: 权威快照=harness/w0-e02-t3c-c3-control/artifact_hashes.json(9) 快照=['harness/w0-e02-t3c-c3-control/artifact_hashes.json'] 覆盖=9/9
+  [OK ] harness/w0-e02-t3c-freeze: 权威快照=harness/w0-e02-t3c-freeze/artifact_hashes.json(2) 快照=['harness/w0-e02-t3c-freeze/artifact_hashes.json'] 覆盖=2/2
+  [OK ] harness/w0-e02-t3d-prefix-exc: 权威快照=harness/w0-e02-t3d-prefix-exc/artifact_hashes.json(9) 快照=['harness/w0-e02-t3d-prefix-exc/artifact_hashes.json'] 覆盖=9/9
+  [OK ] harness/w0-e02-t3d-prefix-natural: 权威快照=harness/w0-e02-t3d-prefix-natural/artifact_hashes.json(9) 快照=['harness/w0-e02-t3d-prefix-natural/artifact_hashes.json'] 覆盖=9/9
+
+====================================================================================================
+## 交付物指纹（SHA256）
+====================================================================================================
+test-reports-2026-10/harness/run_gates.py                                bytes= 24476 lines= 514 sha256=46A5D182F3FE463CA6862A440BC2F165884A980945E57CB88FA17F032C7DF706
+test-reports-2026-10/harness/w0_e02_injection.py                         bytes= 16310 lines= 326 sha256=7C0535ECFE7152C1D84568BF18B32C645410EF3858F4CCA2C332EB199ADD8DC4
+test-reports-2026-10/evidence/harness/w0-e02-t3-prefix/run_gates.prefix.py bytes= 19388 lines= 439 sha256=4D946FCEA4A6644ECBCEBDD4C872E59AF3D9F282CEB0C896FF76C5BC66527E4D
+

@@ -1,0 +1,382 @@
+﻿# 09-W0可信度加固说明 —— 原始输出（t1 / E-01）
+# 生成时间：2026-10-07 13:18:37
+# 解释器：F:\Miniconda\envs\wage\python.exe
+# 说明：本文件是 09 说明文档的机读/原文附件（位于 evidence/ 之外，不影响 evidence/** 的索引口径）
+
+===== console_selftest.txt =====
+[evidence_hash] 解释器 F:\Miniconda\envs\wage\python.exe
+[evidence_hash] 仓库根 D:\workspace\wage_management_system - bak
+[evidence_hash] run_id=w0-e01-selftest-final  模式=selftest
+[evidence_hash] strict_coverage=on（A-50 判据：索引快照未覆盖本目录文件 ⇒ 违规）
+[selftest] 合成受控树 D:\workspace\wage_management_system - bak\test-reports-2026-10\.tmp\w0-e01-selftest-final\evidence_hash_selftest\synthetic_evidence
+[guard] 新建 artifact_hashes.json
+[guard] 新建 artifact_hashes.json
+[guard] 新建 artifact_hashes.json
+[guard] 新建 artifact_hashes.json
+[guard] 新建 artifact_hashes.snap2.json
+==============================================================================
+[evidence_hash] 对抗自检 run_id=w0-e01-selftest-final（受控合成树）
+==============================================================================
+  [PASS] EH-P1 阳性对照：合成树 --freeze 后 --verify 必须通过
+        expected={'verdict': 'ok', 'indexes_written': 4}
+        actual  ={'verdict': 'ok', 'indexes_written': 4, 'counts': {'baseline_files': 5, 'current_files': 5, 'modified': 0, 'deleted': 0, 'journal_broken': 0, 'added': 0, 'index_missing': 0, 'coverage_gap': 0, 'phantom_entry': 0, 'baseline_tampered': 0, 'dirs_conform': 3, 'dirs_total': 3}}
+  [PASS] EH-P2 阳性对照：同一状态连续两次校验 ⇒ 读数完全一致（确定性）
+        expected={'counts_equal': True}
+        actual  ={'counts_equal': True, 'counts': {'baseline_files': 5, 'current_files': 5, 'modified': 0, 'deleted': 0, 'journal_broken': 0, 'added': 0, 'index_missing': 0, 'coverage_gap': 0, 'phantom_entry': 0, 'baseline_tampered': 0, 'dirs_conform': 3, 'dirs_total': 3}}
+  [PASS] EH-N1 阴性：改写 alpha/a.txt 一个字节 ⇒ 校验必须失败
+        expected={'verdict': 'violation', 'modified>=1': True}
+        actual  ={'verdict': 'violation', 'modified': 1}
+  [PASS] EH-N2 阴性：删除 beta/run.txt ⇒ 校验必须失败（含幽灵条目）
+        expected={'verdict': 'violation', 'deleted>=1': True, 'phantom>=1': True}
+        actual  ={'verdict': 'violation', 'deleted': 1, 'phantom': 1}
+  [PASS] EH-N3 A-50 回归：冻结后新增文件 ⇒ coverage_gap 非 0；放宽时允许；--freeze 补快照后转 0
+        expected={'gap_verdict': 'violation', 'gap_kind': 'coverage_gap', 'relaxed_verdict': 'ok', 'after_freeze_verdict': 'ok'}
+        actual  ={'gap_verdict': 'violation', 'gap_kinds': ['coverage_gap'], 'relaxed_verdict': 'ok', 'after_freeze_verdict': 'ok', 'new_snapshots': 1}
+  [PASS] EH-N4 --freeze 幂等 + 自愈：既有快照哈希不变、第二次写 0 个、冻结后覆盖自检全通过
+        expected={'second_freeze_writes': 0, 'existing_snapshots_unchanged': True, 'guard_renamed': 0, 'dirs_conform': 'dirs_total'}
+        actual  ={'first_freeze_writes': 0, 'second_freeze_writes': 0, 'existing_snapshots_unchanged': True, 'guard_renamed': 0, 'dirs_conform': '3/3'}
+  [PASS] EH-N5 evidence_journal.jsonl：追加行 ⇒ 通过；截断 ⇒ 失败
+        expected={'append': 'ok', 'truncate': 'violation'}
+        actual  ={'append': 'ok', 'truncate': 'violation', 'journal_broken': 1}
+  [PASS] EH-N6 阴性：同名二次写入 ⇒ 改名保留（原件字节不变），绝不覆盖
+        expected={'original_path_kept': True, 'second_write_renamed': True}
+        actual  ={'original': 'w0-e01-selftest-final/w0_guard_injection_probe.w0-e01-selftest-final.3.txt', 'second': 'w0-e01-selftest-final/w0_guard_injection_probe.w0-e01-selftest-final.4.txt', 'original_kept': True, 'renamed': True}
+  [PASS] EH-N7 禁止洗白：① 改写后 --freeze 仍判违规；② 删除基线快照 ⇒ baseline_tampered
+        expected={'after_freeze_still_violation': True, 'snapshot_deletion_detected': True}
+        actual  ={'freeze_writes': 0, 'verdict_after_freeze': 'violation', 'modified_after_freeze': 1, 'verdict_after_snapshot_delete': 'violation', 'baseline_tampered': 1}
+  [INFO] 真实证据树当前读数：verdict=violation 改写=0 删除=5 覆盖缺项=2 幽灵条目=1（并发写入者的删改会在此显现，不计入本自检判定）
+[evidence_hash] 自检结果 9/9 通过 ⇒ 退出码 0
+[evidence_hash] 自检原始输出：test-reports-2026-10/evidence/harness/w0-e01-selftest-final/evidence_hash_selftest.out.w0-e01-selftest-final.txt
+[evidence_hash] 自检机读：test-reports-2026-10/.tmp/w0-e01-deliver/selftest.json
+
+===== console_freeze.txt =====
+[evidence_hash] 解释器 F:\Miniconda\envs\wage\python.exe
+[evidence_hash] 仓库根 D:\workspace\wage_management_system - bak
+[evidence_hash] run_id=w0-e01-deliver  模式=freeze
+[evidence_hash] strict_coverage=on（A-50 判据：索引快照未覆盖本目录文件 ⇒ 违规）
+[guard] 新建 artifact_hashes.snap2.json
+[guard] 新建 artifact_hashes.json
+[guard] 新建 artifact_hashes.snap2.json
+[guard] 新建 artifact_hashes.json
+[guard] 新建 artifact_hashes.snap2.json
+[guard] 新建 artifact_hashes.snap2.json
+[guard] 新建 artifact_hashes.json
+[freeze] 新写索引 7 个，既有索引跳过 15 个，guard 改名 0 个
+  [written] baseline-prefix/artifact_hashes.snap2.json
+  [written] captain-verification/artifact_hashes.json
+  [written] harness/artifact_hashes.snap2.json
+  [written] harness/w0-e01-a50check/artifact_hashes.json
+  [written] harness/w0-e01-accept/artifact_hashes.snap2.json
+  [written] harness/w0-e01-baseline/artifact_hashes.snap2.json
+  [written] harness/w0-e01-selftest-final/artifact_hashes.json
+  [kept]    analysis/artifact_hashes.w0.json（已存在且已覆盖，未重写）
+  [kept]    api/artifact_hashes.json（已存在且已覆盖，未重写）
+  [kept]    final/artifact_hashes.w0.json（已存在且已覆盖，未重写）
+  [kept]    harness/captain-hc2-20261007/artifact_hashes.json（已存在且已覆盖，未重写）
+  [kept]    harness/captain-healthcheck-20261007/artifact_hashes.json（已存在且已覆盖，未重写）
+  [kept]    harness/w0-e01-A/artifact_hashes.json（已存在且已覆盖，未重写）
+  [kept]    harness/w0-e01-B/artifact_hashes.json（已存在且已覆盖，未重写）
+  [kept]    harness/w0-e01-final/artifact_hashes.json（已存在且已覆盖，未重写）
+  [kept]    harness/w0-e01-final2/artifact_hashes.json（已存在且已覆盖，未重写）
+  [kept]    harness/w0-e01-final3/artifact_hashes.json（已存在且已覆盖，未重写）
+  [kept]    harness/w0-e01-selftest/artifact_hashes.json（已存在且已覆盖，未重写）
+  [kept]    harness/w0-e01-selftest2/artifact_hashes.json（已存在且已覆盖，未重写）
+  [kept]    improve/artifact_hashes.w0.json（已存在且已覆盖，未重写）
+  [kept]    uat/artifact_hashes.w0.json（已存在且已覆盖，未重写）
+  [kept]    ./artifact_hashes.json（已存在且已覆盖，未重写）
+==============================================================================
+[evidence_hash] 模式=verify run_id=w0-e01-deliver
+[evidence_hash] 证据根 D:\workspace\wage_management_system - bak\test-reports-2026-10\evidence
+[evidence_hash] 基线文件数=221  当前文件数=216  改写=0  删除=5  流水损坏=0  新增(允许)=0  覆盖缺项=0  幽灵条目=1
+  [VIOLATION/deleted] baseline-prefix/e01-ab-compare.txt: 基线中的文件已不存在（删除即失败）
+  [VIOLATION/deleted] baseline-prefix/e01-verify.txt: 基线中的文件已不存在（删除即失败）
+  [VIOLATION/deleted] baseline-prefix/idx-conflict-check.txt: 基线中的文件已不存在（删除即失败）
+  [VIOLATION/deleted] baseline-prefix/idx-gap-check.txt: 基线中的文件已不存在（删除即失败）
+  [VIOLATION/deleted] baseline-prefix/idx-gap-detail.txt: 基线中的文件已不存在（删除即失败）
+  [VIOLATION/phantom_entry] baseline-prefix: 索引快照列出了本目录并不存在的文件：['e01-ab-compare.txt', 'e01-verify.txt', 'idx-conflict-check.txt', 'idx-gap-check.txt', 'idx-gap-detail.txt']
+[evidence_hash] 每目录索引自检：22/22 目录「快照并集」覆盖本目录全部非索引文件
+  [OK ] .: 权威快照=artifact_hashes.json(62) 快照=['artifact_hashes.json'] 覆盖=62/62
+  [OK ] analysis: 权威快照=analysis/artifact_hashes.w0.json(5) 快照=['analysis/artifact_hashes.json', 'analysis/artifact_hashes.w0.json'] 覆盖=5/5
+  [OK ] api: 权威快照=api/artifact_hashes.json(11) 快照=['api/artifact_hashes.json'] 覆盖=11/11
+  [OK ] baseline-prefix: 权威快照=baseline-prefix/artifact_hashes.w0-e01-final2.json(8) 快照=['baseline-prefix/artifact_hashes.json', 'baseline-prefix/artifact_hashes.snap2.json', 'baseline-prefix/artifact_hashes.w0-e01-final2.json'] 覆盖=4/4
+  [OK ] captain-verification: 权威快照=captain-verification/artifact_hashes.json(2) 快照=['captain-verification/artifact_hashes.json'] 覆盖=2/2
+  [OK ] final: 权威快照=final/artifact_hashes.w0.json(4) 快照=['final/artifact_hashes.json', 'final/artifact_hashes.w0.json'] 覆盖=4/4
+  [OK ] harness: 权威快照=harness/artifact_hashes.snap2.json(19) 快照=['harness/artifact_hashes.json', 'harness/artifact_hashes.snap2.json'] 覆盖=19/19
+  [OK ] harness/captain-hc2-20261007: 权威快照=harness/captain-hc2-20261007/artifact_hashes.json(8) 快照=['harness/captain-hc2-20261007/artifact_hashes.json'] 覆盖=8/8
+  [OK ] harness/captain-healthcheck-20261007: 权威快照=harness/captain-healthcheck-20261007/artifact_hashes.json(7) 快照=['harness/captain-healthcheck-20261007/artifact_hashes.json'] 覆盖=7/7
+  [OK ] harness/w0-e01-A: 权威快照=harness/w0-e01-A/artifact_hashes.json(22) 快照=['harness/w0-e01-A/artifact_hashes.json'] 覆盖=22/22
+  [OK ] harness/w0-e01-B: 权威快照=harness/w0-e01-B/artifact_hashes.json(8) 快照=['harness/w0-e01-B/artifact_hashes.json'] 覆盖=8/8
+  [OK ] harness/w0-e01-a50check: 权威快照=harness/w0-e01-a50check/artifact_hashes.json(5) 快照=['harness/w0-e01-a50check/artifact_hashes.json'] 覆盖=5/5
+  [OK ] harness/w0-e01-accept: 权威快照=harness/w0-e01-accept/artifact_hashes.snap2.json(9) 快照=['harness/w0-e01-accept/artifact_hashes.json', 'harness/w0-e01-accept/artifact_hashes.snap2.json', 'harness/w0-e01-accept/artifact_hashes.w0-e01-accept.json'] 覆盖=9/9
+  [OK ] harness/w0-e01-baseline: 权威快照=harness/w0-e01-baseline/artifact_hashes.snap2.json(11) 快照=['harness/w0-e01-baseline/artifact_hashes.json', 'harness/w0-e01-baseline/artifact_hashes.snap2.json', 'harness/w0-e01-baseline/artifact_hashes.w0-e01-final2.json'] 覆盖=11/11
+  [OK ] harness/w0-e01-final: 权威快照=harness/w0-e01-final/artifact_hashes.json(6) 快照=['harness/w0-e01-final/artifact_hashes.json'] 覆盖=6/6
+  [OK ] harness/w0-e01-final2: 权威快照=harness/w0-e01-final2/artifact_hashes.json(5) 快照=['harness/w0-e01-final2/artifact_hashes.json'] 覆盖=5/5
+  [OK ] harness/w0-e01-final3: 权威快照=harness/w0-e01-final3/artifact_hashes.json(5) 快照=['harness/w0-e01-final3/artifact_hashes.json'] 覆盖=5/5
+  [OK ] harness/w0-e01-selftest: 权威快照=harness/w0-e01-selftest/artifact_hashes.json(5) 快照=['harness/w0-e01-selftest/artifact_hashes.json'] 覆盖=5/5
+  [OK ] harness/w0-e01-selftest-final: 权威快照=harness/w0-e01-selftest-final/artifact_hashes.json(4) 快照=['harness/w0-e01-selftest-final/artifact_hashes.json'] 覆盖=4/4
+  [OK ] harness/w0-e01-selftest2: 权威快照=harness/w0-e01-selftest2/artifact_hashes.json(5) 快照=['harness/w0-e01-selftest2/artifact_hashes.json'] 覆盖=5/5
+  [OK ] improve: 权威快照=improve/artifact_hashes.w0.json(3) 快照=['improve/artifact_hashes.json', 'improve/artifact_hashes.w0.json'] 覆盖=3/3
+  [OK ] uat: 权威快照=uat/artifact_hashes.w0.json(6) 快照=['uat/artifact_hashes.json', 'uat/artifact_hashes.w0.json'] 覆盖=6/6
+[evidence_hash] 判定 = VIOLATION（退出码 1）
+==============================================================================
+[evidence_hash] 控制台原文（经 save_evidence，带台账）：test-reports-2026-10/evidence/harness/w0-e01-deliver/evidence_hash_verify.out.txt
+[evidence_hash] 机读报告：D:\workspace\wage_management_system - bak\test-reports-2026-10\.tmp\w0-e01-deliver\freeze_report.json（改名=False）
+
+
+
+===== console_freeze2.txt =====
+[evidence_hash] 解释器 F:\Miniconda\envs\wage\python.exe
+[evidence_hash] 仓库根 D:\workspace\wage_management_system - bak
+[evidence_hash] run_id=w0-e01-deliver2  模式=freeze
+[evidence_hash] strict_coverage=on（A-50 判据：索引快照未覆盖本目录文件 ⇒ 违规）
+[guard] 新建 artifact_hashes.json
+[freeze] 新写索引 1 个，既有索引跳过 22 个，guard 改名 0 个
+  [written] harness/w0-e01-deliver/artifact_hashes.json
+  [kept]    analysis/artifact_hashes.w0.json（已存在且已覆盖，未重写）
+  [kept]    api/artifact_hashes.json（已存在且已覆盖，未重写）
+  [kept]    baseline-prefix/artifact_hashes.json（已存在且已覆盖，未重写）
+  [kept]    captain-verification/artifact_hashes.json（已存在且已覆盖，未重写）
+  [kept]    final/artifact_hashes.w0.json（已存在且已覆盖，未重写）
+  [kept]    harness/artifact_hashes.json（已存在且已覆盖，未重写）
+  [kept]    harness/captain-hc2-20261007/artifact_hashes.json（已存在且已覆盖，未重写）
+  [kept]    harness/captain-healthcheck-20261007/artifact_hashes.json（已存在且已覆盖，未重写）
+  [kept]    harness/w0-e01-A/artifact_hashes.json（已存在且已覆盖，未重写）
+  [kept]    harness/w0-e01-B/artifact_hashes.json（已存在且已覆盖，未重写）
+  [kept]    harness/w0-e01-a50check/artifact_hashes.json（已存在且已覆盖，未重写）
+  [kept]    harness/w0-e01-accept/artifact_hashes.json（已存在且已覆盖，未重写）
+  [kept]    harness/w0-e01-baseline/artifact_hashes.json（已存在且已覆盖，未重写）
+  [kept]    harness/w0-e01-final/artifact_hashes.json（已存在且已覆盖，未重写）
+  [kept]    harness/w0-e01-final2/artifact_hashes.json（已存在且已覆盖，未重写）
+  [kept]    harness/w0-e01-final3/artifact_hashes.json（已存在且已覆盖，未重写）
+  [kept]    harness/w0-e01-selftest/artifact_hashes.json（已存在且已覆盖，未重写）
+  [kept]    harness/w0-e01-selftest-final/artifact_hashes.json（已存在且已覆盖，未重写）
+  [kept]    harness/w0-e01-selftest2/artifact_hashes.json（已存在且已覆盖，未重写）
+  [kept]    improve/artifact_hashes.w0.json（已存在且已覆盖，未重写）
+  [kept]    uat/artifact_hashes.w0.json（已存在且已覆盖，未重写）
+  [kept]    ./artifact_hashes.json（已存在且已覆盖，未重写）
+==============================================================================
+[evidence_hash] 模式=verify run_id=w0-e01-deliver2
+[evidence_hash] 证据根 D:\workspace\wage_management_system - bak\test-reports-2026-10\evidence
+[evidence_hash] 基线文件数=223  当前文件数=218  改写=0  删除=5  流水损坏=0  新增(允许)=0  覆盖缺项=0  幽灵条目=1
+  [VIOLATION/deleted] baseline-prefix/e01-ab-compare.txt: 基线中的文件已不存在（删除即失败）
+  [VIOLATION/deleted] baseline-prefix/e01-verify.txt: 基线中的文件已不存在（删除即失败）
+  [VIOLATION/deleted] baseline-prefix/idx-conflict-check.txt: 基线中的文件已不存在（删除即失败）
+  [VIOLATION/deleted] baseline-prefix/idx-gap-check.txt: 基线中的文件已不存在（删除即失败）
+  [VIOLATION/deleted] baseline-prefix/idx-gap-detail.txt: 基线中的文件已不存在（删除即失败）
+  [VIOLATION/phantom_entry] baseline-prefix: 索引快照列出了本目录并不存在的文件：['e01-ab-compare.txt', 'e01-verify.txt', 'idx-conflict-check.txt', 'idx-gap-check.txt', 'idx-gap-detail.txt']
+[evidence_hash] 每目录索引自检：23/23 目录「快照并集」覆盖本目录全部非索引文件
+  [OK ] .: 权威快照=artifact_hashes.json(62) 快照=['artifact_hashes.json'] 覆盖=62/62
+  [OK ] analysis: 权威快照=analysis/artifact_hashes.w0.json(5) 快照=['analysis/artifact_hashes.json', 'analysis/artifact_hashes.w0.json'] 覆盖=5/5
+  [OK ] api: 权威快照=api/artifact_hashes.json(11) 快照=['api/artifact_hashes.json'] 覆盖=11/11
+  [OK ] baseline-prefix: 权威快照=baseline-prefix/artifact_hashes.w0-e01-final2.json(8) 快照=['baseline-prefix/artifact_hashes.json', 'baseline-prefix/artifact_hashes.snap2.json', 'baseline-prefix/artifact_hashes.w0-e01-final2.json'] 覆盖=4/4
+  [OK ] captain-verification: 权威快照=captain-verification/artifact_hashes.json(2) 快照=['captain-verification/artifact_hashes.json'] 覆盖=2/2
+  [OK ] final: 权威快照=final/artifact_hashes.w0.json(4) 快照=['final/artifact_hashes.json', 'final/artifact_hashes.w0.json'] 覆盖=4/4
+  [OK ] harness: 权威快照=harness/artifact_hashes.snap2.json(19) 快照=['harness/artifact_hashes.json', 'harness/artifact_hashes.snap2.json'] 覆盖=19/19
+  [OK ] harness/captain-hc2-20261007: 权威快照=harness/captain-hc2-20261007/artifact_hashes.json(8) 快照=['harness/captain-hc2-20261007/artifact_hashes.json'] 覆盖=8/8
+  [OK ] harness/captain-healthcheck-20261007: 权威快照=harness/captain-healthcheck-20261007/artifact_hashes.json(7) 快照=['harness/captain-healthcheck-20261007/artifact_hashes.json'] 覆盖=7/7
+  [OK ] harness/w0-e01-A: 权威快照=harness/w0-e01-A/artifact_hashes.json(22) 快照=['harness/w0-e01-A/artifact_hashes.json'] 覆盖=22/22
+  [OK ] harness/w0-e01-B: 权威快照=harness/w0-e01-B/artifact_hashes.json(8) 快照=['harness/w0-e01-B/artifact_hashes.json'] 覆盖=8/8
+  [OK ] harness/w0-e01-a50check: 权威快照=harness/w0-e01-a50check/artifact_hashes.json(5) 快照=['harness/w0-e01-a50check/artifact_hashes.json'] 覆盖=5/5
+  [OK ] harness/w0-e01-accept: 权威快照=harness/w0-e01-accept/artifact_hashes.snap2.json(9) 快照=['harness/w0-e01-accept/artifact_hashes.json', 'harness/w0-e01-accept/artifact_hashes.snap2.json', 'harness/w0-e01-accept/artifact_hashes.w0-e01-accept.json'] 覆盖=9/9
+  [OK ] harness/w0-e01-baseline: 权威快照=harness/w0-e01-baseline/artifact_hashes.snap2.json(11) 快照=['harness/w0-e01-baseline/artifact_hashes.json', 'harness/w0-e01-baseline/artifact_hashes.snap2.json', 'harness/w0-e01-baseline/artifact_hashes.w0-e01-final2.json'] 覆盖=11/11
+  [OK ] harness/w0-e01-deliver: 权威快照=harness/w0-e01-deliver/artifact_hashes.json(2) 快照=['harness/w0-e01-deliver/artifact_hashes.json'] 覆盖=2/2
+  [OK ] harness/w0-e01-final: 权威快照=harness/w0-e01-final/artifact_hashes.json(6) 快照=['harness/w0-e01-final/artifact_hashes.json'] 覆盖=6/6
+  [OK ] harness/w0-e01-final2: 权威快照=harness/w0-e01-final2/artifact_hashes.json(5) 快照=['harness/w0-e01-final2/artifact_hashes.json'] 覆盖=5/5
+  [OK ] harness/w0-e01-final3: 权威快照=harness/w0-e01-final3/artifact_hashes.json(5) 快照=['harness/w0-e01-final3/artifact_hashes.json'] 覆盖=5/5
+  [OK ] harness/w0-e01-selftest: 权威快照=harness/w0-e01-selftest/artifact_hashes.json(5) 快照=['harness/w0-e01-selftest/artifact_hashes.json'] 覆盖=5/5
+  [OK ] harness/w0-e01-selftest-final: 权威快照=harness/w0-e01-selftest-final/artifact_hashes.json(4) 快照=['harness/w0-e01-selftest-final/artifact_hashes.json'] 覆盖=4/4
+  [OK ] harness/w0-e01-selftest2: 权威快照=harness/w0-e01-selftest2/artifact_hashes.json(5) 快照=['harness/w0-e01-selftest2/artifact_hashes.json'] 覆盖=5/5
+  [OK ] improve: 权威快照=improve/artifact_hashes.w0.json(3) 快照=['improve/artifact_hashes.json', 'improve/artifact_hashes.w0.json'] 覆盖=3/3
+  [OK ] uat: 权威快照=uat/artifact_hashes.w0.json(6) 快照=['uat/artifact_hashes.json', 'uat/artifact_hashes.w0.json'] 覆盖=6/6
+[evidence_hash] 判定 = VIOLATION（退出码 1）
+==============================================================================
+[evidence_hash] 机读报告：D:\workspace\wage_management_system - bak\test-reports-2026-10\.tmp\w0-e01-deliver\freeze2_report.json（改名=False）
+
+
+
+===== console_freeze3.txt =====
+[evidence_hash] 解释器 F:\Miniconda\envs\wage\python.exe
+[evidence_hash] 仓库根 D:\workspace\wage_management_system - bak
+[evidence_hash] run_id=w0-e01-deliver3  模式=freeze
+[evidence_hash] strict_coverage=on（A-50 判据：索引快照未覆盖本目录文件 ⇒ 违规）
+[guard] 新建 artifact_hashes.snap2.json
+[guard] 新建 artifact_hashes.snap2.json
+[freeze] 新写索引 2 个，既有索引跳过 21 个，guard 改名 0 个
+  [written] captain-verification/artifact_hashes.snap2.json
+  [written] harness/w0-e01-selftest-final/artifact_hashes.snap2.json
+  [kept]    analysis/artifact_hashes.w0.json（已存在且已覆盖，未重写）
+  [kept]    api/artifact_hashes.json（已存在且已覆盖，未重写）
+  [kept]    baseline-prefix/artifact_hashes.json（已存在且已覆盖，未重写）
+  [kept]    final/artifact_hashes.w0.json（已存在且已覆盖，未重写）
+  [kept]    harness/artifact_hashes.json（已存在且已覆盖，未重写）
+  [kept]    harness/captain-hc2-20261007/artifact_hashes.json（已存在且已覆盖，未重写）
+  [kept]    harness/captain-healthcheck-20261007/artifact_hashes.json（已存在且已覆盖，未重写）
+  [kept]    harness/w0-e01-A/artifact_hashes.json（已存在且已覆盖，未重写）
+  [kept]    harness/w0-e01-B/artifact_hashes.json（已存在且已覆盖，未重写）
+  [kept]    harness/w0-e01-a50check/artifact_hashes.json（已存在且已覆盖，未重写）
+  [kept]    harness/w0-e01-accept/artifact_hashes.json（已存在且已覆盖，未重写）
+  [kept]    harness/w0-e01-baseline/artifact_hashes.json（已存在且已覆盖，未重写）
+  [kept]    harness/w0-e01-deliver/artifact_hashes.json（已存在且已覆盖，未重写）
+  [kept]    harness/w0-e01-final/artifact_hashes.json（已存在且已覆盖，未重写）
+  [kept]    harness/w0-e01-final2/artifact_hashes.json（已存在且已覆盖，未重写）
+  [kept]    harness/w0-e01-final3/artifact_hashes.json（已存在且已覆盖，未重写）
+  [kept]    harness/w0-e01-selftest/artifact_hashes.json（已存在且已覆盖，未重写）
+  [kept]    harness/w0-e01-selftest2/artifact_hashes.json（已存在且已覆盖，未重写）
+  [kept]    improve/artifact_hashes.w0.json（已存在且已覆盖，未重写）
+  [kept]    uat/artifact_hashes.w0.json（已存在且已覆盖，未重写）
+  [kept]    ./artifact_hashes.json（已存在且已覆盖，未重写）
+==============================================================================
+[evidence_hash] 模式=verify run_id=w0-e01-deliver3
+[evidence_hash] 证据根 D:\workspace\wage_management_system - bak\test-reports-2026-10\evidence
+[evidence_hash] 基线文件数=229  当前文件数=224  改写=0  删除=5  流水损坏=0  新增(允许)=0  覆盖缺项=0  幽灵条目=1
+  [VIOLATION/deleted] baseline-prefix/e01-ab-compare.txt: 基线中的文件已不存在（删除即失败）
+  [VIOLATION/deleted] baseline-prefix/e01-verify.txt: 基线中的文件已不存在（删除即失败）
+  [VIOLATION/deleted] baseline-prefix/idx-conflict-check.txt: 基线中的文件已不存在（删除即失败）
+  [VIOLATION/deleted] baseline-prefix/idx-gap-check.txt: 基线中的文件已不存在（删除即失败）
+  [VIOLATION/deleted] baseline-prefix/idx-gap-detail.txt: 基线中的文件已不存在（删除即失败）
+  [VIOLATION/phantom_entry] baseline-prefix: 索引快照列出了本目录并不存在的文件：['e01-ab-compare.txt', 'e01-verify.txt', 'idx-conflict-check.txt', 'idx-gap-check.txt', 'idx-gap-detail.txt']
+[evidence_hash] 每目录索引自检：23/23 目录「快照并集」覆盖本目录全部非索引文件
+  [OK ] .: 权威快照=artifact_hashes.json(62) 快照=['artifact_hashes.json'] 覆盖=62/62
+  [OK ] analysis: 权威快照=analysis/artifact_hashes.w0.json(5) 快照=['analysis/artifact_hashes.json', 'analysis/artifact_hashes.w0.json'] 覆盖=5/5
+  [OK ] api: 权威快照=api/artifact_hashes.json(11) 快照=['api/artifact_hashes.json'] 覆盖=11/11
+  [OK ] baseline-prefix: 权威快照=baseline-prefix/artifact_hashes.w0-e01-final2.json(8) 快照=['baseline-prefix/artifact_hashes.json', 'baseline-prefix/artifact_hashes.snap2.json', 'baseline-prefix/artifact_hashes.w0-e01-final2.json'] 覆盖=4/4
+  [OK ] captain-verification: 权威快照=captain-verification/artifact_hashes.snap2.json(3) 快照=['captain-verification/artifact_hashes.json', 'captain-verification/artifact_hashes.snap2.json'] 覆盖=3/3
+  [OK ] final: 权威快照=final/artifact_hashes.w0.json(4) 快照=['final/artifact_hashes.json', 'final/artifact_hashes.w0.json'] 覆盖=4/4
+  [OK ] harness: 权威快照=harness/artifact_hashes.snap2.json(19) 快照=['harness/artifact_hashes.json', 'harness/artifact_hashes.snap2.json'] 覆盖=19/19
+  [OK ] harness/captain-hc2-20261007: 权威快照=harness/captain-hc2-20261007/artifact_hashes.json(8) 快照=['harness/captain-hc2-20261007/artifact_hashes.json'] 覆盖=8/8
+  [OK ] harness/captain-healthcheck-20261007: 权威快照=harness/captain-healthcheck-20261007/artifact_hashes.json(7) 快照=['harness/captain-healthcheck-20261007/artifact_hashes.json'] 覆盖=7/7
+  [OK ] harness/w0-e01-A: 权威快照=harness/w0-e01-A/artifact_hashes.json(22) 快照=['harness/w0-e01-A/artifact_hashes.json'] 覆盖=22/22
+  [OK ] harness/w0-e01-B: 权威快照=harness/w0-e01-B/artifact_hashes.json(8) 快照=['harness/w0-e01-B/artifact_hashes.json'] 覆盖=8/8
+  [OK ] harness/w0-e01-a50check: 权威快照=harness/w0-e01-a50check/artifact_hashes.json(5) 快照=['harness/w0-e01-a50check/artifact_hashes.json'] 覆盖=5/5
+  [OK ] harness/w0-e01-accept: 权威快照=harness/w0-e01-accept/artifact_hashes.snap2.json(9) 快照=['harness/w0-e01-accept/artifact_hashes.json', 'harness/w0-e01-accept/artifact_hashes.snap2.json', 'harness/w0-e01-accept/artifact_hashes.w0-e01-accept.json'] 覆盖=9/9
+  [OK ] harness/w0-e01-baseline: 权威快照=harness/w0-e01-baseline/artifact_hashes.snap2.json(11) 快照=['harness/w0-e01-baseline/artifact_hashes.json', 'harness/w0-e01-baseline/artifact_hashes.snap2.json', 'harness/w0-e01-baseline/artifact_hashes.w0-e01-final2.json'] 覆盖=11/11
+  [OK ] harness/w0-e01-deliver: 权威快照=harness/w0-e01-deliver/artifact_hashes.json(2) 快照=['harness/w0-e01-deliver/artifact_hashes.json'] 覆盖=2/2
+  [OK ] harness/w0-e01-final: 权威快照=harness/w0-e01-final/artifact_hashes.json(6) 快照=['harness/w0-e01-final/artifact_hashes.json'] 覆盖=6/6
+  [OK ] harness/w0-e01-final2: 权威快照=harness/w0-e01-final2/artifact_hashes.json(5) 快照=['harness/w0-e01-final2/artifact_hashes.json'] 覆盖=5/5
+  [OK ] harness/w0-e01-final3: 权威快照=harness/w0-e01-final3/artifact_hashes.json(5) 快照=['harness/w0-e01-final3/artifact_hashes.json'] 覆盖=5/5
+  [OK ] harness/w0-e01-selftest: 权威快照=harness/w0-e01-selftest/artifact_hashes.json(5) 快照=['harness/w0-e01-selftest/artifact_hashes.json'] 覆盖=5/5
+  [OK ] harness/w0-e01-selftest-final: 权威快照=harness/w0-e01-selftest-final/artifact_hashes.snap2.json(9) 快照=['harness/w0-e01-selftest-final/artifact_hashes.json', 'harness/w0-e01-selftest-final/artifact_hashes.snap2.json'] 覆盖=9/9
+  [OK ] harness/w0-e01-selftest2: 权威快照=harness/w0-e01-selftest2/artifact_hashes.json(5) 快照=['harness/w0-e01-selftest2/artifact_hashes.json'] 覆盖=5/5
+  [OK ] improve: 权威快照=improve/artifact_hashes.w0.json(3) 快照=['improve/artifact_hashes.json', 'improve/artifact_hashes.w0.json'] 覆盖=3/3
+  [OK ] uat: 权威快照=uat/artifact_hashes.w0.json(6) 快照=['uat/artifact_hashes.json', 'uat/artifact_hashes.w0.json'] 覆盖=6/6
+[evidence_hash] 判定 = VIOLATION（退出码 1）
+==============================================================================
+[evidence_hash] 机读报告：D:\workspace\wage_management_system - bak\test-reports-2026-10\.tmp\w0-e01-deliver\freeze3_report.json（改名=False）
+
+
+
+===== console_verify_final.txt =====
+[evidence_hash] 解释器 F:\Miniconda\envs\wage\python.exe
+[evidence_hash] 仓库根 D:\workspace\wage_management_system - bak
+[evidence_hash] run_id=w0-e01-deliver3  模式=verify
+[evidence_hash] strict_coverage=on（A-50 判据：索引快照未覆盖本目录文件 ⇒ 违规）
+==============================================================================
+[evidence_hash] 模式=verify run_id=w0-e01-deliver3
+[evidence_hash] 证据根 D:\workspace\wage_management_system - bak\test-reports-2026-10\evidence
+[evidence_hash] 基线文件数=229  当前文件数=224  改写=0  删除=5  流水损坏=0  新增(允许)=0  覆盖缺项=0  幽灵条目=1
+  [VIOLATION/deleted] baseline-prefix/e01-ab-compare.txt: 基线中的文件已不存在（删除即失败）
+  [VIOLATION/deleted] baseline-prefix/e01-verify.txt: 基线中的文件已不存在（删除即失败）
+  [VIOLATION/deleted] baseline-prefix/idx-conflict-check.txt: 基线中的文件已不存在（删除即失败）
+  [VIOLATION/deleted] baseline-prefix/idx-gap-check.txt: 基线中的文件已不存在（删除即失败）
+  [VIOLATION/deleted] baseline-prefix/idx-gap-detail.txt: 基线中的文件已不存在（删除即失败）
+  [VIOLATION/phantom_entry] baseline-prefix: 索引快照列出了本目录并不存在的文件：['e01-ab-compare.txt', 'e01-verify.txt', 'idx-conflict-check.txt', 'idx-gap-check.txt', 'idx-gap-detail.txt']
+[evidence_hash] 每目录索引自检：23/23 目录「快照并集」覆盖本目录全部非索引文件
+  [OK ] .: 权威快照=artifact_hashes.json(62) 快照=['artifact_hashes.json'] 覆盖=62/62
+  [OK ] analysis: 权威快照=analysis/artifact_hashes.w0.json(5) 快照=['analysis/artifact_hashes.json', 'analysis/artifact_hashes.w0.json'] 覆盖=5/5
+  [OK ] api: 权威快照=api/artifact_hashes.json(11) 快照=['api/artifact_hashes.json'] 覆盖=11/11
+  [OK ] baseline-prefix: 权威快照=baseline-prefix/artifact_hashes.w0-e01-final2.json(8) 快照=['baseline-prefix/artifact_hashes.json', 'baseline-prefix/artifact_hashes.snap2.json', 'baseline-prefix/artifact_hashes.w0-e01-final2.json'] 覆盖=4/4
+  [OK ] captain-verification: 权威快照=captain-verification/artifact_hashes.snap2.json(3) 快照=['captain-verification/artifact_hashes.json', 'captain-verification/artifact_hashes.snap2.json'] 覆盖=3/3
+  [OK ] final: 权威快照=final/artifact_hashes.w0.json(4) 快照=['final/artifact_hashes.json', 'final/artifact_hashes.w0.json'] 覆盖=4/4
+  [OK ] harness: 权威快照=harness/artifact_hashes.snap2.json(19) 快照=['harness/artifact_hashes.json', 'harness/artifact_hashes.snap2.json'] 覆盖=19/19
+  [OK ] harness/captain-hc2-20261007: 权威快照=harness/captain-hc2-20261007/artifact_hashes.json(8) 快照=['harness/captain-hc2-20261007/artifact_hashes.json'] 覆盖=8/8
+  [OK ] harness/captain-healthcheck-20261007: 权威快照=harness/captain-healthcheck-20261007/artifact_hashes.json(7) 快照=['harness/captain-healthcheck-20261007/artifact_hashes.json'] 覆盖=7/7
+  [OK ] harness/w0-e01-A: 权威快照=harness/w0-e01-A/artifact_hashes.json(22) 快照=['harness/w0-e01-A/artifact_hashes.json'] 覆盖=22/22
+  [OK ] harness/w0-e01-B: 权威快照=harness/w0-e01-B/artifact_hashes.json(8) 快照=['harness/w0-e01-B/artifact_hashes.json'] 覆盖=8/8
+  [OK ] harness/w0-e01-a50check: 权威快照=harness/w0-e01-a50check/artifact_hashes.json(5) 快照=['harness/w0-e01-a50check/artifact_hashes.json'] 覆盖=5/5
+  [OK ] harness/w0-e01-accept: 权威快照=harness/w0-e01-accept/artifact_hashes.snap2.json(9) 快照=['harness/w0-e01-accept/artifact_hashes.json', 'harness/w0-e01-accept/artifact_hashes.snap2.json', 'harness/w0-e01-accept/artifact_hashes.w0-e01-accept.json'] 覆盖=9/9
+  [OK ] harness/w0-e01-baseline: 权威快照=harness/w0-e01-baseline/artifact_hashes.snap2.json(11) 快照=['harness/w0-e01-baseline/artifact_hashes.json', 'harness/w0-e01-baseline/artifact_hashes.snap2.json', 'harness/w0-e01-baseline/artifact_hashes.w0-e01-final2.json'] 覆盖=11/11
+  [OK ] harness/w0-e01-deliver: 权威快照=harness/w0-e01-deliver/artifact_hashes.json(2) 快照=['harness/w0-e01-deliver/artifact_hashes.json'] 覆盖=2/2
+  [OK ] harness/w0-e01-final: 权威快照=harness/w0-e01-final/artifact_hashes.json(6) 快照=['harness/w0-e01-final/artifact_hashes.json'] 覆盖=6/6
+  [OK ] harness/w0-e01-final2: 权威快照=harness/w0-e01-final2/artifact_hashes.json(5) 快照=['harness/w0-e01-final2/artifact_hashes.json'] 覆盖=5/5
+  [OK ] harness/w0-e01-final3: 权威快照=harness/w0-e01-final3/artifact_hashes.json(5) 快照=['harness/w0-e01-final3/artifact_hashes.json'] 覆盖=5/5
+  [OK ] harness/w0-e01-selftest: 权威快照=harness/w0-e01-selftest/artifact_hashes.json(5) 快照=['harness/w0-e01-selftest/artifact_hashes.json'] 覆盖=5/5
+  [OK ] harness/w0-e01-selftest-final: 权威快照=harness/w0-e01-selftest-final/artifact_hashes.snap2.json(9) 快照=['harness/w0-e01-selftest-final/artifact_hashes.json', 'harness/w0-e01-selftest-final/artifact_hashes.snap2.json'] 覆盖=9/9
+  [OK ] harness/w0-e01-selftest2: 权威快照=harness/w0-e01-selftest2/artifact_hashes.json(5) 快照=['harness/w0-e01-selftest2/artifact_hashes.json'] 覆盖=5/5
+  [OK ] improve: 权威快照=improve/artifact_hashes.w0.json(3) 快照=['improve/artifact_hashes.json', 'improve/artifact_hashes.w0.json'] 覆盖=3/3
+  [OK ] uat: 权威快照=uat/artifact_hashes.w0.json(6) 快照=['uat/artifact_hashes.json', 'uat/artifact_hashes.w0.json'] 覆盖=6/6
+[evidence_hash] 判定 = VIOLATION（退出码 1）
+==============================================================================
+[evidence_hash] 机读报告：D:\workspace\wage_management_system - bak\test-reports-2026-10\.tmp\w0-e01-deliver\verify_final.w0-e01-deliver3.json（改名=True）
+
+
+
+===== console_freeze2.txt =====
+[evidence_hash] 解释器 F:\Miniconda\envs\wage\python.exe
+[evidence_hash] 仓库根 D:\workspace\wage_management_system - bak
+[evidence_hash] run_id=w0-e01-deliver2  模式=freeze
+[evidence_hash] strict_coverage=on（A-50 判据：索引快照未覆盖本目录文件 ⇒ 违规）
+[guard] 新建 artifact_hashes.json
+[freeze] 新写索引 1 个，既有索引跳过 22 个，guard 改名 0 个
+  [written] harness/w0-e01-deliver/artifact_hashes.json
+  [kept]    analysis/artifact_hashes.w0.json（已存在且已覆盖，未重写）
+  [kept]    api/artifact_hashes.json（已存在且已覆盖，未重写）
+  [kept]    baseline-prefix/artifact_hashes.json（已存在且已覆盖，未重写）
+  [kept]    captain-verification/artifact_hashes.json（已存在且已覆盖，未重写）
+  [kept]    final/artifact_hashes.w0.json（已存在且已覆盖，未重写）
+  [kept]    harness/artifact_hashes.json（已存在且已覆盖，未重写）
+  [kept]    harness/captain-hc2-20261007/artifact_hashes.json（已存在且已覆盖，未重写）
+  [kept]    harness/captain-healthcheck-20261007/artifact_hashes.json（已存在且已覆盖，未重写）
+  [kept]    harness/w0-e01-A/artifact_hashes.json（已存在且已覆盖，未重写）
+  [kept]    harness/w0-e01-B/artifact_hashes.json（已存在且已覆盖，未重写）
+  [kept]    harness/w0-e01-a50check/artifact_hashes.json（已存在且已覆盖，未重写）
+  [kept]    harness/w0-e01-accept/artifact_hashes.json（已存在且已覆盖，未重写）
+  [kept]    harness/w0-e01-baseline/artifact_hashes.json（已存在且已覆盖，未重写）
+  [kept]    harness/w0-e01-final/artifact_hashes.json（已存在且已覆盖，未重写）
+  [kept]    harness/w0-e01-final2/artifact_hashes.json（已存在且已覆盖，未重写）
+  [kept]    harness/w0-e01-final3/artifact_hashes.json（已存在且已覆盖，未重写）
+  [kept]    harness/w0-e01-selftest/artifact_hashes.json（已存在且已覆盖，未重写）
+  [kept]    harness/w0-e01-selftest-final/artifact_hashes.json（已存在且已覆盖，未重写）
+  [kept]    harness/w0-e01-selftest2/artifact_hashes.json（已存在且已覆盖，未重写）
+  [kept]    improve/artifact_hashes.w0.json（已存在且已覆盖，未重写）
+  [kept]    uat/artifact_hashes.w0.json（已存在且已覆盖，未重写）
+  [kept]    ./artifact_hashes.json（已存在且已覆盖，未重写）
+==============================================================================
+[evidence_hash] 模式=verify run_id=w0-e01-deliver2
+[evidence_hash] 证据根 D:\workspace\wage_management_system - bak\test-reports-2026-10\evidence
+[evidence_hash] 基线文件数=223  当前文件数=218  改写=0  删除=5  流水损坏=0  新增(允许)=0  覆盖缺项=0  幽灵条目=1
+  [VIOLATION/deleted] baseline-prefix/e01-ab-compare.txt: 基线中的文件已不存在（删除即失败）
+  [VIOLATION/deleted] baseline-prefix/e01-verify.txt: 基线中的文件已不存在（删除即失败）
+  [VIOLATION/deleted] baseline-prefix/idx-conflict-check.txt: 基线中的文件已不存在（删除即失败）
+  [VIOLATION/deleted] baseline-prefix/idx-gap-check.txt: 基线中的文件已不存在（删除即失败）
+  [VIOLATION/deleted] baseline-prefix/idx-gap-detail.txt: 基线中的文件已不存在（删除即失败）
+  [VIOLATION/phantom_entry] baseline-prefix: 索引快照列出了本目录并不存在的文件：['e01-ab-compare.txt', 'e01-verify.txt', 'idx-conflict-check.txt', 'idx-gap-check.txt', 'idx-gap-detail.txt']
+[evidence_hash] 每目录索引自检：23/23 目录「快照并集」覆盖本目录全部非索引文件
+  [OK ] .: 权威快照=artifact_hashes.json(62) 快照=['artifact_hashes.json'] 覆盖=62/62
+  [OK ] analysis: 权威快照=analysis/artifact_hashes.w0.json(5) 快照=['analysis/artifact_hashes.json', 'analysis/artifact_hashes.w0.json'] 覆盖=5/5
+  [OK ] api: 权威快照=api/artifact_hashes.json(11) 快照=['api/artifact_hashes.json'] 覆盖=11/11
+  [OK ] baseline-prefix: 权威快照=baseline-prefix/artifact_hashes.w0-e01-final2.json(8) 快照=['baseline-prefix/artifact_hashes.json', 'baseline-prefix/artifact_hashes.snap2.json', 'baseline-prefix/artifact_hashes.w0-e01-final2.json'] 覆盖=4/4
+  [OK ] captain-verification: 权威快照=captain-verification/artifact_hashes.json(2) 快照=['captain-verification/artifact_hashes.json'] 覆盖=2/2
+  [OK ] final: 权威快照=final/artifact_hashes.w0.json(4) 快照=['final/artifact_hashes.json', 'final/artifact_hashes.w0.json'] 覆盖=4/4
+  [OK ] harness: 权威快照=harness/artifact_hashes.snap2.json(19) 快照=['harness/artifact_hashes.json', 'harness/artifact_hashes.snap2.json'] 覆盖=19/19
+  [OK ] harness/captain-hc2-20261007: 权威快照=harness/captain-hc2-20261007/artifact_hashes.json(8) 快照=['harness/captain-hc2-20261007/artifact_hashes.json'] 覆盖=8/8
+  [OK ] harness/captain-healthcheck-20261007: 权威快照=harness/captain-healthcheck-20261007/artifact_hashes.json(7) 快照=['harness/captain-healthcheck-20261007/artifact_hashes.json'] 覆盖=7/7
+  [OK ] harness/w0-e01-A: 权威快照=harness/w0-e01-A/artifact_hashes.json(22) 快照=['harness/w0-e01-A/artifact_hashes.json'] 覆盖=22/22
+  [OK ] harness/w0-e01-B: 权威快照=harness/w0-e01-B/artifact_hashes.json(8) 快照=['harness/w0-e01-B/artifact_hashes.json'] 覆盖=8/8
+  [OK ] harness/w0-e01-a50check: 权威快照=harness/w0-e01-a50check/artifact_hashes.json(5) 快照=['harness/w0-e01-a50check/artifact_hashes.json'] 覆盖=5/5
+  [OK ] harness/w0-e01-accept: 权威快照=harness/w0-e01-accept/artifact_hashes.snap2.json(9) 快照=['harness/w0-e01-accept/artifact_hashes.json', 'harness/w0-e01-accept/artifact_hashes.snap2.json', 'harness/w0-e01-accept/artifact_hashes.w0-e01-accept.json'] 覆盖=9/9
+  [OK ] harness/w0-e01-baseline: 权威快照=harness/w0-e01-baseline/artifact_hashes.snap2.json(11) 快照=['harness/w0-e01-baseline/artifact_hashes.json', 'harness/w0-e01-baseline/artifact_hashes.snap2.json', 'harness/w0-e01-baseline/artifact_hashes.w0-e01-final2.json'] 覆盖=11/11
+  [OK ] harness/w0-e01-deliver: 权威快照=harness/w0-e01-deliver/artifact_hashes.json(2) 快照=['harness/w0-e01-deliver/artifact_hashes.json'] 覆盖=2/2
+  [OK ] harness/w0-e01-final: 权威快照=harness/w0-e01-final/artifact_hashes.json(6) 快照=['harness/w0-e01-final/artifact_hashes.json'] 覆盖=6/6
+  [OK ] harness/w0-e01-final2: 权威快照=harness/w0-e01-final2/artifact_hashes.json(5) 快照=['harness/w0-e01-final2/artifact_hashes.json'] 覆盖=5/5
+  [OK ] harness/w0-e01-final3: 权威快照=harness/w0-e01-final3/artifact_hashes.json(5) 快照=['harness/w0-e01-final3/artifact_hashes.json'] 覆盖=5/5
+  [OK ] harness/w0-e01-selftest: 权威快照=harness/w0-e01-selftest/artifact_hashes.json(5) 快照=['harness/w0-e01-selftest/artifact_hashes.json'] 覆盖=5/5
+  [OK ] harness/w0-e01-selftest-final: 权威快照=harness/w0-e01-selftest-final/artifact_hashes.json(4) 快照=['harness/w0-e01-selftest-final/artifact_hashes.json'] 覆盖=4/4
+  [OK ] harness/w0-e01-selftest2: 权威快照=harness/w0-e01-selftest2/artifact_hashes.json(5) 快照=['harness/w0-e01-selftest2/artifact_hashes.json'] 覆盖=5/5
+  [OK ] improve: 权威快照=improve/artifact_hashes.w0.json(3) 快照=['improve/artifact_hashes.json', 'improve/artifact_hashes.w0.json'] 覆盖=3/3
+  [OK ] uat: 权威快照=uat/artifact_hashes.w0.json(6) 快照=['uat/artifact_hashes.json', 'uat/artifact_hashes.w0.json'] 覆盖=6/6
+[evidence_hash] 判定 = VIOLATION（退出码 1）
+==============================================================================
+[evidence_hash] 机读报告：D:\workspace\wage_management_system - bak\test-reports-2026-10\.tmp\w0-e01-deliver\freeze2_report.json（改名=False）
+
+
+

@@ -1,0 +1,682 @@
+================================================================================
+25 - W2/W3 fix (quality loop + piecework/material accounting) : RAW CONSOLE OUTPUT
+repo   : D:\workspace\wage_management_system - bak
+hint   : commands are listed in 25-W2W3修复说明.md section 9
+note   : new scripts print ASCII-safe console lines (A-14/A-60); Chinese appears only in
+         files written as UTF-8 (evidence / report).
+================================================================================
+
+
+================================================================================
+### W2/W3 probe -- DEC-1/DEC-2 matrix + AC shapes + RC (46 checks, run w2w3-t7-final)
+### source: test-reports-2026-10/evidence/harness/w2w3-t7-final/w2w3-transcript.txt
+================================================================================
+
+[PASSED] N1           全新实例正常报工 ⇒ 入库且字段维持 NULL
+        expected={"fg_delta": 4.0, "qs": null} actual={"fg_delta": 4.0, "qs": null} AC-18-NEG / RC-1 / RC-4（无质检任务 ⇒ 不得被顺手改写）
+[PASSED] N3-a         报工 fail ⇒ 不合格登记增量恰为 1 且指回该产出
+        expected={"nc_delta": 1, "target_type": "production_record", "status_in": ["open", "pending_approval"]} actual={"nc_delta": 1.0, "target_type": "production_record", "status": "open"} AC-13-a 断言 1/2/4
+[PASSED] N3-b         实例 quality_status 由 NULL 变 fail（直接字段断言）
+        expected={"qs": "fail"} actual={"qs": "fail"} AC-18-a 断言 1（07b §1.7 直接字段断言）
+[PASSED] N3-c         failing 产出再次报工 ⇒ 拒收（fg 增量 0）且原因可读
+        expected={"fg_delta": 0.0, "reason_nonempty": true} actual={"fg_delta": 0.0, "gate": [false, "\u5b9e\u4f8b _W2W3IA7FINALN3 \u8d28\u68c0\u4e0d\u5408\u683c\uff0c\u4e0d\u5f97\u5165\u6b63\u54c1\u5e93"]} RC-12（结论落地必须产生业务后果）
+[PASSED] N4           处置 rework 至 done 后：字段 pass + 该实例恢复放行
+        expected={"qs": "pass", "fg_delta": 5.0} actual={"qs": "pass", "fg_delta": 5.0} AC-15 / RC-3 / DEC-1 §1.5-4 自动复位
+[PASSED] F3           scrap 处置 ⇒ quality_status=pass 但 status=scrapped ⇒ 仍拒收
+        expected={"qs": "pass", "item_status": "scrapped", "fg_delta": 0.0} actual={"qs": "pass", "item_status": "scrapped", "fg_delta": 0.0} DEC-1 §1.3 / §3.3-5 / RC-5 / RC-11
+[PASSED] P1           pending 且无在办单据 ⇒ 放行（死锁回归）
+        expected={"fg_delta": 7.0, "qs_in": ["pending", "pass"]} actual={"fg_delta": 7.0, "qs": "pending"} DEC-1 §1.6 P1 / P0-2.5 成对常驻（本格为预期翻转）
+[PASSED] P3           pending 实例判 fail ⇒ 字段 fail + NC +1 + 拒收
+        expected={"qs": "fail", "nc_delta": 1, "blocked": false} actual={"qs": "fail", "nc_delta": 1.0, "gate_allowed": false} DEC-1 §1.6 P3
+[PASSED] P4           P3 处置 accept(approved) ⇒ 字段 pass + 放行
+        expected={"qs": "pass", "fg_delta": 9.0} actual={"qs": "pass", "fg_delta": 9.0} DEC-1 §1.6 P4 / AC-15
+[PASSED] A1           pass 实例正常报工 ⇒ 入库 + 维持 pass（不得回归）
+        expected={"fg_delta": 4.0, "qs": "pass"} actual={"fg_delta": 4.0, "qs": "pass"} DEC-1 §3.2 A1 / AC-16 阴性对照
+[PASSED] A2           pass 实例出现 fail 结论 ⇒ 字段 fail + NC +1 + 拒收（守门格）
+        expected={"qs": "fail", "nc_delta": 1, "gate_allowed": false} actual={"qs": "fail", "nc_delta": 1.0, "gate_allowed": false} DEC-1 §3.2 A2（pending 改判后必须仍拦得住）
+[PASSED] F1           fail 未处置 ⇒ 拒收 + 原因指向不合格 + 字段维持 fail
+        expected={"fg_delta": 0.0, "gate_allowed": false, "qs": "fail"} actual={"fg_delta": 0.0, "gate_allowed": false, "qs": "fail"} DEC-1 §3.2 F1 / RC-8
+[PASSED] F2           fail 未处置时再来一个 fail 结论 ⇒ 字段维持 fail + NC +1
+        expected={"qs": "fail", "nc_delta": 1} actual={"nc_delta": 1.0, "qs": "fail"} DEC-1 §3.2 F2
+[PASSED] AC13-1       fail ⇒ NC 增量恰为 1（且重复回放不重复建单）
+        expected={"nc_delta": 1, "replay_delta": 0} actual={"nc_delta": 1.0, "replay_delta": 0.0} AC-13-a 断言 1
+[PASSED] AC13-2       NC 指回该产出（target_type/target_id）且状态未闭环
+        expected={"target_type": "production_record", "target_id": "pr_id", "status": "open"} actual={"target_type": "production_record", "target_id": 14, "pr_id": 14, "status": "open"} AC-13-a 断言 2/3/4
+[PASSED] AC13-3       质检任务本身仍正常闭环（completed）
+        expected={"task_status": "completed"} actual={"task_status": "completed"} AC-13-a 断言 5（不回归项）
+[PASSED] AC18-1       quality_status 由 NULL 变 fail（直接字段断言）
+        expected={"qs": "fail"} actual={"qs": "fail"} AC-18-a 断言 1
+[PASSED] AC18-2       写入命中的恰好是该产出对应的实例（gloval_sn 链定位）
+        expected={"located_item": "item_id", "qs_of_item": "fail"} actual={"located_item": 39, "item_id": 39, "qs_of_item": "fail"} AC-18-a 断言 2 / RC-14
+[PASSED] AC18-3       未命中其它实例：其余实例 quality_status 未被顺手改写
+        expected={"others_changed": []} actual={"others_changed": []} AC-18-a 断言 2（不得写到别的实例）
+[PASSED] AC18-4       pass 提交 ⇒ 字段写 pass（不得只实现 fail 分支）
+        expected={"qs": "pass"} actual={"qs": "pass"} AC-18-a 断言 3
+[PASSED] AC26-a       开关 false→true 的计件差值 ≠ 0（形状断言）
+        expected={"delta": "!=0", "equals_rework_contribution": 200.0} actual={"delta": 200.0} AC-26-a / RC-17
+[PASSED] AC25-a       false 时返工记录**不计件**（剔除额 == 返工贡献）
+        expected={"dropped": 200.0, "counted": 40.0, "excluded": "1 \u6761"} actual={"dropped": 200.0, "counted": 40.0, "excluded_count": 1} AC-25-a
+[PASSED] AC27-C       非返工记录两态**完全相同**（不得回归）
+        expected={"off": 40.0, "on": 40.0} actual={"off": 40.0, "on": 40.0} AC-27-C
+[PASSED] AC04-d       S1 == S2（Employee.total_salary 同口径）
+        expected={"s1": 40.0, "s2": 40.0, "s1_on": 240.0, "s2_on": 240.0} actual={"s1": 40.0, "s2": 40.0, "s1_on": 240.0, "s2_on": 240.0} AC-04-d（S1/S2）
+[PASSED] AC04-d-http  S1 真端点两态数字不同（页面计件单元格）
+        expected={"off_page": ">60.00<", "on_page": ">360.00<"} actual={"off_has_60": true, "off_has_360": false, "on_has_60": true, "on_has_360": true, "http": [200, 200]} AC-26-a（S1 端点实测）
+[PASSED] AC04-e       开关在全仓**只有一个**读取点且缺省值为 False（不得缺省即计入）
+        expected={"sites": 1, "default_is_false": true} actual={"sites": 1, "sites_detail": [{"file": "app/services/mes_service.py", "line": 1763, "default_is_false": true}]} AC-04-e / RC-18
+[PASSED] AC04-e2      三个工资模板中零命中（模板不得分支）
+        expected={"hits": 0} actual={"hits": []} AC-04-e2 / RC-19
+[PASSED] AC04-d-s34   S1/S3/S4 三处均已改为调用共享口径函数
+        expected={"calls_in_routes": 3} actual={"calls_in_routes": 3} AC-04-d（S3/S4 同口径，防「主表变了、员工总工资没变」）
+[PASSED] AC29-ac      报废扣料逐行各扣各自物料（N_i × 件数）且对照料不变
+        expected={"rm1": 96.0, "rm2": 94.0, "rm3": 100.0} actual={"rm1": 96.0, "rm2": 94.0, "rm3": 100.0} AC-29 / AC-29-c（不得只扣 wp.raw_material_id 那一条）
+[PASSED] AC29-b       扣量超过库存 ⇒ 夹紧到 0 且 warning 含四要素
+        expected={"rm1": 0.0, "warning_4_elements": true} actual={"rm1": 0.0, "warnings": ["\u62a5\u5e9f\u6263\u6599\u5939\u7d27\uff1a\u7269\u6599 2 \u539f\u91cf 1.0\uff0c\u8bf7\u6c42\u6263\u51cf 2.0\uff0c\u5939\u7d27\u540e 0.0\uff08\u4e0d\u5408\u683c\u5355 9\uff0c\u4ef6\u6570 1.0\uff09"]} AC-29-b（不得为负）
+[PASSED] AC29-d       无消耗数据 ⇒ 料账不变且存在「未扣减」说明（不得默认减 1）
+        expected={"rm1": 50.0, "has_undeducted_note": true} actual={"rm1": 50.0, "notes": ["\u62a5\u5e9f\u5904\u7f6e\u672a\u6263\u51cf\uff1a\u672a\u627e\u5230\u4ea7\u51fa\u7684\u6d88\u8017\u660e\u7ec6\uff08\u4e0d\u5408\u683c\u5355 10\uff0c\u751f\u4ea7\u8bb0\u5f55 20\uff09\uff08\u4ec5\u6709\u5de5\u4ef6\u6599\u53f7 2\uff0c\u65e0\u6d88\u8017\u91cf\uff09\uff1b\u6309 AC-29d \u4e0d\u6263\u4efb\u4f55\u6599"]} AC-29-d / RC-20
+[PASSED] AC29-d2      显式报废件数 3 ⇒ 扣量 = N_i × 3，报废入库数量 == 3
+        expected={"rm1": 92.0, "rm2": 88.0, "scrap_inbound": 3.0} actual={"rm1": 92.0, "rm2": 88.0, "scrap_inbound": 3.0} AC-29-d2（mes_service.py 报废入库数量同步）
+[PASSED] AC29-neg     非法报废件数（0）⇒ 4xx 且不被静默接受
+        expected={"http_in": [400, 422]} actual={"http": 400} AC-30-b 的同类非法值通道
+[PASSED] AC30-a       返工默认链 ⇒ 新任务件数 == 来源生产记录件数（Q=10）
+        expected={"quantity": 10, "process_id": 3487, "employee_id": 64} actual={"id": 42, "quantity": 10, "notes": "\u8fd4\u5de5 \u4e0d\u5408\u683c\u5355#13\uff1b\u4ef6\u6570\u53d6\u6765\u6e90\u751f\u4ea7\u8bb0\u5f55#23\uff08quantity=10\uff09", "process_id": 3487, "employee_id": 64} AC-30-a / P0-4.2
+[PASSED] AC30-b       显式 rework_quantity=7 覆盖来源件数（10）
+        expected={"quantity": 7} actual={"quantity": 7} AC-30-b
+[PASSED] AC30-b-neg   非法 rework_quantity（0）⇒ 4xx 且不静默落回 1/Q
+        expected={"http_in": [400, 422]} actual={"http": 400} AC-30-b
+[PASSED] AC30-c       取不到来源生产记录 ⇒ 件数 1 且 notes 留痕（禁止静默写死 1）
+        expected={"quantity": 1, "note_has": "\u4ef6\u6570\u53d6\u9ed8\u8ba4\u503c1\uff08\u672a\u627e\u5230\u6765\u6e90\u751f\u4ea7\u8bb0\u5f55\uff09"} actual={"quantity": 1, "notes": "\u8fd4\u5de5 \u4e0d\u5408\u683c\u5355#16\uff1b\u4ef6\u6570\u53d6\u9ed8\u8ba4\u503c1\uff08\u672a\u627e\u5230\u6765\u6e90\u751f\u4ea7\u8bb0\u5f55\uff09"} AC-30-c / 07b §2.3 禁令
+[PASSED] AC30-NEG     批次自动派工产出不计为返工（计件不被剔除）
+        expected={"amount": 40.0, "is_rework": false} actual={"amount": 40.0, "is_rework": false} AC-30-NEG / RC-16（否决 task_type==auto 单判）
+[PASSED] SG-check_templates 静态门禁 check_templates exit 0 且期望行命中
+        expected={"exit": 0, "missing": []} actual={"exit": 0, "missing": []} scripts\check_templates.py
+[PASSED] SG-check_migration_heads 静态门禁 check_migration_heads exit 0 且期望行命中
+        expected={"exit": 0, "missing": []} actual={"exit": 0, "missing": []} scripts\check_migration_heads.py
+[PASSED] SG-check_properties 静态门禁 check_properties exit 0 且期望行命中
+        expected={"exit": 0, "missing": []} actual={"exit": 0, "missing": []} scripts\check_properties.py
+[PASSED] SG-check_model_refs 静态门禁 check_model_refs exit 0 且期望行命中
+        expected={"exit": 0, "missing": []} actual={"exit": 0, "missing": []} scripts\check_model_refs.py --root app
+[PASSED] SG-route_inventory 静态门禁 route_inventory exit 0 且期望行命中
+        expected={"exit": 0, "missing": []} actual={"exit": 0, "missing": []} scripts\_sandbox_compat.py scripts\route_inventory.py
+[PASSED] SG-check_db_bootstrap 静态门禁 check_db_bootstrap exit 0 且期望行命中
+        expected={"exit": 0, "missing": []} actual={"exit": 0, "missing": []} scripts\_sandbox_compat.py scripts\check_db_bootstrap.py
+[PASSED] RC-15        无新增列（is_rework 列声明零命中）且 migrations/ 无改动
+        expected={"column_hits": [], "migration_changes": []} actual={"column_hits": [], "migration_changes": []} RC-15（07b §2.2 否决新增列；禁止 migrate）
+[PASSED] ISO-db       真实库 app.db 全程未被改动
+        expected={"sha256": "F5DA2306BC31CBAB098AAD3774016D320A9B9AA3546F93418196AE9900E0F065"} actual={"before": null, "after": "F5DA2306BC31CBAB098AAD3774016D320A9B9AA3546F93418196AE9900E0F065"} AC-22 / RC-22
+
+
+================================================================================
+### uat_chains diff -- console output (tree copies, run w2w3-uatdiff-final)
+### source: test-reports-2026-10/.tmp/t6-scratch/final_uatdiff.txt
+================================================================================
+
+==============================================================================
+[uatdiff] RUN_ID=w2w3-uatdiff-final started=2026-10-07 14:20:23
+[uatdiff] frozen baseline = test-reports-2026-10/evidence/uat/uat_chains.json (sha256=360A8570BC0080A2984A59AD945B2C837AD96ACF7B55E6242AE7E2C6417DD23A)
+[uatdiff] real db sha256 = F5DA2306BC31CBAB098AAD3774016D320A9B9AA3546F93418196AE9900E0F065
+==============================================================================
+[tree-before] t6/t8 标记全在位=True ; t7 标记全消失=True
+   [OK] keep     app/main/routes.py                 t6 P-01 导入
+   [OK] keep     app/main/routes.py                 t8 P-09
+   [OK] keep     app/main/routes.py                 t8 P-08
+   [OK] keep     app/main/quality.py                t8 P-09
+   [OK] keep     app/__init__.py                    t8 P-12/P-13
+   [OK] t7       app/services/mes_service.py        t7 P-02/P-03
+   [OK] t7       app/services/mes_service.py        t7 P-07b
+   [OK] t7       app/services/mes_service.py        t7 P-04
+   [OK] t7       app/services/mes_service.py        t7 P-06
+   [OK] t7       app/main/routes.py                 t7 P-04 接线
+   [OK] t7       app/models.py                      t7 S2 接线
+   [OK] t7       app/main/stock.py                  t7 入参透传
+[tree-after] t6/t8/t7 标记全在位=True
+
+[frozen baseline] total=40 passed=34 failed=6
+[run before] exit=0 total=40 passed=34 failed=6
+[run after ] exit=0 total=40 passed=35 failed=5
+[diff] frozen_reds=['P0-1.6', 'P0-1.7', 'P0-1.8', 'P0-3.1', 'P0-4.2', 'P0-4.4']
+[diff] red_to_green=['P0-1.7', 'P0-1.8', 'P0-4.2', 'P0-4.4']
+[diff] green_to_red=['P0-2.1', 'P0-2.5', 'P0-3.3'] (expected_flips=['P0-2.1', 'P0-2.5', 'P0-3.3'] unexpected=[])
+[diff] still_red=['P0-1.6', 'P0-3.1'] (spec_defects=['P0-1.6', 'P0-3.1'] unexplained=[])
+[diff] substantive deltas = {"nc_total_after_fail": {"after": 1, "before": 0}, "quality_status_after_fail": {"after": "fail", "before": null}, "quality_status_before_any_conclusion": {"after": null, "before": null}, "rework_task_quantity": {"after": 10, "before": 1}, "scrap_deducted": {"after": 2.0, "before": 1.0}, "switch_read_sites": {"after": ["app/services/mes_service.py:1763"], "before": []}}
+[diff] before_reds == frozen_reds ? True ; after_total == frozen_total ? True
+  [PASS] UD-0 冻结基线与 before 树红链集合一致（回退干净） -- frozen=['P0-1.6', 'P0-1.7', 'P0-1.8', 'P0-3.1', 'P0-4.2', 'P0-4.4'] before=['P0-1.6', 'P0-1.7', 'P0-1.8', 'P0-3.1', 'P0-4.2', 'P0-4.4']
+  [PASS] UD-1a 可判定的 4 条基线红链全部转绿（P0-1.7/1.8/4.2/4.4） -- red_to_green=['P0-1.7', 'P0-1.8', 'P0-4.2', 'P0-4.4']
+  [PASS] UD-1b 其余 2 条基线红链是**断言/夹具写错**且已逐条给出理由（不掩盖、不改资产） -- still_red=['P0-1.6', 'P0-3.1'] spec_defects=['P0-1.6', 'P0-3.1'] unexplained=[]
+  [PASS] UD-1c 同一业务含义的**实质读数**在链内 RAW 里也发生预期变化（字段/增量/件数/扣量/读取点） -- {"nc_total_after_fail": {"after": 1, "before": 0}, "quality_status_after_fail": {"after": "fail", "before": null}, "quality_status_before_any_conclusion": {"after": null, "before": null}, "rework_task_quantity": {"after": 10, "before": 1}, "scrap_deducted": {"after": 2.0, "before": 1.0}, "switch_read_sites": {"after": ["app/services/mes_service.py:1763"], "before": []}}
+  [PASS] UD-2 基线绿链无**非预期**变红 -- unexpected=[]
+  [PASS] UD-3 预期翻转与 DEC-1 一致（P0-2.5/P0-3.3/P0-2.1） -- green_to_red=['P0-2.1', 'P0-2.5', 'P0-3.3']
+  [PASS] UD-4 链总数不变（40 条） -- after=40 frozen=40
+  [PASS] UD-5 before 树不含 t7 改动、after 树含（t6/t8 标记两树都在位） -- t7_gone=True keep_ok=True
+[real-db] F5DA2306BC31 -> F5DA2306BC31 unchanged=True
+[evidence] -> test-reports-2026-10/evidence/harness/w2w3-uatdiff-final/w2w3-uatdiff-result.json
+[evidence] -> test-reports-2026-10/evidence/harness/w2w3-uatdiff-final/uat_chains.before.json
+[evidence] -> test-reports-2026-10/evidence/harness/w2w3-uatdiff-final/uat_chains.after.json
+[verdict] PASS
+
+
+================================================================================
+### functional_test -- 109 pass / 0 fail (scripts/_sandbox_compat.py shim)
+### source: test-reports-2026-10/.tmp/t6-scratch/t7_functional.utf8.txt
+================================================================================
+
+
+== SystemConfig ==
+  PASS  bool 解析  -- False
+  PASS  json 解析  -- ['admin', 'manager']
+  PASS  未知 key 返回默认值
+  PASS  seed_defaults 幂等
+  PASS  set 返回值变化标记  -- True
+  PASS  set 后读到新值
+  PASS  set 写审计日志  -- 73 -> 74
+  PASS  同值再写不算变化
+  PASS  set 自动失效缓存  -- 读到 True（False 说明 set 没有清缓存）
+  PASS  配置页 admin 可访问  -- 200
+  PASS  配置页 user 被拒
+  PASS  部分提交不误改其他开关  -- incoming_inspection_required 变成 True（默认 true，被复选框缺省逻辑重置）
+  PASS  整页提交可关闭开关  -- incoming_inspection_required=False
+  PASS  整页提交可开启开关  -- full_workflow_enabled=True
+
+== Excel 模板 / 导出（GET） ==
+  PASS  /employees/template 期望file  -- HTTP 200 application/vnd.openxmlformats-officedocument 5394B
+  PASS  /process_prices/template 期望file  -- HTTP 200 application/vnd.openxmlformats-officedocument 5545B
+  PASS  /production_records/template 期望file  -- HTTP 200 application/vnd.openxmlformats-officedocument 5133B
+  PASS  /bonus_penalties/template 期望file  -- HTTP 200 application/vnd.openxmlformats-officedocument 5214B
+  PASS  /tasks/template 期望file  -- HTTP 200 application/vnd.openxmlformats-officedocument 5183B
+  PASS  /products/template 期望file  -- HTTP 200 application/vnd.openxmlformats-officedocument 7969B
+  PASS  /inventory/template 期望file  -- HTTP 200 application/vnd.openxmlformats-officedocument 5483B
+  PASS  /export_tasks 期望file  -- HTTP 200 application/vnd.openxmlformats-officedocument 6478B
+  PASS  /employees/export 期望form  -- HTTP 200 text/html; charset=utf-8 27505B
+  PASS  /process_prices/export 期望form  -- HTTP 200 text/html; charset=utf-8 28184B
+  PASS  /production_records/export 期望form  -- HTTP 200 text/html; charset=utf-8 28202B
+  PASS  /bonus_penalties/export 期望form  -- HTTP 200 text/html; charset=utf-8 28268B
+
+== 导出表单 POST ==
+  PASS  POST /employees/export 下载 xlsx  -- HTTP 200 application/vnd.openxmlformats-officedocument 8728B
+  PASS  POST /process_prices/export 下载 xlsx  -- HTTP 200 application/vnd.openxmlformats-officedocument 160329B
+
+== JSON API 契约 ==
+  PASS  /api/inventory/raw-materials 返回 JSON  -- HTTP 200 keys=data,success
+  PASS  /api/inventory/finished-products 返回 JSON  -- HTTP 200 keys=data,success
+  PASS  /api/inventory/consumables 返回 JSON  -- HTTP 200 keys=data,success
+  PASS  /api/consumable-categories 返回 JSON  -- HTTP 200 keys=categories,success
+  PASS  /api/raw-material-categories 返回 JSON  -- HTTP 200 keys=data,success
+  PASS  /api/customers/search?q=a 返回 JSON  -- HTTP 200 keys=data,success
+  PASS  /api/materials/search?q=a 返回 JSON  -- HTTP 200 keys=data,success
+  PASS  /api/products/search?q=a 返回 JSON  -- HTTP 200 keys=data,success
+  PASS  /api/sales_orders/search?q=a 返回 JSON  -- HTTP 200 keys=data,success
+  PASS  /api/notifications/recent 返回 JSON  -- HTTP 200 keys=notifications,success
+  PASS  /api/notifications/stats 返回 JSON  -- HTTP 200 keys=archived,by_type,read,total,unread
+  PASS  /api/quality/tasks 返回 JSON  -- HTTP 200 keys=data,success
+  PASS  /api/quality/templates 返回 JSON  -- HTTP 200 keys=data,success
+  PASS  /api/quality/records 返回 JSON  -- HTTP 200 keys=data,success
+  PASS  /api/quality/inspectors 返回 JSON  -- HTTP 200 keys=inspectors,success
+  PASS  /api/quality/processes 返回 JSON  -- HTTP 200 keys=data,success
+  PASS  /api/quality/finished-products 返回 JSON  -- HTTP 200 keys=data,success
+  PASS  /api/quality/production-records 返回 JSON  -- HTTP 200 keys=data,success
+  PASS  /api/process_assignment 返回 JSON  -- HTTP 200 keys=data,success
+  PASS  /api/chart-data/production 返回 JSON  -- HTTP 200 keys=data,success
+  PASS  /api/chart-data/salary 返回 JSON  -- HTTP 200 keys=data,success
+  PASS  /api/chart-data/task 返回 JSON  -- HTTP 200 keys=data,success
+  PASS  /api/chart-data/department 返回 JSON  -- HTTP 200 keys=data,success
+  PASS  /api/products/names 返回 JSON  -- HTTP 200 keys=data,success
+  PASS  /api/search/suggestions?q=a 返回 JSON  -- HTTP 200 keys=suggestions
+
+== 未登录访问 JSON API 的返回形式 ==
+  PASS  /api/inventory/raw-materials 未登录返回  -- HTTP 401 Content-Type=application/json -> 
+  PASS  /api/quality/tasks 未登录返回  -- HTTP 401 Content-Type=application/json -> 
+  PASS  /api/notifications/stats 未登录返回  -- HTTP 401 Content-Type=application/json -> 
+
+== 不存在的资源应返回 404 ==
+  PASS  /tasks/999999/get 不存在时 404  -- HTTP 404
+  PASS  /process_prices/999999 不存在时 404  -- HTTP 404
+  PASS  /inventory/raw/999999 不存在时 404  -- HTTP 404
+  PASS  /products/999999 不存在时 404  -- HTTP 404
+  PASS  /api/sales_orders/999999/customer_addresses 不存在时 404  -- HTTP 404
+
+== 全局搜索 ==
+  PASS  admin 全局搜索 200  -- HTTP 200
+  PASS  admin 搜到员工  -- 页面里找不到 YHGL0001
+  PASS  admin 搜索实体范围  -- 期望 ['customers', 'employees', 'inventory', 'process_prices', 'production_orders', 'production_records', 'products', 'sales_orders']，实到 ['customers', 'employees', 'inventory', 'process_prices', 'production_orders', 'production_records', 'products', 'sales_orders']
+  PASS  hr 搜索实体范围  -- 期望 ['employees', 'process_prices', 'production_records']，实到 ['employees', 'process_prices', 'production_records']
+  PASS  manager 搜索实体范围  -- 期望 ['customers', 'inventory', 'process_prices', 'production_orders', 'production_records', 'products', 'sales_orders']，实到 ['customers', 'inventory', 'process_prices', 'production_orders', 'production_records', 'products', 'sales_orders']
+  PASS  sales 搜索实体范围  -- 期望 ['customers', 'sales_orders']，实到 ['customers', 'sales_orders']
+  PASS  accountant 搜索实体范围  -- 期望 []，实到 []
+  PASS  inspector 搜索实体范围  -- 期望 []，实到 []
+  PASS  user 搜索实体范围  -- 期望 []，实到 []
+  PASS  库存页按品类名搜原材料 200  -- HTTP 200
+  PASS  库存页搜到该品类下的原材料  -- 页面里找不到 HJK123
+  PASS  生产记录页按品类名搜 200  -- HTTP 200
+  PASS  全局搜索按品类名搜库存 200  -- HTTP 200
+  PASS  全局搜索命中该品类  -- 结果里没有品类名
+  PASS  user 拿不到员工姓名建议  -- HTTP 403 {}
+
+== 任务写操作 ==
+  PASS  user 新增任务被拒 403  -- 403
+  PASS  admin 新增任务成功  -- HTTP 200 {'message': '任务分配成功', 'success': True, 'task': {'employee_name': '李银芳', 'id': 19, 'process_name': '铣心轨基础（含倒角）', 'quantity': 3, 'status': 'pending', 'target_date': '2026-12-31'}}
+  PASS  user 改他人任务被拒 403  -- HTTP 403 {'message': '只能更新分配给本人的任务', 'success': False}
+  PASS  user 改本人任务放行  -- HTTP 200 {'message': '更新成功', 'success': True}
+  PASS  更新任务状态  -- HTTP 200 {'message': '更新成功', 'success': True}
+  PASS  超量提交被拒 400  -- HTTP 400 {'message': '完成数量不能超过任务数量', 'success': False}
+  PASS  负数被拒 400  -- HTTP 400
+  PASS  完工后 status=completed  -- 'completed'
+  PASS  完工后 completed_at 回填  -- datetime.datetime(2026, 10, 7, 14, 21, 36, 627057)
+  PASS  user 删除任务被拒 403  -- 403
+  PASS  admin 删除任务成功  -- 200
+
+== 无工艺路线禁止下生产单 ==
+  PASS  测试产品无工序  -- process_items=0
+  PASS  无工序下单失败  -- HTTP 400 {'message': '产品未配置工艺路线，不能创建生产订单', 'success': False}
+  PASS  失败原因含工艺路线  -- 产品未配置工艺路线，不能创建生产订单
+
+== 领用选真实库存并行发料扣账 ==
+  PASS  创建领用单 302  -- HTTP 302 <!doctype html>
+<html lang=en>
+<title>Redirecting...</title>
+<h1>Redirecting...</h1>
+<p>You should be redirected automatically to the target URL: <a href="/material_requisitions/2"
+  PASS  领用明细写入真实 material_id  -- item.material_id=1
+  PASS  免审批易耗品直接 approved  -- status=approved
+  PASS  发料成功  -- HTTP 200 {'message': '发料成功，已扣减库存', 'success': True}
+  PASS  发料后库存减少 2  -- 10.0 -> 8.0
+  PASS  领用单 completed  -- 'completed'
+
+== 盘点完成调账 ==
+  PASS  创建盘点 302  -- HTTP 302 <!doctype html>
+<html lang=en>
+<title>Redirecting...</title>
+<h1>Redirecting...</h1>
+<p>You should be redirected automatically to the target URL: <a href="/inventory_counts/1">/inv
+  PASS  盘点快照有行  -- items=1 item_id=1
+  PASS  开始盘点  -- HTTP 200 {'message': '已开始盘点', 'success': True}
+  PASS  录入实盘  -- HTTP 200 {'message': '实盘数量已保存', 'success': True}
+  PASS  完成调账  -- HTTP 200 {'message': '盘点完成，库存已按实盘调整', 'success': True}
+  PASS  库存已写成实盘数  -- 8.0 -> 11.0 (期望 11.0)
+  PASS  adjustment_applied  -- True
+  PASS  盘点 completed  -- 'completed'
+
+== _ensure_schema / seed 幂等（子进程内连续两次 create_app） ==
+  PASS  连续两次启动无异常  -- []
+  PASS  两次启动配置项数一致  -- [{'n_configs': 5}, {'n_configs': 5}]
+  PASS  system_configs 表被自动创建
+  PASS  task_assignment.completed_at 自动补齐
+  PASS  sales_order_items 扩展列齐全
+
+================ 结果：109 通过 / 0 失败 ================
+
+--- stderr ---
+D:\workspace\wage_management_system - bak\scripts\functional_test.py:243: LegacyAPIWarning: The Query.get() method is considered legacy as of the 1.x series of SQLAlchemy and becomes a legacy construct in 2.0. The method is now available as Session.get() (deprecated since: 2.0) (Background on SQLAlchemy 2.0 at: https://sqlalche.me/e/b8d9)
+  emp_row = Employee.query.get(emp_id)
+D:\workspace\wage_management_system - bak\scripts\functional_test.py:255: LegacyAPIWarning: The Query.get() method is considered legacy as of the 1.x series of SQLAlchemy and becomes a legacy construct in 2.0. The method is now available as Session.get() (deprecated since: 2.0) (Background on SQLAlchemy 2.0 at: https://sqlalche.me/e/b8d9)
+  emp_row = Employee.query.get(emp_id)
+[2026-10-07 14:21:36,631] WARNING in mes_service: 报工扣料归集跳过：任务 19 未挂生产批次/批次实例
+D:\workspace\wage_management_system - bak\scripts\functional_test.py:276: LegacyAPIWarning: The Query.get() method is considered legacy as of the 1.x series of SQLAlchemy and becomes a legacy construct in 2.0. The method is now available as Session.get() (deprecated since: 2.0) (Background on SQLAlchemy 2.0 at: https://sqlalche.me/e/b8d9)
+  t = TaskAssignment.query.get(tid)
+D:\workspace\wage_management_system - bak\scripts\functional_test.py:371: LegacyAPIWarning: The Query.get() method is considered legacy as of the 1.x series of SQLAlchemy and becomes a legacy construct in 2.0. The method is now available as Session.get() (deprecated since: 2.0) (Background on SQLAlchemy 2.0 at: https://sqlalche.me/e/b8d9)
+  after = Consumable.query.get(mat_id).quantity
+D:\workspace\wage_management_system - bak\scripts\functional_test.py:372: LegacyAPIWarning: The Query.get() method is considered legacy as of the 1.x series of SQLAlchemy and becomes a legacy construct in 2.0. The method is now available as Session.get() (deprecated since: 2.0) (Background on SQLAlchemy 2.0 at: https://sqlalche.me/e/b8d9)
+  req = MaterialRequisition.query.get(rid)
+D:\workspace\wage_management_system - bak\scripts\functional_test.py:448: LegacyAPIWarning: The Query.get() method is considered legacy as of the 1.x series of SQLAlchemy and becomes a legacy construct in 2.0. The method is now available as Session.get() (deprecated since: 2.0) (Background on SQLAlchemy 2.0 at: https://sqlalche.me/e/b8d9)
+  after = Consumable.query.get(mat_id).quantity
+D:\workspace\wage_management_system - bak\scripts\functional_test.py:449: LegacyAPIWarning: The Query.get() method is considered legacy as of the 1.x series of SQLAlchemy and becomes a legacy construct in 2.0. The method is now available as Session.get() (deprecated since: 2.0) (Background on SQLAlchemy 2.0 at: https://sqlalche.me/e/b8d9)
+  count = InventoryCount.query.get(cid)
+
+
+================================================================================
+### run_gates -- E-04 gate chain (must equal the frozen golden)
+### source: test-reports-2026-10/.tmp/t6-scratch/t7_run_gates.utf8.txt
+================================================================================
+
+[run_gates] run_id=w2w3-t7-regress  5/6 项 pass
+[run_gates] probe_unexpected = 1   (取证型探针与锁定期望值不一致的条数；>0 => 退出码 1)
+  OK   check_templates              exit=0 mode=native checks=5/5
+  OK   check_migration_heads        exit=0 mode=native checks=3/3
+  OK   check_properties             exit=0 mode=native checks=2/2
+  OK   route_inventory              exit=0 mode=shim   checks=5/5  [报告型：退出码无信息量]
+  FAIL route_inventory_native_probe exit=0 mode=native checks=0/0  [取证型：退出码与锁定期望值不一致 => 计入 probe_unexpected => 退出码 1]
+  OK   check_db_bootstrap           exit=0 mode=shim   checks=3/3
+[run_gates] real.db unchanged = True (F5DA2306BC31CBAB…)
+[run_gates] exit = 1  原因=['probe_unexpected=1']
+[run_gates] JSON -> D:\workspace\wage_management_system - bak\test-reports-2026-10\.tmp\t6-scratch\t7_gates.utf8.json
+
+
+================================================================================
+### negative_matrix -- 28 cases (classification of the 7 failures in the report section 5.4)
+### source: test-reports-2026-10/.tmp/t6-scratch/t7_negative.utf8.txt
+================================================================================
+
+[negative_matrix] run_id=w2w3-t7-regress
+[negative_matrix] 真实库开工 SHA256 = F5DA2306BC31CBAB098AAD3774016D320A9B9AA3546F93418196AE9900E0F065
+
+== 用例 1：真实库防误写（含故意负例） ==
+  [PASSED ] NV-1.1  真实库 SHA256 跑前 == 跑后 == 钉死值
+  [PASSED ] NV-1.2  故意负例 A：URI 指向真实库本身必须被拒
+  [PASSED ] NV-1.3  旁证：同名不同文件（另一目录的 app.db）不算真实库
+  [PASSED ] NV-1.4  阳性对照：副本上 bootstrap 隔离闸必须放行
+  [PASSED ] NV-1.5  口径校准：副本指纹 == 真实库指纹（故指纹不能当拒绝判据）
+
+== 用例 2：假开关双向差分（quality.rework_counts_piecework） ==
+  [FAILED ] NV-2.1  双向差分：返工记录计件工资应随开关变化
+            expected={'delta_rework': '!= 0'}
+            actual  ={'delta_rework': 0.0, 'piecework_off': 75.0, 'piecework_on': 75.0}
+            note    =delta=0 ⇒ 开关在本版本对工资计算零影响（假开关）。
+  [PASSED ] NV-2.2  非返工场景两次必须相同
+  [FAILED ] NV-2.3  静态佐证：该开关是全仓唯一没有任何读取点的配置项
+            expected={'switches_with_reads': 4, 'rework_switch_reads': 0}
+            actual  ={'read_sites': {'purchase.full_workflow_enabled': ['app/main/purchase.py:20'], 'purchase.settlement_enabled': ['app/main/purchase.py:24'], 'purchase.incoming_inspection_required': ['app/main/purchase.py:28'], 'quality.rework_counts_piecework': ['app/services/mes_service.py:1763'], 'quality.concession_approver_roles': ['app/services/mes_service.py:960', 'app/services/mes_service.py:1056']}, 'unread_defaults': []}
+            note    =这是 GAP-18 缺陷的静态证据：开关只有种子定义，没有消费方。
+  [FAILED ] NV-2.4  阳性对照：同一差分口径能测出真实生效的开关
+            expected={'switches_with_read_sites': 4}
+            actual  ={'purchase.full_workflow_enabled': 1, 'purchase.settlement_enabled': 1, 'purchase.incoming_inspection_required': 1, 'quality.rework_counts_piecework': 1, 'quality.concession_approver_roles': 2}
+  [PASSED ] NV-2.5  差分机制自检：把开关值真读进来时，工资必须随值变化
+
+== 用例 3：门禁阴性（production_record 路径）+ 阳性对照 ==
+  [PASSED ] NV-3.1  门禁阴性：报工路径调用后，不合格单/成品/门禁字段零增量
+  [PASSED ] NV-3.2  落地点实参取证：真实调用点不传 production_record
+  [FAILED ] NV-3.3  源码读数：门禁调用点与定义的行号断言
+            expected={'line': 326, 'contains': 'qc_gate_allows_output(batch_item=item, workpieces=workpieces)'}
+            actual  ={'line': 326, 'text': 'batch = ProductionBatch.query.get(task.production_batch_id)'}
+  [PASSED ] NV-3.4  阳性对照 1：被锁工件（status=machining + 未闭环不合格）必须被拒
+  [PASSED ] NV-3.5  阳性对照 2：同一条生产记录实参下，两条记录路径被逐个打亮
+  [FAILED ] NV-3.5b  阳性对照 3：同一实参喂两个实例 ⇒ 判定随实例 quality_status 变化
+            expected={'instance_fail_reason_has_code': True, 'instance_pending_reason_has_code': True}
+            actual  ={'fail_instance': [False, '实例 _hvBI_FAIL 质检不合格，不得入正品库'], 'pending_instance': [True, None]}
+  [PASSED ] NV-3.6  阴性对照：干净输入必须放行（防止探针恒假）
+  [PASSED ] NV-3.7  同形态对照：批次实例 quality_status=fail 会被拒（门禁并非失效）
+  [PASSED ] NV-3.8  增量复核：门禁探针全程未写入任何业务表
+  [FAILED ] NV-3.9  GAP-14 阴性：判不合格后 quality_status 不会自动回写
+            expected={'changed': False, 'nc_delta': 0, 'call_state': 'ok'}
+            actual  ={'changed': True, 'quality_status_before': 'pending', 'quality_status_after': 'fail', 'nc_delta': 1, 'call_state': 'ok'}
+            note    =apply_inspection_result 对 target_type=production_record 在 mes_service.py:421-422 直接 return ⇒ 既不建 NC 也不回写门禁字段。
+  [FAILED ] NV-3.10  静态佐证：quality_status 的赋值点只有手工 PUT
+            expected={'candidates': 1, 'file': 'app/main/routes.py', 'line': 8899}
+            actual  ={'candidates': 4, 'hits': [{'file': 'app/main/routes.py', 'line': 8927, 'text': "item.quality_status = data['quality_status']"}, {'file': 'app/services/mes_service.py', 'line': 597, 'text': 'batch_item.quality_status = value'}, {'file': 'app/services/mes_service.py', 'line': 642, 'text': "f'质检结论落地：生产记录 {production_record.id} → 实例 {item.id} quality_status={value}')"}, {'file': 'app/services/mes_service.py', 'line': 669, 'text': "f'不合格单 {nc.id} 闭环（{nc.status}）后复算：实例 {item.id} quality_status={value}')"}]}
+            note    =扫描口径：行内 `=` 左侧以 quality_status 结尾（排除 == 比较）。
+
+== 用例 4：料账夹具尺度断言（A-10） ==
+  [PASSED ] NV-4.1  A-10 前提复核：真实库料账确实不可分辨
+  [PASSED ] NV-4.2  夹具尺度：新建料账行数 ≥ 5 且每行 quantity ≥ 5
+  [PASSED ] NV-4.3  扣料辨析力：三种不同扣量必须得到三个不同余额（破除「硬编码减 1」）
+  [PASSED ] NV-4.4  扣料回写：MaterialAllocation.consumed_quantity 按数量累加
+
+== 用例 5（A-4 前置）：发货链夹具必须先注入 stock_kind='fg' ==
+  [PASSED ] NV-5.1  A-4 前提复核：真实库 finished_product.stock_kind 全为 NULL
+  [PASSED ] NV-5.2  夹具注入后发货候选可见（stock_kind='fg' 过滤能取到）
+  [PASSED ] NV-0  收尾：真实库 SHA256 仍等于钉死值
+
+[negative_matrix] 合计 28 条：passed=21 failed=7 blocked=0
+[negative_matrix] 真实库异常？ 否（SHA256 未变）
+[negative_matrix] 基础设施级问题：无
+[negative_matrix] JSON -> D:\workspace\wage_management_system - bak\test-reports-2026-10\evidence\harness\w2w3-t7-regress\negative_matrix.json
+
+
+================================================================================
+### gates comparison vs E-04 golden (expected_lock / summary / per-gate checks)
+### source: test-reports-2026-10/.tmp/t6-scratch/t7_gates_compare.txt
+================================================================================
+
+expected_lock identical        = True
+summary identical             = True
+summary                       = {"evidence_only": ["route_inventory_native_probe"], "exit_code_informative": 4, "fail": 0, "in_gate_chain": ["check_templates", "check_migration_heads", "check_properties", "check_db_bootstrap"], "pass": 5, "probe_only": 1, "probe_unexpected": 1, "report_only": ["route_inventory"], "sensitivity_ok": null, "total": 6}
+
+gate set identical            = True
+gate                           exit     verdict checks same_checks same_verdict
+check_templates                0/0      pass   5/5    True      True
+check_migration_heads          0/0      pass   3/3    True      True
+check_properties               0/0      pass   2/2    True      True
+route_inventory                0/0      pass   5/5    True      True
+route_inventory_native_probe   0/1      unexpected 0/0    True      True
+check_db_bootstrap             0/0      pass   3/3    True      True
+
+--- in-gate-chain facts (golden vs new) ---
+check_templates                {"templates_files": [87, 87, "passed"], "capabilities_declared": [44, 44, "passed"], "capabilities_used_templates": [40, 40, "passed"], "capabilities_used_routes": [44, 44, "passed"], "landing_endpoints": [5, 5, "passed"]}
+check_migration_heads          {"migration_heads": [["p1nonctarget"], ["p1nonctarget"], "passed"], "migration_head_count": [1, 1, "passed"], "migration_revisions": [35, 35, "passed"]}
+check_properties               {"properties_files": [23, 23, "passed"], "model_classes": [74, 74, "passed"]}
+route_inventory                {"routes_total_rules": [271, 271, "passed"], "routes_dup_method_path": [0, 0, "passed"], "routes_get_no_arg": [104, 104, "passed"], "routes_get_with_arg": [56, 56, "passed"], "routes_non_get": [110, 110, "passed"]}
+route_inventory_native_probe   {}
+check_db_bootstrap             {"bootstrap_accounts": [64, 64, "passed"], "bootstrap_copied_rows": [6712, 6712, "passed"], "bootstrap_skipped_tables": [0, 0, "passed"]}
+
+exit_code_semantics golden = {"code": 1, "reasons": ["probe_unexpected=1"], "rule": "exit 0 \u27fa summary['fail']==0 \u2227 summary['probe_unexpected']==0 \u2227 (\u672a\u8dd1 --self-test \u2228 summary['sensitivity_ok'] is True)", "inputs": {"fail": 0, "probe_unexpected": 1, "sensitivity_ok": null}}
+exit_code_semantics new    = {"code": 1, "reasons": ["probe_unexpected=1"], "rule": "exit 0 \u27fa summary['fail']==0 \u2227 summary['probe_unexpected']==0 \u2227 (\u672a\u8dd1 --self-test \u2228 summary['sensitivity_ok'] is True)", "inputs": {"fail": 0, "probe_unexpected": 1, "sensitivity_ok": null}}
+
+
+================================================================================
+### uat_chains diff -- machine-readable result (trimmed)
+### source: test-reports-2026-10/evidence/harness/w2w3-uatdiff-final/w2w3-uatdiff-result.json
+================================================================================
+
+{
+ "run_id": "w2w3-uatdiff-final",
+ "frozen_summary": {
+  "run_id": "t5-uat-final",
+  "started": "2026-10-06 22:33:13",
+  "finished": "2026-10-06 22:33:15",
+  "total": 40,
+  "passed": 34,
+  "failed": 6,
+  "blocked": 0,
+  "execution_errors": false
+ },
+ "before_summary": {
+  "run_id": "t5-uat-20261007-142023",
+  "started": "2026-10-07 14:20:23",
+  "finished": "2026-10-07 14:20:25",
+  "total": 40,
+  "passed": 34,
+  "failed": 6,
+  "blocked": 0,
+  "execution_errors": false
+ },
+ "after_summary": {
+  "run_id": "t5-uat-20261007-142026",
+  "started": "2026-10-07 14:20:26",
+  "finished": "2026-10-07 14:20:28",
+  "total": 40,
+  "passed": 35,
+  "failed": 5,
+  "blocked": 0,
+  "execution_errors": false
+ },
+ "frozen_reds": [
+  "P0-1.6",
+  "P0-1.7",
+  "P0-1.8",
+  "P0-3.1",
+  "P0-4.2",
+  "P0-4.4"
+ ],
+ "red_to_green": [
+  "P0-1.7",
+  "P0-1.8",
+  "P0-4.2",
+  "P0-4.4"
+ ],
+ "green_to_red": [
+  "P0-2.1",
+  "P0-2.5",
+  "P0-3.3"
+ ],
+ "expected_flips": [
+  "P0-2.1",
+  "P0-2.5",
+  "P0-3.3"
+ ],
+ "unexpected_red": [],
+ "still_red": [
+  "P0-1.6",
+  "P0-3.1"
+ ],
+ "spec_defect_reds": [
+  "P0-1.6",
+  "P0-3.1"
+ ],
+ "substantive_deltas": {
+  "quality_status_after_fail": {
+   "before": null,
+   "after": "fail"
+  },
+  "nc_total_after_fail": {
+   "before": 0,
+   "after": 1
+  },
+  "rework_task_quantity": {
+   "before": 1,
+   "after": 10
+  },
+  "scrap_deducted": {
+   "before": 1.0,
+   "after": 2.0
+  },
+  "switch_read_sites": {
+   "before": [],
+   "after": [
+    "app/services/mes_service.py:1763"
+   ]
+  },
+  "quality_status_before_any_conclusion": {
+   "before": null,
+   "after": null
+  }
+ },
+ "checks": [
+  {
+   "id": "UD-0 冻结基线与 before 树红链集合一致（回退干净）",
+   "ok": true,
+   "evidence": "frozen=['P0-1.6', 'P0-1.7', 'P0-1.8', 'P0-3.1', 'P0-4.2', 'P0-4.4'] before=['P0-1.6', 'P0-1.7', 'P0-1.8', 'P0-3.1', 'P0-4.2', 'P0-4.4']"
+  },
+  {
+   "id": "UD-1a 可判定的 4 条基线红链全部转绿（P0-1.7/1.8/4.2/4.4）",
+   "ok": true,
+   "evidence": "red_to_green=['P0-1.7', 'P0-1.8', 'P0-4.2', 'P0-4.4']"
+  },
+  {
+   "id": "UD-1b 其余 2 条基线红链是**断言/夹具写错**且已逐条给出理由（不掩盖、不改资产）",
+   "ok": true,
+   "evidence": "still_red=['P0-1.6', 'P0-3.1'] spec_defects=['P0-1.6', 'P0-3.1'] unexplained=[]"
+  },
+  {
+   "id": "UD-1c 同一业务含义的**实质读数**在链内 RAW 里也发生预期变化（字段/增量/件数/扣量/读取点）",
+   "ok": true,
+   "evidence": "{\"nc_total_after_fail\": {\"after\": 1, \"before\": 0}, \"quality_status_after_fail\": {\"after\": \"fail\", \"before\": null}, \"quality_status_before_any_conclusion\": {\"after\": null, \"before\": null}, \"rework_task_quantity\": {\"after\": 10, \"before\": 1}, \"scrap_deducted\": {\"after\": 2.0, \"before\": 1.0}, \"switch_read_sites\": {\"after\": [\"app/services/mes_service.py:1763\"], \"before\": []}}"
+  },
+  {
+   "id": "UD-2 基线绿链无**非预期**变红",
+   "ok": true,
+   "evidence": "unexpected=[]"
+  },
+  {
+   "id": "UD-3 预期翻转与 DEC-1 一致（P0-2.5/P0-3.3/P0-2.1）",
+   "ok": true,
+   "evidence": "green_to_red=['P0-2.1', 'P0-2.5', 'P0-3.3']"
+  },
+  {
+   "id": "UD-4 链总数不变（40 条）",
+   "ok": true,
+   "evidence": "after=40 frozen=40"
+  },
+  {
+   "id": "UD-5 before 树不含 t7 改动、after 树含（t6/t8 标记两树都在位）",
+   "ok": true,
+   "evidence": "t7_gone=True keep_ok=True"
+  }
+ ],
+ "verdict": "PASS",
+ "markers_before_ok": {
+  "keep_ok": true,
+  "t7_gone": true
+ },
+ "verdicts_before": {
+  "ISO.1": "passed",
+  "ISO.2": "passed",
+  "P0-1.1": "passed",
+  "P0-1.2": "passed",
+  "P0-1.3": "passed",
+  "P0-1.4": "passed",
+  "P0-1.5": "passed",
+  "P0-1.6": "failed",
+  "P0-1.7": "failed",
+  "P0-1.8": "failed",
+  "P0-1.9": "passed",
+  "P0-2.1": "passed",
+  "P0-2.2": "passed",
+  "P0-2.3": "passed",
+  "P0-2.4": "passed",
+  "P0-2.5": "passed",
+  "P0-3.1": "failed",
+  "P0-3.2": "passed",
+  "P0-3.3": "passed",
+  "P0-3.4": "passed",
+  "P0-3.5": "passed",
+  "P0-4.0": "passed",
+  "P0-4.1": "passed",
+  "P0-4.2": "failed",
+  "P0-4.3": "passed",
+  "P0-4.4": "failed",
+  "P0-4.5": "passed",
+  "C-1": "passed",
+  "C-2": "passed",
+  "C-3": "passed",
+  "C-4": "passed",
+  "P0-5.1": "passed",
+  "P0-5.2": "passed",
+  "P0-5.3": "passed",
+  "P0-5.4": "passed",
+  "P0-5.5": "passed",
+  "P0-5.6": "passed",
+  "P0-5.7": "passed",
+  "ISO.3": "passed",
+  "ISO.4": "passed"
+ },
+ "verdicts_after": {
+  "ISO.1": "passed",
+  "ISO.2": "passed",
+  "P0-1.1": "passed",
+  "P0-1.2": "passed",
+  "P0-1.3": "passed",
+  "P0-1.4": "passed",
+  "P0-1.5": "passed",
+  "P0-1.6": "failed",
+  "P0-1.7": "passed",
+  "P0-1.8": "passed",
+  "P0-1.9": "passed",
+  "P0-2.1": "failed",
+  "P0-2.2": "passed",
+  "P0-2.3": "passed",
+  "P0-2.4": "passed",
+  "P0-2.5": "failed",
+  "P0-3.1": "failed",
+  "P0-3.2": "passed",
+  "P0-3.3": "failed",
+  "P0-3.4": "passed",
+  "P0-3.5": "passed",
+  "P0-4.0": "passed",
+  "P0-4.1": "passed",
+  "P0-4.2": "passed",
+  "P0-4.3": "passed",
+  "P0-4.4": "passed",
+  "P0-4.5": "passed",
+  "C-1": "passed",
+  "C-2": "passed",
+  "C-3": "passed",
+  "C-4": "passed",
+  "P0-5.1": "passed",
+  "P0-5.2": "passed",
+  "P0-5.3": "passed",
+  "P0-5.4": "passed",
+  "P0-5.5": "passed",
+  "P0-5.6": "passed",
+  "P0-5.7": "passed",
+  "ISO.3": "passed",
+  "ISO.4": "passed"
+ },
+ "spec_defects": {
+  "P0-1.6": {
+   "why": "断言点在 p0_1_report_and_fail 内（uat_chains.py:335-340），即「报工后、任何质检结论落库**之前**」；DEC-1 §1.2 规定此刻 `quality_status` 必须仍是 NULL（N1/AC-18-NEG/RC-4） ⇒ 期望「已写 fail」与 DEC-1 直接冲突，任何正确实现都不会转绿。",
+   "covered_by": "链内 P0-1.8（同一实例、结论落库后由 NULL 变 fail，本轮已转绿） + 本任务 w2w3_probe 的 AC18-1/AC18-2/AC18-3（含定位断言）"
+  },
+  "P0-3.1": {
+   "why": "夹具按 `notes` 标记（`_uat 返工记录`）造「返工记录」，而 DEC-2 §2.2 **明确否决** notes 标记（报工链不写 notes），选定 R1∨R2（NC.rework_task_id / global_sn）；且断言用的是链内**自己重算**的 `piecework_formula`（uat_chains.py:566-587 与 :608），不是产品路径 ⇒ 夹具与断言双重与 DEC-2 冲突，任何正确实现都不会转绿。",
+   "covered_by": "本任务 w2w3_probe 的 amounts 段（DEC-2 §2.2 合规夹具：NC.rework_task_id + global_sn 关联）：AC26-a（两态差 ≠ 0）、AC25-a（false 剔除额 == 返工贡献）、AC04-d-http（S1 真端点页面 >60.00< / >360.00<）、AC04-d（S1 == S2）"
+  }
+ }
+}

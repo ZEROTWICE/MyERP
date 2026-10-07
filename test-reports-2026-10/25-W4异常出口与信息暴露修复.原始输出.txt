@@ -1,0 +1,1087 @@
+====================================================================================================
+## 修前基线（run_id=w4-t8-pre3）· 各场景 summary
+## P-09：18 个谓词实例中 12 个 500、6 个（R1…R6）200 + 吞掉的 404 文案 ⇒ status_404=0
+====================================================================================================
+{
+ "p09": {
+  "requests": 18,
+  "status_404": 0,
+  "status_5xx": 12,
+  "leak_rows": 0,
+  "fake_200_success": 0
+ },
+ "p10": {
+  "p10a": {
+   "status": 500,
+   "task_still_exists": true,
+   "record_count": 1,
+   "leaks": [
+    "[parameters:",
+    "[sql:",
+    "integrityerror",
+    "sqlite3."
+   ],
+   "reason": "{\"message\":\"\\u5220\\u9664\\u5931\\u8d25\\uff1a(sqlite3.IntegrityError) NOT NULL constraint failed: inspection_records.task_id\\n[SQL: UPDATE inspection_records SET task_id=? WHERE inspection_records.id = ?]\\n[parameters: (Non"
+  },
+  "p10b": {
+   "status": 200,
+   "task_deleted": true,
+   "audit_delete": true
+  },
+  "p10c": {
+   "status": 400,
+   "reason": "{\"message\":\"\\u8fdb\\u884c\\u4e2d\\u6216\\u5df2\\u5b8c\\u6210\\u7684\\u4efb\\u52a1\\u4e0d\\u80fd\\u5220\\u9664\",\"success\":false} "
+  },
+  "p10d": {
+   "status": 500
+  },
+  "reasons_differ": true
+ },
+ "p11": {
+  "leak_rows": 1,
+  "leak_detail": [
+   {
+    "label": "DELETE 有记录任务（P-10 出口）",
+    "leaks": [
+     "[parameters:",
+     "[sql:",
+     "integrityerror",
+     "sqlite3."
+    ],
+    "head": "{\"message\":\"\\u5220\\u9664\\u5931\\u8d25\\uff1a(sqlite3.IntegrityError) NOT NULL constraint failed: inspection_records.task_id\\n[SQL: UPDATE inspection_records SET task_id=? WHERE inspection_records.id = ?]\\n[parameters: (Non"
+   }
+  ],
+  "empty_body_rows": [],
+  "injection_hits": 3,
+  "statuses": {
+   "DELETE 有记录任务（P-10 出口）": 500,
+   "PUT templates 部分更新": 500,
+   "POST tasks 缺 type": 500,
+   "POST tasks type 非法": 500,
+   "PUT templates 哨兵 id": 500,
+   "DELETE tasks 哨兵 id": 500,
+   "POST /tasks/add 空表单体": 500,
+   "POST process_assignment 空表单体": 500,
+   "PUT tasks 空 JSON": 200
+  }
+ },
+ "p12": {
+  "requests": 24,
+  "status_4xx_400_415": 0,
+  "status_5xx": 24,
+  "leak_rows": [
+   "415-form POST /audit_logs/rollback/<id>"
+  ],
+  "html_rows": [],
+  "silent_200": [],
+  "p12b": {
+   "partial": 500,
+   "only_required": 500,
+   "task_bad_type": 500,
+   "task_missing_type": 500,
+   "partial_body": "{\"message\":\"\\u64cd\\u4f5c\\u5931\\u8d25\\uff1a404 Not Found: The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.\",\"success\":false} ",
+   "task_bad_body": "{\"message\":\"\\u521b\\u5efa\\u5931\\u8d25\\uff1a'inspection_target_id'\",\"success\":false} "
+  },
+  "statuses": {
+   "415-form POST /tasks/add": 500,
+   "415-form POST /api/quality/templates": 500,
+   "415-form POST /api/quality/tasks": 500,
+   "415-form POST records/<real>/submit": 500,
+   "415-form POST tasks/<real>/start-inspection": 500,
+   "415-form PUT /api/quality/tasks/<real>": 500,
+   "415-form PUT /api/quality/templates/<real>": 500,
+   "415-form POST /api/process_assignment/<id>": 500,
+   "415-form POST /api/process_assignment/bulk": 500,
+   "415-form POST create_instances": 500,
+   "415-form POST items/<id>/tech_decomposition": 500,
+   "415-form POST items/<id>/execute_operation": 500,
+   "415-form POST /audit_logs/rollback/<id>": 500,
+   "415-form DELETE /api/quality/templates/<real>": 500,
+   "empty-json POST /tasks/add": 500,
+   "empty-json POST /api/quality/templates": 500,
+   "empty-json POST /api/quality/tasks": 500,
+   "empty-json POST records/<real>/submit": 500,
+   "empty-json POST tasks/<real>/start-inspection": 500,
+   "empty-json PUT /api/quality/tasks/<real>": 500,
+   "P-12-b PUT templates/{is_active:false}": 500,
+   "P-12-b PUT templates/{template_code:X}": 500,
+   "P-12-b POST tasks {type:x}": 500,
+   "P-12-b POST tasks 缺 type": 500
+  }
+ }
+}
+
+====================================================================================================
+## 修后权威判据（run_id=w4-t8-accept3）· 39/39 PASS
+====================================================================================================
+{
+ "verdict": "PASS",
+ "real_db": {
+  "before": "F5DA2306BC31CBAB098AAD3774016D320A9B9AA3546F93418196AE9900E0F065",
+  "after": "F5DA2306BC31CBAB098AAD3774016D320A9B9AA3546F93418196AE9900E0F065",
+  "unchanged": true
+ },
+ "checks": [
+  {
+   "slot": "p09",
+   "desc": "P-09-a 全部 404（18 谓词实例 / 17 源站点）",
+   "status": "passed"
+  },
+  {
+   "slot": "p09",
+   "desc": "P-09-a 无 5xx",
+   "status": "passed"
+  },
+  {
+   "slot": "p09",
+   "desc": "P-09-a 无泄漏",
+   "status": "passed"
+  },
+  {
+   "slot": "p09",
+   "desc": "P-09-a 无「200 + success:true」伪装",
+   "status": "passed"
+  },
+  {
+   "slot": "p09",
+   "desc": "P-09-a 404 面 Content-Type 为 JSON（JSON 面 16 处；R1/R6 页面命名空间 GET 按既有 _wants_json() 口径为 HTML，残留项见文档 §9）",
+   "status": "passed"
+  },
+  {
+   "slot": "p10",
+   "desc": "P-10-a (status, exists, records, leaks) == (400, True, 1, 0)",
+   "status": "passed"
+  },
+  {
+   "slot": "p10",
+   "desc": "P-10-a 原因可读（含「质检记录」）",
+   "status": "passed"
+  },
+  {
+   "slot": "p10",
+   "desc": "P-10-b 无记录 pending 仍 200 且行数 -1",
+   "status": "passed"
+  },
+  {
+   "slot": "p10",
+   "desc": "P-10-b AuditLog rollback_type=delete",
+   "status": "passed"
+  },
+  {
+   "slot": "p10",
+   "desc": "P-10-c in_progress 仍 400",
+   "status": "passed"
+  },
+  {
+   "slot": "p10",
+   "desc": "P-10-c 两条原因可区分",
+   "status": "passed"
+  },
+  {
+   "slot": "p10",
+   "desc": "P-10-d 哨兵 id ⇒ 404（并入 P-09-a）",
+   "status": "passed"
+  },
+  {
+   "slot": "p11",
+   "desc": "P-11-a 5 类泄漏命中 == 0",
+   "status": "passed"
+  },
+  {
+   "slot": "p11",
+   "desc": "P-11-a 错误正文非空（RC-6 可读原因）",
+   "status": "passed"
+  },
+  {
+   "slot": "p11",
+   "desc": "P-11-a 状态码语义未变坏（无 5xx）",
+   "status": "passed"
+  },
+  {
+   "slot": "p11",
+   "desc": "P-11-b 注入 str(e) 后判据必须报红",
+   "status": "passed"
+  },
+  {
+   "slot": "p12",
+   "desc": "P-12-a 无 5xx（原红线 == 0）",
+   "status": "passed"
+  },
+  {
+   "slot": "p12",
+   "desc": "P-12-a JSON 面不得返回 HTML 错误页",
+   "status": "passed"
+  },
+  {
+   "slot": "p12",
+   "desc": "P-12-a 无泄漏",
+   "status": "passed"
+  },
+  {
+   "slot": "p12",
+   "desc": "P-12-b templates 部分更新 ∈ {200,400}",
+   "status": "passed"
+  },
+  {
+   "slot": "p12",
+   "desc": "P-12-b tasks 非法 type ⇒ 400",
+   "status": "passed"
+  },
+  {
+   "slot": "p12",
+   "desc": "P-12-b tasks 缺 type ⇒ 400",
+   "status": "passed"
+  },
+  {
+   "slot": "p12",
+   "desc": "P-12-c 空体不得 200 success",
+   "status": "passed"
+  },
+  {
+   "slot": "p08",
+   "desc": "P-08-a 200 且库内 notes == NEW_NOTES",
+   "status": "passed"
+  },
+  {
+   "slot": "p08",
+   "desc": "P-08-a 既有字段仍正确落库（quantity == 9）",
+   "status": "passed"
+  },
+  {
+   "slot": "p08",
+   "desc": "P-08-b 审计 old != new（核心）",
+   "status": "passed"
+  },
+  {
+   "slot": "p08",
+   "desc": "P-08-b 审计元数据齐备",
+   "status": "passed"
+  },
+  {
+   "slot": "p08",
+   "desc": "P-08-c 未传 notes ⇒ 保持原值",
+   "status": "passed"
+  },
+  {
+   "slot": "p13",
+   "desc": "P-13-a 200+HTML ≤ 1 且已登记",
+   "status": "passed"
+  },
+  {
+   "slot": "p13",
+   "desc": "P-13-a 200+二进制 == 3 且不被改成 JSON",
+   "status": "passed"
+  },
+  {
+   "slot": "p13",
+   "desc": "P-13-a /api/ 面无非预期状态（50 个请求：200/404/405 之外为空；405 = 8，由 Flask 路由层产生、与本次修复无关）",
+   "status": "passed"
+  },
+  {
+   "slot": "p13",
+   "desc": "P-13-a 无 5xx",
+   "status": "passed"
+  },
+  {
+   "slot": "p13",
+   "desc": "P-13-c 载体登记册 == 4 行、违规 0 行",
+   "status": "passed"
+  },
+  {
+   "slot": "p13",
+   "desc": "P-13-c 登记册与实测逐行一致",
+   "status": "passed"
+  },
+  {
+   "slot": "s",
+   "desc": "S-1 合法读仍 200 + JSON",
+   "status": "passed"
+  },
+  {
+   "slot": "s",
+   "desc": "S-2 既有字段仍正确落库（quantity=9，status 不变）",
+   "status": "passed"
+  },
+  {
+   "slot": "s",
+   "desc": "S-3 无记录 pending 仍可删（200）",
+   "status": "passed"
+  },
+  {
+   "slot": "s",
+   "desc": "S-4 三条导出仍为 xlsx",
+   "status": "passed"
+  },
+  {
+   "slot": "s",
+   "desc": "S-6 合法 JSON 正常路径仍 200",
+   "status": "passed"
+  }
+ ],
+ "summaries": {
+  "p09": {
+   "requests": 18,
+   "status_404": 18,
+   "status_5xx": 0,
+   "leak_rows": 0,
+   "fake_200_success": 0
+  },
+  "p10": {
+   "p10a": {
+    "status": 400,
+    "task_still_exists": true,
+    "record_count": 1,
+    "leaks": [],
+    "reason": "{\"message\":\"\\u8be5\\u4efb\\u52a1\\u5df2\\u4ea7\\u751f\\u8d28\\u68c0\\u8bb0\\u5f55\\uff0c\\u4e0d\\u80fd\\u5220\\u9664\\uff1b\\u5982\\u9700\\u4f5c\\u5e9f\\u8bf7\\u5148\\u5904\\u7406\\u5bf9\\u5e94\\u7684\\u8d28\\u68c0\\u8bb0\\u5f55\",\"record_id\":1,\"succe"
+   },
+   "p10b": {
+    "status": 200,
+    "task_deleted": true,
+    "audit_delete": true
+   },
+   "p10c": {
+    "status": 400,
+    "reason": "{\"message\":\"\\u8fdb\\u884c\\u4e2d\\u6216\\u5df2\\u5b8c\\u6210\\u7684\\u4efb\\u52a1\\u4e0d\\u80fd\\u5220\\u9664\",\"success\":false} "
+   },
+   "p10d": {
+    "status": 404
+   },
+   "reasons_differ": true
+  },
+  "p11": {
+   "leak_rows": 0,
+   "leak_detail": [],
+   "empty_body_rows": [],
+   "injection_hits": 3,
+   "statuses": {
+    "DELETE 有记录任务（P-10 出口）": 400,
+    "PUT templates 部分更新": 404,
+    "POST tasks 缺 type": 400,
+    "POST tasks type 非法": 400,
+    "PUT templates 哨兵 id": 404,
+    "DELETE tasks 哨兵 id": 404,
+    "POST /tasks/add 空表单体": 415,
+    "POST process_assignment 空表单体": 415,
+    "PUT tasks 空 JSON": 200
+   }
+  },
+  "p12": {
+   "requests": 22,
+   "status_4xx_400_415": 20,
+   "status_5xx": 0,
+   "leak_rows": [],
+   "html_rows": [],
+   "silent_200": [],
+   "p12b": {
+    "partial": 200,
+    "only_required": 200,
+    "task_bad_type": 400,
+    "task_missing_type": 400,
+    "partial_body": "{\"message\":\"\\u6a21\\u677f\\u66f4\\u65b0\\u6210\\u529f\",\"success\":true} ",
+    "task_bad_body": "{\"message\":\"\\u7f3a\\u5c11\\u5fc5\\u586b\\u5b57\\u6bb5\\uff1ainspection_target_id\\u3001inspector_id\",\"success\":false} "
+   },
+   "statuses": {
+    "415-form POST /tasks/add": 415,
+    "415-form POST /api/quality/templates": 415,
+    "415-form POST /api/quality/tasks": 415,
+    "415-form POST records/<real>/submit": 415,
+    "415-form POST tasks/<real>/start-inspection": 415,
+    "415-form PUT /api/quality/tasks/<real>": 415,
+    "415-form PUT /api/quality/templates/<real>": 415,
+    "415-form POST /api/process_assignment/<id>": 415,
+    "415-form POST /api/process_assignment/bulk": 415,
+    "415-form POST create_instances": 415,
+    "415-form POST items/<id>/tech_decomposition": 415,
+    "415-form POST items/<id>/execute_operation": 415,
+    "empty-json POST /tasks/add": 400,
+    "empty-json POST /api/quality/templates": 400,
+    "empty-json POST /api/quality/tasks": 400,
+    "empty-json POST records/<real>/submit": 400,
+    "empty-json POST tasks/<real>/start-inspection": 400,
+    "empty-json PUT /api/quality/tasks/<real>": 400,
+    "P-12-b PUT templates/{is_active:false}": 200,
+    "P-12-b PUT templates/{template_code:W4-TMPL2}": 200,
+    "P-12-b POST tasks {type:x}": 400,
+    "P-12-b POST tasks 缺 type": 400
+   }
+  },
+  "p08": {
+   "status": 200,
+   "db_notes_after": "NEW_NOTES",
+   "quantity_after": 9,
+   "audit": {
+    "old_notes": "OLD_NOTES",
+    "new_notes": "NEW_NOTES",
+    "can_rollback": true,
+    "rollback_type": "edit",
+    "target_model": "TaskAssignment",
+    "target_id": 19,
+    "action": "修改生产任务"
+   },
+   "notes_after_no_notes_case": "NEW_NOTES",
+   "status_no_notes_case": 200
+  },
+  "p13": {
+   "api_get_scanned": 50,
+   "html200": [
+    "GET /api/quality/records/<int:record_id>/print"
+   ],
+   "binary200": [
+    "GET /api/quality/records/export",
+    "GET /api/quality/tasks/export",
+    "GET /api/quality/tasks/template"
+   ],
+   "count_405": 8,
+   "count_5xx": 0,
+   "register_rows": 4,
+   "register_violations": 0,
+   "register_mismatched": [],
+   "statuses": {
+    "GET /api/chart-data/department": 200,
+    "GET /api/chart-data/production": 200,
+    "GET /api/chart-data/salary": 200,
+    "GET /api/chart-data/task": 200,
+    "GET /api/consumable-categories": 200,
+    "GET /api/customers/<int:customer_id>/addresses": 200,
+    "GET /api/customers/search": 200,
+    "GET /api/inventory/consumables": 200,
+    "GET /api/inventory/finished-products": 200,
+    "GET /api/inventory/raw-materials": 200,
+    "GET /api/materials/search": 200,
+    "GET /api/notifications/recent": 200,
+    "GET /api/notifications/stats": 200,
+    "GET /api/process_assignment": 200,
+    "GET /api/process_assignment/<int:process_id>": 200,
+    "GET /api/process_assignment/bulk": 405,
+    "GET /api/production/generate-codes": 405,
+    "GET /api/production_center/create_instances": 405,
+    "GET /api/production_center/items/<int:item_id>/detail": 200,
+    "GET /api/production_center/items/<int:item_id>/execute_operation": 405,
+    "GET /api/production_center/items/<int:item_id>/tech_decomposition": 405,
+    "GET /api/products/drawings-by-name": 200,
+    "GET /api/products/names": 200,
+    "GET /api/products/search": 200,
+    "GET /api/quality/finished-products": 200,
+    "GET /api/quality/inspectors": 200,
+    "GET /api/quality/processes": 200,
+    "GET /api/quality/production-records": 200,
+    "GET /api/quality/records": 200,
+    "GET /api/quality/records/<int:record_id>": 200,
+    "GET /api/quality/records/<int:record_id>/print": 200,
+    "GET /api/quality/records/<int:record_id>/submit": 405,
+    "GET /api/quality/records/export": 200,
+    "GET /api/quality/tasks": 200,
+    "GET /api/quality/tasks/<int:task_id>": 200,
+    "GET /api/quality/tasks/<int:task_id>/start-inspection": 405,
+    "GET /api/quality/tasks/export": 200,
+    "GET /api/quality/tasks/import": 405,
+    "GET /api/quality/tasks/template": 200,
+    "GET /api/quality/templates": 200,
+    "GET /api/quality/templates/<int:template_id>": 200,
+    "GET /api/raw-material-categories": 200,
+    "GET /api/sales_orders/<int:order_id>/customer_addresses": 200,
+    "GET /api/sales_orders/search": 200,
+    "GET /api/search/suggestions": 200
+   }
+  },
+  "s": {
+   "s2_quantity": 9,
+   "s2_status": "pending",
+   "s3_status": 200,
+   "xlsx_content_types": [
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/json"
+   ],
+   "statuses": {
+    "S-1 GET records/<real>": 200,
+    "S-1 GET pc items/<real>/detail": 200,
+    "S-2 POST /tasks/<real>/edit（改 quantity/date）": 200,
+    "S-3 DELETE 无记录 pending": 200,
+    "S-4 GET records/export": 200,
+    "S-4 GET tasks/export": 200,
+    "S-4 GET tasks/template": 200,
+    "S-6 PUT templates/<real> 合法全字段": 200
+   }
+  }
+ }
+}
+
+====================================================================================================
+## 修后判据控制台（逐条打印）
+====================================================================================================
+python.exe : D:\workspace\wage_management_system - bak\test-reports-2026-10\harness\w4_probe.py:181: LegacyAPIWarning: 
+The Query.get() method is considered legacy as of the 1.x series of SQLAlchemy and becomes a legacy construct in 2.0. T
+he method is now available as Session.get() (deprecated since: 2.0) (Background on SQLAlchemy 2.0 at: https://sqlalche.
+me/e/b8d9)
+At line:3 char:1
++ & $py -B 'test-reports-2026-10\harness\w4_probe.py' --phase post --sc ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (D:\workspace\wa...lche.me/e/b8d9):String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  still = M.InspectionTask.query.get(tid_rec) is not None
+D:\workspace\wage_management_system - bak\test-reports-2026-10\harness\w4_probe.py:183: LegacyAPIWarning: The Query.get
+() method is considered legacy as of the 1.x series of SQLAlchemy and becomes a legacy construct in 2.0. The method is 
+now available as Session.get() (deprecated since: 2.0) (Background on SQLAlchemy 2.0 at: https://sqlalche.me/e/b8d9)
+  gone = M.InspectionTask.query.get(tid_free) is None
+[w4] phase=post scenario=all run_id=w4-t8-accept3 login=302 copy=app.db
+
+### p09
+  Q1 PUT /api/quality/templates/<S>              404 application/json           leaks=[] 
+  Q2 DELETE /api/quality/templates/<S>           404 application/json           leaks=[] 
+  Q3 POST tasks/<S>/start-inspection             404 application/json           leaks=[] 
+  Q4 POST records/<S>/submit                     404 application/json           leaks=[] 
+  Q5 DELETE tasks/<S>                            404 application/json           leaks=[] 
+  Q6 PUT tasks/<S>                               404 application/json           leaks=[] 
+  Q7 GET records/<S>                             404 application/json           leaks=[] 
+  Q8 GET records/<S>/print                       404 application/json           leaks=[] 
+  PC1 POST create_instances                      404 application/json           leaks=[] 
+  PC2 POST items/<S>/tech_decomposition          404 application/json           leaks=[] 
+  PC3 GET items/<S>/detail                       404 application/json           leaks=[] 
+  PC4 POST items/<S>/execute_operation           404 application/json           leaks=[] 
+  R1 GET /products/<pid>/bom/<S>                 404 text/html                  leaks=[] 
+  R2 PUT /products/<pid>/bom/<S>                 404 application/json           leaks=[] 
+  R3 DELETE /products/<pid>/bom/<S>              404 application/json           leaks=[] 
+  R4 DELETE /products/<pid>/processes/<S>        404 application/json           leaks=[] 
+  R5 PUT /products/<pid>/processes/<S>           404 application/json           leaks=[] 
+  R6 GET /products/<pid>/processes/<S>           404 text/html                  leaks=[] 
+  [OK  ] p09: P-09-a 全部 404（18 谓词实例 / 17 源站点）
+  [OK  ] p09: P-09-a 无 5xx
+  [OK  ] p09: P-09-a 无泄漏
+  [OK  ] p09: P-09-a 无「200 + success:true」伪装
+  [OK  ] p09: P-09-a 404 面 Content-Type 为 JSON（JSON 面 16 处；R1/R6 页面命名空间 GET 按既有 _wants_json() 口径为 HTML，残留项见文档 §9）
+
+### p10
+  P-10-a DELETE 有记录 pending 任务                   400 application/json           leaks=[] 
+  P-10-b DELETE 无记录 pending 任务                   200 application/json           leaks=[] 
+  P-10-c DELETE in_progress 任务                   400 application/json           leaks=[] 
+  P-10-d DELETE 哨兵 id                            404 application/json           leaks=[] 
+  [OK  ] p10: P-10-a (status, exists, records, leaks) == (400, True, 1, 0)
+  [OK  ] p10: P-10-a 原因可读（含「质检记录」）
+  [OK  ] p10: P-10-b 无记录 pending 仍 200 且行数 -1
+  [OK  ] p10: P-10-b AuditLog rollback_type=delete
+  [OK  ] p10: P-10-c in_progress 仍 400
+  [OK  ] p10: P-10-c 两条原因可区分
+  [OK  ] p10: P-10-d 哨兵 id ⇒ 404（并入 P-09-a）
+
+### p11
+  DELETE 有记录任务（P-10 出口）                          400 application/json           leaks=[] 
+  PUT templates 部分更新                             404 application/json           leaks=[] 
+  POST tasks 缺 type                              400 application/json           leaks=[] 
+  POST tasks type 非法                             400 application/json           leaks=[] 
+  PUT templates 哨兵 id                            404 application/json           leaks=[] 
+  DELETE tasks 哨兵 id                             404 application/json           leaks=[] 
+  POST /tasks/add 空表单体                           415 text/html                  leaks=[] 
+  POST process_assignment 空表单体                   415 application/json           leaks=[] 
+  PUT tasks 空 JSON                               200 application/json           leaks=[] 
+  P-11-b 注入探针端点（回显 str(e)）                       500 text/html                  leaks=['[sql:', 'operationalerror', 'sqlite3.'] 判据必须报红（hits>=1）
+  [OK  ] p11: P-11-a 5 类泄漏命中 == 0
+  [OK  ] p11: P-11-a 错误正文非空（RC-6 可读原因）
+  [OK  ] p11: P-11-a 状态码语义未变坏（无 5xx）
+  [OK  ] p11: P-11-b 注入 str(e) 后判据必须报红
+
+### p12
+  415-form POST /tasks/add                       415 text/html                  leaks=[] 
+  415-form POST /api/quality/templates           415 application/json           leaks=[] 
+  415-form POST /api/quality/tasks               415 application/json           leaks=[] 
+  415-form POST records/<real>/submit            415 application/json           leaks=[] 
+  415-form POST tasks/<real>/start-inspection    415 application/json           leaks=[] 
+  415-form PUT /api/quality/tasks/<real>         415 application/json           leaks=[] 
+  415-form PUT /api/quality/templates/<real>     415 application/json           leaks=[] 
+  415-form POST /api/process_assignment/<id>     415 application/json           leaks=[] 
+  415-form POST /api/process_assignment/bulk     415 application/json           leaks=[] 
+  415-form POST create_instances                 415 application/json           leaks=[] 
+  415-form POST items/<id>/tech_decomposition    415 application/json           leaks=[] 
+  415-form POST items/<id>/execute_operation     415 application/json           leaks=[] 
+  empty-json POST /tasks/add                     400 application/json           leaks=[] 
+  empty-json POST /api/quality/templates         400 application/json           leaks=[] 
+  empty-json POST /api/quality/tasks             400 application/json           leaks=[] 
+  empty-json POST records/<real>/submit          400 application/json           leaks=[] 
+  empty-json POST tasks/<real>/start-inspection  400 application/json           leaks=[] 
+  empty-json PUT /api/quality/tasks/<real>       400 application/json           leaks=[] 
+  P-12-b PUT templates/{is_active:false}         200 application/json           leaks=[] 
+  P-12-b PUT templates/{template_code:W4-TMPL2}  200 application/json           leaks=[] 
+  P-12-b POST tasks {type:x}                     400 application/json           leaks=[] 
+  P-12-b POST tasks 缺 type                       400 application/json           leaks=[] 
+  [OK  ] p12: P-12-a 无 5xx（原红线 == 0）
+  [OK  ] p12: P-12-a JSON 面不得返回 HTML 错误页
+  [OK  ] p12: P-12-a 无泄漏
+  [OK  ] p12: P-12-b templates 部分更新 ∈ {200,400}
+  [OK  ] p12: P-12-b tasks 非法 type ⇒ 400
+  [OK  ] p12: P-12-b tasks 缺 type ⇒ 400
+  [OK  ] p12: P-12-c 空体不得 200 success
+
+### p08
+  P-08-a POST /tasks/<id>/edit（notes=NEW_NOTES）  200 application/json           leaks=[] 
+  P-08-c POST /tasks/<id>/edit（不传 notes）         200 application/json           leaks=[] 
+  [OK  ] p08: P-08-a 200 且库内 notes == NEW_NOTES
+  [OK  ] p08: P-08-a 既有字段仍正确落库（quantity == 9）
+  [OK  ] p08: P-08-b 审计 old != new（核心）
+  [OK  ] p08: P-08-b 审计元数据齐备
+  [OK  ] p08: P-08-c 未传 notes ⇒ 保持原值
+
+### p13
+  [OK  ] p13: P-13-a 200+HTML ≤ 1 且已登记
+  [OK  ] p13: P-13-a 200+二进制 == 3 且不被改成 JSON
+  [OK  ] p13: P-13-a /api/ 面无非预期状态（50 个请求：200/404/405 之外为空；405 = 8，由 Flask 路由层产生、与本次修复无关）
+  [OK  ] p13: P-13-a 无 5xx
+  [OK  ] p13: P-13-c 载体登记册 == 4 行、违规 0 行
+  [OK  ] p13: P-13-c 登记册与实测逐行一致
+
+### s
+  S-1 GET records/<real>                         200 application/json           leaks=[] 
+  S-1 GET pc items/<real>/detail                 200 application/json           leaks=[] 
+  S-2 POST /tasks/<real>/edit（改 quantity/date）   200 application/json           leaks=[] 
+  S-3 DELETE 无记录 pending                         200 application/json           leaks=[] 
+  S-4 GET records/export                         200 application/vnd.openxmlformats-officedocument.spreadsheetml.sheet leaks=[] 
+  S-4 GET tasks/export                           200 application/vnd.openxmlformats-officedocument.spreadsheetml.sheet leaks=[] 
+  S-4 GET tasks/template                         200 application/vnd.openxmlformats-officedocument.spreadsheetml.sheet leaks=[] 
+  S-6 PUT templates/<real> 合法全字段                 200 application/json           leaks=[] 
+  [OK  ] s: S-1 合法读仍 200 + JSON
+  [OK  ] s: S-2 既有字段仍正确落库（quantity=9，status 不变）
+  [OK  ] s: S-3 无记录 pending 仍可删（200）
+  [OK  ] s: S-4 三条导出仍为 xlsx
+  [OK  ] s: S-6 合法 JSON 正常路径仍 200
+
+== 判据（phase=post）==
+  [OK  ] p09: P-09-a 全部 404（18 谓词实例 / 17 源站点）
+  [OK  ] p09: P-09-a 无 5xx
+  [OK  ] p09: P-09-a 无泄漏
+  [OK  ] p09: P-09-a 无「200 + success:true」伪装
+  [OK  ] p09: P-09-a 404 面 Content-Type 为 JSON（JSON 面 16 处；R1/R6 页面命名空间 GET 按既有 _wants_json() 口径为 HTML，残留项见文档 §9）
+  [OK  ] p10: P-10-a (status, exists, records, leaks) == (400, True, 1, 0)
+  [OK  ] p10: P-10-a 原因可读（含「质检记录」）
+  [OK  ] p10: P-10-b 无记录 pending 仍 200 且行数 -1
+  [OK  ] p10: P-10-b AuditLog rollback_type=delete
+  [OK  ] p10: P-10-c in_progress 仍 400
+  [OK  ] p10: P-10-c 两条原因可区分
+  [OK  ] p10: P-10-d 哨兵 id ⇒ 404（并入 P-09-a）
+  [OK  ] p11: P-11-a 5 类泄漏命中 == 0
+  [OK  ] p11: P-11-a 错误正文非空（RC-6 可读原因）
+  [OK  ] p11: P-11-a 状态码语义未变坏（无 5xx）
+  [OK  ] p11: P-11-b 注入 str(e) 后判据必须报红
+  [OK  ] p12: P-12-a 无 5xx（原红线 == 0）
+  [OK  ] p12: P-12-a JSON 面不得返回 HTML 错误页
+  [OK  ] p12: P-12-a 无泄漏
+  [OK  ] p12: P-12-b templates 部分更新 ∈ {200,400}
+  [OK  ] p12: P-12-b tasks 非法 type ⇒ 400
+  [OK  ] p12: P-12-b tasks 缺 type ⇒ 400
+  [OK  ] p12: P-12-c 空体不得 200 success
+  [OK  ] p08: P-08-a 200 且库内 notes == NEW_NOTES
+  [OK  ] p08: P-08-a 既有字段仍正确落库（quantity == 9）
+  [OK  ] p08: P-08-b 审计 old != new（核心）
+  [OK  ] p08: P-08-b 审计元数据齐备
+  [OK  ] p08: P-08-c 未传 notes ⇒ 保持原值
+  [OK  ] p13: P-13-a 200+HTML ≤ 1 且已登记
+  [OK  ] p13: P-13-a 200+二进制 == 3 且不被改成 JSON
+  [OK  ] p13: P-13-a /api/ 面无非预期状态（50 个请求：200/404/405 之外为空；405 = 8，由 Flask 路由层产生、与本次修复无关）
+  [OK  ] p13: P-13-a 无 5xx
+  [OK  ] p13: P-13-c 载体登记册 == 4 行、违规 0 行
+  [OK  ] p13: P-13-c 登记册与实测逐行一致
+  [OK  ] s: S-1 合法读仍 200 + JSON
+  [OK  ] s: S-2 既有字段仍正确落库（quantity=9，status 不变）
+  [OK  ] s: S-3 无记录 pending 仍可删（200）
+  [OK  ] s: S-4 三条导出仍为 xlsx
+  [OK  ] s: S-6 合法 JSON 正常路径仍 200
+  真库未变: True
+JSON -> test-reports-2026-10\evidence\harness\w4-t8-accept3\w4_post.json
+原始输出 -> D:\workspace\wage_management_system - bak\test-reports-2026-10\evidence\harness\w4-t8-accept3\w4_post_all.console.txt
+
+====================================================================================================
+## P-09-c 机读判据（AST：会吞成静默出口的站点）
+## doc 口径 = 17 处源站点（本探针按谓词实例计 18 个 try 站点）；app 口径 = 全量信息项（§7.3）
+====================================================================================================
+$ test-reports-2026-10\harness\w4_http_contract.py --scope doc --expect 0
+[w4_http_contract] 扫描根 = app  口径 = doc
+[w4_http_contract] 会吞成静默出口的站点 = 0（期望 0）
+[w4_http_contract] exit_code_semantics={"rule": "sites == --expect -> exit 0 else 1", "sites": 0, "expected": 0, "code": 0}
+
+--- stderr ---
+
+
+[exit=0]
+$ test-reports-2026-10\harness\w4_http_contract.py --scope app --expect 999
+[w4_http_contract] 扫描根 = app  口径 = app
+  [SITE] app/main/routes.py:1717 add_bonus_penalty()  patterns=['get_json()']  处理器行=[1755]
+  [SITE] app/main/routes.py:5359 add_code_rule()  patterns=['get_json()']  处理器行=[5397]
+  [SITE] app/main/routes.py:5412 edit_code_rule()  patterns=['get_json()']  处理器行=[5453]
+  [SITE] app/main/routes.py:6225 auto_archive_inventory()  patterns=['get_json()']  处理器行=[6268]
+  [SITE] app/main/routes.py:7018 add_product()  patterns=['get_json()']  处理器行=[7085]
+  [SITE] app/main/routes.py:8059 add_production_order()  patterns=['get_json()']  处理器行=[8098]
+  [SITE] app/main/routes.py:10072 manage_delivery_batches()  patterns=['get_json()']  处理器行=[10096]
+  [SITE] app/main/routes.py:10826 update_consumable()  patterns=['get_json()']  处理器行=[10899]
+  [SITE] app/main/routes.py:10968 use_consumable()  patterns=['get_json()']  处理器行=[11019]
+  [SITE] app/main/routes.py:11130 update_consumable_category()  patterns=['get_json()']  处理器行=[11185]
+[w4_http_contract] 会吞成静默出口的站点 = 10（期望 999）
+[w4_http_contract] exit_code_semantics={"rule": "sites == --expect -> exit 0 else 1", "sites": 10, "expected": 999, "code": 1}
+
+--- stderr ---
+
+
+[exit=1]
+
+--- 判据敏感性自检 ---
+$ test-reports-2026-10\harness\w4_http_contract.py --selftest
+  [PASS] WT-P1 有 _reraise_http ⇒ 不算站点（期望 0，实测 0）
+  [PASS] WT-P2 独立 except HTTPException: raise ⇒ 不算站点（期望 0，实测 0）
+  [PASS] WT-N1 get_or_404 被裸捕 ⇒ 算站点（期望 1，实测 1）
+  [PASS] WT-N2 get_json() 被裸捕 ⇒ 算站点（期望 1，实测 1）
+  [PASS] WT-N3 first_or_404 + 裸 except ⇒ 算站点（期望 1，实测 1）
+[w4_http_contract] 自检 2/5 通过
+
+--- stderr ---
+
+
+[exit=0]
+
+====================================================================================================
+## AGENTS.md 四项静态门禁（exit 0 ×4）
+====================================================================================================
+--- scripts/check_templates.py ---
+[templates] parsed 87 files
+[permissions] 44 declared / 40 used in templates / 44 used on routes
+[landing] 5 role landing endpoints
+RESULT: OK
+--- scripts/check_migration_heads.py ---
+HEADS=['p1nonctarget']
+head_count=1  revisions=35
+OK: 单一 head p1nonctarget
+--- scripts/check_properties.py ---
+已扫描 23 个文件，模型类 74 个
+RESULT: OK（未发现把 @property / 不存在的列当数据库列用）
+--- scripts/route_inventory.py ---
+[routes] total rules=271
+[routes] duplicate (method,path) registrations=0
+[routes] GET no-arg=104 GET with-arg=56 non-GET=110
+  GET  /
+  GET  /add_process_price
+  GET  /api/chart-data/department
+  GET  /api/chart-data/production
+  GET  /api/chart-data/salary
+  GET  /api/chart-data/task
+  GET  /api/consumable-categories
+  GET  /api/customers/search
+  GET  /api/inventory/consumables
+  GET  /api/inventory/finished-products
+  GET  /api/inventory/raw-materials
+  GET  /api/materials/search
+  GET  /api/notifications/recent
+  GET  /api/notifications/stats
+  GET  /api/process_assignment
+  GET  /api/products/drawings-by-name
+  GET  /api/products/names
+  GET  /api/products/search
+  GET  /api/quality/finished-products
+  GET  /api/quality/inspectors
+  GET  /api/quality/processes
+  GET  /api/quality/production-records
+  GET  /api/quality/records
+  GET  /api/quality/records/export
+  GET  /api/quality/tasks
+  GET  /api/quality/tasks/export
+  GET  /api/quality/tasks/template
+  GET  /api/quality/templates
+  GET  /api/raw-material-categories
+  GET  /api/sales_orders/search
+  GET  /api/search/suggestions
+  GET  /assembly
+  GET  /audit_logs
+  GET  /auth/
+  GET  /auth/login
+  GET  /auth/logout
+  GET  /auth/register
+  GET  /bonus_penalties
+  GET  /bonus_penalties/export
+  GET  /bonus_penalties/template
+  GET  /code_rules
+  GET  /code_rules/add
+  GET  /code_rules/available/material
+  GET  /code_rules/available/product
+  GET  /consumables
+  GET  /consumables/categories
+  GET  /consumables/inbound
+  GET  /customer/add
+  GET  /customers
+  GET  /employee/add
+  GET  /employees
+  GET  /employees/export
+  GET  /employees/template
+  GET  /equipment
+  GET  /export_tasks
+  GET  /heat_lots
+  GET  /inventory
+  GET  /inventory/finished-product/inbound
+  GET  /inventory/inbound
+  GET  /inventory/raw-material/categories
+  GET  /inventory/raw-material/inbound
+  GET  /inventory/template
+  GET  /inventory_counts
+  GET  /inventory_counts/add
+  GET  /material_requisitions
+  GET  /material_requisitions/add
+  GET  /material_returns
+  GET  /material_returns/add
+  GET  /my_tasks
+  GET  /notification_rules
+  GET  /notification_rules/add
+  GET  /notifications
+  GET  /process_assignment
+  GET  /process_prices
+  GET  /process_prices/export
+  GET  /process_prices/template
+  GET  /production_center
+  GET  /production_orders
+  GET  /production_records
+  GET  /production_records/export
+  GET  /production_records/template
+  GET  /products
+  GET  /products/export
+  GET  /products/template
+  GET  /purchase_orders
+  GET  /purchase_requisitions
+  GET  /quality
+  GET  /quality/nonconformities
+  GET  /quality/records
+  GET  /quality/tasks
+  GET  /quality/templates
+  GET  /salary_calculation
+  GET  /sales_order/add
+  GET  /sales_orders
+  GET  /search
+  GET  /search/advanced
+  GET  /shipments
+  GET  /suppliers
+  GET  /system_configs
+  GET  /tasks
+  GET  /tasks/template
+  GET  /user_dashboard
+  GET  /work_centers
+  GET  /workpieces
+--- GET with args ---
+  GET  /api/customers/<int:customer_id>/addresses <- ['customer_id']
+  GET  /api/material_requisitions/<int:id>/issued-items <- ['id']
+  GET  /api/process_assignment/<int:process_id> <- ['process_id']
+  GET  /api/production_center/items/<int:item_id>/detail <- ['item_id']
+  GET  /api/quality/records/<int:record_id> <- ['record_id']
+  GET  /api/quality/records/<int:record_id>/print <- ['record_id']
+  GET  /api/quality/tasks/<int:task_id> <- ['task_id']
+  GET  /api/quality/templates/<int:template_id> <- ['template_id']
+  GET  /api/sales_orders/<int:order_id>/customer_addresses <- ['order_id']
+  GET  /assembly/<int:product_id> <- ['product_id']
+  GET  /bonus_penalties/<int:id> <- ['id']
+  GET  /bootstrap/static/<path:filename> <- ['filename']
+  GET  /code_rules/<int:rule_id>/edit <- ['rule_id']
+  GET  /consumables/<int:id> <- ['id']
+  GET  /consumables/categories/<int:category_id> <- ['category_id']
+  GET  /customer/<int:customer_id> <- ['customer_id']
+  GET  /customer/<int:customer_id>/address/<int:address_id>/edit <- ['address_id', 'customer_id']
+  GET  /customer/<int:customer_id>/address/add <- ['customer_id']
+  GET  /customer/<int:customer_id>/edit <- ['customer_id']
+  GET  /employee_salary_changes/<int:employee_id> <- ['employee_id']
+  GET  /employees/<int:id>/edit <- ['id']
+  GET  /equipment/<int:id>/layout <- ['id']
+  GET  /heat_lots/<int:id> <- ['id']
+  GET  /inventory/finished/<int:id> <- ['id']
+  GET  /inventory/raw-material/categories/<int:category_id> <- ['category_id']
+  GET  /inventory/raw/<int:id> <- ['id']
+  GET  /inventory_counts/<int:id> <- ['id']
+  GET  /material_requisitions/<int:id> <- ['id']
+  GET  /material_returns/<int:id> <- ['id']
+  GET  /process_prices/<int:id> <- ['id']
+  GET  /process_prices/<int:id>/edit <- ['id']
+  GET  /production_batches/<int:batch_id> <- ['batch_id']
+  GET  /production_center/items/<int:item_id> <- ['item_id']
+  GET  /production_orders/<int:order_id> <- ['order_id']
+  GET  /production_orders/<int:order_id>/edit <- ['order_id']
+  GET  /products/<int:id> <- ['id']
+  GET  /products/<int:id>/bom <- ['id']
+  GET  /products/<int:product_id>/bom/<int:bom_item_id> <- ['bom_item_id', 'product_id']
+  GET  /products/<int:product_id>/processes <- ['product_id']
+  GET  /products/<int:product_id>/processes/<int:process_item_id> <- ['process_item_id', 'product_id']
+  GET  /purchase_orders/<int:id> <- ['id']
+  GET  /quality/inspection/<int:record_id> <- ['record_id']
+  GET  /quality/tasks/<int:task_id> <- ['task_id']
+  GET  /salary/<int:employee_id> <- ['employee_id']
+  GET  /sales_order/<int:order_id> <- ['order_id']
+  GET  /sales_order/<int:order_id>/edit <- ['order_id']
+  GET  /sales_order/<int:order_id>/item/add <- ['order_id']
+  GET  /sales_order_item/<int:item_id>/delivery_batches <- ['item_id']
+  GET  /sales_order_item/<int:item_id>/delivery_batches/manage <- ['item_id']
+  GET  /sales_order_item/<int:item_id>/edit <- ['item_id']
+  GET  /shipments/<int:id> <- ['id']
+  GET  /stock/<kind> <- ['kind']
+  GET  /tasks/<int:id> <- ['id']
+  GET  /tasks/<int:id>/get <- ['id']
+  GET  /tasks/assignment/<int:id> <- ['id']
+  GET  /workpieces/<int:id> <- ['id']
+--- non-GET ---
+  ---  /add_salary_change
+  ---  /api/process_assignment/<int:process_id>
+  ---  /api/process_assignment/bulk
+  ---  /api/production/generate-codes
+  ---  /api/production_center/create_instances
+  ---  /api/production_center/items/<int:item_id>/execute_operation
+  ---  /api/production_center/items/<int:item_id>/tech_decomposition
+  ---  /api/quality/nonconformities/<int:id>/dispose
+  ---  /api/quality/records/<int:record_id>/submit
+  ---  /api/quality/tasks
+  ---  /api/quality/tasks/<int:task_id>
+  ---  /api/quality/tasks/<int:task_id>/start-inspection
+  ---  /api/quality/tasks/import
+  ---  /api/quality/templates
+  ---  /api/quality/templates/<int:template_id>
+  ---  /audit_logs/rollback/<int:log_id>
+  ---  /bonus_penalties/<int:id>/edit
+  ---  /bonus_penalties/<int:id>/update
+  ---  /bonus_penalties/add
+  ---  /bonus_penalties/import
+  ---  /bonus_penalty/<int:id>
+  ---  /code_rules/<int:rule_id>/delete
+  ---  /code_rules/<int:rule_id>/generate
+  ---  /consumables/<int:id>
+  ---  /consumables/<int:id>
+  ---  /consumables/<int:id>/use
+  ---  /consumables/categories/<int:category_id>
+  ---  /consumables/categories/<int:category_id>
+  ---  /consumables/categories/add
+  ---  /customer/<int:customer_id>/address/<int:address_id>/delete
+  ---  /customer/<int:customer_id>/address/<int:address_id>/set_primary
+  ---  /customer/<int:customer_id>/delete
+  ---  /delete_production_record/<int:id>
+  ---  /delete_salary_change
+  ---  /employee/<int:id>
+  ---  /employees/import
+  ---  /equipment/<int:id>/downtime
+  ---  /equipment/<int:id>/resume
+  ---  /equipment/save
+  ---  /goods_receipts/<int:id>/nonconformity
+  ---  /goods_receipts/<int:id>/putaway
+  ---  /heat_lots/<int:id>/charge
+  ---  /heat_lots/<int:id>/fire
+  ---  /heat_lots/<int:id>/unload
+  ---  /heat_lots/create
+  ---  /inventory/auto-archive
+  ---  /inventory/finished/<int:id>
+  ---  /inventory/finished/<int:id>
+  ---  /inventory/finished/<int:id>/archive
+  ---  /inventory/finished/add
+  ---  /inventory/finished/import
+  ---  /inventory/raw-material/categories/<int:category_id>
+  ---  /inventory/raw-material/categories/<int:category_id>
+  ---  /inventory/raw-material/categories/add
+  ---  /inventory/raw/<int:id>
+  ---  /inventory/raw/<int:id>
+  ---  /inventory/raw/<int:id>/archive
+  ---  /inventory/raw/add
+  ---  /inventory/raw/import
+  ---  /inventory_counts/<int:id>/cancel
+  ---  /inventory_counts/<int:id>/complete
+  ---  /inventory_counts/<int:id>/record
+  ---  /inventory_counts/<int:id>/start
+  ---  /material_requisitions/<int:id>/approve
+  ---  /material_requisitions/<int:id>/cancel
+  ---  /material_requisitions/<int:id>/issue
+  ---  /material_requisitions/<int:id>/reject
+  ---  /material_returns/<int:id>/confirm
+  ---  /material_returns/<int:id>/reject
+  ---  /notifications/<int:notification_id>/read
+  ---  /process_price/<int:id>
+  ---  /process_prices/import
+  ---  /production_batch_items/<int:item_id>/update
+  ---  /production_batches/<int:batch_id>/status
+  ---  /production_orders/<int:order_id>
+  ---  /production_orders/<int:order_id>/batches/add
+  ---  /production_orders/add
+  ---  /production_records/import
+  ---  /products/<int:id>
+  ---  /products/<int:id>
+  ---  /products/<int:product_id>/bom/<int:bom_item_id>
+  ---  /products/<int:product_id>/bom/<int:bom_item_id>
+  ---  /products/<int:product_id>/bom/add
+  ---  /products/<int:product_id>/processes/<int:process_item_id>
+  ---  /products/<int:product_id>/processes/<int:process_item_id>
+  ---  /products/<int:product_id>/processes/add
+  ---  /products/add
+  ---  /products/import
+  ---  /purchase_orders/<int:id>/receive
+  ---  /purchase_orders/<int:id>/settle
+  ---  /purchase_orders/save
+  ---  /purchase_requisitions/<int:id>/approve
+  ---  /purchase_requisitions/<int:id>/convert
+  ---  /purchase_requisitions/save
+  ---  /sales_order/<int:order_id>/create_production_order
+  ---  /sales_order/<int:order_id>/delete
+  ---  /sales_order_item/<int:item_id>/create_production_order
+  ---  /sales_order_item/<int:item_id>/delete
+  ---  /search/quick
+  ---  /shipments/<int:id>/add_item
+  ---  /shipments/<int:id>/ship
+  ---  /shipments/<int:id>/sign
+  ---  /shipments/create
+  ---  /suppliers/save
+  ---  /tasks/<int:id>
+  ---  /tasks/<int:id>/edit
+  ---  /tasks/<int:id>/update_status
+  ---  /tasks/add
+  ---  /tasks/import
+  ---  /work_centers/save
+[e03] exit_code_semantics={"script": "scripts/route_inventory.py", "class": "报告型（无判据语义 => 恒 exit 0，E-03/A-30）", "in_gate_chain": false, "consumer": "test-reports-2026-10/harness/coverage_drift.py（解析 stdout/JSON 做漂移检测）", "code": 0}
+
+====================================================================================================
+## 既有回归网：scripts/functional_test.py（shim）
+====================================================================================================
+S  无工序下单失败  -- HTTP 400 {'message': '产品未配置工艺路线，不能创建生产订单', 'success': False}
+  PASS  失败原因含工艺路线  -- 产品未配置工艺路线，不能创建生产订单
+
+== 领用选真实库存并行发料扣账 ==
+  PASS  创建领用单 302  -- HTTP 302 <!doctype html>
+<html lang=en>
+<title>Redirecting...</title>
+<h1>Redirecting...</h1>
+<p>You should be redirected automatically to the target URL: <a href="/material_requisitions/2"
+  PASS  领用明细写入真实 material_id  -- item.material_id=1
+  PASS  免审批易耗品直接 approved  -- status=approved
+  PASS  发料成功  -- HTTP 200 {'message': '发料成功，已扣减库存', 'success': True}
+  PASS  发料后库存减少 2  -- 10.0 -> 8.0
+  PASS  领用单 completed  -- 'completed'
+
+== 盘点完成调账 ==
+  PASS  创建盘点 302  -- HTTP 302 <!doctype html>
+<html lang=en>
+<title>Redirecting...</title>
+<h1>Redirecting...</h1>
+<p>You should be redirected automatically to the target URL: <a href="/inventory_counts/1">/inv
+  PASS  盘点快照有行  -- items=1 item_id=1
+  PASS  开始盘点  -- HTTP 200 {'message': '已开始盘点', 'success': True}
+  PASS  录入实盘  -- HTTP 200 {'message': '实盘数量已保存', 'success': True}
+  PASS  完成调账  -- HTTP 200 {'message': '盘点完成，库存已按实盘调整', 'success': True}
+  PASS  库存已写成实盘数  -- 8.0 -> 11.0 (期望 11.0)
+  PASS  adjustment_applied  -- True
+  PASS  盘点 completed  -- 'completed'
+
+== _ensure_schema / seed 幂等（子进程内连续两次 create_app） ==
+  PASS  连续两次启动无异常  -- []
+  PASS  两次启动配置项数一致  -- [{'n_configs': 5}, {'n_configs': 5}]
+  PASS  system_configs 表被自动创建
+  PASS  task_assignment.completed_at 自动补齐
+  PASS  sales_order_items 扩展列齐全
+
+================ 结果：109 通过 / 0 失败 ================
+
+[exit=0]
+
+====================================================================================================
+## 交付物指纹 + 真实库
+====================================================================================================
+app/__init__.py                                            bytes=  9898 lines= 257 sha256=06B07A11F9409F42F535175CC184698BA3BEC612499F703D645952B408D66482
+app/main/quality.py                                        bytes= 70415 lines=1733 sha256=F6DEABAA6E48AAADD193FA811668074502E11DD3E93A8014102458C046C3BC7E
+app/main/production_center.py                              bytes= 17887 lines= 453 sha256=1169F17BF8E6F1A7ACEF2D3089C26E89FDD43AB5193B37D125EBACDE04747095
+app/main/routes.py                                         bytes=511365 lines=12147 sha256=474143DB4DBE577687930B6B7A4C29DF1682B815F8F2ECDF77614E3ECDD4FCC3
+test-reports-2026-10\harness\w4_probe.py                   bytes= 34257 lines= 630 sha256=F72C5B6CCB52BF04FDD4DC12072DBB8862790BFE96A31CAD4164A5B343D95978
+test-reports-2026-10\harness\w4_http_contract.py           bytes= 10229 lines= 250 sha256=541359066522076464761A6EFA02768C12EBA57892D4D87125D031C26E860F02
+test-reports-2026-10\24-W4载体登记册.json                       bytes=  2521 lines=  55 sha256=4D6DB71826792BF4175A828FE503DD8972CF6A6BF8DE581F86AE27EBA963E425
+
+app.db SHA256 = F5DA2306BC31CBAB098AAD3774016D320A9B9AA3546F93418196AE9900E0F065
+
