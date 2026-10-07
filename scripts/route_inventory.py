@@ -1,11 +1,30 @@
-"""列出全部路由，按是否带参数、方法分类，并检测重复注册。"""
+"""列出全部路由，按是否带参数、方法分类，并检测重复注册。
+
+**退出码语义（E-03 分类：报告型 ⇒ 恒 0，不得进 CI 门禁链）**
+
+本脚本 stdout 全是**度量值**、无判据语义 ⇒ `return 0` 是**有意设计**（A-30）：
+即便 `duplicate (method,path) registrations > 0` 也不会失败。因此**消费方不得读它的退出码**，
+应改为解析其 stdout / JSON 做漂移检测 —— 判据落在
+`test-reports-2026-10/harness/coverage_drift.py`（TL-03），CI 链里**不得**出现本脚本的退出码。
+"""
 import collections
+import json
 import sys
 
 from _test_bootstrap import make_app
 
 
+def a14_reconfigure():
+    """A-14：本机控制台 GBK，print 非 GBK 字符不得把「跑完」伪装成「崩溃 exit 1」。"""
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(errors='replace')
+        except Exception:
+            pass
+
+
 def main():
+    a14_reconfigure()
     app, _ = make_app()
     rules = list(app.url_map.iter_rules())
 
@@ -35,6 +54,13 @@ def main():
     print('--- non-GET ---')
     for p in post_only:
         print(f'  ---  {p}')
+    print('[e03] exit_code_semantics=' + json.dumps({
+        'script': 'scripts/route_inventory.py',
+        'class': '报告型（无判据语义 => 恒 exit 0，E-03/A-30）',
+        'in_gate_chain': False,
+        'consumer': 'test-reports-2026-10/harness/coverage_drift.py（解析 stdout/JSON 做漂移检测）',
+        'code': 0,
+    }, ensure_ascii=False))
     return 0
 
 

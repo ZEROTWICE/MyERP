@@ -2,13 +2,34 @@
 
 对每个角色（含匿名）访问所有 GET 路由，记录状态码、重定向链、服务端异常。
 带参数的路由用库里真实存在的 ID 填充；取不到 ID 的路由跳过并单独列出。
+
+**退出码语义（E-03 分类：原「写盘污染型」→ 已把写盘与退出码解耦）**
+
+* 退出码**只反映断言**：0 问题 ⇒ **exit 0**；有 5xx / 异常 / 重定向死循环 ⇒ **exit 1**；
+* 明细 JSON 默认写 `test-reports-2026-10/.tmp/<RUN_ID>/_smoke_results.json`（**不再写仓库根**），
+  `--out PATH` 可指定落点、`--no-dump` 完全跳过；**写盘失败只打印 `[WARN]`，绝不改变退出码**。
+  历史缺陷 T-07/A-11：写仓库根 JSON 被沙箱拒时「断言全绿也 exit 1」= 狼来了，退出码因此不可信；
+* 本脚本只覆盖 GET 可达性（状态码/异常/重定向），**不得当作业务验收替代品**（AGENTS.md D-8）。
+
+用法（仓库根目录）：
+
+    python -B scripts/smoke_test.py                 # 默认落 .tmp/<RUN_ID>/
+    python -B scripts/smoke_test.py --no-dump       # 不落盘（CI 推荐）
+    python -B scripts/smoke_test.py --out /tmp/x.json
 """
+import argparse
 import collections
 import json
+import os
 import sys
+import time
 import traceback
 
 from _test_bootstrap import make_app, ensure_role_users, login_as, seed_fixtures, ROLES
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+REPORTS = os.path.join(ROOT, 'test-reports-2026-10')
+DUMP_NAME = '_smoke_results.json'
 
 SKIP = {'/auth/logout', '/auth/register', '/bootstrap/static/<path:filename>'}
 
@@ -61,6 +82,39 @@ PATH_MODEL = [
 ]
 
 
+def run_id():
+    """落盘标识：优先 HARNESS_RUN_ID，否则时间戳。"""
+    return os.environ.get('HARNESS_RUN_ID') or time.strftime('run-%Y%m%d-%H%M%S')
+
+
+def default_out():
+    """.tmp/<RUN_ID>/ 下的落点（绝对路径，与 cwd 无关 —— 不再是 cwd 相对的 `../`）。"""
+    return os.path.join(REPORTS, '.tmp', run_id(), DUMP_NAME)
+
+
+def a14_reconfigure():
+    """A-14：本机控制台是 GBK；只放宽 errors，避免编码问题被误读成「崩溃 exit 1」。"""
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(errors='replace')
+        except Exception:
+            pass
+
+
+def dump_results(results, errors, out_path):
+    """落盘（**与退出码解耦**）：失败返回 (False, 警告串)，调用方不得据此改退出码。"""
+    payload = {a: {k: list(v) for k, v in d.items()} for a, d in results.items()}
+    try:
+        directory = os.path.dirname(os.path.abspath(out_path))
+        if directory:
+            os.makedirs(directory, exist_ok=True)
+        with open(out_path, 'w', encoding='utf-8', newline='\n') as f:
+            json.dump(payload, f, ensure_ascii=False, indent=1)
+        return True, f'明细已写入 {out_path}（{len(errors)} 个问题）'
+    except OSError as e:
+        return False, (f'[WARN] 落盘失败（不影响退出码）: {e.__class__.__name__}: {e}')
+
+
 def first_ids(app):
     """预取每个模型的第一个 id。"""
     from app import models
@@ -103,7 +157,8 @@ def resolve_url(rule, ids):
     return path, None
 
 
-def run():
+def run(out_path=None, dump=True):
+    a14_reconfigure()
     app, db_path = make_app()
     users, password = ensure_role_users(app)
     seeded = seed_fixtures(app)
@@ -183,12 +238,35 @@ def run():
         print(f'  [{kind}] {actor:10s} {rule_str}')
         print(f'          {detail}')
 
-    with open('../_smoke_results.json', 'w', encoding='utf-8') as f:
-        json.dump({a: {k: list(v) for k, v in d.items()} for a, d in results.items()},
-                  f, ensure_ascii=False, indent=1)
-    print(f'\n明细已写入 _smoke_results.json（{len(errors)} 个问题）')
-    return 1 if errors else 0
+    # ---- E-03：写盘与退出码解耦（写盘失败绝不改变断言结论）----
+    if dump:
+        _ok, note = dump_results(results, errors, out_path or default_out())
+        print('\n' + note)
+    else:
+        print('\n[--no-dump] 已跳过落盘（退出码只反映断言）')
+
+    code = 1 if errors else 0
+    print(f'[e03] 问题数 = {len(errors)} => exit {code}')
+    print('[e03] exit_code_semantics=' + json.dumps({
+        'script': 'scripts/smoke_test.py',
+        'class': '有失败出口（写盘已解耦，E-03）',
+        'rule': 'errors == 0 -> exit 0; errors != 0 -> exit 1（写盘结果不参与）',
+        'inputs': {'errors': len(errors), 'actors': len(results), 'targets': len(targets)},
+        'dump': ('skipped' if not dump else (out_path or default_out())),
+        'code': code,
+    }, ensure_ascii=False))
+    return code
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(
+        description='全角色 GET 冒烟（E-03：退出码只反映断言；写盘与退出码解耦）')
+    ap.add_argument('--out', default=None,
+                    help=f'明细 JSON 落点（默认 {REPORTS}/.tmp/<RUN_ID>/{DUMP_NAME}）')
+    ap.add_argument('--no-dump', action='store_true', help='完全不落盘（退出码只反映断言）')
+    args = ap.parse_args(argv)
+    return run(out_path=args.out, dump=not args.no_dump)
 
 
 if __name__ == '__main__':
-    sys.exit(run())
+    sys.exit(main())

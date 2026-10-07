@@ -11,7 +11,51 @@ env:
   IMAGE_NAME: zerotwice/myerp
 
 jobs:
+  # ---------------------------------------------------------------- E-04 门禁
+  # 第一阶段（当前）：report-only —— continue-on-error: true，且 build-and-push **不** needs 本 job（不阻塞发布）
+  # 第二阶段（A-63 第二步，观测 1 轮全绿后）：① 删掉 continue-on-error；② 在 build-and-push 下加 `needs: gate`
+  gate:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+
+      - name: 安装依赖
+        run: python -m pip install --upgrade pip && python -m pip install -r requirements.txt
+
+      - name: 门禁入口存在性检查（测试资产是否已纳入版本控制）
+        run: |
+          if [ ! -f test-reports-2026-10/harness/ci_gates.py ]; then
+            echo "::warning::E-04 门禁入口缺失：需先把 test-reports-2026-10/harness/** 纳入版本控制（见 test-reports-2026-10/23-E04门禁进CI.md §9）"
+            exit 3
+          fi
+
+      - name: E-04 门禁（CI 等价入口）
+        run: |
+          python -B test-reports-2026-10/harness/ci_gates.py \
+            --phase first \
+            --json test-reports-2026-10/evidence/harness/ci-gh-${{ github.run_id }}/ci_gates.json
+
+      - name: 校验 CI 配置本身（E-04-c/E-04-d）
+        if: always()
+        run: python -B test-reports-2026-10/harness/ci_lint.py --phase first
+
+      - name: 上传门禁 JSON（无论成败）
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-gates-json
+          path: test-reports-2026-10/evidence/harness/ci-gh-*/ci_gates.json
+          if-no-files-found: warn
+
   build-and-push:
+    # 第二阶段：在此加 `needs: gate`（当前不加 ⇒ gate 不阻塞发布）
     runs-on: ubuntu-latest
     permissions:
       contents: read

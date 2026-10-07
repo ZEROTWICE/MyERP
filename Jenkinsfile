@@ -16,6 +16,9 @@ pipeline {
         
         // Python环境（使用conda环境中的python）
         PYTHON_PATH = 'python'  // 在激活conda环境后使用
+
+        // 绝对路径解释器（A-7：PATH 上的 python 无 Flask）—— E-04 门禁 stage 用
+        PY_EXE = 'F:\\Miniconda\\envs\\wage\\python.exe'
         
         // 数据库配置
         DB_BACKUP_DIR = "${BACKUP_PATH}\\db_backups"
@@ -84,6 +87,46 @@ pipeline {
             }
         }
         
+        stage('门禁检查(E-04)') {
+            // E-04：把 AGENTS.md 的「必跑门禁表」变成自动执法。
+            // 规格：test-reports-2026-10/21-E04精确修法与验收判据.md
+            // 入口：test-reports-2026-10/harness/ci_gates.py（blocking/report-only 分组见其 docstring）
+            steps {
+                script {
+                    echo '[E-04] 运行 CI 等价门禁入口'
+                    echo '[E-04] blocking: check_templates/check_migration_heads/check_properties/check_db_bootstrap/functional_test/permission_matrix/coverage_drift/run_gates(非环境依赖部分)'
+                    echo '[E-04] report-only: smoke_test(A-63 第一步观测)/route_inventory_native_probe(A-62 环境依赖)/报告型退出码'
+                    def ciRc = bat(returnStatus: true, script: """
+                    call ${CONDA_PATH} activate ${CONDA_ENV_NAME}
+                    if not exist "test-reports-2026-10/harness/ci_gates.py" (
+                        echo [E-04] 门禁入口缺失: test-reports-2026-10/harness/ci_gates.py 不在工作区
+                        echo [E-04] 需先把测试资产纳入版本控制(见 23-E04门禁进CI.md 9)
+                        exit /b 3
+                    )
+                    "${PY_EXE}" -B test-reports-2026-10/harness/ci_gates.py --phase first --json test-reports-2026-10/evidence/harness/ci-build-%BUILD_NUMBER%/ci_gates.json
+                    """)
+                    archiveArtifacts allowEmptyArchive: true, artifacts: 'test-reports-2026-10/evidence/harness/ci-build-*/**'
+                    echo "[E-04] ci_gates exit=${ciRc} (0=all green; 2=report-only failed; 1=blocking failed; 3=entry missing)"
+                    if (ciRc == 3) {
+                        // 第二阶段（A-63 第二步）：入口缺失必须红灯 => 把下面注释换成 error()
+                        // error('[E-04] 门禁入口缺失：请先把 test-reports-2026-10/harness/** 纳入版本控制')
+                        currentBuild.result = 'UNSTABLE'
+                        echo '[E-04][第一阶段] 门禁入口缺失（测试资产未纳入版本控制），按 report-only 处理'
+                    }
+                    if (ciRc == 2) {
+                        currentBuild.result = 'UNSTABLE'
+                        echo '[E-04] report-only 步骤失败（不阻塞构建，见 21-E04 3.1 第一阶段）'
+                    }
+                    if (ciRc == 1) {
+                        // 第二阶段（A-63 第二步）：把下面这行注释换成 error()，即成为阻塞门禁
+                        // error("[E-04] blocking 门禁失败: 4 项真闸门 / functional_test / permission_matrix / coverage_drift")
+                        currentBuild.result = 'UNSTABLE'
+                        echo '[E-04][第一阶段] blocking 门禁失败，暂记 UNSTABLE（第二阶段改为 error()）'
+                    }
+                }
+            }
+        }
+
         stage('停止现有服务') {
             steps {
                 echo '停止现有应用服务...'
