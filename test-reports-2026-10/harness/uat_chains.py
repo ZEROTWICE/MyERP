@@ -332,12 +332,19 @@ def p0_1_report_and_fail(app, client, ctx):
            'status': (RAW['p0_1_entities']['inspection_task'] or {}).get('status')},
           'passed' if (RAW['p0_1_entities']['inspection_task'] or {}).get('target_type')
           == 'production_record' else 'failed', 'routes.py:3417-3430')
-    check('P0-1.6', '实例 quality_status 无自动回写（真实库 23 个实例全 NULL，本夹具初始即 NULL）',
-          {'quality_status': 'fail/failed/rejected'},
+    # ---------------------------------------------------------------- [A-66 r2 · 仅追加重写]
+    # 作废原断言（保留痕迹）：`P0-1.6` 原期望 `quality_status ∈ {fail, failed, rejected}`，
+    # 断言点是「报工后、任何质检结论落库**之前**」（本函数内）。DEC-1 §1.2 明文规定此刻
+    # 该字段必须仍是 NULL（N1 / AC-18-NEG / RC-4）⇒ 原期望与 DEC-1 直接冲突，
+    # **任何正确实现都不可能使其转绿**。重写为「此刻必须 NULL」，并由链内 P0-1.8
+    # （结论落库后 NULL -> fail）承担「自动回写」的判据。
+    check('P0-1.6', '[A-66 r2] 结论落库**之前**实例 quality_status 必须仍为 NULL'
+                    '（DEC-1 §1.2 禁令②：报工不得写该字段）',
+          {'quality_status': None},
           {'quality_status': RAW['p0_1_entities']['batch_item']['quality_status']},
-          'passed' if (RAW['p0_1_entities']['batch_item']['quality_status'] or '') in
-          ('fail', 'failed', 'rejected') else 'failed',
-          'GAP-14/V-03：质检结论落地未回写实例字段（预期红）；真实库分布见 _diag_quality_status 输出')
+          'passed' if RAW['p0_1_entities']['batch_item']['quality_status'] is None else 'failed',
+          '[A-66 r2] 原断言期望 fail/failed/rejected（写在结论落库前）=> 已作废；'
+          '同一业务含义的判据在 P0-1.8（结论落库后 NULL -> fail）')
     return rec_id, qtask_id
 
 
@@ -385,13 +392,14 @@ def p0_1_submit_fail(app, client, rec_id, qtask_id, ctx):
     check('P0-1.7', '报工路径质检 fail → nonconformity_records +1（AC-13 / GAP-13）',
           {'nc_delta': 1}, {'nc_delta': after['nonconformity_rows'] - before['nonconformity_rows']},
           'passed' if after['nonconformity_rows'] - before['nonconformity_rows'] == 1 else 'failed',
-          'mes_service.py:421-422 对 target_type=production_record 直接 return ⇒ 预期 +0')
+          'mes_service.apply_production_record_result（P-02 修复后）= production_record 分支建单')
     check('P0-1.8', '质检 fail 后实例 quality_status 被写为不合格口径（AC-18 / GAP-14）',
           {'quality_status': 'fail'},
           {'quality_status': RAW['p0_1_after_fail']['batch_item_quality_status']},
           'passed' if (RAW['p0_1_after_fail']['batch_item_quality_status'] or '') in
           ('fail', 'failed', 'rejected') else 'failed',
-          'quality_status 唯一赋值点是手工 PUT routes.py:8899')
+          'DEC-1 §1.2：唯一自动复算写点 = mes_service.recompute_production_quality_status'
+          '（人工 PUT routes.py 仅作纠正通道）')
     check('P0-1.9', '件数守恒：fail 未产生 failed 库/报废库台账行（对照 AC-17）',
           {'failed_pieces_delta': 0, 'scrap_pieces_delta': 0},
           {'failed_pieces_delta': after['failed_pieces'] - before['failed_pieces'],
@@ -402,7 +410,7 @@ def p0_1_submit_fail(app, client, rec_id, qtask_id, ctx):
 
 # ------------------------------------------------------------------ P0-2 门禁
 def p0_2_gate(app, client, ctx):
-    """门禁实测：形态矩阵 + 两条阳性对照 + 一条 pending 死锁实证。
+    """门禁实测：形态矩阵 + 两条阳性对照 + pending 成对判据（无在办单据=>放行 / 确有=>拒）。
 
     关键口径（`00b` 纪律 16 / captain 任务书三.1）：`mes_service.py:326` 实参**不含**
     `production_record` ⇒ `records` 只来自 `batch_item_production_records`（notes 软关联）。
@@ -490,13 +498,55 @@ def p0_2_gate(app, client, ctx):
     out['null_item'] = _report_on_new_item(902, f'{RUN_ID[-4:]}A', 4, None)
     # 死锁实证：quality_status='pending' 的新实例 —— 门禁拒绝入 fg（且原因可读）
     out['pending_item'] = _report_on_new_item(903, f'{RUN_ID[-4:]}B', 6, 'pending')
+
+    # [A-45 ① 重写] 配对格 GP-P2：`pending` **且确有在办单据**（存在 in_progress 质检任务）
+    # => 必须拒且原因可读（含复位动作）。与下面的「pending 且无在办单据 => 放行」成对常驻。
+    with app.app_context():
+        _it = M.ProductionBatchItem(batch_id=ctx['production']['batch_id'], item_sequence=904,
+                                    product_code=f'_uatIT{RUN_ID[-4:]}C', status='in_progress',
+                                    quality_status='pending')
+        db.session.add(_it)
+        db.session.flush()
+        _tk = M.TaskAssignment(employee_id=ctx['emp_id'], process_id=ctx['process_ok']['id'],
+                               target_date=date.today(), quantity=3, status='pending',
+                               task_type='auto', batch_item_id=_it.id,
+                               production_batch_id=ctx['production']['batch_id'],
+                               notes='_uat GP-P2 配对格')
+        db.session.add(_tk)
+        db.session.flush()
+        _pr = M.ProductionRecord(employee_id=ctx['emp_id'], process_id=ctx['process_ok']['id'],
+                                 quantity=3, date=date.today(), global_sn=_tk.global_sn,
+                                 notes='{"batch_item_id": %d}' % _it.id)
+        db.session.add(_pr)
+        db.session.flush()
+        _admin = M.User.query.filter_by(username='_t_admin').first()
+        _aid = _admin.id if _admin else 1
+        _itask = M.InspectionTask(global_sn=M.SerialNumber.get_next_number(),
+                                  target_type='production_record', target_id=_pr.id,
+                                  inspector_id=_aid, status='in_progress', created_by=_aid)
+        db.session.add(_itask)
+        db.session.commit()
+        out['GP_P2'] = list(mes_service.qc_gate_allows_output(batch_item=_it))
+        out['GP_P2_premise'] = {'item_id': _it.id, 'record_id': _pr.id,
+                                'inspection_task_id': _itask.id,
+                                'inspection_status': 'in_progress'}
     RAW['p0_2'] = out
 
-    check('P0-2.1', '形态A（真实调用点：只传 batch_item，实例已 completed/quality_status=NULL）——放行',
-          {'allowed': True}, {'allowed': out['A_item_only'][0]},
-          'passed' if out['A_item_only'][0] is True else 'failed',
-          f"实例 status={out['item_status']} quality_status={out['item_quality_status']}；"
-          'mes_service.py:326 实参不含 production_record')
+    # ---------------------------------------------------------------- [A-66 r2 · 仅追加重写]
+    # 作废原断言（保留痕迹）：`P0-2.1` 原为「形态A（只传 batch_item，实例已 completed 且
+    # quality_status=NULL）=> 放行」，其**前提**（该实例此刻仍是 NULL）已被本轮修复取代：
+    # 链内 P0-1.7/P0-1.8 转绿后，同一实例的 quality_status 已是 `fail` ⇒ 按 DEC-1 §1.4 序 1
+    # **必须拒收**。重写为「形态A + 实例 fail => 拒且原因可读」；「NULL 实例放行」的阳性对照
+    # 由 P0-2.4（fg +4）承担，两条成对（防过度放松）。
+    check('P0-2.1', '[A-66 r2] 形态A（真实调用点：只传 batch_item，实例 quality_status=fail）'
+                    '—— 按 DEC-1 §1.4 序 1 必须拒收且原因可读',
+          {'allowed': False, 'reason_has': '质检不合格'},
+          {'allowed': out['A_item_only'][0], 'reason': out['A_item_only'][1]},
+          'passed' if (out['A_item_only'][0] is False
+                       and '质检不合格' in (out['A_item_only'][1] or '')) else 'failed',
+          f"[A-66 r2] 实例 status={out['item_status']} quality_status={out['item_quality_status']}；"
+          '原期望 allowed=True（前提是该实例仍 NULL，已被 DEC-1 §1.4 序 1 取代）；'
+          'NULL 实例不得被拒 = P0-2.4 阳性对照（fg +4）')
     check('P0-2.2', '形态C：显式传带未闭环 NC 的 production_record —— 拒绝且原因可读',
           {'allowed': False, 'reason': '含「不合格」'},
           {'allowed': out['C_open_nc_record'][0], 'reason': out['C_open_nc_record'][1]},
@@ -509,13 +559,27 @@ def p0_2_gate(app, client, ctx):
     check('P0-2.4', '阳性对照 2：quality_status=NULL 的新实例报工 → fg 件数 +4（链本身是通的）',
           {'fg_pieces_delta': 4.0}, {'fg_pieces_delta': out['null_item']['fg_delta']},
           'passed' if abs(out['null_item']['fg_delta'] - 4.0) < 1e-9 else 'failed',
-          f"HTTP {out['null_item']['http']['status_code']}；fp_row={out['null_item']['fp_row']}")
-    check('P0-2.5', '阴性-死锁实证：实例 quality_status=\'pending\' 报工 → fg 件数 +0 且被拒（原因可读）',
-          {'fg_pieces_delta': 0.0, 'reason': '质检未出结果'},
-          {'fg_pieces_delta': out['pending_item']['fg_delta']},
-          'passed' if abs(out['pending_item']['fg_delta']) < 1e-9 else 'failed',
-          '门禁 :172-173 把 pending 视为「未出结果」⇒ 该实例永不入 fg，而唯一人工回写点是 '
-          'routes.py:8899；真实库 23 个实例全为 NULL（_diag_quality_status 实读）')
+          f"HTTP {out['null_item']['http']['status_code']}；fp_row={out['null_item']['fp_row']}；"
+          '[A-45 ③] 本格必须维持不变（防「pending 一律放行」的过度放松）')
+    # ---------------------------------------------------------------- [A-45 ① · 仅追加重写]
+    # 作废原断言（保留痕迹）：`P0-2.5` 原期望「pending 报工 => fg +0 且被拒（原因：质检未出结果）」，
+    # 把**死锁**当成了正确行为。DEC-1 §1.4 序 3 / §1.6 P1 改判：`pending` **且无在办单据** => 放行。
+    # 重写为**成对**判据（A-45 ① 明确要求两者常驻）：
+    #   (a) pending 且无在办单据 => 放行（fg > 0，死锁解除）；
+    #   (b) pending 且确有在办单据 => 拒且原因可读（含复位动作）——GP-P2 配对格。
+    _gp2_ok = (out['GP_P2'][0] is False
+               and '未出结果' in (out['GP_P2'][1] or '')
+               and '处置' in (out['GP_P2'][1] or ''))
+    check('P0-2.5', '[A-45 ①] pending 两态成对：(a) 且无在办单据 => 放行；(b) 且确有在办单据'
+                    ' => 拒且原因可读（含复位动作）',
+          {'no_docs_fg_delta': '> 0（放行）', 'with_docs_allowed': False,
+           'with_docs_reason_has': '未出结果 + 处置'},
+          {'no_docs_fg_delta': out['pending_item']['fg_delta'],
+           'with_docs_allowed': out['GP_P2'][0], 'with_docs_reason': out['GP_P2'][1],
+           'gp_p2_premise': out['GP_P2_premise']},
+          'passed' if (out['pending_item']['fg_delta'] > 1e-9 and _gp2_ok) else 'failed',
+          '[A-45 ①] 原期望 fg +0（把死锁当正确）=> 已作废；A-67 口径：序 3 只在'
+          '「确有在办单据」时可见，本格用构造性前置把该形态摆出来')
     return out
 
 # ------------------------------------------------------------------ P0-3 假开关双向差分
@@ -526,7 +590,8 @@ def salary_view(app, client, start, end, emp_id):
                    'employee_id': str(emp_id)})
     text = r.data.decode('utf-8', 'replace') if hasattr(r, 'data') else ''
     nums = re.findall(r'(?:计件|piecework)[^0-9\-]{0,40}(-?\d[\d,]*\.?\d*)', text, re.I)
-    return {'status_code': r.status_code, 'piecework_hits': nums[:6], 'html_bytes': len(text)}
+    return {'status_code': r.status_code, 'piecework_hits': nums[:6], 'html_bytes': len(text),
+            'has_60': '>60.00<' in text, 'has_360': '>360.00<' in text}
 
 
 def p0_3_fake_switch(app, client, ctx):
@@ -544,12 +609,50 @@ def p0_3_fake_switch(app, client, ctx):
         db.session.add(emp)
         db.session.flush()
         recs = []
-        for qty, notes in ((10, '_uat 返工记录'), (2, '_uat 正常记录')):
+        # [A-66 r2 / DEC-2 §2.2 · 仅追加重写] 作废原夹具（保留痕迹）：原先两条记录**仅以
+        # `notes`（'_uat 返工记录'）区分返工/正常`，而 DEC-2 §2.2 明确**否决** notes 标记
+        # （报工链不写 notes），选定 R1∨R2。重写为 DEC-2 合规夹具：
+        #   R1 主判据 `NonconformityRecord.rework_task_id == TaskAssignment.id`
+        #   R2 次判据 该任务 `global_sn` == `ProductionRecord.global_sn`
+        _admin_u = M.User.query.filter_by(username='_t_admin').first()
+        _aid = _admin_u.id if _admin_u else 1
+        rework_task = M.TaskAssignment(employee_id=emp.id, process_id=proc.id, target_date=day,
+                                       quantity=10, status='pending', task_type='auto',
+                                       notes='返工 不合格单#_uat')
+        db.session.add(rework_task)
+        db.session.flush()
+        _wp = M.Workpiece(code=f'_uatWP_P031_{RUN_ID[-4:]}', status='machining',
+                          product_id=ctx['product']['id'])
+        db.session.add(_wp)
+        db.session.flush()
+        _itask = M.InspectionTask(global_sn=M.SerialNumber.get_next_number(),
+                                  target_type='workpiece', target_id=_wp.id,
+                                  inspector_id=_aid, status='in_progress', created_by=_aid)
+        db.session.add(_itask)
+        db.session.flush()
+        _irec = M.InspectionRecord(global_sn=M.SerialNumber.get_next_number(),
+                                   task_id=_itask.id, inspector_id=_aid,
+                                   inspection_date=day, result='fail')
+        db.session.add(_irec)
+        db.session.flush()
+        _nc = M.NonconformityRecord(record_id=_irec.id, type='rework', handler_id=_aid,
+                                    handling_date=day, handling_result='_uat 返工',
+                                    status='done', workpiece_id=_wp.id,
+                                    target_type='workpiece', target_id=_wp.id,
+                                    rework_task_id=rework_task.id, scrap_cost=0)
+        db.session.add(_nc)
+        db.session.flush()
+        for qty, notes, sn in ((10, '_uat 返工记录', rework_task.global_sn),
+                               (2, '_uat 正常记录', None)):
             rec = M.ProductionRecord(employee_id=emp.id, process_id=proc.id, quantity=qty,
-                                     date=day, notes=notes)
+                                     date=day, global_sn=sn, notes=notes)
             db.session.add(rec)
             db.session.flush()
-            recs.append({'id': rec.id, 'quantity': qty, 'notes': notes})
+            recs.append({'id': rec.id, 'quantity': qty, 'notes': notes,
+                         'global_sn': rec.global_sn})
+        out['rework_link'] = {'rework_task_id': rework_task.id,
+                              'rework_task_global_sn': rework_task.global_sn,
+                              'nc_id': _nc.id, 'workpiece_id': _wp.id}
         db.session.commit()
         out['employee_id'] = emp.id
         out['employee_code'] = emp.employee_id
@@ -561,14 +664,25 @@ def p0_3_fake_switch(app, client, ctx):
     out['switch_false_write'] = setres
     false_http = salary_view(app, client, start, end, out['employee_id'])
     with app.app_context():
+        from app.services import mes_service as _mes
         emp = M.Employee.query.get(out['employee_id'])
         recs = M.ProductionRecord.query.filter(M.ProductionRecord.employee_id == emp.id).all()
+        _counted, _dropped, _excluded = _mes.piecework_breakdown(recs)
+        _base = emp.base_salary or 0.0
+        _adj = sum(bp.amount if bp.type == 'bonus' else -bp.amount for bp in emp.bonuses_penalties)
+        _coeff = emp.coefficient or 1.0
         false_calc = {
             'piecework_formula': round(sum(r.quantity * r.process.price for r in recs)
                                        * emp.coefficient, 6),
             'rework_qty': sum(r.quantity for r in recs if '返工' in (r.notes or '')),
             'normal_qty': sum(r.quantity for r in recs if '返工' not in (r.notes or '')),
             'total_salary_property': round(emp.total_salary, 6),
+            # [A-66 r2] 产品路径读数：唯一口径函数 + Employee.total_salary(S2)
+            'product_piecework': round(_counted * _coeff, 6),
+            'product_counted_raw': round(_counted, 6),
+            's2_piecework': round((emp.total_salary - _base - _adj) / _coeff, 6),
+            'excluded_ids': sorted(_excluded),
+            'dropped': round(_dropped, 6),
         }
 
     setres2 = fixtures.set_rework_switch(app, True)
@@ -576,14 +690,24 @@ def p0_3_fake_switch(app, client, ctx):
     true_http = salary_view(app, client, start, end, out['employee_id'])
     reset_session(app)
     with app.app_context():
+        from app.services import mes_service as _mes
         emp = M.Employee.query.get(out['employee_id'])
         recs = M.ProductionRecord.query.filter(M.ProductionRecord.employee_id == emp.id).all()
+        _counted, _dropped, _excluded = _mes.piecework_breakdown(recs)
+        _base = emp.base_salary or 0.0
+        _adj = sum(bp.amount if bp.type == 'bonus' else -bp.amount for bp in emp.bonuses_penalties)
+        _coeff = emp.coefficient or 1.0
         true_calc = {
             'piecework_formula': round(sum(r.quantity * r.process.price for r in recs)
                                        * emp.coefficient, 6),
             'rework_qty': sum(r.quantity for r in recs if '返工' in (r.notes or '')),
             'normal_qty': sum(r.quantity for r in recs if '返工' not in (r.notes or '')),
             'total_salary_property': round(emp.total_salary, 6),
+            'product_piecework': round(_counted * _coeff, 6),
+            'product_counted_raw': round(_counted, 6),
+            's2_piecework': round((emp.total_salary - _base - _adj) / _coeff, 6),
+            'excluded_ids': sorted(_excluded),
+            'dropped': round(_dropped, 6),
         }
     out['false_branch'] = {'switch': setres, 'http': false_http, **false_calc}
     out['true_branch'] = {'switch': setres2, 'http': true_http, **true_calc}
@@ -606,24 +730,56 @@ def p0_3_fake_switch(app, client, ctx):
     RAW['p0_3'] = out
 
     delta_val = round(true_calc['piecework_formula'] - false_calc['piecework_formula'], 6)
-    check('P0-3.1', '开关 false→true 后计件工资必须不同（AC-26 / GAP-18）',
-          {'delta': '≠0', 'contract_false': out['contract_expectation']['false_piecework_should_be'],
-           'contract_true': out['contract_expectation']['true_piecework_should_be']},
-          {'delta': delta_val, 'false_actual': false_calc['piecework_formula'],
-           'true_actual': true_calc['piecework_formula']},
-          'passed' if abs(delta_val) > 1e-9 else 'failed',
-          '该员工记录 = 10 件返工 + 2 件正常（见 all_records）；契约口径 false 应为 60.0、'
-          'true 应为 360.0；实测两分支同值 360.0 ⇒ 开关对公式无影响（假开关）')
+    # ---------------------------------------------------------------- [A-66 r2 · 仅追加重写]
+    # 作废原断言（保留痕迹）：`P0-3.1` 原判据 `abs(delta_val) > 1e-9`，其 delta 取自**链内自算公式**
+    # `sum(r.quantity*r.process.price)*coefficient`（与产品路径无关，开关怎么改它都不动），
+    # 且夹具用 `notes` 标记造返工（DEC-2 §2.2 已否决）⇒ 双重与 DEC-2 冲突。
+    # 重写为：DEC-2 合规夹具（R1∨R2）+ **产品路径**读数（唯一口径函数 `piecework_breakdown`
+    # 与 `Employee.total_salary`，均见 mes_service.py:1812-1834 / models.py Employee.total_salary）
+    # + 真端点页面（/salary_calculation 的计件单元格）。
+    _prod_delta = round(true_calc['product_piecework'] - false_calc['product_piecework'], 6)
+    check('P0-3.1', '[A-66 r2] 开关 false→true：false 剔除返工（计件=60.0）、true 全含'
+                    '（计件=360.0），差值 300.0 = 返工贡献（AC-26/AC-25，产品路径读数）',
+          {'false_piecework': 60.0, 'true_piecework': 360.0, 'delta': 300.0,
+           'false_excluded_records': 1, 's1_eq_s2': True,
+           'page_off': '>60.00<', 'page_on': '>360.00<'},
+          {'false_piecework': false_calc['product_piecework'],
+           'true_piecework': true_calc['product_piecework'], 'delta': _prod_delta,
+           'false_excluded_records': len(false_calc['excluded_ids']),
+           's1_raw': false_calc['product_counted_raw'],
+           's2_raw': false_calc['s2_piecework'],
+           'false_dropped': false_calc['dropped'],
+           'page_off_60': false_http['has_60'], 'page_off_360': false_http['has_360'],
+           'page_on_60': true_http['has_60'], 'page_on_360': true_http['has_360'],
+           'rework_link': out.get('rework_link')},
+          'passed' if (abs(false_calc['product_piecework'] - 60.0) < 1e-6
+                       and abs(true_calc['product_piecework'] - 360.0) < 1e-6
+                       and len(false_calc['excluded_ids']) == 1
+                       and abs(false_calc['product_counted_raw']
+                               - false_calc['s2_piecework']) < 1e-6
+                       and false_http['has_60'] and not false_http['has_360']
+                       and true_http['has_360']) else 'failed',
+          '[A-66 r2] 原判据 delta 取自链内自算公式 + notes 夹具 => 已作废；'
+          '现值 = mes_service.piecework_breakdown（唯一口径）×系数 与 Employee.total_salary(S2)，'
+          '夹具按 R1∨R2（NC.rework_task_id + global_sn）')
     check('P0-3.2', '阴性对照：非返工场景两次必须相同（AC-27）',
           {'normal_only_piecework_same': True},
           {'normal_qty': false_calc['normal_qty'], 'formula_unchanged': True},
           'passed' if false_calc['normal_qty'] == true_calc['normal_qty'] else 'failed',
           '正常记录 2 件 × 20.0 × 1.5 = 60.0（两分支同值）')
-    check('P0-3.3', '静态佐证：quality.rework_counts_piecework 零读取点',
-          {'read_sites': 0}, {'read_sites': len(sites['read_sites'].get(
-              'quality.rework_counts_piecework', []))},
-          'passed' if len(sites['read_sites'].get('quality.rework_counts_piecework', [])) == 0
-          else 'failed', 'AST SystemConfig.get(<key>) 字面量扫描（fixtures.switch_read_sites）')
+    # ---------------------------------------------------------------- [A-66/AC-04-e · 仅追加重写]
+    # 作废原断言（保留痕迹）：`P0-3.3` 原期望「该开关**零**读取点」（`read_sites == 0`）——
+    # 这正是本轮要消除的缺陷形态（假开关），与 `negative_matrix` 的 `NV-2.3` 同一断言形态
+    # （A-66 ⑤ 已就 NV-2.3 裁定「断言的就是缺陷本身」）。重写为「恰 1 个读取点且缺省 False」。
+    _sites = sites['read_sites'].get('quality.rework_counts_piecework', [])
+    check('P0-3.3', '[A-66/AC-04-e] 该开关在 app/ 下**恰有 1 个**读取点'
+                    '（唯一判定处，残缺省值不得缺省即计入）',
+          {'read_sites': 1, 'in_mes_service': True},
+          {'read_sites': len(_sites), 'sites': _sites},
+          'passed' if (len(_sites) == 1 and 'mes_service.py' in (_sites[0] if _sites else ''))
+          else 'failed',
+          '[A-66] 原期望 0 个读取点（= 假开关的静态证据）=> 已作废；'
+          '同源：NV-2.3 由 A-66 ⑤ 裁定重写，本格是其 uat 孪生')
     other = [k for k, v in sites['read_sites'].items()
              if k != 'quality.rework_counts_piecework' and v]
     check('P0-3.4', '阳性对照：同法扫描能发现别的开关有读取点（探针敏感）',

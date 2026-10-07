@@ -217,6 +217,100 @@ out['mechanism_self_check'] = {{
 
 out['raw_config_rows'] = fixtures.set_rework_switch(app, True)['readback']
 out['switch_read_sites'] = fixtures.switch_read_sites()
+
+# ---------------------------------------------------------------- [A-66 ③ r2 · 仅追加]
+# DEC-2 §2.2「反查优先」合规夹具（R1∨R2）+ **产品路径**读数（不再用链内自算公式）。
+# 作废原夹具的理由：它只用 notes（'_hv 返工记录'）区分返工，而 DEC-2 §2.2 明确否决 notes 标记
+# （报工链不写 notes）。本段另起一名员工，旧员工与其 notes-记录**保持原样**（痕迹保留）。
+import datetime as _dt
+
+from app import db as _db
+from app import models as _M
+from app.services import mes_service as _mes
+
+with app.app_context():
+    _proc = _M.ProcessPrice.query.first()
+    _admin = _M.User.query.filter_by(username='_t_admin').first() or _M.User.query.first()
+    _day = _dt.date(2026, 10, 6)
+    _emp2 = _M.Employee(employee_id='_hvEMP_R2', name='_hv 员工R2', department='_hv',
+                        base_salary=0.0, coefficient=1.5, hire_date=_dt.date(2026, 1, 1))
+    _db.session.add(_emp2)
+    _db.session.flush()
+    # R1：返工任务被不合格单引用；R2：该任务的 global_sn == 产出记录的 global_sn
+    _rtask = _M.TaskAssignment(employee_id=_emp2.id, process_id=_proc.id, target_date=_day,
+                               quantity=5, status='pending', task_type='auto',
+                               notes='返工 不合格单#_hv')
+    _db.session.add(_rtask)
+    _db.session.flush()
+    _rec_r = _M.ProductionRecord(employee_id=_emp2.id, process_id=_proc.id, quantity=5,
+                                 date=_day, global_sn=_rtask.global_sn, notes='_hv R2 返工产出')
+    _rec_n = _M.ProductionRecord(employee_id=_emp2.id, process_id=_proc.id, quantity=3,
+                                 date=_day, notes='_hv R2 正常产出')
+    _db.session.add_all([_rec_r, _rec_n])
+    _db.session.flush()
+    _itask = _M.InspectionTask(global_sn=_M.SerialNumber.get_next_number(),
+                               target_type='production_record', target_id=_rec_r.id,
+                               inspector_id=_admin.id, status='in_progress',
+                               created_by=_admin.id)
+    _db.session.add(_itask)
+    _db.session.flush()
+    _irec = _M.InspectionRecord(global_sn=_M.SerialNumber.get_next_number(), task_id=_itask.id,
+                                inspector_id=_admin.id, inspection_date=_day, result='fail')
+    _db.session.add(_irec)
+    _db.session.flush()
+    _db.session.add(_M.NonconformityRecord(record_id=_irec.id, type='rework',
+                                           handler_id=_admin.id, handling_date=_day,
+                                           handling_result='_hv 返工', status='done',
+                                           rework_task_id=_rtask.id,
+                                           target_type='production_record', target_id=_rec_r.id,
+                                           scrap_cost=0))
+    # RC-16 对照：批次自动派工（task_type='auto' 但非返工任务）不得被计入返工
+    _atask = _M.TaskAssignment(employee_id=_emp2.id, process_id=_proc.id, target_date=_day,
+                               quantity=4, status='pending', task_type='auto',
+                               notes='批次自动派工（非返工）')
+    _db.session.add(_atask)
+    _db.session.flush()
+    _rec_a = _M.ProductionRecord(employee_id=_emp2.id, process_id=_proc.id, quantity=4,
+                                 date=_day, global_sn=_atask.global_sn, notes='_hv 自动派工产出')
+    _db.session.add(_rec_a)
+    _db.session.commit()
+    _emp2_id = _emp2.id
+    _atask_id = _atask.id
+
+
+def _product_reads(value):
+    fixtures.set_rework_switch(app, value)
+    with app.app_context():
+        emp = _M.Employee.query.get(_emp2_id)
+        records = _M.ProductionRecord.query.filter(
+            _M.ProductionRecord.employee_id == _emp2_id).all()
+        counted, dropped, excluded = _mes.piecework_breakdown(records)
+        base = emp.base_salary or 0.0
+        adj = sum(bp.amount if bp.type == 'bonus' else -bp.amount for bp in emp.bonuses_penalties)
+        coeff = emp.coefficient or 1.0
+        s2_raw = (emp.total_salary - base - adj) / coeff
+        return {{'counted_raw': round(counted, 6), 'dropped_raw': round(dropped, 6),
+                'counted_with_coeff': round(counted * coeff, 6),
+                's2_raw': round(s2_raw, 6), 'excluded_count': len(excluded),
+                'excluded_ids': sorted(excluded)}}
+
+
+_off = _product_reads(False)
+_on = _product_reads(True)
+with app.app_context():
+    _auto_not_rework = _mes.is_rework_task(_M.TaskAssignment.query.get(_atask_id)) is False
+out['product_path'] = {{
+    'off_counted_raw': _off['counted_raw'], 'on_counted_raw': _on['counted_raw'],
+    'delta_raw': round(_on['counted_raw'] - _off['counted_raw'], 6),
+    'delta_with_coeff': round(_on['counted_with_coeff'] - _off['counted_with_coeff'], 6),
+    'off_excluded_records': _off['excluded_count'],
+    'off_excluded_ids': _off['excluded_ids'],
+    'off_s2_matches': abs(_off['s2_raw'] - _off['counted_raw']) < 1e-6,
+    'on_s2_matches': abs(_on['s2_raw'] - _on['counted_raw']) < 1e-6,
+    'auto_task_not_rework': _auto_not_rework,
+    'off_normal_only_raw': 30.0,
+}}
+fixtures.set_rework_switch(app, False)
 print('__SALARY__' + json.dumps(out, ensure_ascii=False))
 '''
 
@@ -241,16 +335,33 @@ def case2_switch_differential():
         return
     delta_rework = parsed['deltas']['_hvEMP_REWORK']
     delta_normal = parsed['deltas']['_hvEMP_NORMAL']
-    record('NV-2.1', '双向差分：返工记录计件工资应随开关变化',
-           '开关 false->true 后，返工场景工资数字必须不同（GAP-18 的判据形状）',
-           {'delta_rework': '!= 0'},
-           {'delta_rework': delta_rework,
-            'piecework_off': parsed['piecework_off']['_hvEMP_REWORK']['piecework'],
-            'piecework_on': parsed['piecework_on']['_hvEMP_REWORK']['piecework']},
-           'passed' if delta_rework != 0 else 'failed',
+    # ---------------------------------------------------------------- [A-66 ③ r2 · 仅追加重写]
+    # 作废原断言（保留痕迹）：`NV-2.1` 原判据 = `delta_rework != 0`，其 delta 由**夹具自算**
+    # `fixtures.salary_piecework`（按 routes.py:1815 的原式复算）而来，而夹具用 `notes`
+    # （'_hv 返工记录'）标记返工 —— DEC-2 §2.2 明确否决 notes 标记（选定 R1∨R2）
+    # ⇒ 产品实现认不出来，即使开关已真生效，原判据也不会转绿（"在断言夹具写错"）。
+    # 重写为：DEC-2 §2.2 合规夹具（R1∨R2）+ **产品路径**读数
+    # （`mes_service.piecework_amount` 唯一口径函数 与 `Employee.total_salary`）。
+    nv21_expected = {'off_counted_raw': 70.0, 'on_counted_raw': 120.0, 'delta_raw': 50.0,
+                     'delta_with_coeff': 75.0, 'off_excluded_records': 1,
+                     'off_s2_matches': True, 'auto_task_not_rework': True}
+    nv21_actual = parsed.get('product_path') or {}
+    record('NV-2.1', '[A-66 ③ r2] 双向差分（DEC-2 §2.2 合规夹具 + 产品路径读数）：'
+                     '开关 false⇒true 后该员工的计件必须 +50.0（未乘系数）/ +75.0（×系数 1.5）',
+           '夹具：返工 5 件（R1 NC.rework_task_id + R2 global_sn）+ 正常 3 件 + 自动派工 4 件，'
+           '单价 10.0、系数 1.5 ⇒ 关：(3+4)×10=70.0；开：(5+3+4)×10=120.0；差 = 返工贡献 50.0',
+           nv21_expected,
+           nv21_actual,
+           'passed' if (abs((nv21_actual.get('off_counted_raw') or 0) - 70.0) < 1e-6
+                        and abs((nv21_actual.get('on_counted_raw') or 0) - 120.0) < 1e-6
+                        and abs((nv21_actual.get('delta_with_coeff') or 0) - 75.0) < 1e-6
+                        and nv21_actual.get('off_excluded_records') == 1
+                        and nv21_actual.get('off_s2_matches') is True
+                        and nv21_actual.get('auto_task_not_rework') is True) else 'failed',
            evidence=os.path.relpath(ev, REPO_ROOT),
-           note='delta=0 ⇒ 开关在本版本对工资计算零影响（假开关）。' if delta_rework == 0
-           else '')
+           note='[A-66 ③] 原判据基于 `fixtures.salary_piecework`（链内自算公式）+ notes 夹具 => 已作废；'
+                '本轮的「开关真生效」由产品路径（mes_service.piecework_amount / '
+                'Employee.total_salary）承证，并由 NV-2.5 的机制自检证明判据可证伪。')
     record('NV-2.2', '非返工场景两次必须相同',
            '开关切换不影响普通记录员工的计件工资（证明差分口径本身有效）',
            {'delta_normal': 0}, {'delta_normal': delta_normal},
@@ -258,21 +369,40 @@ def case2_switch_differential():
            evidence=os.path.relpath(ev, REPO_ROOT))
     sites = parsed['switch_read_sites']
     unread = sites['unread_defaults']
-    record('NV-2.3', '静态佐证：该开关是全仓唯一没有任何读取点的配置项',
-           'AST 扫 SystemConfig.get(\'<key>\') 调用点；至少 4 个开关有读取点、'
-           'quality.rework_counts_piecework 为 0',
-           {'switches_with_reads': 4, 'rework_switch_reads': 0},
-           {'read_sites': sites['read_sites'], 'unread_defaults': unread},
-           'passed' if 'quality.rework_counts_piecework' in unread and
-           len(unread) == 1 else 'failed',
+    # ---------------------------------------------------------------- [A-66 ⑤ r2 · 仅追加重写]
+    # 作废原断言（保留痕迹）：`NV-2.3` 原期望「该开关是全仓唯一**没有**任何读取点的配置项」
+    # （`quality.rework_counts_piecework in unread and len(unread) == 1`）—— 它断言的正是
+    # 本轮要消除的缺陷形态（假开关），任何正确实现都不可能使其转绿（A-66 ⑤）。
+    # 重写为：该开关**恰有 1 个**读取点，且位于唯一判定处 mes_service（AC-04-e）。
+    rework_sites = sites['read_sites'].get('quality.rework_counts_piecework', [])
+    record('NV-2.3', '[A-66 ⑤ r2] 静态佐证：该开关恰有 1 个读取点且位于唯一判定处'
+                     '（mes_service.py，AC-04-e）',
+           'AST 扫 SystemConfig.get(\'<key>\') 调用点；quality.rework_counts_piecework 恰 1 处、'
+           '在 app/services/mes_service.py；至少 4 个其它开关也有读取点',
+           {'rework_switch_reads': 1, 'sites': rework_sites},
+           {'all_read_sites': sites['read_sites'], 'unread_defaults': unread},
+           'passed' if len(rework_sites) == 1 and 'mes_service.py' in rework_sites[0] else 'failed',
            evidence=os.path.relpath(ev, REPO_ROOT),
-           note='这是 GAP-18 缺陷的静态证据：开关只有种子定义，没有消费方。')
-    record('NV-2.4', '阳性对照：同一差分口径能测出真实生效的开关',
-           'purchase.* 三个开关与 concession_approver_roles 各有读取点 ⇒ 本探针非恒假',
-           {'switches_with_read_sites': 4},
-           {k: len(v) for k, v in sites['read_sites'].items()},
-           'passed' if sum(1 for k, v in sites['read_sites'].items() if v) == 4 else 'failed',
-           evidence=os.path.relpath(ev, REPO_ROOT))
+           note='[A-66 ⑤] 原期望「零读取点」（= GAP-18 的静态证据）=> 已作废；'
+                '缺省值口径（default=False）由 w2w3_probe 的 AC-04-e 承证')
+    # ---------------------------------------------------------------- [A-66 ④ r2 · 仅追加重写]
+    # 作废原断言（保留痕迹）：`NV-2.4` 原把「有读取点的开关数」**写死为 4**；修复后该开关
+    # 也有读取点 ⇒ 变成 5，判据恒假（A-66 ④「计数写死」）。重写为**集合包含**判据：
+    # 要求 4 个既有开关各有 ≥1 个读取点（阳性对照的敏感度），不再钉总数。
+    required = ['purchase.full_workflow_enabled', 'purchase.settlement_enabled',
+                'purchase.incoming_inspection_required', 'quality.concession_approver_roles']
+    present = {k: len(v) for k, v in sites['read_sites'].items() if v}
+    missing = [k for k in required if k not in present]
+    record('NV-2.4', '[A-66 ④ r2] 阳性对照：同一差分口径能测出真实生效的开关'
+                     '（改为集合包含判据，不再钉总数）',
+           '4 个既有开关必须各被扫出 ≥1 个读取点（探针敏感度）；总数不再钉死',
+           {'required_keys_all_have_read_sites': required},
+           {'present_keys': present, 'missing_required': missing,
+            'total_keys_with_reads': len(present)},
+           'passed' if not missing else 'failed',
+           evidence=os.path.relpath(ev, REPO_ROOT),
+           note='[A-66 ④] 原判据 `sum(...) == 4` 属计数写死 => 已作废（修复后本开关也有读取点）；'
+                '探针敏感度由「4 个既有开关必须都被扫出」承证')
     record('NV-2.5', '差分机制自检：把开关值真读进来时，工资必须随值变化',
            '同一份数据用「真消费开关」的公式重算：True 时 +75（5 件×10 元×系数 1.5），'
            'False 时 +0 ⇒ 本差分口径具备检出能力（否则 NV-2.1 的 delta=0 不能归因于假开关）',
@@ -417,6 +547,11 @@ out['record_nc_link'] = {{
 mes = open(os.path.join(r'{repo}', 'app', 'services', 'mes_service.py'), encoding='utf-8')
 lines = mes.read().splitlines()
 out['call_site_326'] = {{'line': 326, 'text': lines[325].strip()}}
+# [A-66 ④ r2] 门禁调用点**全集**（按内容定位，不再依赖固定行号；def 行不计）
+out['qc_gate_call_sites'] = [{{'line': i + 1, 'text': lines[i].strip()}}
+                             for i in range(len(lines))
+                             if 'qc_gate_allows_output(' in lines[i]
+                             and not lines[i].lstrip().startswith('def ')]
 out['gate_def_157'] = {{'line': 157, 'text': lines[156].strip()}}
 out['blocked_def'] = [{{'line': i + 1, 'text': lines[i].strip()}}
                       for i in range(len(lines)) if 'def workpiece_blocked' in lines[i]]
@@ -463,12 +598,23 @@ def case3_gate_negative_with_control():
                 'production_record=None ⇒ records 恒空 ⇒ :184-197 两条路径无数据可触发。')
     states = parsed['gate_states']
     rec = parsed['call_site_326']
-    record('NV-3.3', '源码读数：门禁调用点与定义的行号断言',
-           'mes_service.py:326 为 qc_gate_allows_output(batch_item=..., workpieces=...)',
-           {'line': 326, 'contains': 'qc_gate_allows_output(batch_item=item, workpieces=workpieces)'},
-           rec,
-           'passed' if 'qc_gate_allows_output(batch_item=item, workpieces=workpieces)'
-           in rec['text'] else 'failed', evidence=os.path.relpath(ev, REPO_ROOT))
+    # ---------------------------------------------------------------- [A-66 ④ r2 · 仅追加重写]
+    # 作废原断言（保留痕迹）：`NV-3.3` 原把门禁调用点**写死为 `mes_service.py:326`**
+    # （`rec['line'] == 326` 的静态读数）—— 本轮修复使该调用点行号平移，判据恒假（A-66 ④
+    # 「行号写死」）。重写为**按内容定位**：文件内存在 `qc_gate_allows_output(batch_item=...,
+    # workpieces=...)` 调用，且**任何**调用点都不得传 `production_record`。
+    call_sites = parsed.get('qc_gate_call_sites') or []
+    bad_sites = [c for c in call_sites if 'production_record' in c['text']]
+    record('NV-3.3', '[A-66 ④ r2] 源码读数（按内容定位，不钉行号）：门禁调用点存在且实参不含'
+                     ' production_record',
+           '文件内存在 qc_gate_allows_output(batch_item=..., workpieces=...) 调用；'
+           '且任何调用点都不得传 production_record（def 行不计）',
+           {'call_sites_found': '>= 1', 'sites_passing_production_record': 0},
+           {'line_326_now': rec['text'], 'call_sites': call_sites, 'bad_sites': bad_sites},
+           'passed' if call_sites and not bad_sites else 'failed',
+           evidence=os.path.relpath(ev, REPO_ROOT),
+           note='[A-66 ④] 原判据 `line == 326` 属行号写死 => 已作废（修复后该调用点已平移）；'
+                '「不传 production_record」这一实质口径不变（A-67 的适用边界由此承证）')
     # 阳性对照 1：工件路径必须拒绝
     f = states['F_blocked_workpiece']
     record('NV-3.4', '阳性对照 1：被锁工件（status=machining + 未闭环不合格）必须被拒',
@@ -493,13 +639,23 @@ def case3_gate_negative_with_control():
                 '（NonconformityRecord.record_id 是 FK→inspection_records，SQLite 默认不开外键），'
                 '已如实登记该构造手法。')
     h = states['H_same_record_two_instances']
-    record('NV-3.5b', '阳性对照 3：同一实参喂两个实例 ⇒ 判定随实例 quality_status 变化',
-           '同一 production_record 实参下，fail 实例拒、pending 实例也拒，但**原因文本不同**',
-           {'instance_fail_reason_has_code': True, 'instance_pending_reason_has_code': True},
+    # ---------------------------------------------------------------- [A-66 ⑤ / A-67 r2 · 仅追加重写]
+    # 作废原断言（保留痕迹）：`NV-3.5b` 原期望「fail 实例拒、**pending 实例也拒**，仅原因文本不同」——
+    # 「pending 一律拒」正是 DEC-1 §1.4 序 3 要消除的**死锁形态**（A-45/A-67 同源）。
+    # 重写为：fail 实例 ⇒ 拒且原因含实例码；pending 实例（本例**无在办单据**）⇒ **放行**。
+    record('NV-3.5b', '[A-66 ⑤ / A-67 r2] 阳性对照 3：同一实参喂两个实例 ⇒ 判定随实例'
+                      ' quality_status 变化（fail ⇒ 拒；pending 且无在办单据 ⇒ 放行）',
+           '同一 production_record 实参下：fail 实例必须被拒（原因含实例码）；'
+           'pending 实例（本例无在办单据）必须放行 —— DEC-1 §1.4 序 3 / A-67',
+           {'fail_instance_rejected': True, 'fail_reason_has_code': True,
+            'pending_instance_allowed': True},
            {'fail_instance': h[0], 'pending_instance': h[1]},
-           'passed' if h[0][0] is False and h[1][0] is False
-           and '_hvBI_FAIL' in (h[0][1] or '') and '_hvBI_PENDING' in (h[1][1] or '')
-           else 'failed', evidence=os.path.relpath(ev, REPO_ROOT))
+           'passed' if (h[0][0] is False and '_hvBI_FAIL' in (h[0][1] or '')
+                        and h[1][0] is True) else 'failed',
+           evidence=os.path.relpath(ev, REPO_ROOT),
+           note='[A-66 ⑤/A-67] 原期望「pending 也拒」（= 死锁）=> 已作废：DEC-1 §1.4 序 3 规定'
+                '「pending **且确有在办单据**」才拒，本格构造的 pending 实例无在办单据 ⇒ 放行。'
+                '配对格（pending 且确有在办单据 ⇒ 拒）见 uat P0-2.5(b) / w2w3_probe cells。')
     e = states['E_clean_workpiece']
     d2 = states.get('D2_explicit_closed_nc_record')
     g = states['G_nothing_at_all']
@@ -527,26 +683,48 @@ def case3_gate_negative_with_control():
            'passed' if all(v == 0 for v in deltas.values()) else 'failed',
            evidence=os.path.relpath(ev, REPO_ROOT))
     aw = parsed.get('auto_writeback') or {}
-    record('NV-3.9', 'GAP-14 阴性：判不合格后 quality_status 不会自动回写',
-           '提交 production_record 的 fail 结论后，批次实例 quality_status 保持 pending、'
-           '不合格单增量 0（A-3 的「缺少触发拒绝的数据」）',
-           {'changed': False, 'nc_delta': 0, 'call_state': 'ok'},
+    # ---------------------------------------------------------------- [A-66 ⑤ r2 · 仅追加重写]
+    # 作废原断言（保留痕迹）：`NV-3.9` 原期望「判不合格后 quality_status **不会**自动回写」
+    # （`changed is False and nc_delta == 0`）—— 它断言的正是本轮要消除的缺陷形态
+    # （GAP-14 未闭环），任何正确实现都不可能使其转绿（A-66 ⑤）。
+    # 重写为 AC-18-a 的正面口径：pending ⇒ fail 且不合格单 +1（直接字段断言）。
+    record('NV-3.9', '[A-66 ⑤ r2] GAP-14 正面口径：判不合格后 quality_status 必须**自动回写**'
+                     '（pending ⇒ fail）且不合格单恰 +1',
+           '提交 production_record 的 fail 结论后：quality_status 由 pending 变 fail、'
+           '不合格单增量 1、调用无异常（AC-18-a 形状）',
+           {'changed': True, 'quality_status_after': 'fail', 'nc_delta': 1, 'call_state': 'ok'},
            {'changed': aw.get('changed'), 'quality_status_before': aw.get('quality_status_before'),
             'quality_status_after': aw.get('quality_status_after'),
             'nc_delta': aw.get('nc_delta'), 'call_state': aw.get('call_state')},
-           'passed' if aw.get('call_state') == 'ok' and aw.get('changed') is False
-           and aw.get('nc_delta') == 0 else 'failed',
+           'passed' if (aw.get('call_state') == 'ok' and aw.get('changed') is True
+                        and aw.get('quality_status_after') == 'fail'
+                        and aw.get('nc_delta') == 1) else 'failed',
            evidence=os.path.relpath(ev, REPO_ROOT),
-           note='apply_inspection_result 对 target_type=production_record 在 mes_service.py:421-422 '
-                '直接 return ⇒ 既不建 NC 也不回写门禁字段。')
+           note='[A-66 ⑤] 原期望「不回写 / nc_delta=0」= 缺陷本身 => 已作废；'
+                'mes_service.apply_production_record_result + recompute_production_quality_status')
     aw2 = parsed.get('quality_status_write_candidates') or []
-    record('NV-3.10', '静态佐证：quality_status 的赋值点只有手工 PUT',
-           '全仓 quality_status 赋值候选点应只有 app/main/routes.py 一处（t1 记 :8899）',
-           {'candidates': 1, 'file': 'app/main/routes.py', 'line': 8899},
-           {'candidates': len(aw2), 'hits': aw2},
-           'passed' if len(aw2) == 1 and aw2[0]['file'] == 'app/main/routes.py' else 'failed',
+    # ---------------------------------------------------------------- [A-66 ⑤ r2 · 仅追加重写]
+    # 作废原断言（保留痕迹）：`NV-3.10` 原期望「全仓赋值点**只有**人工 PUT 一处（routes.py:8899）」
+    # —— 与 NV-3.9 同源，断言的正是缺陷形态。重写为**白名单 + 存在性**判据：
+    #   (a) 必须存在 app/services/mes_service.py 的自动复算写点（DEC-1 §1.2 的唯一自动写点）；
+    #   (b) 人工纠正通道 app/main/routes.py 的赋值点仍在；
+    #   (c) 任何赋值候选点都不得落在白名单外的模块（防新增临时写点）。
+    _files = {h['file'] for h in aw2}
+    _has_auto = any(h['file'] == 'app/services/mes_service.py' for h in aw2)
+    _has_manual = any(h['file'] == 'app/main/routes.py' for h in aw2)
+    _outside = sorted(_files - {'app/services/mes_service.py', 'app/main/routes.py'})
+    record('NV-3.10', '[A-66 ⑤ r2] 静态佐证（白名单判据）：存在 mes_service 的自动复算写点 + '
+                      '人工 PUT 纠正通道，且无白名单外的赋值点',
+           '赋值候选点必须同时覆盖 app/services/mes_service.py（自动复算写点）与'
+           ' app/main/routes.py（人工纠正通道），且不得落在白名单外的模块',
+           {'auto_write_point_in_mes_service': True, 'manual_put_in_routes': True,
+            'files_outside_whitelist': 0},
+           {'candidates': len(aw2), 'files': sorted(_files), 'outside': _outside, 'hits': aw2},
+           'passed' if _has_auto and _has_manual and not _outside else 'failed',
            evidence=os.path.relpath(ev, REPO_ROOT),
-           note='扫描口径：行内 `=` 左侧以 quality_status 结尾（排除 == 比较）。')
+           note='[A-66 ⑤] 原判据「只有 1 处、在 routes.py:8899」= 缺陷本身 => 已作废；'
+                '扫描口径同前（行内 `=` 左侧以 quality_status 结尾），'
+                '其中 mes_service.py:642/669 是 logger f-string 文本的**启发式假阳性**，已如实登记')
 
 
 # --------------------------------------------------------------- 用例 4：夹具尺度断言

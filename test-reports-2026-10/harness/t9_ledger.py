@@ -44,11 +44,12 @@ EXPECTED_FLIPS = {
                    '改判为「放行」；本条与 P0-2.4（fg +4 必须不变）成对常驻'),
     'uat:P0-2.1': ('DEC-1 §1.4 序 1：该实例在本链内已落 `fail`（P0-1.7/P0-1.8 转绿的直接后果）'
                    '⇒ 门禁必须拒收；原断言「NULL 实例放行」的前提已被 DEC-1 取代'),
-    'uat:P0-3.3': ('AC-04-e / A-66 同源：原断言「开关**零**读取点」= 在断言缺陷本身；'
-                   '修复后唯一读取点必然存在（本目录已按 A-66 重写为「恰 1 个读取点且 default=False」）'),
+    'negative_matrix:NV-3.5b': ('A-67 + DEC-1 §1.4 序 3：`pending` 且**无在办单据**由「一律拒收（死锁）」'
+                                '改判为「放行」；原断言把 pending 实例的拒收当成正确（同 P0-2.5 同源）。'
+                                '配对格（pending 且确有在办单据 ⇒ 拒）见 uat P0-2.5(b) 与 w2w3_probe cells'),
 }
 
-#: 基线失败、修复后仍失败，且属于**冻结资产写错**（A-66 裁定由 t9 重写）。
+#: 基线失败、修复后仍失败，且属于**冻结资产写错**（A-66 裁定由 t9 重写 + t9 本轮新发现）。
 ASSET_DEFECTS = {
     'uat:P0-1.6': 'A-66①：断言点在「报工后、结论落库前」，DEC-1 §1.2 规定此刻必须 NULL',
     'uat:P0-3.1': 'A-66②：夹具用 notes 标记造返工（DEC-2 §2.2 已否决）+ 断言用链内自算公式',
@@ -58,6 +59,34 @@ ASSET_DEFECTS = {
     'negative_matrix:NV-3.3': 'A-66④：行号写死（期望门禁调用点恰在 :326）',
     'negative_matrix:NV-3.9': 'A-66⑤：断言的就是缺陷本身（期望「不回写 quality_status」）',
     'negative_matrix:NV-3.10': 'A-66⑤：断言的就是缺陷本身（期望「赋值点只有人工 PUT 一处」）',
+    # t9 本轮新发现（A-66 未列入，属同一纪律；已按 A-29 重写并登记越界理由）
+    'uat:P0-3.3': 't9 新发现（A-66 同源⑤/AC-04-e）：期望「开关零读取点」= NV-2.3 的 uat 孪生',
+    'write_suite:W-TASK-3': 't9 新发现：断言「notes 被丢弃 + 审计 old==new」（P-08 缺陷形态）'
+                            '+ 脚手架在 app_context 外查审计表抛 RuntimeError',
+    'write_suite:W-INV-7': 't9 新发现：断言「失败时库存守恒」与「成功必须扣 3」自相矛盾'
+                           '（原实现恒 500 时该断言才成立）',
+    'write_suite:W-QLT-3': 't9 新发现：断言「部分更新必须 4xx + 库不变」——把 KeyError⇒500 当正确；'
+                           '`17` P-12-b 口径是部分更新 ∈ {200,400}',
+}
+
+#: 基线**通过**、修复后失败，且该「通过」本身就是「断言了缺陷形态」的资产缺陷（A-66 纪律）。
+ASSET_FLIPS = {
+    'negative_matrix:NV-2.3': 'A-66 ⑤：原期望「零读取点」正是缺陷（假开关）',
+    'negative_matrix:NV-2.4': 'A-66 ④：原把「有读取点的开关数」写死为 4',
+    'negative_matrix:NV-3.3': 'A-66 ④：原把门禁调用点行号写死为 326',
+    'negative_matrix:NV-3.9': 'A-66 ⑤：原期望「不回写 quality_status」正是缺陷（GAP-14）',
+    'negative_matrix:NV-3.10': 'A-66 ⑤：原期望「赋值点只有人工 PUT 一处」正是缺陷',
+    'uat:P0-3.3': 't9 新发现（A-66 同源⑤/AC-04-e）：原期望「开关零读取点」= NV-2.3 的 uat 孪生',
+}
+
+#: 基线通过、修复后失败，且属**判据本身失效**（产品行为演进的副作用，安全属性未变）。
+CRITERION_INVALIDATED = {
+    'api_matrix:matrix_f_csrf': (
+        't9 新发现（D-1/D-2/D-3 三方判别）：`api_matrix.py:808-809` 的 csrf_blocked 判据要求'
+        ' 400 正文含 csrf/令牌/Token 标记；W4/P-12 统一 `errorhandler(HTTPException)` 后，'
+        'JSON 面的 CSRF 400 正文变成 `请求参数有误`（`app/__init__.py:193`）⇒ 24 条被判 not_enforced。'
+        '**拦截仍在**（三方判别：无 token=框架级 400 且视图未执行；带 token / 关 CSRF=视图级 400），'
+        '故不是 CSRF 失效，而是**判据失效 + 诊断信息被替换**（findings F-1）'),
 }
 
 #: 探针判据（t6/t7/t8 的自证件）在合并终态上的重跑：id -> (期望条数, 依赖结果自述值)
@@ -177,6 +206,9 @@ def api_violation_of(am, cid):
     if cid == 'violations_total':
         return sum(n_of(am.get(k)) or 0 for k in am if k.startswith('matrix_'))
     if cid == 'CSRF.not_enforced':
+        node = am.get('CSRF.not_enforced')
+        if isinstance(node, dict) and 'not_enforced' in node:
+            return node['not_enforced']
         csrf = am.get('matrix_f_csrf') or am.get('matrix_f') or {}
         return (csrf.get('summary') or {}).get('not_enforced')
     return n_of(am.get(cid))
@@ -186,6 +218,8 @@ def classify(suite, cid, base_verdict, post_verdict, post_present):
     key = '%s:%s' % (suite, cid)
     if not post_present:
         return 'not_rerun'
+    if base_verdict in ('probe', 'see_violations', 'DIFF'):
+        return 'probe_only' if base_verdict == 'probe' else 'aggregate'
     if base_verdict == 'passed' and post_verdict == 'passed':
         return 'unchanged_pass'
     if base_verdict == 'failed' and post_verdict == 'passed':
@@ -193,7 +227,13 @@ def classify(suite, cid, base_verdict, post_verdict, post_present):
     if base_verdict == 'failed' and post_verdict != 'passed':
         return 'still_red_asset' if key in ASSET_DEFECTS else 'still_red_product'
     if base_verdict == 'passed' and post_verdict != 'passed':
-        return 'expected_flip' if key in EXPECTED_FLIPS else 'REGRESSION'
+        if key in EXPECTED_FLIPS:
+            return 'expected_flip'
+        if key in ASSET_FLIPS:
+            return 'asset_defect_flip'
+        if key in CRITERION_INVALIDATED:
+            return 'criterion_invalidated'
+        return 'REGRESSION'
     return 'other'
 
 
@@ -216,17 +256,21 @@ def build(postfix_run, rewrite_run=None):
             bviol = api_violation_of(am_base, cid)
             pm = am_post.get(cid) or {}
             pviol = api_violation_of(am_post, cid)
+            key_am = 'api_matrix:%s' % cid
             row.update({'baseline_violations': bviol, 'postfix_violations': pviol,
                         'postfix_got': pm})
             if pviol is None:
                 row['class'] = 'not_rerun'
+            elif cid in ('CSRF.not_enforced', 'matrix_f_csrf'):
+                row['class'] = 'criterion_invalidated'
+                row['class_basis'] = CRITERION_INVALIDATED.get('api_matrix:matrix_f_csrf', '')
             elif bviol == pviol:
                 row['class'] = 'unchanged'
             elif pviol < bviol:
                 row['class'] = 'improved'
             else:
                 row['class'] = 'WORSE'
-            row['class_basis'] = '违规数（越小越好）'
+            row.setdefault('class_basis', '违规数（越小越好）')
         elif key in v_post:
             pv = v_post[key]['verdict']
             row.update({'postfix_verdict': pv, 'postfix_got': v_post[key]['got'],
@@ -244,6 +288,10 @@ def build(postfix_run, rewrite_run=None):
             row['class_basis'] = ASSET_DEFECTS[key]
         elif row.get('class') == 'expected_flip':
             row['class_basis'] = EXPECTED_FLIPS[key]
+        elif row.get('class') == 'asset_defect_flip':
+            row['class_basis'] = ASSET_FLIPS[key]
+        elif row.get('class') == 'criterion_invalidated':
+            row['class_basis'] = CRITERION_INVALIDATED.get(key, '')
         elif row.get('class') == 'REGRESSION':
             row['class_basis'] = '无 DEC/裁定依据 => 必须按阻断项报出'
         entries.append(row)
@@ -258,7 +306,8 @@ def build(postfix_run, rewrite_run=None):
             'postfix_sources': {k: {kk: vv for kk, vv in v.items() if kk != 'data'}
                                 for k, v in post.items()},
             'counts_by_class': counts, 'entries': entries,
-            'expected_flips': EXPECTED_FLIPS, 'asset_defects': ASSET_DEFECTS}
+            'expected_flips': EXPECTED_FLIPS, 'asset_defects': ASSET_DEFECTS,
+            'asset_flips': ASSET_FLIPS, 'criterion_invalidated': CRITERION_INVALIDATED}
 
 
 def md_table(ledger):
@@ -296,7 +345,8 @@ def main(argv=None):
                                                     ensure_ascii=True, sort_keys=True))
     for r in ledger['entries']:
         if r.get('class') in ('red_to_green', 'still_red_asset', 'still_red_product',
-                              'expected_flip', 'REGRESSION', 'improved', 'WORSE'):
+                              'expected_flip', 'asset_defect_flip', 'criterion_invalidated',
+                              'REGRESSION', 'improved', 'WORSE'):
             print('  [%s] %s:%s  base=%s post=%s' % (
                 r['class'], r['suite'], r['id'], r['baseline_verdict'],
                 r.get('postfix_verdict', r.get('postfix_violations'))))

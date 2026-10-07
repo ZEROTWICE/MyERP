@@ -197,15 +197,22 @@ def build_probes():
         # ★ 缺陷探针：源码 routes.py:4502-4506 只赋值 target_date/employee_id/process_id/
         #   quantity，**没有 task.notes 赋值**，而 :4497/:4532 把 task.notes 当作已更新值
         #   写进审计 ⇒ 备注静默丢弃 + 审计 old/new 相同。
-        c.eq('★ notes 入参被丢弃（期望落库，实测见 detail）', row.notes == notes,
+        # ---------------------------------------------------------------- [A-66 同源 r2 · 仅追加]
+        # 作废原断言（保留痕迹）：原判据「★ notes 入参被丢弃」（期望库内 notes == 旧值）与
+        # 「★ 审计 old_data.notes == new_data.notes（都等于旧值）」——断言的正是本轮要消除的
+        # 缺陷形态（P-08 静默丢弃）。另：原代码在 app_context **之外**执行 `M.AuditLog.query`
+        # ⇒ 抛 RuntimeError 中断用例（脚手架缺陷，修复前后两轮基线同此现象）。
+        # 重写为 P-08 的验收形状：notes 必须落库 + 审计 old != new。
+        with c.app.app_context():
+            audit = (M.AuditLog.query.filter_by(target_model='TaskAssignment', target_id=tid)
+                     .order_by(M.AuditLog.id.desc()).first())
+        c.eq('★ notes 入参必须落库（A-66 同源 r2：原断言期望被丢弃）', row.notes == notes,
               f'期望 {notes!r} 实测 {row.notes!r}')
-        audit = (M.AuditLog.query.filter_by(target_model='TaskAssignment', target_id=tid)
-                 .order_by(M.AuditLog.id.desc()).first())
-        c.eq('★ 审计 old_data.notes == new_data.notes（都等于旧值）',
-              (audit.old_data or {}).get('notes') == (audit.new_data or {}).get('notes')
-              if audit else False,
-              f'old={(audit.old_data or {}).get("notes")!r} '
-              f'new={(audit.new_data or {}).get("notes")!r}')
+        c.eq('★ 审计 old_data.notes != new_data.notes（P-08 核心；原断言期望相等）',
+              bool(audit) and (audit.old_data or {}).get('notes')
+              != (audit.new_data or {}).get('notes'),
+              (f'old={(audit.old_data or {}).get("notes")!r} '
+               f'new={(audit.new_data or {}).get("notes")!r}') if audit else 'no audit row')
         c.eq('status 按入参置 completed', row.status == 'completed', row.status)
         c.eq('审计行可回滚（can_rollback=True）',
               _audit_count(c.app, 'TaskAssignment') >= 1,
@@ -346,15 +353,26 @@ def build_probes():
             c.eq('库内该行仍存在', False, '行不见了')
             return
         c.snap_after('cons', row, ['quantity', 'status'])
-        # ★ 缺陷探针：routes.py:10939 use_consumable 直接用 Consumable，但该模块
-        #   只在 :10555/:10683/:10786 三处**函数内**导入 Consumable ⇒ 本函数 NameError
-        #   → 500；同时库存完全没扣（拒绝时不留半成品，但功能整体不可用）。
+        # ★ 缺陷探针（t6/P-01 修前）：routes.py:10939 use_consumable 直接用 Consumable，而该模块
+        #   只在 :10555/:10683/:10786 三处**函数内**导入 Consumable ⇒ 修前恒 NameError ⇒ 500 且
+        #   库存不扣。修后（模块级导入）必须 200 且扣减 3。
+        #   [A-66 同源 r2] 原第二条断言「失败时不得改动库存（守恒）」与「成功必须扣减」自相矛盾，
+        #   已按状态码分支重写（见下）。
         c.eq('★ 使用易耗品成功（期望 quantity 减少 3；实测见 detail）',
               r.status_code == 200 and abs(float(row.quantity) - (float(row0.quantity) - 3)) < 1e-9,
               f'HTTP {r.status_code} quantity {row0.quantity} -> {row.quantity} '
               f'响应={r.get_data(as_text=True)[:120]}')
-        c.eq('★ 失败时不得改动库存（守恒）', float(row.quantity) == float(row0.quantity),
-              f'{row0.quantity} -> {row.quantity}')
+        # ---------------------------------------------------------------- [A-66 同源 r2 · 仅追加]
+        # 作废原断言（保留痕迹）：原「★ 失败时不得改动库存（守恒）」**无条件**要求库存不变
+        # （`row.quantity == row0.quantity`）——它与上一条「成功必须扣减 3」自相矛盾；原实现
+        # 恒 500（NameError）时该断言才成立，故属「断言的就是缺陷形态」。重写为**按状态码分支**：
+        # 成功 ⇒ 必须正好扣 3；失败 ⇒ 库存必须一字不变。
+        _used_ok = (r.status_code == 200
+                    and abs(float(row.quantity) - (float(row0.quantity) - 3)) < 1e-9)
+        _conserved = abs(float(row.quantity) - float(row0.quantity)) < 1e-9
+        c.eq('★ 成功扣减 / 失败守恒（按状态码分支；A-66 同源 r2）',
+              _used_ok or (r.status_code != 200 and _conserved),
+              f'HTTP {r.status_code} {row0.quantity} -> {row.quantity}')
 
     def i_consumable_put(c, e):
         from app import models as M
@@ -586,12 +604,10 @@ def build_probes():
         c.eq('name 落库为新值', row.name == e['tag'] + '_模板改', row.name)
 
     def q_tpl_partial_put(c, e):
-        """★ 缺陷探针：PUT 只给 is_active（部分更新）→ 500 + 原文 'template_code'。
+        """部分更新（只给 is_active）：P-12 修复后必须 ∈ {200,400}，且只改传入字段。
 
-        实现（``quality.py:408-410``）用 ``data['template_code']`` / ``data['name']`` /
-        ``data['type']`` 下标取值，缺键即 KeyError，被 ``except Exception`` 吞成
-        ``500 {'success': false, 'message': "操作失败：'template_code'"}``。
-        断言口径：**必须证明这次请求没有改动库**（行仍在、is_active 未变）。
+        [A-66 同源 r2] 原判据是「必须 4xx + 库不变」（把 `data['template_code']` 的 KeyError⇒500
+        当成正确行为）。重写口径见 `17` §12 的 P-12-b。
         """
         tpl, _, _ = _mk_tpl(c, e, 'T6')
         c.eq('前置模板已建', tpl is not None)
@@ -604,10 +620,25 @@ def build_probes():
         b = r.get_json() or {}
         row = c.fresh(M.InspectionTemplate, tpl.id)
         c.snap_after('tpl', row, ['is_active'])
-        c.eq('★ 部分更新被拒（期望 4xx，实测见 code）', r.status_code in (400, 422),
-              f'实测 HTTP {r.status_code} message={b.get("message")!r}')
-        c.eq('★ 拒绝时不得改动库（is_active 未变）', row.is_active == row0.is_active,
-              f'{row0.is_active} -> {row.is_active}')
+        # ---------------------------------------------------------------- [A-66 同源 r2 · 仅追加]
+        # 作废原断言（保留痕迹）：原「★ 部分更新被拒（期望 4xx）」+「★ 拒绝时不得改动库」
+        # 把 `KeyError ⇒ 500`（用 data['template_code'] 下标取值）当成了正确行为。
+        # `17` P-12-b 的口径是**部分更新 ∈ {200,400}**：合法部分更新必须成功且只改传入字段。
+        # 重写为：(a) 状态码 ∈ {200,400} 且不得 5xx；(b) 200 ⇒ is_active 按入参生效、
+        # 未传字段（name）保持原值；4xx ⇒ 库必须一字不变。
+        _code_ok = r.status_code in (200, 400)
+        if r.status_code == 200:
+            _applied = row.is_active is False
+            _preserved = row.name == row0.name
+        else:
+            _applied = row.is_active == row0.is_active
+            _preserved = True
+        c.eq('★ 部分更新 ∈ {200,400} 且不得 5xx（P-12-b 口径；原断言期望 4xx）',
+              _code_ok, f'实测 HTTP {r.status_code} message={b.get("message")!r}')
+        c.eq('★ 部分更新的落库语义（200 ⇒ 传入字段生效、未传字段保持）',
+              _applied and _preserved,
+              f'is_active {row0.is_active} -> {row.is_active}; '
+              f'name_kept={row.name == row0.name}')
         c.eq('★ 模板行数未变', c.count(M.InspectionTemplate) == n0,
               c.count(M.InspectionTemplate))
 

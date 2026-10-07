@@ -66,39 +66,62 @@ def _post_text(client, headers=None):
     return resp.status_code, (resp.get_data(as_text=True) or '')
 
 
+def _msg(body):
+    """从 JSON 正文里取 message（响应正文是 \\uXXXX 转义，直接子串匹配会漏）。"""
+    try:
+        return (json.loads(body) or {}).get('message')
+    except Exception:
+        return None
+
+
 def section_csrf(env):
-    from flask_wtf.csrf import generate_csrf
+    import re as _re
     app = env['app']
     client = env['client']
     out = {}
     orig = bool(app.config.get('WTF_CSRF_ENABLED'))
+
+    def _mint_token():
+        """用**同一个 client 会话**渲染 base.html 的 `<meta name="csrf-token">`（base.html:7）。"""
+        page = client.get('/')
+        html = page.get_data(as_text=True) or ''
+        m = _re.search(r'name="csrf-token"\s+content="([^"]+)"', html)
+        return (m.group(1) if m else None), page.status_code, len(html)
+
+    token, page_code, page_bytes = _mint_token()
     app.config['WTF_CSRF_ENABLED'] = True
     try:
         code_a, body_a = _post_text(client)
-        with app.test_request_context('/'):
-            token = generate_csrf()
-        code_b, body_b = _post_text(client, headers={'X-CSRFToken': token})
+        code_b, body_b = _post_text(client, headers={'X-CSRFToken': token or ''})
         app.config['WTF_CSRF_ENABLED'] = False
         code_c, body_c = _post_text(client)
     finally:
         app.config['WTF_CSRF_ENABLED'] = orig
-    out.update({'token_minted': bool(token), 'a_no_token_csrf_on': {'code': code_a,
-                                                                  'body': body_a[:200]},
-                'b_valid_token_csrf_on': {'code': code_b, 'body': body_b[:200]},
-                'c_no_token_csrf_off': {'code': code_c, 'body': body_c[:200]},
+    out.update({'token_from_page': bool(token), 'token_page': {'code': page_code,
+                                                              'bytes': page_bytes},
+                'a_no_token_csrf_on': {'code': code_a, 'body': body_a[:200],
+                                       'message': _msg(body_a)},
+                'b_valid_token_csrf_on': {'code': code_b, 'body': body_b[:200],
+                                          'message': _msg(body_b)},
+                'c_no_token_csrf_off': {'code': code_c, 'body': body_c[:200],
+                                        'message': _msg(body_c)},
                 'csrf_flag_restored': bool(app.config.get('WTF_CSRF_ENABLED')) == orig})
     RAW['csrf'] = out
-    ck('D-1', '无 token + CSRF 开 => 框架级 400（视图未执行）；带 token / 关 CSRF => 视图执行',
-       {'a_has_framework_text': True, 'a_view_not_executed': True,
-        'b_has_view_text': True, 'c_has_view_text': True},
-       {'a_code': code_a, 'a_framework': FRAMEWORK_400_TEXT in body_a,
-        'a_view_marker': VIEW_400_TEXT in body_a,
-        'b_code': code_b, 'b_view': VIEW_400_TEXT in body_b,
-        'c_code': code_c, 'c_view': VIEW_400_TEXT in body_c},
-       code_a == 400 and FRAMEWORK_400_TEXT in body_a and VIEW_400_TEXT not in body_a
-       and VIEW_400_TEXT in body_b and VIEW_400_TEXT in body_c,
-       '响应正文对照（同一端点三方）=> CSRF 拦截仍在，仅「CSRF 标记」被统一 400 文案替换')
-    ck('D-2', 'api_matrix 的 csrf_blocked 判据在本仓库**已失效**（标记被替换）',
+    # (a) 无 token + CSRF 开 ⇒ 框架级 400（视图未执行）;(c) 关 CSRF ⇒ 视图级 400 文案
+    a_ok = code_a == 400 and _msg(body_a) == FRAMEWORK_400_TEXT and VIEW_400_TEXT not in body_a
+    c_ok = VIEW_400_TEXT == _msg(body_c)
+    b_ok = (_msg(body_b) == VIEW_400_TEXT) if token else None
+    ck('D-1', '无 token + CSRF 开 => 框架级 400（视图未执行）；关 CSRF => 视图级 400（视图执行）'
+              ' ⇒ CSRF 拦截仍在，只是标记被统一 400 文案替换',
+       {'a_message': FRAMEWORK_400_TEXT, 'c_message': VIEW_400_TEXT},
+       {'a_code': code_a, 'a_message': _msg(body_a), 'c_code': code_c,
+        'c_message': _msg(body_c)},
+       a_ok and c_ok, '同一端点的 CSRF 开/关对照（production_center.py:400）')
+    ck('D-2', '带合法 token（同一会话的 meta csrf-token）=> 视图必须执行（三方判别闭环）',
+       {'b_message': VIEW_400_TEXT}, {'token_found': bool(token), 'b_code': code_b,
+                                      'b_message': _msg(body_b)},
+       bool(token) and b_ok, 'base.html:7 的 meta csrf-token + X-CSRFToken 头（base.html:576 同法）')
+    ck('D-3', 'api_matrix 的 csrf_blocked 判据在本仓库**已失效**（标记被替换）',
        {'csrf_marker_in_a_body': False},
        {'csrf_marker_in_a_body': ('csrf' in body_a.lower() or '令牌' in body_a
                                   or 'Token' in body_a)},
@@ -220,8 +243,13 @@ def section_ownership(env, ctx):
         client.get('/auth/logout')
         st = login_as(client, username, password)
         resp = getattr(client, method)(url, json=payload)
-        return {'login': st.status_code, 'code': resp.status_code,
-                'body': (resp.get_data(as_text=True) or '')[:220]}
+        raw = (resp.get_data(as_text=True) or '')
+        try:
+            message = (json.loads(raw) or {}).get('message')
+        except Exception:
+            message = None
+        return {'login': st.status_code, 'code': resp.status_code, 'body': raw[:220],
+                'message': message}
 
     b_start = _as('_t9_inspector_B', 'post',
                   '/api/quality/tasks/%d/start-inspection' % task_id, {'template_id': tpl_id})
@@ -236,19 +264,21 @@ def section_ownership(env, ctx):
     RAW['ownership'] = out
 
     ck('F-1', '非归属 inspector 提交 start-inspection => 403 + 原因可读 + 0 个 5xx',
-       {'code': 403, 'reason_has': '自己'}, {'code': b_start['code'],
-                                            'body': b_start['body']},
-       b_start['code'] == 403 and '只能执行分配给自己的质检任务' in b_start['body'], '17 §12.3')
+       {'code': 403, 'message': '只能执行分配给自己的质检任务'},
+       {'code': b_start['code'], 'message': b_start['message']},
+       b_start['code'] == 403 and b_start['message'] == '只能执行分配给自己的质检任务',
+       '17 §12.3')
     ck('F-2', '归属人（阳性对照）同一请求 => **不得 403**（防「一律 403」假修复）',
        {'code_not': 403, 'code_in': [200, 400, 404, 415]},
-       {'code': a_start['code'], 'body': a_start['body']},
+       {'code': a_start['code'], 'message': a_start['message']},
        a_start['code'] != 403, '17 §12.3 阳性对照 / RC-4 / RC-8')
     ck('F-3', '非归属 inspector 提交 records/<id>/submit => 403 + 原因可读',
-       {'code': 403, 'reason_has': '自己'}, {'code': b_submit['code'],
-                                            'body': b_submit['body']},
-       b_submit['code'] == 403 and '只能提交分配给自己的质检记录' in b_submit['body'], '17 §12.3')
+       {'code': 403, 'message': '只能提交分配给自己的质检记录'},
+       {'code': b_submit['code'], 'message': b_submit['message']},
+       b_submit['code'] == 403 and b_submit['message'] == '只能提交分配给自己的质检记录',
+       '17 §12.3')
     ck('F-4', '归属人提交同一质检记录 => **不得 403**',
-       {'code_not': 403}, {'code': a_submit['code'], 'body': a_submit['body']},
+       {'code_not': 403}, {'code': a_submit['code'], 'message': a_submit['message']},
        a_submit['code'] != 403, '17 §12.3 阳性对照')
     for cid, row in (('F-1', b_start), ('F-3', b_submit)):
         ck(cid + '-noleak', '%s 的正文不得泄漏实现细节' % cid,

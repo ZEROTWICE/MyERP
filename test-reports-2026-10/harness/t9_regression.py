@@ -25,6 +25,7 @@ import argparse
 import json
 import os
 import shutil
+import subprocess
 import sys
 import time
 
@@ -81,7 +82,11 @@ def build_tree(dest):
 
 
 # ---------------------------------------------------------------- 步骤定义
-def tree_steps():
+def tree_steps(tree_root=None):
+    """树内步骤表。`tree_root` 决定 `--out` 落点（**必须**与被测树一致，否则会写坏另一棵树的证据）。"""
+    reports = os.path.join(tree_root or TREE, 'test-reports-2026-10') \
+        if tree_root else TREE_REPORTS
+    run_dir = os.path.join(reports, 'evidence', 'harness', RUN_ID)
     shim = 'scripts/_sandbox_compat.py'
     return [
         ('functional_test', [shim, 'scripts/functional_test.py'], False),
@@ -92,14 +97,14 @@ def tree_steps():
         ('check_model_refs', ['scripts/check_model_refs.py'], False),
         ('check_db_bootstrap', ['scripts/check_db_bootstrap.py'], False),
         ('negative_matrix', ['test-reports-2026-10/harness/negative_matrix.py',
-                             '--out', os.path.join(TREE_RUN, 'negative_matrix.json')], False),
+                             '--out', os.path.join(run_dir, 'negative_matrix.json')], False),
         ('write_suite', ['test-reports-2026-10/harness/write_suite.py'], False),
         ('api_matrix', ['test-reports-2026-10/harness/api_matrix.py'], False),
         ('uat_chains', ['test-reports-2026-10/harness/uat_chains.py'], True),
         ('run_gates', ['test-reports-2026-10/harness/run_gates.py', '--self-test',
-                       '--out', os.path.join(TREE_RUN, 'gates.json')], False),
+                       '--out', os.path.join(run_dir, 'gates.json')], False),
         ('measure_coverage', ['test-reports-2026-10/harness/measure_coverage.py',
-                              '--out', os.path.join(TREE_RUN, 'coverage.json'),
+                              '--out', os.path.join(run_dir, 'coverage.json'),
                               '--copy-tag', 't9'], False),
     ]
 
@@ -149,7 +154,7 @@ def run_step(label, args, cwd, with_uat_id):
 def stage_suites(only):
     build_tree(TREE)
     rows = []
-    for label, args, with_uat_id in tree_steps():
+    for label, args, with_uat_id in tree_steps(TREE):
         if only and label not in only:
             continue
         print('[t9] === tree step %s ===' % label, flush=True)
@@ -179,6 +184,47 @@ def stage_probes(only):
     return 0
 
 
+def stage_before(only):
+    """在**修复前的树副本**里复跑重写后的判据（可证伪性证据）。
+
+    重写后的断言必须**对修复敏感**：在修复前树上必须报红，否则新判据本身就是恒真
+    （"让基线变绿"而非"断言正确语义"）。
+
+    ⚠ 为什么不用 `w2w3_uatdiff.build_tree(revert_t7=True)`：该工具的回退基准是 `git show HEAD:`，
+    而阶段A的修复**已被 captain 提交**（`fd51023` / `3113f90`）⇒ `HEAD` 现在**已含** t7 的改动，
+    该回退**不再生效**（实测：回退树里 `mes_service.py` 仍含 `piecework_amount`/
+    `rework_counts_piecework`）。⇒ 本函数改为按**提交 `2c6dbfd`（阶段A修复前最后提交）**
+    覆盖 5 个生产文件，重建「修复前」的这 5 个面（其余文件保持 HEAD，故本树只用于
+    **这 5 个文件修复面**的可证伪性判定，不作历史树使用）。
+    """
+    base_rev = os.environ.get('T9_BASE_REV', '2c6dbfd')
+    tree_before = os.path.join(tmp_dir('tree'), 'before-prefix-' + base_rev)
+    build_tree(tree_before)
+    overlaid = []
+    for rel in ('app/services/mes_service.py', 'app/main/routes.py', 'app/models.py',
+                'app/main/stock.py', 'app/main/quality.py'):
+        dest = os.path.join(tree_before, rel.replace('/', os.sep))
+        with open(dest, 'wb') as fh:
+            proc = subprocess.run(['git', 'show', '%s:%s' % (base_rev, rel)], cwd=REPO_ROOT,
+                                  stdout=fh, stderr=subprocess.DEVNULL)
+        overlaid.append({'file': rel, 'git_show_exit': proc.returncode})
+    print('[t9] before-tree = HEAD + %s 覆盖 %d 个文件' % (base_rev, len(overlaid)), flush=True)
+    rows = []
+    for label, args, with_uat_id in tree_steps(tree_before):
+        if label not in (only or {'uat_chains', 'negative_matrix', 'write_suite'}):
+            continue
+        print('[t9] === before-prefix step %s ===' % label, flush=True)
+        row = run_step(label, args, tree_before, with_uat_id)
+        print('[t9] %s exit=%s (%.1fs)' % (label, row['exit_code'], row['duration_s']), flush=True)
+        rows.append(row)
+    out = {'stage': 'before-prefix', 'run_id': RUN_ID, 'tree': tree_before, 'base_rev': base_rev,
+           'overlaid': overlaid, 'started': time.strftime('%Y-%m-%d %H:%M:%S'), 'steps': rows}
+    path = save_evidence('t9-beforeprefix-steps.json',
+                         json.dumps(out, ensure_ascii=False, indent=1))
+    print('[t9] before-prefix evidence -> %s' % os.path.relpath(path, REPO_ROOT).replace('\\', '/'))
+    return 0
+
+
 def main(argv=None):
     try:
         sys.stdout.reconfigure(encoding='utf-8', errors='replace')
@@ -186,7 +232,7 @@ def main(argv=None):
     except (AttributeError, ValueError, OSError):
         pass
     ap = argparse.ArgumentParser(description='t9 regression orchestrator')
-    ap.add_argument('--stage', required=True, choices=('suites', 'probes', 'tree', 'ledger'))
+    ap.add_argument('--stage', required=True, choices=('suites', 'probes', 'tree', 'ledger', 'before-prefix'))
     ap.add_argument('--only', default='', help='逗号分隔的步骤 label 过滤')
     args = ap.parse_args(argv)
     only = {x.strip() for x in args.only.split(',') if x.strip()}
@@ -204,6 +250,8 @@ def main(argv=None):
         build_tree(TREE)
         print('[t9] tree built at %s' % TREE)
         rc = 0
+    elif args.stage == 'before-prefix':
+        rc = stage_before(only)
     else:
         import t9_ledger
         rc = t9_ledger.main([])
