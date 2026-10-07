@@ -1,4 +1,4 @@
-"""w2w3_uatdiff.py — 用**树副本**做 `uat_chains` 40 条链的「修复前 / 修复后」逐条 diff。
+﻿"""w2w3_uatdiff.py — 用**树副本**做 `uat_chains` 40 条链的「修复前 / 修复后」逐条 diff。
 
 ## 为什么用树副本（关键工程约束）
 `uat_chains.py` **直接写** `<repo>/test-reports-2026-10/evidence/uat/uat_chains.json`（未经
@@ -95,33 +95,47 @@
 `uat_chains.before.json / .after.json` **逐字节必然不同**。故「双跑一致」一律按
 **【红集 / 实质读数 / 判据集合】逐条比对**判定，**不得**用文件 SHA256 判「双跑不一致」。
 
-## ⚠ 已登记的残余局限（V-18 / F1b；**如实登记，不得伪装通过**）
+## ⚠ UD-0/UD-1b/UD-3/UD-4 已按 A-70 标 **superseded** + 替代判据集 `RE-*` 生效（V-20 / 触发项 V18-F1b）
 
-本脚本在 V-18 完成基线来源分离后，**仍有 4 条判据为红且结构性不可满足**：
-`UD-0`（`before_reds == frozen_reds`）、`UD-1b`（`still_red == SPEC_DEFECTS`）、
-`UD-3`（`green_to_red == KNOWN_FLIPS`）、`UD-4`（`len(v_after) == len(frozen_v) == 40`）。
-**退出码仍为 1** —— 这些红**不**被豁免、**不**自动通过（代码里没有任何「已知红 ⇒ 放行」的分支）。
+### 1) 旧行为 → 新状态（A-70 三步登记，触发项 ID = **V-12/C-04 语料扩链 + 阶段A A-66/A-68 断言重写**）
 
-**根因 = 两条「已授权」的资产演进晚于冻结基线**（与 V-15 的钉修、与 V-18 的基线来源分离
-**均无关**）：
+| 项 | 内容 |
+| --- | --- |
+| **旧行为** | `UD-0`/`UD-1b`/`UD-3`/`UD-4` 拿 **t5 时代 40 链** 的冻结基线判 `before/after` 两棵树；V-12 扩链后变为**结构性不可满足**（`before` 11 条红里 5 条在基线里根本不存在；`after` 84 链 ≠ 40）；且 `SPEC_DEFECTS`(P0-1.6/P0-3.1) 与 `KNOWN_FLIPS`(P0-2.1/P0-2.5/P0-3.3) 那 5 条已被阶段A 的 A-66/A-68 **授权重写并转绿** ⇒ `UD-1b`/`UD-3` 的旧前提消失。 |
+| **新状态** | 四条标 `state=superseded`：**旧读数与旧判定原样保留**（`ok` 仍是当时的观测值，绝不改写为 `passed`、绝不删除），但**不计入 pass、也不计入 fail**，因此**不再决定退出码**。 |
+| **替代判据集** | 新立 `RE-1`/`RE-2`/`RE-3`（见 §3），在**当前语料 + 钉死修复前提交**下重新具备真实判定能力，且**可被阴性对照证伪**。 |
+| **复算命令** | `python -c "import json;d=json.load(open(r'test-reports-2026-10/evidence/harness/r2-exec-b4-v20-run1/w2w3-uatdiff-result.json',encoding='utf-8'));print([(c['id'][:6],c['state'],c['ok']) for c in d['checks']])"` —— 应看到四条 `('UD-0'…, 'superseded', False)` 与 `RE-*` 为 `('active', True)`。 |
+| **回退步骤** | `git checkout -- test-reports-2026-10/harness/w2w3_uatdiff.py` ⇒ 回到「四条计入 fail」的 V-18 行为（V18-F1b 复现、exit 1）。**回退后不得把红当成产品回归。** |
 
-| # | 演进 | 授权 | 对本脚本的影响 |
-| --- | --- | --- | --- |
-| ① | t9 重写 **15 处冻结断言**（含 uat 的 `P0-1.6`/`P0-3.1` 与 `P0-2.1`/`P0-2.5`/`P0-3.3`） | **A-66 / A-68** | 这 5 条在当前语料下**全部 `passed`** ⇒ `still_red` 变空、`green_to_red` 变空 ⇒ `UD-1b`/`UD-3` 的旧前提（「仍红」/「预期变红」）已不存在。**属进展，不是回归。** |
-| ② | V-12（t13/A-105）把语料由 **40 链扩到 84 链**（纯追加，既有 40 条期望值逐字节不变） | A-105 | 本次比较运行的是**当前语料**（after 84 / before 76），而基线记录的是 **40 链** ⇒ `UD-0` 的集合相等与 `UD-4` 的 `== 40` 不可满足（before 的 11 条红里有 **5 条在基线里根本不存在**：`APPEND.1`/`B7`/`FLIP.SUM`/`P0-3.ERR`/`V12-链B-ERR`）。 |
+### 2) 退出码语义（**明写**，与 superseded 语义一致）
 
-**读法纪律（下游必须遵守）**：
-1. **不得**把 `UD-0/UD-1b/UD-3/UD-4` 当作绿；
-2. **不得**把其红点归因到 V-15（`UD-PIN` 钉修）或 V-18（`UD-BASE` 基线分离）的资产修正；
-3. 那两条修正的效果**可单独验证**：`UD-PIN`、`UD-BASE` 以及 `UD-1a`（本次由红转绿）均 PASS。
+> **exit 0** ⇔ `state=active` 的判据**全部**通过（六条原判据 `UD-BASE/UD-PIN/UD-1a/UD-1c/UD-2/UD-5`
+> + 替代判据 `RE-1/RE-2/RE-3`）；**exit 1** ⇔ 任一 `state=active` 判据失败。
+> `state=superseded` 的四条**既不参与 pass 计数也不参与 fail 计数**（旧观测值仍逐条落盘）。
+> 代码中**没有**任何「已知红 ⇒ 放行」分支 —— superseded 是**按 A-70 显式登记**的状态迁移，
+> 不是红点豁免。
 
-**后续归属**：由 captain 另立任务处理（截至本次检查，`t20` 已用于 V-19/write_suite 白名单面，
-语料/UD-* 重定的后续任务 id 以 captain 指派为准）。候选方案：把**语料**也钉到同一不可变时代
-（A-70 式钉显式提交）；**不得**按新语料重写期望值（那会使判据不可证伪，A-106/A-107 同族）。
+### 3) 替代判据集（当前时代有效且可证伪）
 
-**运行期如实标注**：当且仅当失败集恰为上述 4 条时，脚本会额外打印
-`[residual]` 一行并在证据里写 `residual_registered`（含实测根因读数），**仅作标注**——
-不改变任何判据的 `ok`、不改变退出码。
+| id | 判据 | 证伪方式（阴性对照） |
+| --- | --- | --- |
+| `RE-1` | **固定树（当前工作树副本）在当前语料下全绿**：`after_reds == []` 且链数 > 0（读出现场复算） | 产品回归 ⇒ after 树出现红即如实转红；同机器对**修复前树**报出 11 条红 = 「红检测真实」的敏感性证据 |
+| `RE-2` | **修复前树（钉显式提交号 `2c6dbfd6…`，绝不 HEAD）在当前语料下产生具名非空红集 `R_now`**，且 `R_now ⊇ {P0-1.7, P0-1.8, P0-4.2, P0-4.4}`（t7 可修的 4 条） | `--pre-fix-rev HEAD` ⇒ 回退失效、`R_now=[]` ⇒ **RE-2 如实转红** |
+| `RE-3` | **`R_now` 与替代基线逐条一致**：替代基线现场复算 `bytes+SHA256` 必须 == 声明钉值，且其记录的 `R_now`/`pre_fix_rev` 与本次实测**逐条相同**（替代基线 = 本任务新建的冻结快照，**不读 live 路径**） | `--baseline <篡改 +1 字节>` 或 `--alt-baseline <篡改>` ⇒ 钉值不符 ⇒ **RE-3 如实转红** |
+
+替代基线快照路径（**新建，非 live 锚点、非预冻结归档**）：
+`test-reports-2026-10/evidence/harness/w2w3-alt-baseline-v20/w2w3-alt-baseline.json`
+（由 `--write-alt-baseline` 引导一次，经 `_env.save_evidence` 落盘；内容**确定性**：无 run_id/时间戳，
+故 bytes+SHA256 跨 run 稳定。缺失 ⇒ `RE-3` 直接报红，**绝不回落** live 路径。）
+
+### 4) 读法纪律（V-18 三条，**保留**）
+
+1. **不得**把 `UD-0/UD-1b/UD-3/UD-4` 当作绿（它们现在是 `superseded`，其旧判定仍是 `ok=False`）；
+2. **不得**把其红点归因到 V-15（`UD-PIN` 钉修）或 V-18（`UD-BASE` 基线分离）的资产修正 —— 那两项的效果由 `UD-PIN`/`UD-BASE`/`UD-1a` PASS 单独证明；
+3. **后续归属已立项** = 本任务 **V-20 / t21**（方案 (c) 强化版）。明确否决 (a) 把语料钉回 t5 时代、(b) 按新语料重写期望值（A-106/A-107 同族，不得再提）。
+
+**运行期标注**：脚本打印每条判据的 `state`（`PASS`/`FAIL`/`SUPERSEDED`），并在证据里写
+`superseded_registered`（四条旧读数 + 结构性不可满足的实测根因）与 `re_criteria`（替代判据读数）。
 """
 import argparse
 import hashlib
@@ -168,11 +182,26 @@ FIX_COMMIT_REV = 'fd5102360b3777d8ec2a0fb2610b2abbc2119df6'
 PRE_FIX_REV_ENV = 'WMS_PREFIX_REV'
 #: 回退源文件（t7 前与钉死的修复前提交逐字节相同 ⇒ 可整文件回退）
 REVERT_SOURCE_FILE = 'app/services/mes_service.py'
+#: `--pre-fix-rev` 的运行时覆盖（CLI > env > 常量；见 `pre_fix_rev()`）
+PRE_FIX_REV_OVERRIDE = {}
 
-#: ── 已登记的残余局限（V-18/F1b）：「结构性不可满足」的判据集合 ───────────────────────────
-#: 仅用于**如实标注**（见模块 docstring 与 `residual_registered`）；**不参与判据、不改退出码**。
-#: 根因 = A-66/A-68 授权 t9 重写 15 处冻结断言 + V-12/A-105 授权语料 40→84 链（纯追加）。
-KNOWN_RESIDUAL = ('UD-0', 'UD-1b', 'UD-3', 'UD-4')
+#: ── 已 superseded 的判据（V-20/A-70；**不参与判定**，仅保留旧读数）────────────────────────
+#: 根因 = V-12/C-04 语料扩链（40→84）+ 阶段A A-66/A-68 断言重写。详见模块 docstring §1/§2。
+SUPERSEDED_IDS = ('UD-0', 'UD-1b', 'UD-3', 'UD-4')
+KNOWN_RESIDUAL = SUPERSEDED_IDS          # 兼容 V-18 时代的名字
+
+#: ── 替代判据集 RE-*（V-20）：替代基线 = 本任务新建的**冻结快照**（非 live、非预冻结归档）──
+#: 内容确定性（无 run_id/时间戳）⇒ bytes+SHA256 跨 run 稳定；由 `--write-alt-baseline` 引导写入。
+ALT_BASELINE_NAME = 'w2w3-alt-baseline.json'
+ALT_BASELINE_RUN_ID = 'w2w3-alt-baseline-v20'
+ALT_BASELINE_PATH = os.path.join(REPORTS_ROOT, 'evidence', 'harness', ALT_BASELINE_RUN_ID,
+                                 ALT_BASELINE_NAME)
+#: 钉值（现场复算比对；缺失/不符 ⇒ RE-3 报红，绝不回落）。
+ALT_BASELINE_BYTES = 731
+ALT_BASELINE_SHA256 = 'F852D9133F346C037E2E5B4505900F43CAB9D2B27CDD5746DF6767C8A67CC8D2'
+#: RE-2 的具名红集必须包含这 4 条 t7 可修链（仅在钉死修复前提交时成立；= UD-1a 的 4 条）
+RE2_REQUIRED_REDS = ('P0-1.7', 'P0-1.8', 'P0-4.2', 'P0-4.4')
+ALT_BASELINE_ENV = 'WMS_ALT_BASELINE'
 
 KNOWN_FLIPS = {
     'P0-2.5': 'pending 无在办单据 ⇒ 改判为放行（DEC-1 §1.6 P1 / §1.4 序 3 / A-45）',
@@ -342,10 +371,12 @@ def write(path, text):
 
 
 def pre_fix_rev():
-    """「修复前树」要用的**显式提交号**（A-70）。默认 `PRE_FIX_REV`，可被 `WMS_PREFIX_REV` 覆盖。"""
-    rev = (os.environ.get(PRE_FIX_REV_ENV) or '').strip() or PRE_FIX_REV
-    return {'rev': rev,
-            'source': 'env:%s' % PRE_FIX_REV_ENV if os.environ.get(PRE_FIX_REV_ENV) else 'const'}
+    """「修复前树」要用的**显式提交号**（A-70）。`--pre-fix-rev` > `WMS_PREFIX_REV` > 常量。"""
+    rev = (PRE_FIX_REV_OVERRIDE.get('rev') or os.environ.get(PRE_FIX_REV_ENV)
+           or '').strip() or PRE_FIX_REV
+    src = ('cli:--pre-fix-rev' if PRE_FIX_REV_OVERRIDE.get('rev')
+           else ('env:%s' % PRE_FIX_REV_ENV if os.environ.get(PRE_FIX_REV_ENV) else 'const'))
+    return {'rev': rev, 'source': src}
 
 
 def git_rev_parse(spec):
@@ -462,9 +493,23 @@ def main(argv=None):
     parser.add_argument('--baseline', default=None,
                         help='基线来源路径（默认 = 不可变归档副本 %s）。'
                              '显式指定时进入**诊断模式**：前置 UD-BASE 会如实报红但仍继续评估，'
-                             '用于阴性对照（如喂 live 文件或篡改副本）。'
+                             '用于阴性对照（如喂 live 文件或篡改副本；此时也作为 RE-3 的替代基线来源）。'
                              % os.path.relpath(FROZEN_UAT_ARCHIVE, REPO_ROOT).replace('\\', '/'))
+    parser.add_argument('--pre-fix-rev', default=None,
+                        help='「修复前树」的钉号（默认 = 常量 %s，绝不 HEAD）。'
+                             '阴性对照用 `--pre-fix-rev HEAD` 可令回退失效 ⇒ RE-2/RE-3 如实转红。'
+                             % PRE_FIX_REV[:12])
+    parser.add_argument('--alt-baseline', default=None,
+                        help='RE-3 替代基线（默认 = 新建冻结快照 %s；也可用环境变量 %s）。'
+                             '显式指定 `--baseline` 时以 `--baseline` 为准。'
+                             % (os.path.relpath(ALT_BASELINE_PATH, REPO_ROOT).replace('\\', '/'),
+                                ALT_BASELINE_ENV))
+    parser.add_argument('--write-alt-baseline', action='store_true',
+                        help='引导模式：把本次实测的 R_now + 上下文写成**确定性**冻结快照'
+                             '（经 _env.save_evidence 落到 w2w3-alt-baseline-v20/），并打印其'
+                             ' bytes+SHA256 供回填钉值。正常判定运行**不会**写该快照。')
     args = parser.parse_args(argv)
+    PRE_FIX_REV_OVERRIDE['rev'] = args.pre_fix_rev
 
     baseline_path = os.path.abspath(args.baseline) if args.baseline else FROZEN_UAT_ARCHIVE
     baseline_ok, baseline_info = baseline_guard(baseline_path, explicit=bool(args.baseline))
@@ -654,6 +699,86 @@ def main(argv=None):
         and not substantive['switch_read_sites']['before']
         and len(substantive['switch_read_sites']['after'] or []) == 1
     )
+    #: ── 替代判据集 RE-1/RE-2/RE-3（V-20）─────────────────────────────────────────────
+    aft_total, bef_total = len(v_after), len(v_before)
+    r_now = sorted(before_reds)
+    #: RE-1：固定树（当前工作树副本）在当前语料下**全绿**
+    re1_ok = (not after_reds) and aft_total > 0
+    #: RE-2：修复前树（钉显式提交号，绝不 HEAD）在当前语料下产生**具名非空红集 R_now**
+    re2_ok = (bool(r_now) and bool(pin_info.get('pin_distinct_vs_head'))
+              and set(RE2_REQUIRED_REDS).issubset(set(r_now)))
+
+    #: RE-3：替代基线现场复算 bytes+SHA256 == 钉值，且其记录的 R_now / pre_fix_rev 与实测逐条相同
+    alt_path = os.path.abspath(args.alt_baseline or os.environ.get(ALT_BASELINE_ENV)
+                              or args.baseline or ALT_BASELINE_PATH)
+    alt_info = {'path': os.path.relpath(alt_path, REPO_ROOT).replace('\\', '/'),
+                'explicit': bool(args.alt_baseline or args.baseline or
+                                 os.environ.get(ALT_BASELINE_ENV)),
+                'expected_bytes': ALT_BASELINE_BYTES, 'expected_sha256': ALT_BASELINE_SHA256,
+                'bytes': None, 'sha256': None, 'status': None, 'recorded_R_now': None,
+                'recorded_pre_fix_rev': None, 'diff': None}
+    alt_payload = None
+    if not os.path.exists(alt_path):
+        alt_info['status'] = 'missing'
+    else:
+        _b = open(alt_path, 'rb').read()
+        alt_info['bytes'] = len(_b)
+        alt_info['sha256'] = hashlib.sha256(_b).hexdigest().upper()
+        try:
+            alt_payload = json.loads(_b.decode('utf-8'))
+        except Exception as e:                                   # noqa: BLE001
+            alt_info['status'] = 'unparsable: %s' % e
+        if alt_payload is not None:
+            alt_info['recorded_R_now'] = alt_payload.get('R_now')
+            alt_info['recorded_pre_fix_rev'] = alt_payload.get('pre_fix_rev')
+            alt_info['status'] = 'ok' if (alt_info['bytes'] == ALT_BASELINE_BYTES
+                                         and alt_info['sha256'] == ALT_BASELINE_SHA256) else \
+                'pin-mismatch'
+    pin_alt_ok = (alt_info['status'] == 'ok')
+    set_ok = bool(alt_payload) and alt_info['recorded_R_now'] == r_now
+    rev_ok = bool(alt_payload) and alt_info['recorded_pre_fix_rev'] == pre_fix_rev()['rev']
+    re3_ok = pin_alt_ok and set_ok and rev_ok
+    alt_info.update({'pin_ok': pin_alt_ok, 'set_ok': set_ok, 'rev_ok': rev_ok})
+    if alt_payload is not None and not set_ok:
+        alt_info['diff'] = {'only_in_recorded': sorted(set(alt_info['recorded_R_now'] or [])
+                                                       - set(r_now)),
+                            'only_in_observed': sorted(set(r_now)
+                                                       - set(alt_info['recorded_R_now'] or []))}
+    re_checks = [
+        ('RE-1 固定树（当前工作树副本）在当前语料下全绿（after_reds 空且链数 >0）',
+         re1_ok, 'after_total=%d after_reds=%s' % (aft_total, sorted(after_reds))),
+        ('RE-2 修复前树（钉显式提交号 %s，绝不 HEAD）在当前语料下产生具名非空红集 R_now，'
+         '且含 %s' % (pre_fix_rev()['rev'][:12], list(RE2_REQUIRED_REDS)),
+         re2_ok, 'pre_fix_rev=%s rev_source=%s pin_distinct_vs_head=%s before_total=%d R_now=%s'
+                 % (pre_fix_rev()['rev'][:12], pre_fix_rev()['source'],
+                    pin_info.get('pin_distinct_vs_head'), bef_total, r_now)),
+        ('RE-3 R_now 与替代基线逐条一致（替代基线现场复算 bytes+SHA256 == 钉值；不读 live）',
+         re3_ok, 'alt=%s status=%s bytes=%s sha256=%s expected=%d/%s set_ok=%s rev_ok=%s '
+                 'diff=%s' % (alt_info['path'], alt_info['status'], alt_info['bytes'],
+                              (alt_info['sha256'] or '?')[:16], ALT_BASELINE_BYTES,
+                              ALT_BASELINE_SHA256[:16], set_ok, rev_ok, alt_info['diff'])),
+    ]
+    #: 引导模式：把本次 R_now + 上下文写成**确定性**冻结快照（正常判定运行不写）
+    boot = None
+    if args.write_alt_baseline:
+        snap = {'asset': 'w2w3_uatdiff alternative baseline (V-20 / RE-3)',
+                'pre_fix_rev': pre_fix_rev()['rev'],
+                'superseded_ids': list(SUPERSEDED_IDS),
+                'cause': 'V-12/C-04 语料扩链（40→84）+ 阶段A A-66/A-68 断言重写',
+                'corpus': {'archive_baseline_total': len(frozen_v), 'before_total': bef_total,
+                           'after_total': aft_total},
+                'R_now': r_now,
+                'R_now_not_in_archive_baseline': sorted(set(r_now) - set(frozen_v)),
+                'note': 'RE-3 的替代基线；内容确定性（无 run_id/时间戳）⇒ bytes+SHA256 跨 run 稳定'}
+        text = json.dumps(snap, ensure_ascii=False, indent=1, sort_keys=True) + '\n'
+        saved_snap = save_evidence(ALT_BASELINE_NAME, text, run_id=ALT_BASELINE_RUN_ID)
+        boot = {'path': os.path.relpath(saved_snap, REPO_ROOT).replace('\\', '/'),
+                'bytes': len(text.encode('utf-8')),
+                'sha256': hashlib.sha256(text.encode('utf-8')).hexdigest().upper()}
+        print('  [alt-baseline] 已写冻结快照 %s' % boot['path'])
+        print('  [alt-baseline] ALT_BASELINE_BYTES = %d' % boot['bytes'])
+        print('  [alt-baseline] ALT_BASELINE_SHA256 = %s' % boot['sha256'])
+
     checks = [
         ('UD-0 冻结基线与 before 树红链集合一致（回退干净）', before_reds == frozen_reds,
          'frozen=%s before=%s' % (sorted(frozen_reds), sorted(before_reds))),
@@ -674,44 +799,87 @@ def main(argv=None):
          t7_gone_before and keep_ok_before, 't7_gone=%s keep_ok=%s' % (t7_gone_before, keep_ok_before)),
         pin_check,
         base_check,
-    ]
-    for cid, ok, ev in checks:
-        print('  [%s] %s -- %s' % ('PASS' if ok else 'FAIL', cid, ev))
-    result['checks'] = [{'id': cid, 'ok': bool(ok), 'evidence': ev} for cid, ok, ev in checks]
-    failed = [cid for cid, ok, _ in checks if not ok]
-    result['verdict'] = 'PASS' if not failed else 'FAIL'
+    ] + re_checks
 
-    #: ── 已登记的残余局限标注（V-18/F1b）──────────────────────────────────────────────
-    #: **仅作如实标注**：不改变任何判据的 ok、不改变退出码（下方仍 return 1）。当且仅当失败集
-    #: 恰为 KNOWN_RESIDUAL 时打印一行，并把实测根因读数写进证据，防止下游把红点误读成回归。
-    residual_hit = sorted(cid.split()[0] for cid in failed)
-    residual_expected = (set(residual_hit) == set(KNOWN_RESIDUAL))
-    aft_chains = len(v_after)
-    base_chains = len(frozen_v)
-    stale_chain_status = {k: v_after.get(k) for k in ('P0-1.6', 'P0-3.1', 'P0-2.1', 'P0-2.5',
-                                                      'P0-3.3')}
-    result['residual_registered'] = {
-        'expected_residual_set': list(KNOWN_RESIDUAL),
-        'observed_failed': residual_hit,
-        'matches': residual_expected,
-        'cause': '链语料漂移（同族更深缺陷）：A-66/A-68 授权 t9 重写 15 处冻结断言 + '
-                 'V-12/A-105 授权语料 40→84 链（纯追加）⇒ 本基线下这 4 条结构性不可满足',
-        'readings': {'baseline_chains': base_chains, 'after_chains': aft_chains,
-                     'before_reds_not_in_baseline':
-                         sorted(set(before_reds) - set(frozen_v)),
-                     'stale_expectation_chains_status_in_after': stale_chain_status},
+    _emit_checks(checks, result, run_before, run_after)
+    _record_superseded_and_re(checks, result, run_before, run_after,
+                              {'frozen_v': frozen_v, 'v_after': v_after, 'v_before': v_before,
+                               'before_reds': before_reds})
+    if boot:
+        result['alt_baseline_bootstrap'] = boot
+    return _finalize(result, run_before, run_after)
+
+
+def _state_of(cid):
+    """判据状态：`superseded`（V-20/A-70，不参与判定）或 `active`（参与判定）。"""
+    return 'superseded' if cid.split()[0] in SUPERSEDED_IDS else 'active'
+
+
+def _emit_checks(checks, result, run_before, run_after):
+    """打印 + 落盘判据（区分 PASS/FAIL/SUPERSEDED），返回 (failed_active, superseded_ids)。"""
+    for cid, ok, ev in checks:
+        state = _state_of(cid)
+        tag = 'SUPERSEDED' if state == 'superseded' else ('PASS' if ok else 'FAIL')
+        print('  [%s] %s -- %s' % (tag, cid, ev))
+    superseded_ids = [cid for cid, _ok, _ev in checks if _state_of(cid) == 'superseded']
+    failed = [cid for cid, ok, _ev in checks if not ok and _state_of(cid) == 'active']
+    result['checks'] = [{'id': cid, 'state': _state_of(cid), 'ok': bool(ok),
+                         'observed_ok': bool(ok), 'evidence': ev}
+                        for cid, ok, ev in checks]
+    result['superseded_ids'] = superseded_ids
+    result['exit_code_semantics'] = (
+        'exit 0 ⇔ state=active 的判据全部通过（六条原判据 + RE-1/RE-2/RE-3）；'
+        'exit 1 ⇔ 任一 active 判据失败。state=superseded 的四条（%s）既不计 pass 也不计 fail，'
+        '其旧观测值仍逐条落盘（ok 保持当时的 False，绝不改写为 passed）。'
+        '代码内无「已知红 ⇒ 放行」分支。' % list(SUPERSEDED_IDS))
+    result['verdict'] = 'PASS' if not failed else 'FAIL'
+    return failed, superseded_ids
+
+
+def _build_main(checks, result, run_before, run_after):
+    return _emit_checks(checks, result, run_before, run_after)
+
+
+def _record_superseded_and_re(checks, result, run_before, run_after, ctx):
+    """落盘：superseded 四条的**旧读数**（保留）+ 结构性不可满足的实测根因 + RE-* 读数 + 退出码。
+
+    注意：这里**只记录**，不参与 `_emit_checks` 的判定计算 —— superseded 的状态迁移发生在
+    `_state_of()`（按 A-70 登记），不是「看到红就放行」。
+    """
+    obs = {cid.split()[0]: bool(ok) for cid, ok, _ev in checks}
+    superseded_old = {cid: obs.get(cid) for cid in SUPERSEDED_IDS}
+    failed_active = [cid for cid, ok, _ev in checks
+                     if not ok and _state_of(cid) == 'active']
+    aft_chains, base_chains = len(run_after['data'] and verdicts(run_after['data']) or {}), \
+        len(ctx['frozen_v'])
+    stale = {k: ctx['v_after'].get(k) for k in ('P0-1.6', 'P0-3.1', 'P0-2.1', 'P0-2.5', 'P0-3.3')}
+    result['superseded_registered'] = {
+        'superseded_ids': list(SUPERSEDED_IDS),
+        'old_verdicts_preserved': superseded_old,
+        'old_verdicts_note': '旧判定原样保留（未删除、未改写为 passed）；它们不参与判定',
+        'cause': 'V-12/C-04 语料扩链（40→84）+ 阶段A A-66/A-68 断言重写',
+        'readings': {'archive_baseline_chains': base_chains, 'after_chains': aft_chains,
+                     'before_chains': len(ctx['v_before']),
+                     'before_reds_not_in_baseline': sorted(set(ctx['before_reds'])
+                                                           - set(ctx['frozen_v'])),
+                     'stale_expectation_chains_status_in_after': stale},
         'reading_discipline': ['不得把 UD-0/UD-1b/UD-3/UD-4 当作绿',
                                '不得把其红点归因到 V-15（UD-PIN）或 V-18（UD-BASE）的资产修正',
                                'UD-PIN / UD-BASE / UD-1a PASS 可单独证明上述两项修正已生效'],
-        'follow_up': 'captain 另立任务（方案：4 条按 A-70 标 superseded + 新立可证伪的替代判据集；'
-                     '明确否决「按新语料重写期望值」与「把语料钉回 t5 时代」）',
+        'superseded_by_task': 'V-20 / t21（方案 (c) 强化版；替代判据集 RE-1/RE-2/RE-3 已生效）',
+        'rollback': 'git checkout -- test-reports-2026-10/harness/w2w3_uatdiff.py'
+                    '（回退后四条重新计入 fail ⇒ V18-F1b 复现、exit 1）',
     }
-    print('  [residual] 已登记的残余局限：observed_failed=%s matches_expected_set=%s '
-          '(baseline_chains=%d / after_chains=%d)' % (residual_hit, residual_expected,
-                                                      base_chains, aft_chains))
-    print('  [residual] 根因 = 链语料漂移（A-66/A-68 断言重写 + V-12/A-105 扩链）⇒ 退出码仍为 1；'
-          '**不得当绿、不得归因 V-15/V-18**，后续归属 = captain 另立任务')
+    result['re_criteria'] = {c['id'].split()[0]: {'ok': c['ok'], 'evidence': c['evidence']}
+                             for c in result['checks'] if c['id'].startswith('RE-')}
+    result['active_failed'] = failed_active
+    print('  [superseded] %s ⇒ 不计 pass 亦不计 fail（旧判定保留：%s）'
+          % (list(SUPERSEDED_IDS), superseded_old))
+    print('  [exit-code] %s' % result['exit_code_semantics'])
+    return failed_active
 
+
+def _finalize(result, run_before, run_after):
     saved = [save_evidence('w2w3-uatdiff-result.json',
                            json.dumps(result, ensure_ascii=False, indent=1, default=str))]
     for tag, run in (('before', run_before), ('after', run_after)):
