@@ -1,0 +1,386 @@
+{
+ "harness": "t10-阶段A收口复核读数 / 26-阶段A收口报告 附件",
+ "task": "t10",
+ "attempt_id": "b027839d-48f5-4010-982b-18b6c7864631",
+ "produced_at": "2026-10-07 14:27:57",
+ "producer": "高级项目经理",
+ "interpreter": "F:\\Miniconda\\envs\\wage\\python.exe",
+ "note": "全部退出码取真实进程返回值，不经管道；行数口径 = Python splitlines()（A-23）；未由 t10 复跑的读数不在此文件内。",
+ "commands": [
+  {
+   "run_id": "wrapa-t10-ci",
+   "argv": "python -B test-reports-2026-10/harness/ci_gates.py --phase first --json test-reports-2026-10/.tmp/wrapa-t10/ci_gates.json",
+   "cwd": "D:\\workspace\\wage_management_system - bak",
+   "exit_code": 0,
+   "expected": "0",
+   "steps_ok": "11/11",
+   "readings": {
+    "blocking_failed": [],
+    "report_only_failed": [],
+    "root_json_untouched": true,
+    "check_templates": "parsed 87 / 44 declared / 40 used in templates / 44 used on routes / landing 5 / RESULT: OK",
+    "check_migration_heads": "HEADS=['p1nonctarget'] / head_count=1 / revisions=35",
+    "check_properties": "已扫描 23 个文件，模型类 74 个 / RESULT: OK",
+    "check_db_bootstrap": "64 账号 / 直接拷贝 6712 行，跳过 0 张表 / OK",
+    "run_gates": {
+     "exit_code": 1,
+     "note": "A-62 预期：环境依赖探针 native_exit=0 expected=1；blocking 判据取 gates.json 非环境依赖部分 => 通过",
+     "summary": {
+      "total": 6,
+      "pass": 5,
+      "fail": 0,
+      "probe_only": 1,
+      "probe_unexpected": 1,
+      "exit_code_informative": 4
+     },
+     "in_chain": {
+      "check_templates": "pass",
+      "check_migration_heads": "pass",
+      "check_properties": "pass",
+      "check_db_bootstrap": "pass"
+     }
+    },
+    "functional_test": "结果：109 通过 / 0 失败",
+    "permission_matrix": "[OK] 匿名可访问 = 0；[WARN] 落盘失败 不出现",
+    "smoke_test": "无 5xx / 异常 / 重定向死循环；[WARN] 落盘失败 不出现",
+    "route_inventory": "total rules=271 / duplicate registrations=0",
+    "measure_coverage": "(报告型，退出码不作判据)",
+    "coverage_drift": "判据 8/8 通过",
+    "evidence_level": "11 步全部「原文可信」(U+FFFD=0)",
+    "real_db_unchanged": "每步 True",
+    "exit_code_semantics": {
+     "code": 0,
+     "inputs": {
+      "blocking_failed": [],
+      "report_only_failed": [],
+      "root_json_untouched": true
+     }
+    }
+   },
+   "evidence": [
+    "test-reports-2026-10/evidence/harness/ci-wrapa-t10-ci/ci_gates_first.console.txt",
+    "test-reports-2026-10/evidence/harness/wrapa-t10-ci/"
+   ]
+  },
+  {
+   "run_id": "wrapa-t10-probe",
+   "argv": "python -B test-reports-2026-10/harness/w1_p01_probe.py --scenario all",
+   "exit_code": 0,
+   "readings": {
+    "criteria_total": 27,
+    "failed_criteria": [],
+    "verdict": "PASS",
+    "prefix_tree_routes_sha256": "3A8BCE99D827FD4D6971198252DAE44986A45E4F15F6378A36D7254FBC02D4FF",
+    "line6_hits": {
+     "funcs": [
+      "delete_consumable",
+      "use_consumable"
+     ],
+     "lines": [
+      10919,
+      10971
+     ]
+    },
+    "gate_fixed": "exit=0 violations=0",
+    "gate_inject": "exit=1 violations=1",
+    "gate_selftest": "exit=0",
+    "real_db_unchanged": true
+   },
+   "evidence": [
+    "test-reports-2026-10/evidence/harness/wrapa-t10-probe/w1-p01-criteria.json"
+   ]
+  },
+  {
+   "run_id": "wrapa-t10-probe",
+   "argv": "python -B test-reports-2026-10/harness/w2w3_probe.py --scenario all",
+   "exit_code": 0,
+   "readings": {
+    "total": 46,
+    "passed": 46,
+    "failed": 0,
+    "real_db_unchanged": true,
+    "db_copy": "test-reports-2026-10/.tmp/wrapa-t10-probe/db/app_w2w3_wrapa-t10-probe.db (samefile(real)=False)"
+   },
+   "evidence": [
+    "test-reports-2026-10/evidence/harness/wrapa-t10-probe/w2w3-criteria.json"
+   ]
+  },
+  {
+   "run_id": "wrapa-t10-probe",
+   "argv": "python -B test-reports-2026-10/harness/w4_probe.py --phase post --scenario all --json test-reports-2026-10/.tmp/wrapa-t10/w4_post.json",
+   "exit_code": 0,
+   "readings": {
+    "checks_total": 39,
+    "status_counts": {
+     "passed": 39
+    },
+    "verdict": "PASS",
+    "login_status": 302,
+    "p09": {
+     "requests": 18,
+     "status_404": 18,
+     "status_5xx": 0,
+     "leak_rows": 0,
+     "fake_200_success": 0
+    },
+    "real_db_unchanged": true
+   },
+   "evidence": [
+    "test-reports-2026-10/evidence/harness/wrapa-t10-probe/w4_post_all.console.txt",
+    "test-reports-2026-10/.tmp/wrapa-t10/w4_post.json"
+   ]
+  },
+  {
+   "run_id": "wrapa-t10-static",
+   "argv": [
+    "python -B scripts/check_templates.py",
+    "python -B scripts/check_migration_heads.py",
+    "python -B scripts/check_properties.py",
+    "python -B scripts/_sandbox_compat.py scripts/route_inventory.py",
+    "python -B scripts/check_model_refs.py",
+    "python -B test-reports-2026-10/harness/ci_lint.py --phase first"
+   ],
+   "exit_codes": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "readings": {
+    "check_model_refs": "scanned 23 files, name_query_refs 602, violations 0 / RESULT: OK（name_query_refs 为信息项，勿钉）",
+    "ci_lint": "19/19 通过，exit 0（本机无 PyYAML => subset-lint 兜底；Groovy 真解析本机不可得）"
+   },
+   "evidence": [
+    ".analysis-scratch/wrapa-t10-static.txt (scratch)"
+   ]
+  }
+ ],
+ "invariants": {
+  "app_db": {
+   "path": "app.db",
+   "bytes": 2531328,
+   "mtime": "2026-09-18 12:50:55",
+   "sha256_before": "F5DA2306BC31CBAB098AAD3774016D320A9B9AA3546F93418196AE9900E0F065",
+   "sha256_after": "F5DA2306BC31CBAB098AAD3774016D320A9B9AA3546F93418196AE9900E0F065",
+   "unchanged": true
+  },
+  "root_json_untouched": true
+ },
+ "evidence_index": {
+  "pre": {
+   "file": "test-reports-2026-10/.tmp/wrapa-t10/idx-pre.json",
+   "run_id": "wrapa-t10-probe",
+   "checked_at": "2026-10-07 14:24:17",
+   "counts": {
+    "baseline_files": 1699,
+    "current_files": 1709,
+    "modified": 7,
+    "deleted": 15,
+    "journal_broken": 0,
+    "added": 25,
+    "index_missing": 4,
+    "coverage_gap": 1,
+    "phantom_entry": 3,
+    "baseline_tampered": 0,
+    "dirs_conform": 260,
+    "dirs_total": 265
+   },
+   "verdict": "violation",
+   "real_db_matches_pinned": true
+  },
+  "post": {
+   "file": "test-reports-2026-10/.tmp/wrapa-t10/idx-post.json",
+   "run_id": "wrapa-t10-probe",
+   "checked_at": "2026-10-07 14:24:37",
+   "counts": {
+    "baseline_files": 1699,
+    "current_files": 1725,
+    "modified": 7,
+    "deleted": 15,
+    "journal_broken": 0,
+    "added": 41,
+    "index_missing": 5,
+    "coverage_gap": 1,
+    "phantom_entry": 3,
+    "baseline_tampered": 0,
+    "dirs_conform": 260,
+    "dirs_total": 266
+   },
+   "verdict": "violation",
+   "real_db_matches_pinned": true
+  },
+  "freeze": {
+   "file": "test-reports-2026-10/.tmp/wrapa-t10/idx-freeze.json",
+   "run_id": "wrapa-t10-freeze",
+   "checked_at": "2026-10-07 14:25:21",
+   "counts": {
+    "baseline_files": 1748,
+    "current_files": 1734,
+    "modified": 7,
+    "deleted": 15,
+    "journal_broken": 0,
+    "added": 1,
+    "index_missing": 0,
+    "coverage_gap": 1,
+    "phantom_entry": 3,
+    "baseline_tampered": 0,
+    "dirs_conform": 266,
+    "dirs_total": 267
+   },
+   "verdict": "violation",
+   "real_db_matches_pinned": true
+  },
+  "postfreeze": {
+   "file": "test-reports-2026-10/.tmp/wrapa-t10/idx-postfreeze.json",
+   "run_id": "wrapa-t10-final",
+   "checked_at": "2026-10-07 14:25:26",
+   "counts": {
+    "baseline_files": 1748,
+    "current_files": 1735,
+    "modified": 7,
+    "deleted": 15,
+    "journal_broken": 0,
+    "added": 2,
+    "index_missing": 0,
+    "coverage_gap": 1,
+    "phantom_entry": 3,
+    "baseline_tampered": 0,
+    "dirs_conform": 266,
+    "dirs_total": 267
+   },
+   "verdict": "violation",
+   "real_db_matches_pinned": true
+  }
+ },
+ "evidence_index_violation_ownership": {
+  "finding": "改写/删除/幽灵 全部位于 captain 侧（_phaseB-prefreeze/** 归档副本、baseline-prefix/**、captain-verification/**、harness/captain-*）",
+  "t10_own_products_violations": 0,
+  "caveat": "计数随 _phaseB-prefreeze 归档副本份数增长：t4..t8 记 4/10/2（1 份副本）=> t10 记 7/15/3（3 份副本）"
+ },
+ "fingerprints": {
+  "production": [
+   {
+    "path": "app/main/routes.py",
+    "bytes": 511969,
+    "lines_splitlines": 12155,
+    "sha256": "1D040DD2C6B54B07F6550D5F6B4E68BB53D30CE53F83AE3141B57A4BAFEB49BD"
+   },
+   {
+    "path": "app/services/mes_service.py",
+    "bytes": 84486,
+    "lines_splitlines": 1834,
+    "sha256": "19B8493AE8423AFF14EE4551EFC94BC9A9024AFA77CC1BB559AEE1B337CBEF78"
+   },
+   {
+    "path": "app/main/quality.py",
+    "bytes": 70415,
+    "lines_splitlines": 1733,
+    "sha256": "F6DEABAA6E48AAADD193FA811668074502E11DD3E93A8014102458C046C3BC7E"
+   },
+   {
+    "path": "app/__init__.py",
+    "bytes": 9898,
+    "lines_splitlines": 257,
+    "sha256": "06B07A11F9409F42F535175CC184698BA3BEC612499F703D645952B408D66482"
+   },
+   {
+    "path": "app/main/production_center.py",
+    "bytes": 17887,
+    "lines_splitlines": 453,
+    "sha256": "1169F17BF8E6F1A7ACEF2D3089C26E89FDD43AB5193B37D125EBACDE04747095"
+   },
+   {
+    "path": "app/models.py",
+    "bytes": 145999,
+    "lines_splitlines": 3117,
+    "sha256": "1D3823FF06D213AB5CBA25E164EDDB9D13884CE61723043BEFFC9591A0378386"
+   },
+   {
+    "path": "app/main/stock.py",
+    "bytes": 6208,
+    "lines_splitlines": 124,
+    "sha256": "729DFD0E174D212F4C2CC0F935A7FEF3DAAEEF8A0EE052054472C3603BB2DCD7"
+   }
+  ],
+  "tools_and_ci": [
+   {
+    "path": "scripts/check_model_refs.py",
+    "bytes": 15465,
+    "lines_splitlines": 391,
+    "sha256": "7C597A5CE151D59C8D962182F802BCE632C676EC110985B908C568B77391EA8A"
+   },
+   {
+    "path": "Jenkinsfile",
+    "bytes": 19181,
+    "lines_splitlines": 461,
+    "sha256": "C9F9C8937CE58D2DE89D19DF9546CD1D89313562DCF1531BB20B24AB5028D4A6"
+   },
+   {
+    "path": ".github/workflows/docker-deploy.yml",
+    "bytes": 2797,
+    "lines_splitlines": 83,
+    "sha256": "75AE67B8391944671E4E5266BF5ADE6F681B2895AE7DB6EB89DEFE253E03A5E5"
+   },
+   {
+    "path": "test-reports-2026-10/harness/ci_gates.py",
+    "bytes": 18045,
+    "lines_splitlines": 319,
+    "sha256": "A86AF0DECF9858730A74908622633EAF939550F562FBD66DA18C915A93E0AC62"
+   },
+   {
+    "path": "test-reports-2026-10/harness/ci_lint.py",
+    "bytes": 15506,
+    "lines_splitlines": 332,
+    "sha256": "792756FBD079EAEABC5E5373D98480792222B15397A6E217605C41965008D4D3"
+   },
+   {
+    "path": "test-reports-2026-10/harness/coverage_drift.py",
+    "bytes": 11671,
+    "lines_splitlines": 244,
+    "sha256": "F82F46BDC878CC3AFB07881B54584117C24D3F9743E2844F3A9AF579AD6EAE80"
+   },
+   {
+    "path": "test-reports-2026-10/harness/evidence_hash.py",
+    "bytes": 47681,
+    "lines_splitlines": 889,
+    "sha256": "C140900AB9A3969D8101D62B7772E4A81EC9B2B66D26A849A6B86ACD55947698"
+   },
+   {
+    "path": "test-reports-2026-10/harness/w1_p01_probe.py",
+    "bytes": 35208,
+    "lines_splitlines": 670,
+    "sha256": "9069FA3460A955FE20E9EAEED6D51E3D165C125E0E339E781A77214907866F4E"
+   },
+   {
+    "path": "test-reports-2026-10/harness/w2w3_probe.py",
+    "bytes": 69098,
+    "lines_splitlines": 1264,
+    "sha256": "38DAFB81CBEDCDEF7C72D6B547915DF0B3EA4F440AA3052BF8772908C2A56089"
+   },
+   {
+    "path": "test-reports-2026-10/harness/w4_probe.py",
+    "bytes": 34257,
+    "lines_splitlines": 630,
+    "sha256": "F72C5B6CCB52BF04FDD4DC12072DBB8862790BFE96A31CAD4164A5B343D95978"
+   }
+  ]
+ },
+ "outputs": [
+  {
+   "path": "test-reports-2026-10/26-阶段A收口报告.md",
+   "bytes": 61776,
+   "lines_splitlines": 466,
+   "sha256": "01514BB81B390A93EC6CE50FEAC465092CA4B1E73742424B736E8548952ABA0E"
+  },
+  {
+   "path": "test-reports-2026-10/26-阶段A收口-复核读数.json",
+   "note": "本文件自身指纹不写入自身（复算：Get-FileHash）"
+  }
+ ],
+ "rollback": {
+  "production": "git checkout -- app/__init__.py app/main/production_center.py app/main/quality.py app/main/routes.py app/main/stock.py app/models.py app/services/mes_service.py",
+  "committed_test_assets": "git reset --soft HEAD~3"
+ }
+}

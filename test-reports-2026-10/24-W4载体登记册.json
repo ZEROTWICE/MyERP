@@ -1,0 +1,55 @@
+{
+  "doc": "24-W4载体登记册",
+  "version": "1.0",
+  "date": "2026-10-07",
+  "source_task": "t8",
+  "purpose": "/api/ 面**非 JSON 载体**的穷举登记册（17-W4W5 修复验收判据 §6.2 出口② / §6.3 P-13-c）",
+  "口径": {
+    "扫描工具": "test-reports-2026-10/harness/w4_probe.py --scenario p13（副本上对 /api/ 面 GET 逐个发合法请求）",
+    "行数": 4,
+    "违规行数": 0,
+    "说明": "3 条 xlsx 导出为**二进制下载契约**（不得改成 JSON，RC-5）；1 条 print 为**设计即打印页**（HTML 是设计意图，路径挂在 /api/ 前缀下属命名不一致，本期按出口②显式登记；其 404 语义由 P-09 的 Q8 覆盖）。"
+  },
+  "rows": [
+    {
+      "path": "/api/quality/records/export",
+      "method": "GET",
+      "status": 200,
+      "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "分类": "二进制下载",
+      "理由": "质检记录导出（前端下载契约，04 §5.5 观测项；一刀切改 JSON 会破坏下载）",
+      "登记人": "t8 测试工具评估工程师",
+      "日期": "2026-10-07"
+    },
+    {
+      "path": "/api/quality/tasks/export",
+      "method": "GET",
+      "status": 200,
+      "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "分类": "二进制下载",
+      "理由": "质检任务导出（同上传下载契约）",
+      "登记人": "t8 测试工具评估工程师",
+      "日期": "2026-10-07"
+    },
+    {
+      "path": "/api/quality/tasks/template",
+      "method": "GET",
+      "status": 200,
+      "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "分类": "二进制下载",
+      "理由": "质检任务导入模板下载（AGENTS.md：模板下载与导出同为内存生成、二进制载体）",
+      "登记人": "t8 测试工具评估工程师",
+      "日期": "2026-10-07"
+    },
+    {
+      "path": "/api/quality/records/<int:record_id>/print",
+      "method": "GET",
+      "status": 200,
+      "content_type": "text/html",
+      "分类": "设计即打印页",
+      "理由": "打印页返回 HTML 是设计意图（04 §6 E-7）；不一致的是它挂在 /api/ 命名空间下。本期按 17-W4W5 §6.2 出口②『继续挂在 /api/ 但显式登记』处理（不要求改代码）；不存在资源必须 404 的语义已由 P-09 的 Q8 覆盖。",
+      "登记人": "t8 测试工具评估工程师",
+      "日期": "2026-10-07"
+    }
+  ]
+}
