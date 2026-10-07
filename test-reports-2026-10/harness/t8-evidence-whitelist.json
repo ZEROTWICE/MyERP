@@ -247,5 +247,42 @@
     "stale_semantics": "若这两条违规消失（锚点被回滚、或比对基线推进），本块条目即 stale ⇒ TL-04 失败（防悄悄放宽约束）；届时由 captain 决定是否移除本块。",
     "captain_action": "① 若判定该原地改写应回退 ⇒ 回退后删除本块两条；② 若判定为有意更新 ⇒ 在 V-14 台账登记三要素并保留本块；③ 未拍板前，本块只让「已知违规」不再当成「未知篡改」。",
     "exact_33_untouched": "本块不改动上面的 violations[33]（A-95 对称差集语义保持），registered 与 registered_appended 分开报数"
+  },
+  "violations_appended_meta_v19": {
+    "count": 2,
+    "appended_by": "V-19（修复 F-V13-9：write_suite 2 条有意更新的 append-only 登记）/ 2026-10-07",
+    "appended_at": "2026-10-07 23:1x",
+    "authorization": "captain 立项授权（t20 / V-19 任务书）：这 2 条是 V-14 已按 A-70 声明的「有意更新」——本就不是违规，只是尚未登记；V-13 未擅自动该文件（V-01 独占件、不在其 inScope）是正确处置，故由 captain 立项授权",
+    "trigger": "V-13（t14）的 F-V13-9：`ci_gates --phase first` 整体 exit 2 的**唯一障碍** = report-only TL-04 检出这 2 条未登记（`blocking_failed=[]`，其余 10 个 blocking 全绿）",
+    "appended_total_note": "本文件 violations_appended 累计 **4** 条 = 2 条（V-01 / uat 对，见 violations_appended_meta）+ 2 条（V-19 / write_suite 对，见本块）；`registered` 仍只计主块 **33** 条、`registered_rules` 仍 **1** 条",
+    "ledger_cross_reference": {
+      "ledger": "test-reports-2026-10/evidence/regression-r2/r2-exec-b5-v14-ledger.json",
+      "bytes": 30844,
+      "sha256": "26B8F2ED9332D288A7E2B9CBFF1EB0927C716A4E491E5662E0B35DB76C17BE19",
+      "rows": [
+        "api/write_suite.json：台账 anchor_readings[anchor=「写断言套件 54」].intentional_update 的 old(73293/B608117E…)、new(73318/3844E9C2…)、trigger、command 与本批第 1 条**逐字相等**",
+        "api/write_suite.out.txt：台账 anchor_readings **无独立条目**（.out.txt 不是 7 锚点之一）；成对依据 = 同一 run 同一 mtime（2026-10-07 22:45:45）+ `harness/r2_anchor_drift.py:66-67` 的 `INTENTIONAL_RERUN = {'api/write_suite.json','api/write_suite.out.txt', …}`（把两者**成对**判为 `intentional_rerun`）"
+      ]
+    },
+    "recompute_commands": [
+      "& 'F:\\Miniconda\\envs\\wage\\python.exe' -B -c \"import hashlib;d=open(r'test-reports-2026-10/evidence/api/write_suite.json','rb').read();print(len(d),hashlib.sha256(d).hexdigest().upper())\"   # 期望 73318 / 3844E9C2…",
+      "& 'F:\\Miniconda\\envs\\wage\\python.exe' -B -c \"import hashlib;d=open(r'test-reports-2026-10/evidence/api/write_suite.out.txt','rb').read();print(len(d),hashlib.sha256(d).hexdigest().upper())\"   # 期望 22643 / 99B7B12F…",
+      "& 'F:\\Miniconda\\envs\\wage\\python.exe' -B test-reports-2026-10\\harness\\ci_gates.py --phase first   # 期望 exit 0（14 步）",
+      "& 'F:\\Miniconda\\envs\\wage\\python.exe' -B test-reports-2026-10\\harness\\ci_gates.py --selfcheck   # 期望 12/12（W-1..W-5 未被削弱）"
+    ],
+    "rollback_steps": [
+      "① 整体回退：`git checkout -- test-reports-2026-10/harness/t8-evidence-whitelist.json`（本批 2 条随之消失；主块 33 条与通配规则本就未动）",
+      "② 仅删本批：手工删除 violations_appended 末尾 2 条（api/write_suite.json / api/write_suite.out.txt）与 violations_appended_meta_v19",
+      "③ 回退后预期：TL-04 回到「未登记 2 条 ⇒ report-only 失败 ⇒ ci_gates 整体 exit 2」（这是设计口径，不是回归）"
+    ],
+    "stale_semantics": "若这 2 条违规消失（锚点被回滚、或按 A-70 把本 run 新值推进为比对基线），本批条目即 stale ⇒ TL-04 失败（防悄悄放宽约束）；届时由 captain 决定移除本块",
+    "architecture_handoff": {
+      "symptom": "`harness/write_suite.py` **缺 `--out`** ⇒ 每次复跑都原地覆盖 `evidence/api/write_suite.json`（锚点 4）⇒「复跑」与「保锚点」**不可兼得**（A-110 发现②）",
+      "canonical_fix": "给 write_suite.py 加 `--out`，产物落**新 run 目录**（如 `evidence/api/<run_id>/write_suite.json`，A-40/E-01），锚点判定一律从**不可变归档快照**读取",
+      "discipline": "captain 通用纪律「**锚点与产物分离**」（见 AGENTS.md：凡既作冻结基线又被脚本原地写出的文件，判据必须读归档快照、不得读 live 路径）",
+      "explicit_statement": "**白名单是缓解、不是根治**：本块登记只让「已知的有意更新」不再被当成未知篡改；根治必须靠 `--out`（新 run 目录）+ 从归档快照读判据。同族病史：A-89（preflight 归档在 evidence/ 内）、N-1（锚点与 LOCKED 语义互斥）、F1（锚点被下游覆盖）。",
+      "owner": "后续项，**不在 V-19 inScope**（`harness/write_suite.py` 与 `evidence/**` 均禁改）"
+    },
+    "exact_main_block_untouched": "本块不删改主块 violations[33] 与 wildcard_rules[1]（A-89 通配语义 / A-95 对称差集语义保持）；V-01 的 violations_appended_meta 亦未动"
   }
 }
