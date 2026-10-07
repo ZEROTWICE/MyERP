@@ -1,4 +1,11 @@
+# -*- coding: utf-8 -*-
 """ci_gates.py — E-04：CI 等价门禁入口（本地可跑，Jenkins 与 GitHub Actions 共用）。
+
+> **必须保留上面这行编码声明（V-01 实测）**：本文件含中文、体积 > 64 KB，在本机
+> CPython 3.9（Windows，`fgets` 缓冲 512 B）下曾触发**假** SyntaxError
+> `Non-UTF-8 code starting with '\\xe4' ... but no encoding declared`（多字节字符被
+> 分词器读缓冲截断）。声明 `coding: utf-8` 后走「显式编码」解码分支即消失；
+> 删掉它 ⇒ `python -B ci_gates.py` 直接 SyntaxError（这就是它的 behavior_flip_test）。
 
 **为什么需要它**：`Jenkinsfile` 原先对 4 项真闸门 + 请求型脚本的调用次数 = **0**，AGENTS.md 的
 「必跑门禁表」是纯手工纪律。本脚本把 `21-E04精确修法与验收判据.md` §2 的命令清单变成**单一入口**，
@@ -17,13 +24,45 @@ CI 配置只调用它（配置薄、逻辑可离线验证）。
 | --- | --- | --- | --- |
 | `check_model_refs` | TL-01 | **blocking** | `expects` **只钉** `'violations 0'` + `'RESULT: OK'`。**严禁钉 `name_query_refs` 计数**——实测 574/575/602 已三次漂移（它随测试资产自增，非判据）。另钉 `known_bad_absent`（P-01 的两个端点函数名）。 |
 | `check_http_contract` | TL-02 | **blocking** | 落点登记为「**已由 `harness/w4_http_contract.py` 承担**」，**不迁移**到 `scripts/`（A-85 裁定）。基线口径 **B** = `--scope app --expect 10`：P-12 的 10 个 `get_json()` 残留站点**具名登记**（`--scope doc` 只含 17 个 P-09 函数、**看不见 P-12**，故不可作防复发判据）。**`--selftest` 统计行不得进 `expects`**（该行历史实现漏调 `visit()`，曾恒报 2/5）。 |
-| `evidence_hash` | TL-04 | **report-only** + **白名单** | 白名单登记 33 条 **captain 侧既有违规**（A-52/A-55）。**不**带 `--strict-index`（`index_missing` 恒 > 0 ⇒ 会恒 exit 1）。判据 = ① 无**未登记**违规；② 白名单条目**零陈旧**（防悄悄缩小约束）；③ `real_db_matches_pinned` 为真。**新违规 ⇒ 本步失败（report-only ⇒ 整体 exit 2）**。 |
+| `evidence_hash` | TL-04 | **report-only** + **白名单** | 白名单登记 33 条 **captain 侧既有违规**（A-52/A-55）+ **1 条通配规则**（A-89，见下）。**不**带 `--strict-index`（`index_missing` 恒 > 0 ⇒ 会恒 exit 1）。判据 = ① 无**未登记**违规；② 白名单条目**零陈旧**（防悄悄缩小约束）；③ 通配规则**也**纳入陈旧判定（匹配 0 条 ⇒ 失败）；④ `real_db_matches_pinned` 为真。**新违规 ⇒ 本步失败（report-only ⇒ 整体 exit 2）**。 |
 
 > 三接入位的技术条件由 t5 裁定（TL-01 `READY_NOW`／TL-02 `CANNOT_ENABLE_AS_WRITTEN` → 已按 A-85 定落点与口径／TL-04 `REPORT_ONLY_ONLY`）。
 > **生效条件不在本脚本内**：A-85④ 的第二步晋升（`Jenkinsfile:112/122` 解除 `error()` 注释 + GH 去 `continue-on-error` + 加 `needs: gate`）**本轮未实施** ⇒ 这些步骤红灯目前只记 `UNSTABLE`。
+> 该缺口在机读产物里**显式登记为 `blocked`**（`BUILD_LAYER_BLOCKED`，随 `gaps[]` 落盘，**不计入通过数**）。
 
-**注入破坏（判据形态 ⑦）用的两个只读开关**：`--inject-evidence-root`（把 `evidence_hash` 的校验根指向合成树）与
-`--evidence-whitelist`（替换白名单路径）。二者只改**输入路径**，不改任何判据 ⇒ 用于证明「注入 ⇒ 本入口非零」。
+**TL-04 白名单通配（V-01 追加，A-89）**
+
+`regression_preflight.py` 把归档写进 `evidence/_phaseB-prefreeze/<stamp>/`（`ARCHIVE_ROOT`），而
+`evidence_hash` 索引 `evidence/**` ⇒ **每跑一次 preflight 都给 evidence_hash 加一批新文件**
+（stamp 名不可预知，形态恒为 5 `deleted` + 2 `modified` + 1 `phantom_entry`）⇒ 逐条枚举**必然追不上**。
+处置（captain 裁定 A-89）：
+
+* 白名单语义从「逐条枚举」改为「**精确 33 条（不动） + `_phaseB-prefreeze/**` 通配 1 条**」；
+* 通配规则**同样**纳入「陈旧即失败」：匹配到 **0** 条违规 ⇒ 该规则 stale ⇒ 本步失败；
+* **严禁重基线化**（A-85②/A-62 明令）：只追加，不删既有条目；
+* 该规则是根因正解 (a)「`evidence_hash` 默认排除 `_phaseB-prefreeze/**`」的**白名单侧等效实现**；
+  若将来实现 (a) 或把归档移出 `evidence/`（正解 (b)），本规则必须同步删除 —— 不得两套机制并存。
+
+**V-01 追加块 `violations_appended`（只登记、不裁决）**：V-01 复跑时检出 2 条**非本任务**的
+未登记违规 —— `modified|uat/uat_chains.json`、`modified|uat/uat_chains.out.txt`（冻结锚点 1
+在 2026-10-07 22:18:31 被 UAT 链任务**原地重写**，33318 B ⇒ 46051 B）。处置：以
+`violations_appended` 单独登记（**主块 33 条一字不动**，报数分开：`registered` / 
+`registered_appended` / `registered_total`），并同样纳入「陈旧即失败」；合法性由 V-14 的
+7 锚点比对裁定（28 §4），TL-04 只表示「已知且已归属」，**不表示被接受**。
+
+**逐步注入破坏（V-01 追加，判据形态 ⑦）：`--inject-step <id>`**
+
+`INJECTIONS` 表为**每一个**步骤声明 1 次注入，三种机制**都只改「输入路径」，不动判据**：
+
+| 机制 | 含义 | 落在哪些步 |
+| --- | --- | --- |
+| `real_input` | 把该步读的**输入树/产物路径**指向受控合成坏树（脚本副本按原脚本的相对深度放置，故其自解析 ROOT = 合成树根） | `check_templates` / `check_migration_heads` / `check_properties` / `coverage_drift` / `check_model_refs` / `check_http_contract` / `evidence_hash` |
+| `judge_artifact` | 把该步**判据层读的机读产物**换成合成的降级产物（本步程序照常真跑） | `run_gates`（`gates.json`） |
+| `script_fixture` | 该步的脚本**无任何输入路径参数**（跑真 app/真库）⇒ 把「要跑的程序」这一输入路径换成合成夹具（故意打印与期望值不符的行 + 非 0 退出） | `check_db_bootstrap` / `functional_test` / `permission_matrix` / `smoke_test` / `route_inventory` / `measure_coverage` |
+
+**判据未变是机检的**：注入前后各算一次 `criterion_fingerprint`（`expects` / `expect_absent` /
+`expect_exit` / `known_bad_absent` / `mode` / `hook` 的 SHA256），两值必须相等并作为一条 `checks`
+落盘；**注入若没能让该步转红，本入口自己报失败**（`injection_ineffective`，exit 1）—— 防「假注入」。
 
 **三条硬要求**
 1. 进链的请求型脚本**必须** `--no-dump`（A-11：禁止让仓库根写盘参与退出码）；
@@ -41,12 +80,16 @@ CI 配置只调用它（配置薄、逻辑可离线验证）。
     python -B test-reports-2026-10/harness/ci_gates.py                     # 第一阶段（smoke 观测）
     python -B test-reports-2026-10/harness/ci_gates.py --phase second      # 第二阶段（smoke 转 blocking）
     python -B test-reports-2026-10/harness/ci_gates.py --only check_templates --check-templates-script <坏树副本>
+    python -B test-reports-2026-10/harness/ci_gates.py --inject-step <id>  # 判据形态 ⑦：该步注入破坏（须转红并被指名）
+    python -B test-reports-2026-10/harness/ci_gates.py --selfcheck         # 本清单自身的 8 条不变量
 """
 import argparse
+import fnmatch
 import hashlib
 import json
 import os
 import re
+import shutil
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -55,36 +98,532 @@ REPO_ROOT = os.path.dirname(REPORTS_ROOT)
 SCRIPTS_DIR = os.path.join(REPO_ROOT, 'scripts')
 sys.path.insert(0, HERE)
 
-from _env import RUN_ID, guard_write, interpreter, run_child, save_evidence, sha256_file  # noqa: E402
+from _env import (RUN_ID, TMP_ROOT, guard_write, interpreter, run_child,  # noqa: E402
+                  save_evidence, sha256_file)
 
 ROOT_JSON = ('_smoke_results.json', '_permission_matrix.json')
 
 #: TL-04 白名单登记件（A-52/A-55 的 captain 侧既有违规；只登记，不洗白）
 DEFAULT_EVIDENCE_WHITELIST = os.path.join(HERE, 't8-evidence-whitelist.json')
 
+#: A-89：归档根的展示名（通配规则写成 `<ARCHIVE_ROOT_GLOB>`），仅用于打印/断言
+ARCHIVE_ROOT_GLOB = '_phaseB-prefreeze/**'
+
 #: A-63 第二步的晋升注记（晋升时把下面这行改成实际日期）
 SMOKE_PROMOTION_NOTE = 'smoke_test 自 <待晋升日期> 起升为 blocking（A-63 第二步：观测 1 轮构建后）'
 
+#: 构建层阻塞的**显式登记**（V-01 判据 ⑤）：不计入任何通过数，随 gaps[] 落盘。
+#: 判据：本入口红灯目前只记 `UNSTABLE`；真正的「构建层阻塞」要等 A-63 第二步。
+BUILD_LAYER_BLOCKED = {
+    'id': 'A-63-STEP2-BUILD-GATE',
+    'state': 'blocked',
+    'object': '构建层阻塞（Jenkinsfile / GitHub Actions 的门禁晋升）',
+    'blocked_reason': ('A-63 第二步未实施：Jenkinsfile:112 与 :122 的 error() 仍是注释'
+                       '（ciRc==3 / ciRc==1 只置 UNSTABLE）；'
+                       '.github/workflows/docker-deploy.yml:19 continue-on-error: true 未删、'
+                       ':58 的 build-and-push 未加 needs: gate'),
+    'evidence': ['Jenkinsfile:110-125', '.github/workflows/docker-deploy.yml:15-19,54-58',
+                 'ci_gates.py:BUILD_LAYER_BLOCKED'],
+    'condition_to_unblock': ('A-63 第二步：解注释 Jenkinsfile:112/122 + GH 去 continue-on-error '
+                             '+ build-and-push 加 needs: gate，再观测 1 轮全绿'),
+    'owner': 'captain（A-85④ / A-63 明令 captain 独占）',
+    'not_counted_as_passed': True,
+    'verified_by': 'ci_gates.py --selfcheck（断言该登记存在且 state=blocked）',
+}
 
+#: check_templates.py 的 ROUTE_FILES（合成树注入用；与其源码保持一致）
+TEMPLATE_ROUTE_FILES = (
+    'app/main/routes.py',
+    'app/main/quality.py',
+    'app/main/production_center.py',
+    'app/main/equipment.py',
+    'app/main/purchase.py',
+    'app/main/shipping.py',
+    'app/main/stock.py',
+)
+
+#: 无输入路径参数的那几步用的合成夹具输出（**故意**与 expects 不符 ⇒ 判据层必须报红）
+FIXTURE_LINES = {
+    'check_db_bootstrap': ['种子库账号数（经自举导入到空库）= 63',
+                           '直接拷贝 6711 行，跳过 1 张表',
+                           'OK: (v01 注入夹具：非合规实现)'],
+    'functional_test': ['结果：108 通过 / 1 失败'],
+    'permission_matrix': ['[FAIL] 匿名可访问 = 3'],
+    'smoke_test': ['[FAIL] 5xx / 异常 / 重定向死循环 = 2'],
+    'route_inventory': ['[routes] total rules=270',
+                        'duplicate (method,path) registrations=1'],
+    'measure_coverage': ['[measure_coverage] FAIL: coverage probe aborted (v01 注入夹具)'],
+}
+
+#: 合成夹具模板（ASCII 安全：控制台只回显夹具自己的行，由 run_child 以 utf-8 解码）
+FIXTURE_TEMPLATE = '''# -*- coding: utf-8 -*-
+"""V-01 注入夹具（判据形态 7）：替代 %(step)s 的**非合规实现**。
+
+只替换「该步要跑的程序」这一输入路径；ci_gates 的判据（expects / expect_absent / expect_exit）
+由 criterion_fingerprint 机检证明一字未改。夹具故意打印与期望值不符的行并以非 0 退出。
+"""
+import sys
+
+for _s in (sys.stdout, sys.stderr):
+    try:
+        _s.reconfigure(encoding='utf-8', errors='replace')
+    except Exception:
+        pass
+
+for _line in %(lines)r:
+    print(_line)
+raise SystemExit(%(code)d)
+'''
+
+
+def _rel(path):
+    return os.path.relpath(path, REPO_ROOT).replace('\\', '/')
+
+
+# ------------------------------------------------------------------ 白名单（TL-04）
 def load_whitelist(path):
     """读 TL-04 白名单（只读；缺失或不可解析 ⇒ 视为「无白名单」并给原因）。
 
-    返回 ``(registered_set, reason, doc)``：``registered_set`` 为 ``{(kind, path)}``。
+    返回 ``(reg, rules, reason, doc)``：
+
+    * ``reg`` = **精确**登记集 ``{(kind, path)}``（33 条，V-01 不得删改）；
+    * ``rules`` = **通配**规则 ``[{'id', 'glob', 'kinds'}]``（A-89：归档 stamp 不可枚举）；
+    * ``reason`` = 缺失/不可解析的原因（成功时为空串）。
     """
     if not path or not os.path.isfile(path):
-        return set(), 'whitelist missing: %s' % path, None
+        return set(), [], 'whitelist missing: %s' % path, None
     try:
         with open(path, encoding='utf-8') as fh:
             doc = json.load(fh)
     except Exception as e:
-        return set(), 'whitelist unparsable: %s: %s' % (type(e).__name__, e), None
+        return set(), [], 'whitelist unparsable: %s: %s' % (type(e).__name__, e), None
     reg = set()
     for it in doc.get('violations', []):
         if isinstance(it, dict) and it.get('path'):
             reg.add((it.get('kind'), it['path']))
-    return reg, '', doc
+    # 追加块（V-01）：与主块**分开报数**（registered 仍等于主块的 33），但仍纳入
+    # 「未登记 / 陈旧」双侧判定 —— 只登记不裁决，不改变主块与对称差集语义。
+    for it in doc.get('violations_appended', []):
+        if isinstance(it, dict) and it.get('path'):
+            reg.add((it.get('kind'), it['path']))
+    rules = []
+    for it in doc.get('wildcard_rules', []):
+        if not isinstance(it, dict) or not it.get('glob'):
+            continue
+        kinds = it.get('kinds', '*')
+        rules.append({'id': it.get('id') or it['glob'], 'glob': it['glob'],
+                      'kinds': kinds if kinds == '*' else set(kinds)})
+    return reg, rules, '', doc
 
 
+def registration_counts(doc):
+    """白名单的报数口径：主块（33，A-52/A-55）与 V-01 追加块**分开**报（只登记不裁决）。"""
+    doc = doc or {}
+    base = [it for it in doc.get('violations', []) if isinstance(it, dict) and it.get('path')]
+    appended = [it for it in doc.get('violations_appended', [])
+                if isinstance(it, dict) and it.get('path')]
+    return {
+        'registered': len(base),
+        'registered_appended': len(appended),
+        'registered_total': len(base) + len(appended),
+        'appended_paths': ['%s|%s' % (it.get('kind'), it['path']) for it in appended],
+        'appended_meta': doc.get('violations_appended_meta'),
+    }
+
+
+def rule_matches(rule, kind, path):
+    """通配规则是否覆盖某条违规（`kinds='*'` ⇒ 任意 kind 都覆盖）。"""
+    if rule['kinds'] != '*' and kind not in rule['kinds']:
+        return False
+    return fnmatch.fnmatchcase(path, rule['glob'])
+
+
+def match_whitelist(violation_pairs, reg, rules):
+    """把违规集与白名单（精确 + 通配）对拍（纯函数，hook 与 --selfcheck 共用）。
+
+    语义（A-95 的对称差集语义推广到通配）：
+
+    * **精确**条目在报告里消失 ⇒ `stale_exact`（防有人偷偷缩小约束）；
+    * **通配**规则匹配 0 条 ⇒ `stale_rules`（防「归档被删掉后约束被悄悄放宽」）；
+    * 命中通配规则的不再算 `unregistered`；`reg` 与通配命中都不覆盖的才算 `unregistered`。
+    """
+    actual = set(violation_pairs)
+    hit = set()
+    rule_hits = {}
+    for rule in rules:
+        n = 0
+        for kind, path in actual:
+            if (kind, path) in reg:
+                continue
+            if rule_matches(rule, kind, path):
+                n += 1
+                hit.add((kind, path))
+        rule_hits[rule['id']] = n
+    return {
+        'unregistered': sorted(actual - (reg | hit)),
+        'stale_exact': sorted(reg - actual),
+        'stale_rules': [r['id'] for r in rules if not rule_hits[r['id']]],
+        'rule_hits': rule_hits,
+        'covered_by_rules': sorted(hit),
+        'registered': len(reg),
+        'registered_rules': len(rules),
+    }
+
+
+def evidence_hash_whitelist(res, step, run_dir):
+    """TL-04 的判据：把 evidence_hash 的违规集与白名单对拍（只登记既有违规，不洗白）。
+
+    返回 ``(checks, extra)``；``checks`` 里任一项 ``failed`` ⇒ 本步失败。
+    """
+    checks = []
+    extra = {}
+    jpath = step.get('json_path')
+    reg, rules, reason, wdoc = load_whitelist(step.get('whitelist'))
+
+    if not jpath or not os.path.isfile(jpath):
+        checks.append({'kind': 'json', 'needle': 'evidence_hash --out JSON present',
+                       'status': 'failed'})
+        extra['whitelist'] = {'path': step.get('whitelist'), 'registered': None,
+                              'reason': reason or ('json not written: %s' % jpath)}
+        return checks, extra
+
+    with open(jpath, encoding='utf-8') as fh:
+        rep = json.load(fh)
+    violations = rep.get('violations') or []
+    pairs = [(v.get('kind'), v.get('path')) for v in violations if v.get('path')]
+    m = match_whitelist(pairs, reg, rules)
+    counts = registration_counts(wdoc)
+    pinned = bool(rep.get('real_db_matches_pinned'))
+
+    extra['evidence_hash'] = {
+        'verdict': rep.get('verdict'),
+        'counts': rep.get('counts'),
+        'violations_total': len(violations),
+        'real_db_matches_pinned': pinned,
+        'report_json': _rel(jpath),
+    }
+    extra['whitelist'] = {
+        'path': step.get('whitelist'),
+        'registered': counts['registered'],
+        'registered_declared': (wdoc or {}).get('registered_count'),
+        'registered_source': (wdoc or {}).get('registered_source'),
+        'registered_appended': counts['registered_appended'],
+        'registered_total': counts['registered_total'],
+        'appended_paths': counts['appended_paths'],
+        'appended_meta': counts['appended_meta'],
+        'registered_rules': m['registered_rules'],
+        'wildcard_rules': [{'id': r['id'], 'glob': r['glob'], 'hits': m['rule_hits'][r['id']]}
+                           for r in rules],
+        'unregistered_count': len(m['unregistered']),
+        'unregistered_first10': ['%s|%s' % kp for kp in m['unregistered'][:10]],
+        'stale_count': len(m['stale_exact']) + len(m['stale_rules']),
+        'stale_exact_count': len(m['stale_exact']),
+        'stale_rule_ids': m['stale_rules'],
+        'stale_first10': ['%s|%s' % kp for kp in m['stale_exact'][:10]],
+        'covered_by_rules_count': len(m['covered_by_rules']),
+        'a89_note': ('A-89/V-01：%s 由通配规则表达（不逐条枚举）；'
+                     '通配规则匹配 0 条即 stale' % ARCHIVE_ROOT_GLOB),
+    }
+    # 白名单条目清单随报告落盘（供审计：这条约束当前到底由哪些条目构成）
+    if wdoc is not None:
+        mpath, _renamed = guard_write(os.path.join(run_dir, 'evidence_whitelist.registered.json'))
+        with open(mpath, 'w', encoding='utf-8', newline='\n') as fh:
+            json.dump(wdoc, fh, ensure_ascii=False, indent=1)
+        extra['whitelist']['manifest'] = _rel(mpath)
+
+    checks.append({'kind': 'whitelist', 'needle': 'no unregistered violation',
+                   'status': 'passed' if not m['unregistered'] else 'failed'})
+    checks.append({'kind': 'whitelist', 'needle': 'whitelist has no stale exact entry',
+                   'status': 'passed' if not m['stale_exact'] else 'failed'})
+    checks.append({'kind': 'whitelist', 'needle': 'wildcard rule(s) match >=1 violation',
+                   'status': 'passed' if not m['stale_rules'] else 'failed'})
+    checks.append({'kind': 'pinned', 'needle': 'real_db_matches_pinned == true',
+                   'status': 'passed' if pinned else 'failed'})
+    return checks, extra
+
+
+# ------------------------------------------------------------------ 注入破坏夹具（形态 ⑦）
+def _inj_ctx(python_exe):
+    root = os.path.join(TMP_ROOT, 'inject')
+    os.makedirs(root, exist_ok=True)
+    return {'python': python_exe, 'root': root}
+
+
+def _inj_fresh(ctx, name):
+    d = os.path.join(ctx['root'], name)
+    if os.path.isdir(d):
+        shutil.rmtree(d)
+    os.makedirs(d)
+    return d
+
+
+def _inj_mkdirs(path):
+    if path and not os.path.isdir(path):
+        os.makedirs(path)
+    return path
+
+
+def _inj_copy(src, dst):
+    _inj_mkdirs(os.path.dirname(dst))
+    shutil.copy2(src, dst)
+    return dst
+
+
+def _inj_write(path, text):
+    _inj_mkdirs(os.path.dirname(path))
+    with open(path, 'w', encoding='utf-8', newline='\n') as fh:
+        fh.write(text)
+    return path
+
+
+def _inj_fixture(ctx, step_id):
+    d = _inj_fresh(ctx, step_id)
+    path = os.path.join(d, 'fixture_%s.py' % step_id)
+    return _inj_write(path, FIXTURE_TEMPLATE % {'step': step_id,
+                                               'lines': FIXTURE_LINES[step_id], 'code': 1})
+
+
+def _inj_check_templates(ctx):
+    """合成树 = 真 app/ 的 templates + permissions + 7 个 route 文件 + **1 个模板注入未登记能力**。
+
+    脚本副本放在 `<syn>/scripts/check_templates.py` ⇒ 其 `ROOT = dirname(dirname(__file__)) = <syn>`
+    ⇒ 扫描合成树（与 E-04-b「坏树副本」同一手法）。
+    """
+    syn = _inj_fresh(ctx, 'check_templates')
+    shutil.copytree(os.path.join(REPO_ROOT, 'app', 'templates'),
+                    os.path.join(syn, 'app', 'templates'))
+    _inj_copy(os.path.join(REPO_ROOT, 'app', 'permissions.py'),
+              os.path.join(syn, 'app', 'permissions.py'))
+    for rel in TEMPLATE_ROUTE_FILES:
+        _inj_copy(os.path.join(REPO_ROOT, rel), os.path.join(syn, rel))
+    script = _inj_copy(os.path.join(SCRIPTS_DIR, 'check_templates.py'),
+                       os.path.join(syn, 'scripts', 'check_templates.py'))
+    tpls = []
+    for dirpath, _dirs, files in os.walk(os.path.join(syn, 'app', 'templates')):
+        for fn in files:
+            if fn.endswith('.html'):
+                tpls.append(os.path.join(dirpath, fn))
+    tpls.sort()
+    target = tpls[0]
+    with open(target, 'a', encoding='utf-8', newline='\n') as fh:
+        fh.write("\n{# V-01 注入：未登记能力 #}\n"
+                 "{% if can('__v01_injected_unknown_capability__') %}<!-- x -->{% endif %}\n")
+    return {'kind': 'real_input', 'replace_script': script,
+            'fixtures': [_rel(syn), _rel(target)],
+            'evidence': {'tree': _rel(syn), 'templates_total': len(tpls),
+                         'degradation': '在 %s 追加 can(%r) ⇒ 未登记能力 ⇒ RESULT: FAIL'
+                                        % (_rel(target), '__v01_injected_unknown_capability__')}}
+
+
+def _inj_check_migration_heads(ctx):
+    """合成树 = 真脚本副本 + 2 个互不为祖先的 revision ⇒ head_count=2 ≠ 1。"""
+    syn = _inj_fresh(ctx, 'check_migration_heads')
+    script = _inj_copy(os.path.join(SCRIPTS_DIR, 'check_migration_heads.py'),
+                       os.path.join(syn, 'scripts', 'check_migration_heads.py'))
+    vers = os.path.join(syn, 'migrations', 'versions')
+    _inj_mkdirs(vers)
+    for rev in ('aaaa0001', 'bbbb0002'):
+        _inj_write(os.path.join(vers, '%s_x.py' % rev),
+                   "revision = '%s'\ndown_revision = None\nbranch_labels = None\n"
+                   "depends_on = None\n\n\ndef upgrade():\n    pass\n\n\n"
+                   "def downgrade():\n    pass\n" % rev)
+    return {'kind': 'real_input', 'replace_script': script, 'fixtures': [_rel(syn)],
+            'evidence': {'tree': _rel(syn), 'degradation': '2 个独立 head（aaaa0001 / bbbb0002）'}}
+
+
+def _inj_check_properties(ctx):
+    """合成树 = 真 app/models.py 副本 + 1 个类级访问 @property 的文件（A 类违规）。"""
+    syn = _inj_fresh(ctx, 'check_properties')
+    _inj_copy(os.path.join(REPO_ROOT, 'app', 'models.py'), os.path.join(syn, 'models.py'))
+    bad = _inj_write(os.path.join(syn, 'bad_ref.py'),
+                     'from models import Employee\n\n\ndef bad():\n'
+                     "    return Employee.query.filter(Employee.status == 'active').all()\n")
+    return {'kind': 'real_input', 'append_argv': ['--root', syn], 'fixtures': [_rel(bad)],
+            'evidence': {'tree': _rel(syn),
+                         'degradation': 'Employee.status 是 @property 却作类级访问（A 类违规）'}}
+
+
+def _inj_check_model_refs(ctx):
+    """合成坏树 = 1 个 `Widget.query`（大写名未绑定）⇒ violations >= 1。"""
+    syn = _inj_fresh(ctx, 'check_model_refs')
+    bad = _inj_write(os.path.join(syn, 'main', 'bad.py'),
+                     'def bad_endpoint(item_id):\n'
+                     '    row = Widget.query.get_or_404(item_id)\n'
+                     "    return {'id': row.id}\n")
+    return {'kind': 'real_input', 'append_argv': ['--root', syn], 'fixtures': [_rel(bad)],
+            'evidence': {'tree': _rel(syn),
+                         'degradation': 'Widget.query（无绑定的大写名）⇒ violations 1'}}
+
+
+def _inj_check_http_contract(ctx):
+    """合成树 = 1 个裸捕 `request.get_json()` 的站点 ⇒ sites=1 ≠ 基线 10。"""
+    syn = _inj_fresh(ctx, 'check_http_contract')
+    bad = _inj_write(os.path.join(syn, 'main', 'bad.py'),
+                     'from flask import request, jsonify\n\n\ndef bad_json():\n'
+                     '    try:\n        data = request.get_json()\n'
+                     '    except Exception as e:\n'
+                     "        return jsonify({'message': str(e)}), 500\n")
+    return {'kind': 'real_input', 'append_argv': ['--roots', syn], 'fixtures': [_rel(bad)],
+            'evidence': {'tree': _rel(syn),
+                         'degradation': 'get_json() 被 except Exception 吞掉 ⇒ sites 1（期望 10）'}}
+
+
+def _inj_evidence_hash(ctx):
+    """合成证据树：先 `--freeze` 建索引，再篡改 1 个文件 ⇒ 必须报 `modified`（新违规 ⇒ 失败）。
+
+    注意：该篡改**不在** `_phaseB-prefreeze/**` 之下 ⇒ 通配规则不得把它吞掉
+    （顺带证明 A-89 的通配规则没有放宽任何其它路径的约束）。
+    """
+    syn = _inj_fresh(ctx, 'evidence_hash')
+    ev = os.path.join(syn, 'ev')
+    _inj_mkdirs(os.path.join(ev, 'sub'))
+    target = _inj_write(os.path.join(ev, 'sub', 'a.txt'), 'original\n')
+    res = run_child(['-B', os.path.join(HERE, 'evidence_hash.py'),
+                     '--evidence-root', ev, '--freeze'],
+                    cwd=REPO_ROOT, timeout=600, label='v01_inj_eh_freeze')
+    if res['exit_code'] != 0:
+        raise RuntimeError('注入夹具准备失败：合成证据树 --freeze exit=%s' % res['exit_code'])
+    with open(target, 'a', encoding='utf-8', newline='\n') as fh:
+        fh.write('tampered-by-v01-injection\n')
+    return {'kind': 'real_input', 'append_argv': ['--evidence-root', ev], 'fixtures': [_rel(syn)],
+            'evidence': {'tree': _rel(syn), 'freeze_exit': res['exit_code'],
+                         'degradation': 'freeze 后篡改 %s（位于通配规则覆盖范围之外）' % _rel(target)}}
+
+
+def _inj_coverage_drift(ctx):
+    """把评判用的 coverage.json 换成「LOCKED 下界被下调 1」的副本 ⇒ 「不许退化」判据必须报红。"""
+    src = os.path.join(REPORTS_ROOT, 'evidence', 'harness', 'coverage.json')
+    if not os.path.isfile(src):
+        raise RuntimeError('注入夹具准备失败：找不到锚点 coverage.json：%s' % src)
+    with open(src, encoding='utf-8') as fh:
+        doc = json.load(fh)
+    summary = doc.get('summary') or {}
+    key = 'writable_any_covered_by_all'
+    if key not in summary:
+        raise RuntimeError('注入夹具准备失败：coverage.json summary 无 %s' % key)
+    before = summary[key]
+    summary[key] = before - 1
+    syn = _inj_fresh(ctx, 'coverage_drift')
+    path = _inj_write(os.path.join(syn, 'coverage_degraded.json'),
+                      json.dumps(doc, ensure_ascii=False, indent=1))
+    return {'kind': 'real_input', 'set_flag': ('--coverage', path), 'fixtures': [_rel(path)],
+            'evidence': {'source': _rel(src), 'degraded': {key: [before, before - 1]},
+                         'degradation': 'LOCKED 是不许退化的下界：%s %s => %s'
+                                        % (key, before, before - 1)}}
+
+
+def _inj_run_gates(ctx):
+    """`judge_artifact`：本步程序照常真跑，但**判据层读的 gates.json** 换成合成的降级产物。"""
+    syn = _inj_fresh(ctx, 'run_gates')
+    doc = {
+        'harness': 'run_gates.py',
+        'run_id': 'v01-injection',
+        'repo_root': REPO_ROOT,
+        'gates': [{
+            'gate': '__v01_injected_degraded_gate__',
+            'script': '<injected>',
+            'mode': 'native',
+            'command': '<injected degraded artifact>',
+            'exit_code': 1, 'expected_exit_code': 0, 'exit_code_informative': True,
+            'checks': [{'fact': 'v01_injection', 'expected': 0, 'actual': 1,
+                        'status': 'failed'}],
+            'verdict': 'fail', 'evidence_level': 'synthetic', 'real_db_unchanged': True,
+        }],
+        'summary': {'total': 1, 'pass': 0, 'fail': 1, 'probe_only': 0, 'probe_unexpected': 0,
+                    'exit_code_informative': 1,
+                    'in_gate_chain': ['__v01_injected_degraded_gate__']},
+        'exit_code_semantics': {'code': 1, 'rule': 'synthetic degraded artifact (V-01 injection)'},
+    }
+    path = _inj_write(os.path.join(syn, 'gates.degraded.json'),
+                      json.dumps(doc, ensure_ascii=False, indent=1))
+    return {'kind': 'judge_artifact', 'judge_artifact': {'gates_json': path},
+            'fixtures': [_rel(path)],
+            'evidence': {'degraded_artifact': _rel(path),
+                         'degradation': 'summary.fail=1 + 1 个进链门禁 verdict=fail ⇒ 判据层必须报红'}}
+
+
+def _inj_script_fixture(ctx, step_id):
+    path = _inj_fixture(ctx, step_id)
+    return {'kind': 'script_fixture', 'replace_script': path, 'fixtures': [_rel(path)],
+            'evidence': {'fixture': _rel(path),
+                         'degradation': '该步无输入路径参数（跑真 app/真库）⇒ 把「要跑的程序」'
+                                        '换成故意不合规的夹具：%s' % FIXTURE_LINES[step_id][0]}}
+
+
+#: 每步 1 次注入（形态 ⑦：只改输入路径，不动判据）——判据 ② 的机读依据
+INJECTIONS = {
+    'check_templates': {'kind': 'real_input', 'builder': _inj_check_templates,
+                        'how': '合成树副本（真 templates + permissions + 7 route 文件）+ 1 个模板注入未登记能力'},
+    'check_migration_heads': {'kind': 'real_input', 'builder': _inj_check_migration_heads,
+                              'how': '脚本副本按原相对深度放置 + 2 个独立 head 的合成 migrations/versions'},
+    'check_properties': {'kind': 'real_input',
+                         'builder': lambda ctx: _inj_check_properties(ctx),
+                         'how': '--root 指向合成树（models.py 副本 + 类级访问 @property 的违规文件）'},
+    'check_db_bootstrap': {'kind': 'script_fixture',
+                           'builder': lambda ctx: _inj_script_fixture(ctx, 'check_db_bootstrap'),
+                           'how': '换掉被跑的脚本为不合规夹具（该步无输入路径参数）'},
+    'run_gates': {'kind': 'judge_artifact', 'builder': _inj_run_gates,
+                  'how': '本步真跑；判据层读的 gates.json 换成合成降级产物（summary.fail=1）'},
+    'functional_test': {'kind': 'script_fixture',
+                        'builder': lambda ctx: _inj_script_fixture(ctx, 'functional_test'),
+                        'how': '换掉被跑的脚本为不合规夹具（该步无输入路径参数）'},
+    'permission_matrix': {'kind': 'script_fixture',
+                          'builder': lambda ctx: _inj_script_fixture(ctx, 'permission_matrix'),
+                          'how': '换掉被跑的脚本为不合规夹具（该步无输入路径参数）'},
+    'smoke_test': {'kind': 'script_fixture',
+                   'builder': lambda ctx: _inj_script_fixture(ctx, 'smoke_test'),
+                   'how': '换掉被跑的脚本为不合规夹具（该步无输入路径参数）'},
+    'route_inventory': {'kind': 'script_fixture',
+                        'builder': lambda ctx: _inj_script_fixture(ctx, 'route_inventory'),
+                        'how': '换掉被跑的脚本为不合规夹具（该步无输入路径参数）'},
+    'measure_coverage': {'kind': 'script_fixture',
+                         'builder': lambda ctx: _inj_script_fixture(ctx, 'measure_coverage'),
+                         'how': '换掉被跑的脚本为不合规夹具（该步无输入路径参数）'},
+    'coverage_drift': {'kind': 'real_input', 'builder': _inj_coverage_drift,
+                       'how': '--coverage 指向 LOCKED 下界被下调 1 的合成 coverage.json'},
+    'check_model_refs': {'kind': 'real_input', 'builder': _inj_check_model_refs,
+                         'how': '--root 指向合成坏树（Widget.query 未绑定）'},
+    'check_http_contract': {'kind': 'real_input', 'builder': _inj_check_http_contract,
+                            'how': '--roots 指向合成树（裸捕 get_json() 的 1 个站点）'},
+    'evidence_hash': {'kind': 'real_input', 'builder': _inj_evidence_hash,
+                      'how': '--evidence-root 指向「freeze 后篡改 1 个文件」的合成证据树'},
+}
+
+
+def build_injection(step_id, ctx):
+    """按表构造注入（返回 dict；`builder` 抛异常即为夹具准备失败 —— 不得静默跳过）。"""
+    spec = INJECTIONS.get(step_id)
+    if spec is None:
+        raise RuntimeError('未知步骤（INJECTIONS 表未声明）：%s' % step_id)
+    out = dict(spec['builder'](ctx))
+    out['step'] = step_id
+    out.setdefault('fixtures', [])
+    out.setdefault('evidence', {})
+    out['how'] = spec['how']
+    out['declared_kind'] = spec['kind']
+    return out
+
+
+def criterion_fingerprint(step):
+    """判据指纹：注入前后必须相等（形态 ⑦「只改输入路径、不改判据」的机检）。"""
+    payload = {
+        'id': step['id'], 'mode': step.get('mode'), 'hook': step.get('hook'),
+        'expects': step.get('expects'), 'expect_absent': step.get('expect_absent'),
+        'expect_exit': step.get('expect_exit'), 'known_bad_absent': step.get('known_bad_absent'),
+    }
+    blob = json.dumps(payload, ensure_ascii=False, sort_keys=True).encode('utf-8')
+    return hashlib.sha256(blob).hexdigest().upper()
+
+
+def _script_index(argv_step):
+    """argv 里「被跑的脚本」位置：最后一个 `.py` 参数（shim 场景下 shim 在前、目标在后）。"""
+    for i in range(len(argv_step) - 1, -1, -1):
+        if str(argv_step[i]).endswith('.py'):
+            return i
+    return None
+
+
+# ------------------------------------------------------------------ 步骤表
 def spec_steps(python_exe, check_templates_script=None,
                evidence_whitelist=DEFAULT_EVIDENCE_WHITELIST):
     """§2 的九条命令 + 判据层链路 + A-85 三接入位（分组见模块 docstring）。"""
@@ -177,67 +716,10 @@ def spec_steps(python_exe, check_templates_script=None,
          'hook': 'evidence_hash_whitelist',
          'whitelist': evidence_whitelist,
          'note': 'TL-04 / G-10：evidence/** 只追加防篡改。判据 = 无未登记违规 + 白名单零陈旧 '
-                 '+ real_db 钉值未变；登记 33 条 captain 侧既有违规（A-52/A-55）。'
-                 '--no-strict-coverage 的理由见上方注释（allowlist 语义 + 去噪声）。'},
+                 '（精确 33 条 + %s 通配 1 条，A-89）+ 通配规则匹配数 > 0 + real_db 钉值未变。'
+                 '--no-strict-coverage 的理由见上方注释（allowlist 语义 + 去噪声）。'
+                 % ARCHIVE_ROOT_GLOB},
     ]
-
-
-def evidence_hash_whitelist(res, step, run_dir):
-    """TL-04 的判据：把 evidence_hash 的违规集与白名单对拍（只登记既有违规，不洗白）。
-
-    返回 ``(checks, extra)``；``checks`` 里任一项 ``failed`` ⇒ 本步失败。
-    """
-    checks = []
-    extra = {}
-    jpath = step.get('json_path')
-    reg, reason, wdoc = load_whitelist(step.get('whitelist'))
-
-    if not jpath or not os.path.isfile(jpath):
-        checks.append({'kind': 'json', 'needle': 'evidence_hash --out JSON present',
-                       'status': 'failed'})
-        extra['whitelist'] = {'path': step.get('whitelist'), 'registered': None,
-                              'reason': reason or ('json not written: %s' % jpath)}
-        return checks, extra
-
-    with open(jpath, encoding='utf-8') as fh:
-        rep = json.load(fh)
-    violations = rep.get('violations') or []
-    actual_set = {(v.get('kind'), v.get('path')) for v in violations if v.get('path')}
-    unregistered = sorted(actual_set - reg)
-    stale = sorted(reg - actual_set)
-    pinned = bool(rep.get('real_db_matches_pinned'))
-
-    extra['evidence_hash'] = {
-        'verdict': rep.get('verdict'),
-        'counts': rep.get('counts'),
-        'violations_total': len(violations),
-        'real_db_matches_pinned': pinned,
-        'report_json': os.path.relpath(jpath, REPO_ROOT).replace('\\', '/'),
-    }
-    extra['whitelist'] = {
-        'path': step.get('whitelist'),
-        'registered': len(reg),
-        'registered_declared': (wdoc or {}).get('registered_count'),
-        'registered_source': (wdoc or {}).get('registered_source'),
-        'unregistered_count': len(unregistered),
-        'unregistered_first10': ['%s|%s' % (k, p) for k, p in unregistered[:10]],
-        'stale_count': len(stale),
-        'stale_first10': ['%s|%s' % (k, p) for k, p in stale[:10]],
-    }
-    # 白名单条目清单随报告落盘（供审计：这条约束当前到底由哪些条目构成）
-    if wdoc is not None:
-        mpath, _renamed = guard_write(os.path.join(run_dir, 'evidence_whitelist.registered.json'))
-        with open(mpath, 'w', encoding='utf-8', newline='\n') as fh:
-            json.dump(wdoc, fh, ensure_ascii=False, indent=1)
-        extra['whitelist']['manifest'] = os.path.relpath(mpath, REPO_ROOT).replace('\\', '/')
-
-    checks.append({'kind': 'whitelist', 'needle': 'no unregistered violation',
-                   'status': 'passed' if not unregistered else 'failed'})
-    checks.append({'kind': 'whitelist', 'needle': 'whitelist has no stale entry',
-                   'status': 'passed' if not stale else 'failed'})
-    checks.append({'kind': 'pinned', 'needle': 'real_db_matches_pinned == true',
-                   'status': 'passed' if pinned else 'failed'})
-    return checks, extra
 
 
 def root_json_state():
@@ -249,6 +731,128 @@ def root_json_state():
     return state
 
 
+# ------------------------------------------------------------------ --selfcheck
+def selfcheck(python_exe, whitelist=DEFAULT_EVIDENCE_WHITELIST, run_dir=None):
+    """门禁清单自身的 8 条不变量（缺一 ⇒ 失败）。返回 ``(exit_code, report)``。"""
+    steps = spec_steps(python_exe, evidence_whitelist=whitelist)
+    ids = [s['id'] for s in steps]
+    checks = []
+
+    def add(name, ok, detail=''):
+        checks.append({'check': name, 'status': 'passed' if ok else 'failed', 'detail': detail})
+
+    add('step_count >= 14', len(steps) >= 14, 'step_count=%d' % len(steps))
+
+    missing = sorted(set(ids) - set(INJECTIONS))
+    extra = sorted(set(INJECTIONS) - set(ids))
+    add('every step declares an injection (INJECTIONS covers all step ids)',
+        not missing and not extra,
+        'missing=%s extra=%s' % (missing or '[]', extra or '[]'))
+
+    http = [s for s in steps if s['id'] == 'check_http_contract']
+    bad_needles = [n for n in (http[0].get('expects') or []) if '自检' in n] if http else ['<no step>']
+    add('check_http_contract expects must NOT contain the --selftest statistic line',
+        http and not bad_needles, 'expects=%s' % ((http[0].get('expects') if http else None),))
+
+    mr = [s for s in steps if s['id'] == 'check_model_refs']
+    bad_cnt = [n for n in (mr[0].get('expects') or []) if 'name_query_refs' in n] if mr else ['<no step>']
+    add('check_model_refs expects must NOT pin name_query_refs count',
+        mr and not bad_cnt, 'expects=%s' % ((mr[0].get('expects') if mr else None),))
+
+    eh = [s for s in steps if s['id'] == 'evidence_hash']
+    eh_ok = bool(eh) and eh[0]['group'] == 'report-only' \
+        and '--no-strict-coverage' in eh[0]['argv'] and '--strict-index' not in eh[0]['argv']
+    add('TL-04 (evidence_hash) is report-only and does not use --strict-index',
+        eh_ok, 'group=%s argv=%s' % (eh[0]['group'] if eh else None, eh[0]['argv'] if eh else None))
+
+    reg, rules, reason, wdoc = load_whitelist(whitelist)
+    counts = registration_counts(wdoc)
+    add('whitelist loads with exact 33 base entries (appended block reported separately)',
+        counts['registered'] == 33 and not reason,
+        'registered=%d registered_appended=%d registered_total=%d reason=%s'
+        % (counts['registered'], counts['registered_appended'], counts['registered_total'],
+           reason or '-'))
+
+    # 通配规则的 4 个对抗用例（证明「任意 stamp 覆盖」+「陈旧即失败」+「精确集不缩水」+「不越界」）
+    reg_list = sorted(reg)
+    case_new = reg_list + [('deleted', '_phaseB-prefreeze/20990101-000000/baseline-prefix/x.txt'),
+                           ('modified', '_phaseB-prefreeze/20990101-000000/harness/y.json'),
+                           ('phantom_entry', '_phaseB-prefreeze/20990101-000000/dir')]
+    m_new = match_whitelist(case_new, reg, rules)
+    ok_new = (not m_new['unregistered']) and (not m_new['stale_exact']) and (not m_new['stale_rules'])
+    add('W-1 wildcard covers ANY stamp under %s' % ARCHIVE_ROOT_GLOB,
+        ok_new, 'unregistered=%d stale_exact=%d stale_rules=%s hits=%s'
+                % (len(m_new['unregistered']), len(m_new['stale_exact']),
+                   m_new['stale_rules'], m_new['rule_hits']))
+
+    m_gone = match_whitelist(reg_list, reg, rules)
+    add('W-2 wildcard rule with 0 matches is reported stale (no silent widening)',
+        bool(m_gone['stale_rules']), 'stale_rules=%s' % (m_gone['stale_rules'],))
+
+    m_shrunk = match_whitelist(reg_list[1:], reg, rules)
+    add('W-3 dropping an exact entry is reported stale (A-95 symmetric difference kept)',
+        bool(m_shrunk['stale_exact']), 'stale_exact=%d' % len(m_shrunk['stale_exact']))
+
+    m_look = match_whitelist(reg_list + [('modified', '_phaseB-prefreezeX/a.json')], reg, rules)
+    add('W-4 look-alike dir outside the archive root is still a violation (glob not over-broad)',
+        len(m_look['unregistered']) == 1, 'unregistered=%s'
+        % ['%s|%s' % kp for kp in m_look['unregistered']])
+
+    # 追加块（V-01）：登记后不算未登记；但同样纳入陈旧判定（只登记不裁决，不改变对称差集语义）
+    base_list = sorted((it.get('kind'), it['path'])
+                       for it in (wdoc or {}).get('violations', [])
+                       if isinstance(it, dict) and it.get('path'))
+    app_pairs = [it for it in (wdoc or {}).get('violations_appended', [])
+                 if isinstance(it, dict) and it.get('path')]
+    app_ok = True
+    app_detail = 'appended=0'
+    if app_pairs:
+        ap = [(it.get('kind'), it['path']) for it in app_pairs]
+        arch = ('deleted', '_phaseB-prefreeze/20990101-000000/baseline-prefix/x.txt')
+        m_app = match_whitelist(base_list + ap + [arch], reg, rules)
+        dropped = match_whitelist(base_list + ap[:-1] + [arch], reg, rules)
+        app_ok = ((not m_app['unregistered']) and (not m_app['stale_exact'])
+                  and (not m_app['stale_rules']) and len(dropped['stale_exact']) == 1)
+        app_detail = ('appended=%d unregistered=%d stale_exact=%d stale_rules=%d '
+                      'drop-one->stale_exact=%d'
+                      % (len(ap), len(m_app['unregistered']), len(m_app['stale_exact']),
+                         len(m_app['stale_rules']), len(dropped['stale_exact'])))
+    add('W-5 appended block: registered (no unregistered) AND still subject to stale',
+        app_ok, app_detail)
+
+    add('build-layer blocking registered as blocked (A-63 step 2 pending)',
+        BUILD_LAYER_BLOCKED.get('state') == 'blocked'
+        and BUILD_LAYER_BLOCKED.get('not_counted_as_passed') is True,
+        'id=%s owner=%s' % (BUILD_LAYER_BLOCKED['id'], BUILD_LAYER_BLOCKED['owner']))
+
+    failed = [c['check'] for c in checks if c['status'] == 'failed']
+    report = {
+        'harness': 'ci_gates.py --selfcheck',
+        'run_id': RUN_ID,
+        'interpreter': python_exe,
+        'step_count': len(steps),
+        'step_ids': ids,
+        'checks': checks,
+        'failed': failed,
+        'whitelist': {'path': whitelist, 'registered': len(reg), 'registered_declared':
+                      (wdoc or {}).get('registered_count'), 'rules': rules},
+        'gaps': [BUILD_LAYER_BLOCKED],
+        'code': 1 if failed else 0,
+    }
+    for c in checks:
+        print('[selfcheck] %-6s %s%s' % ('OK' if c['status'] == 'passed' else 'FAIL',
+                                         c['check'], ('  -- %s' % c['detail']) if c['detail'] else ''))
+    print('[selfcheck] step_count=%d failed=%s' % (len(steps), failed or '无'))
+    if run_dir:
+        path, _renamed = guard_write(os.path.join(run_dir, 'ci_gates.selfcheck.json'))
+        with open(path, 'w', encoding='utf-8', newline='\n') as fh:
+            json.dump(report, fh, ensure_ascii=False, indent=2)
+        report['path'] = _rel(path)
+        print('[selfcheck] JSON -> %s' % _rel(path))
+    return report['code'], report
+
+
+# ------------------------------------------------------------------ 主流程
 def main(argv=None):
     ap = argparse.ArgumentParser(
         description='E-04 CI 等价门禁入口（blocking/report-only 分组见模块 docstring）')
@@ -259,6 +863,10 @@ def main(argv=None):
                          '否则回退 sys.executable，便于 Linux runner）')
     ap.add_argument('--json', default=None, help='机读结果落点（写入守卫：已存在则改名保留）')
     ap.add_argument('--only', default=None, help='只跑某一步（id），用于破坏实验')
+    ap.add_argument('--inject-step', default=None,
+                    help='判据形态 ⑦：对某一步做 1 次注入破坏（只改输入路径；该步必须转红并被指名）')
+    ap.add_argument('--selfcheck', action='store_true',
+                    help='只跑「本清单自身」的不变量检查（步骤数 / 注入覆盖 / 统计行 / 白名单通配语义）')
     ap.add_argument('--check-templates-script', default=None,
                     help='覆盖第 1 步的 check_templates 脚本路径（E-04-b 破坏实验用合成树副本）')
     ap.add_argument('--check-model-refs-root', default=None,
@@ -291,11 +899,27 @@ def main(argv=None):
             if s['id'] == 'evidence_hash':
                 s.setdefault('extra_argv', []).append(
                     {'tail': ['--evidence-root', args.inject_evidence_root]})
+    if args.inject_step and not args.only:
+        args.only = args.inject_step
+    if args.inject_step and args.only != args.inject_step:
+        print('[ci_gates] --inject-step 与 --only 冲突：%s vs %s' % (args.inject_step, args.only))
+        return 1
     if args.only:
         steps = [s for s in steps if s['id'] == args.only]
         if not steps:
             print('[ci_gates] 未知步骤: %s' % args.only)
             return 1
+    if args.inject_step and args.inject_step not in INJECTIONS:
+        print('[ci_gates] 未知注入步骤（INJECTIONS 表未声明）: %s' % args.inject_step)
+        return 1
+
+    run_name = RUN_ID if RUN_ID.startswith('ci-') else 'ci-%s' % RUN_ID
+    run_dir = os.path.join(REPORTS_ROOT, 'evidence', 'harness', run_name)
+    os.makedirs(run_dir, exist_ok=True)
+
+    if args.selfcheck:
+        code, _report = selfcheck(exe, whitelist=args.evidence_whitelist, run_dir=run_dir)
+        return code
 
     if args.list:
         # 把注入破坏开关也展开出来（让「实际会跑什么」可见，便于复现与审计）
@@ -309,16 +933,18 @@ def main(argv=None):
             for spec_extra in s.get('extra_argv', []):
                 argv += [a.replace('{json}', '<run_dir>/%s' % spec_extra.get('json_name'))
                          for a in spec_extra.get('tail', [])]
+            inj = INJECTIONS.get(s['id'], {})
             print('[ci_gates] %-22s %-11s %s' % (s['id'], s['group'], ' '.join(argv)))
-        print('[ci_gates] phase=%s interpreter=%s' % (args.phase, exe))
+            print('[ci_gates]   inject: kind=%-15s %s' % (inj.get('kind', '-'),
+                                                          inj.get('how', '-')))
+        print('[ci_gates] phase=%s interpreter=%s steps=%d' % (args.phase, exe, len(steps)))
         return 0
 
-    run_name = RUN_ID if RUN_ID.startswith('ci-') else 'ci-%s' % RUN_ID
-    run_dir = os.path.join(REPORTS_ROOT, 'evidence', 'harness', run_name)
-    os.makedirs(run_dir, exist_ok=True)
     before = root_json_state()
+    inj_ctx = _inj_ctx(exe) if args.inject_step else None
 
     results = []
+    ineffective = []
     for s in steps:
         argv_step = list(s['argv'])
         out_path = None
@@ -360,6 +986,29 @@ def main(argv=None):
         if s.get('capture_stdout'):
             s['stdout_file'] = os.path.join(run_dir, 'route_inventory.stdout.txt')
 
+        # ---- V-01 逐步注入破坏：只改输入路径，判据由指纹机检保持不变 ----
+        injection = None
+        if args.inject_step and s['id'] == args.inject_step:
+            fp_before = criterion_fingerprint(s)
+            injection = build_injection(s['id'], inj_ctx)
+            if injection.get('replace_script'):
+                idx = _script_index(argv_step)
+                if idx is None:
+                    raise RuntimeError('注入失败：argv 里找不到脚本参数：%s' % argv_step)
+                argv_step[idx] = injection['replace_script']
+            if injection.get('set_flag'):
+                flag, value = injection['set_flag']
+                if flag not in argv_step:
+                    raise RuntimeError('注入失败：argv 里没有 %s：%s' % (flag, argv_step))
+                argv_step[argv_step.index(flag) + 1] = value
+            argv_step += list(injection.get('append_argv') or [])
+            if injection.get('judge_artifact'):
+                s['judge_artifact'] = injection['judge_artifact']
+            fp_after = criterion_fingerprint(s)
+            injection['criterion_sha256_before'] = fp_before
+            injection['criterion_sha256_after'] = fp_after
+            injection['criterion_unchanged'] = (fp_before == fp_after)
+
         # 去掉解释器（run_child 自己会加，且遵守 _env.interpreter() 的绝对路径规则）
         res = run_child(argv_step[1:], cwd=REPO_ROOT, timeout=3600, label='ci_%s' % s['id'])
         text = res['stdout'] + res['stderr']
@@ -398,41 +1047,69 @@ def main(argv=None):
             extra.update(hook_extra)
         if s.get('mode') == 'run_gates':
             # A-62：blocking 判据 = 非环境依赖部分
-            with open(out_path, encoding='utf-8') as fh:
-                gates = json.load(fh)
-            summary = gates['summary']
-            in_chain = [g for g in gates['gates'] if g['exit_code_informative']]
-            probes = [g for g in gates['gates'] if g.get('probe_only')]
-            fail_ok = summary['fail'] == 0
-            chain_ok = all(g['verdict'] == 'pass' for g in in_chain)
-            checks_ok = all(all(c['status'] == 'passed' for c in g['checks']) for g in in_chain)
-            checks.append({'kind': 'gates_json', 'needle': 'summary.fail == 0',
-                           'status': 'passed' if fail_ok else 'failed'})
-            checks.append({'kind': 'gates_json', 'needle': '4 项进链门禁全 pass',
-                           'status': 'passed' if chain_ok else 'failed'})
-            checks.append({'kind': 'gates_json', 'needle': '进链门禁逐项 checks 全过',
-                           'status': 'passed' if checks_ok else 'failed'})
-            extra = {
-                'gates_json': os.path.relpath(out_path, REPO_ROOT).replace('\\', '/'),
-                'summary': summary,
-                'exit_code_semantics': gates.get('exit_code_semantics'),
-                'in_chain': {g['gate']: g['verdict'] for g in in_chain},
-                'probe_env_dependent': [
-                    {'gate': g['gate'], 'native_exit': g['exit_code'],
-                     'expected': g['expected_exit_code'], 'verdict': g['verdict']}
-                    for g in probes],
-                'note': 'A-62：环境依赖探针留在 report-only；其 native_exit 与 expected 同时打印',
-            }
-            print('[ci_gates]   run_gates exit=%s（A-62：环境依赖探针不匹配时为 1，属预期）'
-                  % res['exit_code'])
-            for p in extra['probe_env_dependent']:
-                print('[ci_gates]   env-probe %s: native_exit=%s expected=%s verdict=%s'
-                      % (p['gate'], p['native_exit'], p['expected'], p['verdict']))
+            jread = (s.get('judge_artifact') or {}).get('gates_json') or out_path
+            gates = None
+            if not os.path.isfile(jread):
+                checks.append({'kind': 'gates_json',
+                               'needle': 'gates.json 存在（run_gates --out）', 'status': 'failed'})
+                extra = {'gates_json': _rel(jread), 'error': 'missing'}
+            else:
+                try:
+                    with open(jread, encoding='utf-8') as fh:
+                        gates = json.load(fh)
+                except Exception as e:
+                    checks.append({'kind': 'gates_json',
+                                   'needle': 'gates.json 可解析', 'status': 'failed'})
+                    extra = {'gates_json': _rel(jread),
+                             'error': '%s: %s' % (type(e).__name__, e)}
+            if gates is not None:
+                summary = gates['summary']
+                in_chain = [g for g in gates['gates'] if g['exit_code_informative']]
+                probes = [g for g in gates['gates'] if g.get('probe_only')]
+                fail_ok = summary['fail'] == 0
+                chain_ok = all(g['verdict'] == 'pass' for g in in_chain)
+                checks_ok = all(all(c['status'] == 'passed' for c in g['checks'])
+                                for g in in_chain)
+                checks.append({'kind': 'gates_json', 'needle': 'summary.fail == 0',
+                               'status': 'passed' if fail_ok else 'failed'})
+                checks.append({'kind': 'gates_json', 'needle': '4 项进链门禁全 pass',
+                               'status': 'passed' if chain_ok else 'failed'})
+                checks.append({'kind': 'gates_json', 'needle': '进链门禁逐项 checks 全过',
+                               'status': 'passed' if checks_ok else 'failed'})
+                extra = {
+                    'gates_json': _rel(jread),
+                    'summary': summary,
+                    'exit_code_semantics': gates.get('exit_code_semantics'),
+                    'in_chain': {g['gate']: g['verdict'] for g in in_chain},
+                    'probe_env_dependent': [
+                        {'gate': g['gate'], 'native_exit': g['exit_code'],
+                         'expected': g['expected_exit_code'], 'verdict': g['verdict']}
+                        for g in probes],
+                    'note': 'A-62：环境依赖探针留在 report-only；其 native_exit 与 expected 同时打印',
+                }
+                print('[ci_gates]   run_gates exit=%s（A-62：环境依赖探针不匹配时为 1，属预期）'
+                      % res['exit_code'])
+                for p in extra['probe_env_dependent']:
+                    print('[ci_gates]   env-probe %s: native_exit=%s expected=%s verdict=%s'
+                          % (p['gate'], p['native_exit'], p['expected'], p['verdict']))
         if s.get('mode') == 'coverage_drift':
-            extra = {'coverage_json': os.path.relpath(os.path.join(run_dir, 'coverage.json'),
-                                                      REPO_ROOT).replace('\\', '/')}
+            extra = {'coverage_json': _rel(os.path.join(run_dir, 'coverage.json'))}
 
         status = 'passed' if all(c['status'] == 'passed' for c in checks) else 'failed'
+
+        # ---- 注入的自我取证 + 「假注入」兜底：注入必须让该步转红，且判据指纹必须未变 ----
+        if injection is not None:
+            checks.append({'kind': 'injection',
+                           'needle': 'criterion fingerprint unchanged (%s)'
+                                     % injection['criterion_sha256_before'][:16],
+                           'status': 'passed' if injection['criterion_unchanged'] else 'failed'})
+            checks.append({'kind': 'injection', 'needle': 'injection turned the step red',
+                           'status': 'passed' if status == 'failed' else 'failed'})
+            if status != 'failed' or not injection['criterion_unchanged']:
+                ineffective.append(s['id'])
+            status = 'passed' if all(c['status'] == 'passed' for c in checks) else 'failed'
+            extra['injection'] = injection
+
         results.append({
             'id': s['id'], 'group': s['group'], 'command': res['argv_display'],
             'exit_code': res['exit_code'], 'expected_exit': s['expect_exit'],
@@ -446,16 +1123,19 @@ def main(argv=None):
         flag = 'OK  ' if status == 'passed' else 'FAIL'
         print('[ci_gates] %s %-22s group=%-11s exit=%s %s'
               % (flag, s['id'], s['group'], res['exit_code'],
-                 ('checks %d/%d' % (sum(1 for c in checks if c['status'] == 'passed'), len(checks)))) )
+                 ('checks %d/%d' % (sum(1 for c in checks if c['status'] == 'passed'), len(checks)))))
         for c in checks:
             if c['status'] == 'failed':
                 print('[ci_gates]      !! %s %s' % (c['kind'], c['needle']))
+        if injection is not None:
+            print('[ci_gates]      inject kind=%s criterion_unchanged=%s'
+                  % (injection['kind'], injection['criterion_unchanged']))
 
     after = root_json_state()
     root_ok = all(before[n] == after[n] for n in ROOT_JSON)
     blocking_fail = [r['id'] for r in results if r['group'] == 'blocking' and r['status'] != 'passed']
     report_fail = [r['id'] for r in results if r['group'] == 'report-only' and r['status'] != 'passed']
-    code = 1 if (blocking_fail or not root_ok) else (2 if report_fail else 0)
+    code = 1 if (blocking_fail or not root_ok or ineffective) else (2 if report_fail else 0)
 
     out = {
         'harness': 'ci_gates.py',
@@ -463,9 +1143,12 @@ def main(argv=None):
         'phase': args.phase,
         'interpreter': exe,
         'repo_root': REPO_ROOT,
+        'step_count': len(results),
         'steps': results,
         'blocking_failed': blocking_fail,
         'report_only_failed': report_fail,
+        'injection_ineffective': ineffective,
+        'injection': next((r['injection'] for r in results if r.get('injection')), None),
         'root_json_untouched': {
             'ok': root_ok,
             'before': before, 'after': after,
@@ -476,17 +1159,21 @@ def main(argv=None):
             'note': 'A-11：CI 里禁止跑会写仓库根 JSON 的形态；请求型步骤一律 --no-dump'},
         'exit_code_semantics': {
             'code': code,
-            'rule': ('0 = 全部 blocking 通过; 1 = 有 blocking 失败（或仓库根 JSON 被写）; '
+            'rule': ('0 = 全部 blocking 通过; 1 = 有 blocking 失败（或仓库根 JSON 被写 / 注入未生效）; '
                      '2 = 仅 report-only 失败'),
             'inputs': {'blocking_failed': blocking_fail, 'report_only_failed': report_fail,
-                       'root_json_untouched': root_ok},
+                       'root_json_untouched': root_ok, 'injection_ineffective': ineffective},
         },
         'promotion_note': SMOKE_PROMOTION_NOTE,
+        'gaps': [BUILD_LAYER_BLOCKED],
     }
 
-    print('[ci_gates] blocking 失败 = %s' % (blocking_fail or '无'))
+    print('[ci_gates] steps=%d blocking 失败 = %s' % (len(results), blocking_fail or '无'))
     print('[ci_gates] report-only 失败 = %s' % (report_fail or '无'))
+    print('[ci_gates] 注入未生效 = %s' % (ineffective or '无'))
     print('[ci_gates] 仓库根两 JSON 未被触碰 = %s（A-11）' % root_ok)
+    print('[ci_gates] gaps: %s = %s（不计入通过数）'
+          % (BUILD_LAYER_BLOCKED['id'], BUILD_LAYER_BLOCKED['state']))
     print('[ci_gates] exit = %d  phase=%s' % (code, args.phase))
     print('[ci_gates] exit_code_semantics=' + json.dumps(out['exit_code_semantics'],
                                                          ensure_ascii=False))
@@ -497,7 +1184,8 @@ def main(argv=None):
         with open(path, 'w', encoding='utf-8', newline='\n') as fh:
             json.dump(out, fh, ensure_ascii=False, indent=2)
         print('[ci_gates] JSON -> %s%s' % (path, '（写入守卫改名保留）' if renamed else ''))
-    text = ('=' * 88 + '\n[ci_gates] run_id=%s phase=%s interpreter=%s\n' % (RUN_ID, args.phase, exe)
+    text = ('=' * 88 + '\n[ci_gates] run_id=%s phase=%s interpreter=%s steps=%d\n'
+            % (RUN_ID, args.phase, exe, len(results))
             + json.dumps(out, ensure_ascii=False, indent=1) + '\n')
     saved = save_evidence('ci_gates_%s.console.txt' % args.phase, text, subdir=run_name)
     print('[ci_gates] 原始输出已落盘（写入守卫 + 台账）-> %s' % saved)

@@ -7,9 +7,27 @@ P-01 的失效形态是「**同一文件里只有两个函数坏**」（同模�
 | 树 | 来源 | 期望 |
 | --- | --- | --- |
 | `<repo>/app` | 当前工作树（已补导入） | 两端点 **非 5xx**、`use` 后 `quantity` 真的减少、不存在 id 返 **404** |
-| `.tmp/<RUN_ID>/prefix/app` | `git show HEAD:app/main/routes.py`（**修复前**逐字节） | 两端点 **500**、`quantity` **未变**；`use` 的未捕获 `NameError` 由 Flask 记进 stderr |
+| `.tmp/<RUN_ID>/prefix/app` | `git show <PRE_FIX_REV>:app/main/routes.py`（**修复前**逐字节；`PRE_FIX_REV` = 显式钉死的修复前提交 `2c6dbfd`，**不依赖移动的 `HEAD`**） | 两端点 **500**、`quantity` **未变**；`use` 的未捕获 `NameError` 由 Flask 记进 stderr |
 
 两棵树**只差 routes.py 一个文件**，请求脚本、夹具、判据完全同一份 ⇒ 差异只能由那一行导入解释。
+
+## ⚠ 「修复前树」必须钉**显式提交号**（A-79 / 同源 A-70）
+
+本探针原先用 `git show HEAD:app/main/routes.py` 取「修复前树」。**P-01 的修复已被提交
+（`fd51023` = 「修复 13 项产品缺陷（P-01..P-13）」）⇒ `HEAD` 从此**含**修复** ⇒ 「修复前树」
+其实已含修复 ⇒ **负向对照 P-01-r1/r2 必然失败**（实测 `FAILED: P-01-r2 ...: row NOT deleted`），
+而这不是产品回归、是**探针的基准不可复算**（`00b-裁定与纪律增补.md` A-79；A-70 是 `w2w3_uatdiff.py`
+上的同源第 1 例）。
+
+**修正（只改「取哪棵树的 routes.py」，判据口径与期望值一字未动）**：
+- `PRE_FIX_REV` = `2c6dbfd66a43aebf6733500b5579436f7e8d8da0`（= 修复前最后一个提交；
+  `fd51023` 的唯一父提交 ⇒ `2c6dbfd == fd51023^`）；
+- 该常量可被环境变量 `WMS_PREFIX_REV` 覆盖（便于将来换钉），但**默认值永远是显式提交号**，
+  代码里不再出现 `HEAD:` 取树；
+- 新增**可复算性前置（precondition，不是新判据、不改口径）**：把钉住的 blob 与 `HEAD` 的 blob
+  比对，若**相同**说明「修复前树」与当前树无差异 ⇒ 负向对照**空转**（恒真）⇒ 该前置**报红**，
+  避免再次出现「负向对照必然失败/必然通过却无人发现」。
+  期望：修前 `routes.py` blob `4137E998…2263A` ≠ `HEAD` blob `EADE9C2D…52CE2`。
 
 ## 判据（机械可判）
 | id | 判据 |
@@ -61,9 +79,21 @@ APP_DIR = os.path.join(REPO_ROOT, 'app')
 PREFIX_TREE = os.path.join(tmp_dir('prefix'))
 LINE6_TREE = os.path.join(tmp_dir('line6'))
 INJECT_TREE = os.path.join(tmp_dir('inject'))
+#: `build_prefix_tree()` 回填；供 `judge_prefix` / 门禁判据做**可复算性前置**（A-70/A-79）
+PREFIX_INFO = {}
 
 #: 本任务唯一的生产代码改动（`app/main/routes.py:6` 行尾追加）
 MY_IMPORT_SUFFIX = ', Consumable, ConsumableCategory'
+
+#: ── A-70/A-79：「修复前树」钉**显式提交号**，不得依赖移动的 HEAD ────────────────────────
+#: 修复前最后一个提交 = P-01..P-13 修复提交 fd51023 的唯一父提交（`fd51023^`）。
+#: 严禁改回 `HEAD:`/`HEAD` —— 修复一旦被提交，`HEAD` 就含修复，「修复前树」必失效。
+PRE_FIX_REV = '2c6dbfd66a43aebf6733500b5579436f7e8d8da0'
+PRE_FIX_REV_SHORT = PRE_FIX_REV[:7]
+#: 该提交把 P-01..P-13 一次修完；它的父提交即「修复前」。
+FIX_COMMIT_REV = 'fd5102360b3777d8ec2a0fb2610b2abbc2119df6'
+#: 允许换钉（便于将来复核），但**默认值永远是显式提交号**。
+PRE_FIX_REV_ENV = 'WMS_PREFIX_REV'
 
 #: 请求探针（同一份源码跑两棵树；@PLACEHOLDER@ 由 orchestrator 替换）
 REQUEST_SOURCE = r'''
@@ -184,6 +214,30 @@ def git_head_rev():
         return fh.read().strip()
 
 
+def pre_fix_rev():
+    """返回「修复前树」要用的**显式提交号**（A-70/A-79）。
+
+    默认 = `PRE_FIX_REV` 常量；可用 `WMS_PREFIX_REV` 覆盖（换钉用）。
+    **绝不**回落到 `HEAD` —— 那正是被修掉的缺陷。
+    """
+    rev = (os.environ.get(PRE_FIX_REV_ENV) or '').strip() or PRE_FIX_REV
+    dest = os.path.join(tmp_dir('prefix'), 'pre-fix-rev.txt')
+    rc = _git_to_file(['git', 'rev-parse', '--verify', rev + '^{commit}'], dest)
+    with open(dest, encoding='utf-8', errors='replace') as fh:
+        resolved = fh.read().strip()
+    return {'rev': rev, 'resolved': resolved if rc == 0 else '',
+            'rev_parse_exit': rc,
+            'source': 'env:%s' % PRE_FIX_REV_ENV if os.environ.get(PRE_FIX_REV_ENV) else 'const'}
+
+
+def git_blob_of(spec):
+    """`git rev-parse <spec>` ⇒ blob/commit 对象名（用于判定「两棵树是否真有差异」）。"""
+    dest = os.path.join(tmp_dir('prefix'), 'rev-parse-%d.txt' % abs(hash(spec)))
+    rc = _git_to_file(['git', 'rev-parse', '--verify', spec], dest)
+    with open(dest, encoding='utf-8', errors='replace') as fh:
+        return {'spec': spec, 'exit': rc, 'rev': fh.read().strip()}
+
+
 def worktree_state():
     """记录取证时刻的工作树状态（本仓是多人并发写入的活体，A/B 必须写清当时状态）。"""
     dest = os.path.join(tmp_dir(), 'git-status.txt')
@@ -200,46 +254,80 @@ def worktree_state():
 
 
 def build_prefix_tree(lines):
-    """`.tmp/<RUN_ID>/prefix/app` = 当前 app/ 的副本，但 routes.py 换成 git HEAD（修复前逐字节）。"""
+    """`.tmp/<RUN_ID>/prefix/app` = 当前 app/ 的副本，但 routes.py 换成**钉死的修复前提交**的版本。
+
+    （A-70/A-79 修正：原先取 `git show HEAD:`；修复被提交后 `HEAD` 已含修复 ⇒ 该「修复前树」
+    失真。现取 `PRE_FIX_REV`（显式提交号，默认 `2c6dbfd`）⇒ 与 `HEAD` 无关、可复算。）
+    """
     if os.path.isdir(PREFIX_TREE):
         shutil.rmtree(PREFIX_TREE)
     ensure_dir(PREFIX_TREE)
     shutil.copytree(APP_DIR, os.path.join(PREFIX_TREE, 'app'),
                     ignore=shutil.ignore_patterns('__pycache__'))
-    head_routes = os.path.join(PREFIX_TREE, 'git-head-routes.py')
-    rc = _git_to_file(['git', 'show', 'HEAD:' + ROUTES_REL.replace('\\', '/')], head_routes)
-    shutil.copyfile(head_routes, os.path.join(PREFIX_TREE, 'app', 'main', 'routes.py'))
+    pin = pre_fix_rev()
+    rel = ROUTES_REL.replace('\\', '/')
+    pre_fix_routes = os.path.join(PREFIX_TREE, 'pre-fix-routes.py')
+    rc = _git_to_file(['git', 'show', '%s:%s' % (pin['rev'], rel)], pre_fix_routes)
+    shutil.copyfile(pre_fix_routes, os.path.join(PREFIX_TREE, 'app', 'main', 'routes.py'))
     worktree_routes = os.path.join(REPO_ROOT, ROUTES_REL)
+    #: 可复算性前置：钉住的 blob 必须与 HEAD 的 blob **不同**，否则「修复前树」= 当前树
+    #: ⇒ 负向对照空转（恒真）；此时前置报红，绝不静默。
+    head_blob = git_blob_of('HEAD:%s' % rel)
+    pin_blob = git_blob_of('%s:%s' % (pin['rev'], rel))
+    pin_distinct = bool(head_blob['rev']) and bool(pin_blob['rev']) \
+        and head_blob['rev'] != pin_blob['rev']
     info = {
         'git_head_rev': git_head_rev(),
+        'pre_fix_rev': pin['rev'],
+        'pre_fix_rev_resolved': pin['resolved'],
+        'pre_fix_rev_source': pin['source'],
+        'pre_fix_rev_is_default': pin['source'] == 'const',
+        'pre_fix_rev_env': PRE_FIX_REV_ENV,
+        'pre_fix_rev_env_set': bool(os.environ.get(PRE_FIX_REV_ENV)),
         'git_show_exit': rc,
-        'head_routes_bytes': os.path.getsize(head_routes),
-        'head_routes_sha256': sha256_file(head_routes),
+        'pre_fix_rev_blob': pin_blob['rev'],
+        'head_routes_blob': head_blob['rev'],
+        'pin_distinct_vs_head': pin_distinct,
+        'renamed_from': ['head_routes_bytes -> pre_fix_routes_bytes',
+                         'head_routes_sha256 -> pre_fix_routes_sha256',
+                         'line6_head -> line6_pre_fix (A-70/A-79)'],
+        'pre_fix_routes_bytes': os.path.getsize(pre_fix_routes),
+        'pre_fix_routes_sha256': sha256_file(pre_fix_routes),
         'worktree_routes_bytes': os.path.getsize(worktree_routes),
         'worktree_routes_sha256': sha256_file(worktree_routes),
         'prefix_tree': os.path.relpath(PREFIX_TREE, REPO_ROOT).replace('\\', '/'),
         'prefix_routes_sha256': sha256_file(os.path.join(PREFIX_TREE, 'app', 'main', 'routes.py')),
-        'line6_head': None,
+        'line6_pre_fix': None,
         'line6_worktree': None,
     }
-    with open(head_routes, encoding='utf-8', errors='replace') as fh:
-        info['line6_head'] = fh.read().splitlines()[5].strip()[-70:]
+    with open(pre_fix_routes, encoding='utf-8', errors='replace') as fh:
+        info['line6_pre_fix'] = fh.read().splitlines()[5].strip()[-70:]
     with open(worktree_routes, encoding='utf-8', errors='replace') as fh:
         info['line6_worktree'] = fh.read().splitlines()[5].strip()[-70:]
-    log(lines, '[prefix] git show exit=%s rev=%s bytes=%d sha256=%s'
-        % (info['git_show_exit'], info['git_head_rev'][:12], info['head_routes_bytes'],
-           info['head_routes_sha256']))
-    log(lines, '[prefix] head  line6 tail = ...%s' % info['line6_head'])
+    log(lines, '[prefix] git show %s:... exit=%s bytes=%d sha256=%s'
+        % (pin['rev'][:12], info['git_show_exit'], info['pre_fix_routes_bytes'],
+           info['pre_fix_routes_sha256']))
+    log(lines, '[prefix] pre-fix rev = %s (resolved=%s, source=%s, HEAD=%s)'
+        % (pin['rev'][:12], (pin['resolved'] or '?')[:12], pin['source'],
+           info['git_head_rev'][:12]))
+    log(lines, '[prefix] pin_distinct_vs_head=%s (pre-fix blob=%s / HEAD blob=%s)'
+        % (pin_distinct, (pin_blob['rev'] or '?')[:12], (head_blob['rev'] or '?')[:12]))
+    if not pin_distinct:
+        log(lines, '[prefix] !!! 可复算性前置失败：钉住的「修复前 routes.py」与 HEAD 版本**相同** '
+                   '⇒ 负向对照空转（A-70/A-79 类缺陷复发）')
+    log(lines, '[prefix] pre-fix line6 tail = ...%s' % info['line6_pre_fix'])
     log(lines, '[prefix] worktree line6 tail = ...%s (sha256=%s)'
         % (info['line6_worktree'], info['worktree_routes_sha256']))
+    PREFIX_INFO.clear()
+    PREFIX_INFO.update(info)
     return info
 
 
 def build_line6_tree(lines):
     """`.tmp/<RUN_ID>/line6/app` = **当前工作树** app/ 的副本，只把这一行导入改回去。
 
-    为什么需要它：本仓是多人并发写入的活体（W2/W3 同时在改 `app/**`）。git HEAD 树能复现
-    「原始缺陷」，但无法隔离「本任务这一行」；把当前工作树**只回退这一行**（其余字节全同），
+    为什么需要它：本仓是多人并发写入的活体（W2/W3 同时在改 `app/**`）。**钉死的修复前提交**
+    树能复现「原始缺陷」，但无法隔离「本任务这一行」；把当前工作树**只回退这一行**（其余字节全同），
     才能把差异唯一归因到本任务的导入补丁。
     """
     if os.path.isdir(LINE6_TREE):
@@ -397,11 +485,11 @@ def judge_fixed(req):
 
 
 def judge_prefix_like(req, tree_root, label, allow_masked_body=False):
-    """修前行为判据（同一套源码跑两棵「缺这一行」的树：git HEAD 树 / 当前树回退一行）。
+    """修前行为判据（同一套源码跑两棵「缺这一行」的树：**钉死的修复前提交**树 / 当前树回退一行）。
 
     ``allow_masked_body``：并发写入者（W2/W3）给 `delete_consumable` 加了统一错误脱敏后，
     500 正文不再回显异常文案（根因仍由 `current_app.logger.error` 记进 stderr，由另一条判据断言）
-    ⇒ 对「当前工作树」这一侧只要求 **500 + 根因在 stderr**；对冻结的 git HEAD 树仍要求正文原样。
+    ⇒ 对「当前工作树」这一侧只要求 **500 + 根因在 stderr**；对**钉死的修复前树**仍要求正文原样。
     """
     p = req['payload'] or {}
     use = p.get('P01a1_use_existing') or {}
@@ -440,8 +528,34 @@ def judge_prefix_like(req, tree_root, label, allow_masked_body=False):
     ]
 
 
+def pin_guard_criteria(tag):
+    """**可复算性前置**（A-70/A-79）：钉住的「修复前 routes.py」必须与 `HEAD` 版本**不同**。
+
+    这不是新判据口径 —— P-01-r1/r2 与 TL-01-a 的**期望值一字未动**；它只保证那些负向对照
+    **不是空转**（若两棵树同一份 routes.py，「必然 500」就无从谈起）。
+    """
+    pin = PREFIX_INFO or {}
+    eff = pin.get('pre_fix_rev') or PRE_FIX_REV
+    return [('%s pin: pre-fix routes.py 的取源 = %s（rev_source=%s）且与 HEAD 版本**不同**'
+             % (tag, eff, pin.get('pre_fix_rev_source')),
+             bool(pin.get('pin_distinct_vs_head')) and pin.get('git_show_exit') == 0,
+             'pre_fix_rev=%s source=%s pre_fix_blob=%s head_blob=%s distinct=%s '
+             'git_show_exit=%s'
+             % (eff, pin.get('pre_fix_rev_source'),
+                (pin.get('pre_fix_rev_blob') or '?')[:12],
+                (pin.get('head_routes_blob') or '?')[:12],
+                pin.get('pin_distinct_vs_head'), pin.get('git_show_exit')))]
+
+
+def effective_pre_fix_short():
+    """判据标签里显示**实际生效**的修订号（被 `WMS_PREFIX_REV` 覆盖时也要如实显示）。"""
+    return ((PREFIX_INFO or {}).get('pre_fix_rev') or PRE_FIX_REV)[:12]
+
+
 def judge_prefix(req):
-    return judge_prefix_like(req, PREFIX_TREE, '(pre-fix tree = git HEAD routes.py)')
+    return pin_guard_criteria('P-01-precondition') + judge_prefix_like(
+        req, PREFIX_TREE,
+        '(pre-fix tree = pinned rev %s routes.py)' % effective_pre_fix_short())
 
 
 def judge_line6(req):
@@ -506,8 +620,9 @@ def main(argv=None):
         pre_lines = sorted(v['line'] for v in (gate_prefix['parsed'] or {}).get('violations', []))
         l6_funcs = sorted(v['func'] for v in (gate_line6['parsed'] or {}).get('violations', []))
         st_ok = gate_selftest['exit_code'] == 0 and '13/13' in gate_selftest['stdout']
-        gate_criteria = [
-            ('TL-01-a pre-fix gate (git HEAD routes.py) -> exit 1 with exactly 2 hits',
+        gate_criteria = pin_guard_criteria('TL-01-a') + [
+            ('TL-01-a pre-fix gate (pinned rev %s routes.py) -> exit 1 with exactly 2 hits'
+             % effective_pre_fix_short(),
              gate_prefix['exit_code'] == 1 and n_pre == 2,
              'exit=%s violations=%s' % (gate_prefix['exit_code'], n_pre)),
             ('TL-01-a pre-fix hits are routes.py:10891 and :10943',
@@ -566,7 +681,8 @@ def main(argv=None):
                             for c, ok, e in crit_fixed],
         }
         log(lines, '')
-        log(lines, '--- P-01 request criteria (pre-fix tree = git HEAD routes.py) ---')
+        log(lines, '--- P-01 request criteria (pre-fix tree = pinned rev %s routes.py) ---'
+            % effective_pre_fix_short())
         for c, ok, e in crit_prefix:
             log(lines, '  [%s] %s' % ('PASS' if ok else 'FAIL', c))
             log(lines, '         %s' % e)
@@ -631,9 +747,13 @@ def main(argv=None):
                                                'line6_tree': out.get('line6'),
                                                'inject_tree': out.get('inject'),
                                                'routes_rel': ROUTES_REL,
-                                               'note': 'prefix tree = app/ copy + git HEAD '
-                                                       'routes.py; line6 tree = current app/ copy '
-                                                       'with ONLY line 6 reverted'},
+                                               'pre_fix_rev': PRE_FIX_REV,
+                                               'pre_fix_rev_env': PRE_FIX_REV_ENV,
+                                               'note': 'prefix tree = app/ copy + routes.py from the '
+                                                       'PINNED pre-fix commit (%s; A-70/A-79: never '
+                                                       'HEAD) ; line6 tree = current app/ copy '
+                                                       'with ONLY line 6 reverted'
+                                                       % PRE_FIX_REV_SHORT},
                                               ensure_ascii=False, indent=1, default=str)))
     if args.scenario in ('all', 'request'):
         saved.append(save_evidence('w1-p01-request-prefix.json',

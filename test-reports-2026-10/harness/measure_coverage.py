@@ -41,6 +41,11 @@ from _env import EVIDENCE_DIR, REPO_ROOT, ensure_dir, real_db_status
 
 # 被量测的「探针脚本」（只读扫描，不执行）
 # `exit_code_credible` 为 **E-03 后的现状**（t4 修改：smoke_test / permission_matrix 已转正；报告型仍不可信）
+# ⚠ A-83：本清单是**写死白名单** —— 新建探针文件**不会**让覆盖数动一位，必须**先在此登记**。
+#    V-06/C-05 新增第 9 项 `test-reports-2026-10/harness/r2_c05_write_probe.py`（101 条零命中写端点
+#    逐条真发请求；路径口径 = **相对 REPO_ROOT**，故带 `test-reports-2026-10/` 前缀 —— 写错前缀会
+#    静默变成 `exists=False / calls=[]`，这正是 t2 那 6 条 0 站点条目的成因）。
+#    阴性对照（回落实验）用 `--probes-exclude r2_c05_write_probe` 复算，**不改本文件**即可复现 6/14/101。
 PROBES = [
     {'file': 'scripts/smoke_test.py', 'kind': 'request-probe（GET 广度）',
      'exit_code_credible': True,
@@ -59,6 +64,11 @@ PROBES = [
     {'file': 'scripts/check_properties.py', 'kind': '静态门禁', 'exit_code_credible': True, 'why': ''},
     {'file': 'scripts/check_migration_heads.py', 'kind': '静态门禁', 'exit_code_credible': True,
      'why': ''},
+    {'file': 'test-reports-2026-10/harness/r2_c05_write_probe.py',
+     'kind': '写端点命中补强（C-05 / V-06）',
+     'exit_code_credible': False,
+     'why': 'V-06/C-05：报告型（命中面度量；判据落在 coverage_drift 的前后两个数 + 回落实验）⇒ '
+            '退出码不作判据，只表示「103 个站点全发出 + 真实库未变」'},
 ]
 
 HTTP_METHODS = ('get', 'post', 'put', 'delete', 'patch', 'head', 'options')
@@ -403,7 +413,18 @@ def main():
     ap.add_argument('--copy-tag', default='cover')
     ap.add_argument('--no-request-probes', action='store_true',
                     help='跳过实跑 smoke_test / permission_matrix（默认会跑，产物只落本 run 隔离目录）')
+    ap.add_argument('--probes-exclude', default='',
+                    help='阴性对照（A-83 回落实验）：逗号分隔的探针文件子串，从 PROBES 剔除后重算。'
+                         '例：--probes-exclude r2_c05_write_probe ⇒ 计数必须回落 6 / 14 / 101')
     args = ap.parse_args()
+
+    global PROBES
+    excluded = [s.strip() for s in args.probes_exclude.split(',') if s.strip()]
+    if excluded:
+        kept = [p for p in PROBES if not any(x in p['file'] for x in excluded)]
+        print('[coverage] 阴性对照：剔除探针 %s ⇒ PROBES %d -> %d'
+              % (excluded, len(PROBES), len(kept)))
+        PROBES = kept
 
     before = real_db_status()
     app, copy_path, rules = route_inventory_and_rules(args.copy_tag)
@@ -441,6 +462,9 @@ def main():
         'summary': summary,
         'method_matrix': matrix,
         'probes': probe_call_summary(probes),
+        # A-83：把「本次实际参与计数的白名单」与「阴性对照剔除项」写进产物，第三人可复算
+        'probes_files': [p['file'] for p in PROBES],
+        'probes_excluded': excluded,
         'unmatched_calls': {k: [{'method': c['method'], 'raw': c['raw'], 'kind': c['kind'],
                                  'file_line': f"{k}:{c['line']}"} for c in v]
                             for k, v in unmatched.items() if v},
