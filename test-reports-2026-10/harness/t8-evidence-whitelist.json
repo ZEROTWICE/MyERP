@@ -1,0 +1,167 @@
+{
+  "schema": "t8-evidence-whitelist/1",
+  "generated_by": "t8（B1 三接入位实装）",
+  "registered_count": 33,
+  "registered_kinds": {
+    "deleted": 20,
+    "modified": 9,
+    "phantom_entry": 4
+  },
+  "registered_source": "2026-10-07 17:35:45",
+  "measured_from": "evidence_hash.py verify --no-strict-coverage",
+  "counts_at_registration": {
+    "baseline_files": 2747,
+    "current_files": 2781,
+    "modified": 9,
+    "deleted": 20,
+    "journal_broken": 0,
+    "added": 54,
+    "index_missing": 5,
+    "coverage_gap": 1,
+    "phantom_entry": 4,
+    "baseline_tampered": 0,
+    "dirs_conform": 415,
+    "dirs_total": 421
+  },
+  "semantics": [
+    "白名单 = 「已知且已登记的既有违规」，只登记、不洗白：ci_gates 对拍后",
+    "  ① 出现**未登记**违规 ⇒ TL-04 步骤失败（report-only ⇒ 整体 exit 2）；",
+    "  ② 白名单条目在当前报告中**缺失**（stale）⇒ 同样失败，防悄悄缩小约束。",
+    "源：captain 侧既有违规（A-52 删除类 / A-55 及同类原地改写），非产品代码产物。",
+    "不含 index_missing（本轮新 run 目录未 --freeze 的正常形态，另用 --strict-index 控制）。"
+  ],
+  "violations": [
+    {
+      "kind": "deleted",
+      "path": "_phaseB-prefreeze/20261007-132253/baseline-prefix/e01-ab-compare.txt"
+    },
+    {
+      "kind": "deleted",
+      "path": "_phaseB-prefreeze/20261007-132253/baseline-prefix/e01-verify.txt"
+    },
+    {
+      "kind": "deleted",
+      "path": "_phaseB-prefreeze/20261007-132253/baseline-prefix/idx-conflict-check.txt"
+    },
+    {
+      "kind": "deleted",
+      "path": "_phaseB-prefreeze/20261007-132253/baseline-prefix/idx-gap-check.txt"
+    },
+    {
+      "kind": "deleted",
+      "path": "_phaseB-prefreeze/20261007-132253/baseline-prefix/idx-gap-detail.txt"
+    },
+    {
+      "kind": "deleted",
+      "path": "_phaseB-prefreeze/20261007-142403/baseline-prefix/e01-ab-compare.txt"
+    },
+    {
+      "kind": "deleted",
+      "path": "_phaseB-prefreeze/20261007-142403/baseline-prefix/e01-verify.txt"
+    },
+    {
+      "kind": "deleted",
+      "path": "_phaseB-prefreeze/20261007-142403/baseline-prefix/idx-conflict-check.txt"
+    },
+    {
+      "kind": "deleted",
+      "path": "_phaseB-prefreeze/20261007-142403/baseline-prefix/idx-gap-check.txt"
+    },
+    {
+      "kind": "deleted",
+      "path": "_phaseB-prefreeze/20261007-142403/baseline-prefix/idx-gap-detail.txt"
+    },
+    {
+      "kind": "deleted",
+      "path": "_phaseB-prefreeze/20261007-172654/baseline-prefix/e01-ab-compare.txt"
+    },
+    {
+      "kind": "deleted",
+      "path": "_phaseB-prefreeze/20261007-172654/baseline-prefix/e01-verify.txt"
+    },
+    {
+      "kind": "deleted",
+      "path": "_phaseB-prefreeze/20261007-172654/baseline-prefix/idx-conflict-check.txt"
+    },
+    {
+      "kind": "deleted",
+      "path": "_phaseB-prefreeze/20261007-172654/baseline-prefix/idx-gap-check.txt"
+    },
+    {
+      "kind": "deleted",
+      "path": "_phaseB-prefreeze/20261007-172654/baseline-prefix/idx-gap-detail.txt"
+    },
+    {
+      "kind": "deleted",
+      "path": "baseline-prefix/e01-ab-compare.txt"
+    },
+    {
+      "kind": "deleted",
+      "path": "baseline-prefix/e01-verify.txt"
+    },
+    {
+      "kind": "deleted",
+      "path": "baseline-prefix/idx-conflict-check.txt"
+    },
+    {
+      "kind": "deleted",
+      "path": "baseline-prefix/idx-gap-check.txt"
+    },
+    {
+      "kind": "deleted",
+      "path": "baseline-prefix/idx-gap-detail.txt"
+    },
+    {
+      "kind": "modified",
+      "path": "_phaseB-prefreeze/20261007-132253/captain-verification/p01-namespace-probe.txt"
+    },
+    {
+      "kind": "modified",
+      "path": "_phaseB-prefreeze/20261007-132253/harness/captain-e01-audit.json"
+    },
+    {
+      "kind": "modified",
+      "path": "_phaseB-prefreeze/20261007-142403/captain-verification/p01-namespace-probe.txt"
+    },
+    {
+      "kind": "modified",
+      "path": "_phaseB-prefreeze/20261007-142403/harness/captain-e01-audit.json"
+    },
+    {
+      "kind": "modified",
+      "path": "_phaseB-prefreeze/20261007-172654/captain-verification/p01-namespace-probe.txt"
+    },
+    {
+      "kind": "modified",
+      "path": "_phaseB-prefreeze/20261007-172654/harness/captain-e01-audit.json"
+    },
+    {
+      "kind": "modified",
+      "path": "_phaseB-prefreeze/LATEST.txt"
+    },
+    {
+      "kind": "modified",
+      "path": "captain-verification/p01-namespace-probe.txt"
+    },
+    {
+      "kind": "modified",
+      "path": "harness/captain-e01-audit.json"
+    },
+    {
+      "kind": "phantom_entry",
+      "path": "_phaseB-prefreeze/20261007-132253/baseline-prefix"
+    },
+    {
+      "kind": "phantom_entry",
+      "path": "_phaseB-prefreeze/20261007-142403/baseline-prefix"
+    },
+    {
+      "kind": "phantom_entry",
+      "path": "_phaseB-prefreeze/20261007-172654/baseline-prefix"
+    },
+    {
+      "kind": "phantom_entry",
+      "path": "baseline-prefix"
+    }
+  ]
+}

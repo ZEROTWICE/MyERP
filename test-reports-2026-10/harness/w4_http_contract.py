@@ -198,17 +198,19 @@ def selftest():
              ('WT-N2 get_json() 被裸捕 ⇒ 算站点', SELFTEST_BAD2, 1),
              ('WT-N3 first_or_404 + 裸 except ⇒ 算站点', SELFTEST_BAD3, 1)]
     ok_all = True
+    n_ok = 0
     for name, src, expect in cases:
         v = SiteVisitor('<selftest>', src.splitlines())
         v.visit(ast.parse(src))
         got = len(v.sites)
         ok = got == expect
         ok_all = ok_all and ok
+        n_ok += 1 if ok else 0
         print('  [%s] %s（期望 %d，实测 %d）%s' % ('PASS' if ok else 'FAIL', name, expect, got,
                                                  '' if ok else '  <- 判据不敏感/误报'))
-    print('[w4_http_contract] 自检 %d/%d 通过' % (sum(1 for n, s, e in cases
-                                                      if len(SiteVisitor('<s>', s.splitlines())
-                                                             .sites) == e), len(cases)))
+    # 统计行必须复用上面的循环结果。历史实现另起一个 `len(SiteVisitor(...).sites)` 表达式且
+    # **漏调 visit()** ⇒ sites 恒空 ⇒ 恒报 2/5（与判据是否敏感无关）。见 t5/t8 的取证。
+    print('[w4_http_contract] 自检 %d/%d 通过' % (n_ok, len(cases)))
     return 0 if ok_all else 1
 
 
