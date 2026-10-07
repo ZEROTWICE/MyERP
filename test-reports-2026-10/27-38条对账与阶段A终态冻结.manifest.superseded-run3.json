@@ -1,0 +1,4240 @@
+{
+ "task": "t1 / reconcile / 38 条待办对账与阶段A终态冻结",
+ "run_id": "r2t1-reconcile3",
+ "generated_at": "2026-10-07 17:24:26",
+ "repo_root": "D:\\workspace\\wage_management_system - bak",
+ "readonly_declaration": "no app import, no create_app(), no DB open, no HTTP request, no evidence-producing script rerun (A-40); static gates only",
+ "writes": {
+  "evidence": "evidence/harness/<RUN_ID>/r2-38item-reconcile.json（E-01 守卫，只追加）",
+  "tmp_probe": "test-reports-2026-10/.tmp/r2t1-reconcile3/tl05probe/probe.py（TL-05 行为探针源码，gitignored；本项目 .tmp/ 为纯运行时目录）",
+  "note": "除上述两者与可选的 --json 摘要外，本脚本不写任何文件（未原地覆盖任何既有文件）"
+ },
+ "verdict_semantics": {
+  "HIT": "有 content_implementation/behavior_verified 证据且全部子项通过",
+  "PARTIAL": "有实现证据但子项未全通过，或前提只部分成立",
+  "NOT_DONE": "零实现证据（只有 content_mention/file_exists/度量输出）",
+  "MISS": "探测本身失效（子进程 OSError 等），无法判定"
+ },
+ "self_match_guard": {
+  "rule": "判据脚本不得把「自己」与「同为核验工具的脚本」当资产证据",
+  "excluded_basenames": {
+   "reconcile_r2.py": "t1 本任务的搜索脚本自身（自指）",
+   "captain_r2_status.py": "captain 的 38 条状态核验脚本（正文含全部条目名）",
+   "captain_r2_anchors.py": "captain 的锚点计算脚本",
+   "captain_r2_targets.py": "captain 的第2轮靶点清单脚本",
+   "improve_plan.py": "t7 的清单生成器（38 条条目名的来源）",
+   "analysis_ledger.py": "t6 的账本生成器（「描述工作」而非「验证工作」）"
+  },
+  "excluded_from_evidence": "evidence/**（度量产物/冻结基线）不作为「新增用例」的证据"
+ },
+ "freeze": {
+  "head": "27d0ee828209c8aa753cbb4043292d4bec1db401",
+  "head_short": "27d0ee8",
+  "app_tree_sha1": "c8f7d4abca1567b6219dbd77f22c82722f877ad6",
+  "phase_a_commit_span": "590b688..HEAD",
+  "phase_a_commits": [
+   "27d0ee828209c8aa753cbb4043292d4bec1db401|2026-10-07 17:23:33 +0800|docs(r2): A-76 第2轮交接记录 v2（并入纪律书与四条新裁定）",
+   "5ad8d0da0906c5911d2286c13ec9b7b39a178819|2026-10-07 17:23:16 +0800|docs(r2): 下达第2轮执行纪律（主理人，t2-t7 全员适用）",
+   "bc67538e5e3701fffda9503736555afe343b11fa|2026-10-07 17:22:39 +0800|docs(r2): A-75 captain 对六个可疑项的独立判定 + C-06 前提过时发现",
+   "c7210862970f4b8b67085859d53345cf6fec6e6b|2026-10-07 17:21:52 +0800|docs(r2): A-74 自指性假阳性根因（t1 搜索域把搜索脚本自己当被测资产）",
+   "25176039673295e3ae4ed0922245038f0b18bebf|2026-10-07 17:21:11 +0800|docs(r2): A-73 t1 对账过度声称的预检拦截（TL-05 已证伪）+ 预检工具",
+   "34efedf1a49c5716246007438e68f270ad5b9578|2026-10-07 17:19:55 +0800|docs(r2): 登记 A-72 第2轮交接记录 + captain 终审工具三件",
+   "e3c62695c736b30e0706d19c4420aea775c3ccba|2026-10-07 17:17:02 +0800|docs(r2): 登记 A-71（captain 第7次自陈错误：核验搜索域不全）+ 38条独立核验基线",
+   "7e0a99563380f2d89be0b4223d981c27a90570d0|2026-10-07 14:42:44 +0800|docs(phaseA): 纳入阶段一规划文档与各任务原始输出附件",
+   "06d7b293244112c2bedb804468a0f989ed4b93dc|2026-10-07 14:42:39 +0800|test(phaseA): 纳入 t9 回归账本与探针（REGRESSION=0，122 断言全绿）",
+   "92f4e18c9eef5a0255b62fda2bc4d66a2fb60c3e|2026-10-07 14:42:32 +0800|docs(phaseA): 登记册收官 A-64..A-70（仓库策略/并发风险/资产重写/CSRF判据/tree基准）",
+   "3113f903e4d0708852e922556b83f6deb5b00c44|2026-10-07 14:29:00 +0800|test(phaseA): 纳入阶段A全部判据资产与报告（t6/t7/t8 探针 + 收口报告）",
+   "fd5102360b3777d8ec2a0fb2610b2abbc2119df6|2026-10-07 14:28:54 +0800|fix(phaseA): 修复 13 项产品缺陷（P-01..P-13），W0-W5 全部落地",
+   "2c6dbfd66a43aebf6733500b5579436f7e8d8da0|2026-10-07 14:05:18 +0800|feat(tl-01): 新增 check_model_refs 门禁，防 P-01 类 NameError 复发",
+   "17e4bf0209a87f3bb7152f637267027489afbec2|2026-10-07 13:54:17 +0800|fix(w0-e03/e04): 三类退出码分流 + 门禁进 CI（首次改动既有脚本）",
+   "590b6889e35cc1acad54bf4820b5ab751a543952|2026-10-07 13:54:10 +0800|test(w0): 纳入测试战役门禁入口与规格文档，CI 可自动执法（E-01..E-04）"
+  ],
+  "phase_a_commit_count": 15,
+  "worktree_status_rows": [
+   "?? \"docs/\\344\\272\\244\\346\\216\\245\\346\\217\\220\\347\\244\\272\\350\\257\\215-\\346\\211\\271\\346\\254\\2413\\345\\274\\200\\345\\267\\245-2026-10-06.md\"",
+   "?? \"docs/\\345\\274\\200\\345\\217\\221\\344\\270\\216\\346\\265\\213\\350\\257\\225\\350\\247\\204\\345\\210\\222-2026-10-06.md\"",
+   "?? test-reports-2026-10/harness/captain_r2_w6rest.py",
+   "?? test-reports-2026-10/harness/reconcile_r2.py"
+  ],
+  "worktree_dirty_paths": [
+   "\"docs/\\344\\272\\244\\346\\216\\245\\346\\217\\220\\347\\244\\272\\350\\257\\215-\\346\\211\\271\\346\\254\\2413\\345\\274\\200\\345\\267\\245-2026-10-06.md\"",
+   "\"docs/\\345\\274\\200\\345\\217\\221\\344\\270\\216\\346\\265\\213\\350\\257\\225\\350\\247\\204\\345\\210\\222-2026-10-06.md\"",
+   "test-reports-2026-10/harness/captain_r2_w6rest.py",
+   "test-reports-2026-10/harness/reconcile_r2.py"
+  ],
+  "app_tree_clean_vs_head": true,
+  "tags": [],
+  "app_files": [
+   {
+    "path": "app/main/routes.py",
+    "exists": true,
+    "bytes": 511969,
+    "lines": 12155,
+    "nonblank": 10475,
+    "sha256": "1D040DD2C6B54B07F6550D5F6B4E68BB53D30CE53F83AE3141B57A4BAFEB49BD",
+    "mtime": "2026-10-07 14:16:29"
+   },
+   {
+    "path": "app/services/mes_service.py",
+    "exists": true,
+    "bytes": 84486,
+    "lines": 1834,
+    "nonblank": 1609,
+    "sha256": "19B8493AE8423AFF14EE4551EFC94BC9A9024AFA77CC1BB559AEE1B337CBEF78",
+    "mtime": "2026-10-07 14:16:21"
+   },
+   {
+    "path": "app/main/quality.py",
+    "exists": true,
+    "bytes": 70415,
+    "lines": 1733,
+    "nonblank": 1509,
+    "sha256": "F6DEABAA6E48AAADD193FA811668074502E11DD3E93A8014102458C046C3BC7E",
+    "mtime": "2026-10-07 14:02:47"
+   },
+   {
+    "path": "app/__init__.py",
+    "exists": true,
+    "bytes": 9898,
+    "lines": 257,
+    "nonblank": 228,
+    "sha256": "06B07A11F9409F42F535175CC184698BA3BEC612499F703D645952B408D66482",
+    "mtime": "2026-10-07 13:59:35"
+   },
+   {
+    "path": "app/main/production_center.py",
+    "exists": true,
+    "bytes": 17887,
+    "lines": 453,
+    "nonblank": 386,
+    "sha256": "1169F17BF8E6F1A7ACEF2D3089C26E89FDD43AB5193B37D125EBACDE04747095",
+    "mtime": "2026-10-07 14:00:30"
+   },
+   {
+    "path": "app/models.py",
+    "exists": true,
+    "bytes": 145999,
+    "lines": 3117,
+    "nonblank": 2655,
+    "sha256": "1D3823FF06D213AB5CBA25E164EDDB9D13884CE61723043BEFFC9591A0378386",
+    "mtime": "2026-10-07 14:16:26"
+   },
+   {
+    "path": "app/main/stock.py",
+    "exists": true,
+    "bytes": 6208,
+    "lines": 124,
+    "nonblank": 112,
+    "sha256": "729DFD0E174D212F4C2CC0F935A7FEF3DAAEEF8A0EE052054472C3603BB2DCD7",
+    "mtime": "2026-10-07 14:10:38"
+   }
+  ],
+  "script_config_files": [
+   {
+    "path": "scripts/check_model_refs.py",
+    "exists": true,
+    "bytes": 15465,
+    "lines": 391,
+    "nonblank": 329,
+    "sha256": "7C597A5CE151D59C8D962182F802BCE632C676EC110985B908C568B77391EA8A",
+    "mtime": "2026-10-07 13:55:12"
+   },
+   {
+    "path": "scripts/permission_matrix.py",
+    "exists": true,
+    "bytes": 9256,
+    "lines": 218,
+    "nonblank": 183,
+    "sha256": "9A261D52F22C2082129CEF5B70FD6F9D9B6C860461ADED296AB528C7B3809F7F",
+    "mtime": "2026-10-07 13:35:55"
+   },
+   {
+    "path": "scripts/smoke_test.py",
+    "exists": true,
+    "bytes": 11186,
+    "lines": 272,
+    "nonblank": 235,
+    "sha256": "375B0DC507BACEF86B0353EC04CD7B25D48DBA7B33655991DB857CB4DCC956B2",
+    "mtime": "2026-10-07 13:36:36"
+   },
+   {
+    "path": "scripts/route_inventory.py",
+    "exists": true,
+    "bytes": 2687,
+    "lines": 68,
+    "nonblank": 55,
+    "sha256": "FF3186CC091765749899A660969CB27A0B7A215AE38B2052F2BE8A131E1EBEAB",
+    "mtime": "2026-10-07 13:36:55"
+   },
+   {
+    "path": "scripts/check_templates.py",
+    "exists": true,
+    "bytes": 5072,
+    "lines": 148,
+    "nonblank": 121,
+    "sha256": "13B247ED6B4512CB6D5AD3DD64714502C71224AC51EB5074DC85A5CBEA93B4DE",
+    "mtime": "2026-08-27 11:52:15"
+   },
+   {
+    "path": "scripts/check_migration_heads.py",
+    "exists": true,
+    "bytes": 1727,
+    "lines": 44,
+    "nonblank": 32,
+    "sha256": "B0F33BB9448F62640A87876D45849B5897BDCDDFFA438B7A4965BAF6D088C592",
+    "mtime": "2026-09-18 12:55:45"
+   },
+   {
+    "path": "scripts/check_properties.py",
+    "exists": true,
+    "bytes": 9395,
+    "lines": 211,
+    "nonblank": 179,
+    "sha256": "86D26D862FD07EC6F8E50AD171DA0FDD624169BB5EBBF38A57D3C6E4CF820944",
+    "mtime": "2026-10-06 20:39:45"
+   },
+   {
+    "path": "scripts/check_db_bootstrap.py",
+    "exists": true,
+    "bytes": 4083,
+    "lines": 102,
+    "nonblank": 77,
+    "sha256": "AC9952EC61529FCEAF13B7CBFC5CF7C764CB0F37884EA7A7E05C2EE76CD9F650",
+    "mtime": "2026-08-27 16:07:28"
+   },
+   {
+    "path": "requirements.txt",
+    "exists": true,
+    "bytes": 775,
+    "lines": 50,
+    "nonblank": 37,
+    "sha256": "4BDA793697D6AEB2FAFE300B832A429131A9FCD8CEC88A6FC64D3393DD161478",
+    "mtime": "2026-08-27 11:52:15"
+   },
+   {
+    "path": "Jenkinsfile",
+    "exists": true,
+    "bytes": 19181,
+    "lines": 461,
+    "nonblank": 388,
+    "sha256": "C9F9C8937CE58D2DE89D19DF9546CD1D89313562DCF1531BB20B24AB5028D4A6",
+    "mtime": "2026-10-07 13:48:21"
+   },
+   {
+    "path": ".github/workflows/docker-deploy.yml",
+    "exists": true,
+    "bytes": 2797,
+    "lines": 83,
+    "nonblank": 70,
+    "sha256": "75AE67B8391944671E4E5266BF5ADE6F681B2895AE7DB6EB89DEFE253E03A5E5",
+    "mtime": "2026-10-07 13:48:31"
+   }
+  ],
+  "harness_files": [
+   {
+    "path": "test-reports-2026-10/harness/_env.py",
+    "exists": true,
+    "bytes": 14075,
+    "lines": 321,
+    "nonblank": 267,
+    "sha256": "4E595F81C8F90465F4831CAC390E716B204ED70E64090D496ED5390381FDCA8A",
+    "mtime": "2026-10-07 13:10:30"
+   },
+   {
+    "path": "test-reports-2026-10/harness/run_gates.py",
+    "exists": true,
+    "bytes": 24476,
+    "lines": 514,
+    "nonblank": 467,
+    "sha256": "46A5D182F3FE463CA6862A440BC2F165884A980945E57CB88FA17F032C7DF706",
+    "mtime": "2026-10-07 13:26:02"
+   },
+   {
+    "path": "test-reports-2026-10/harness/ci_gates.py",
+    "exists": true,
+    "bytes": 18045,
+    "lines": 319,
+    "nonblank": 287,
+    "sha256": "A86AF0DECF9858730A74908622633EAF939550F562FBD66DA18C915A93E0AC62",
+    "mtime": "2026-10-07 13:47:41"
+   },
+   {
+    "path": "test-reports-2026-10/harness/ci_lint.py",
+    "exists": true,
+    "bytes": 15506,
+    "lines": 332,
+    "nonblank": 296,
+    "sha256": "792756FBD079EAEABC5E5373D98480792222B15397A6E217605C41965008D4D3",
+    "mtime": "2026-10-07 13:48:47"
+   },
+   {
+    "path": "test-reports-2026-10/harness/coverage_drift.py",
+    "exists": true,
+    "bytes": 11671,
+    "lines": 244,
+    "nonblank": 209,
+    "sha256": "F82F46BDC878CC3AFB07881B54584117C24D3F9743E2844F3A9AF579AD6EAE80",
+    "mtime": "2026-10-07 13:37:32"
+   },
+   {
+    "path": "test-reports-2026-10/harness/evidence_hash.py",
+    "exists": true,
+    "bytes": 47681,
+    "lines": 889,
+    "nonblank": 786,
+    "sha256": "C140900AB9A3969D8101D62B7772E4A81EC9B2B66D26A849A6B86ACD55947698",
+    "mtime": "2026-10-07 13:18:27"
+   },
+   {
+    "path": "test-reports-2026-10/harness/regression_preflight.py",
+    "exists": true,
+    "bytes": 4152,
+    "lines": 114,
+    "nonblank": 98,
+    "sha256": "66C94FB6230C8C607280DFABF89258713EE0C3499C73C5AFC803A449A0C05E35",
+    "mtime": "2026-10-07 13:22:50"
+   },
+   {
+    "path": "test-reports-2026-10/harness/t9_regression.py",
+    "exists": true,
+    "bytes": 12656,
+    "lines": 265,
+    "nonblank": 234,
+    "sha256": "41FCE70AC2C97B561EA3EF0585579ADA057123FC2F126133DB501465E1A0BB0D",
+    "mtime": "2026-10-07 14:37:08"
+   },
+   {
+    "path": "test-reports-2026-10/harness/t9_ledger.py",
+    "exists": true,
+    "bytes": 19035,
+    "lines": 366,
+    "nonblank": 327,
+    "sha256": "9F6932D58CB22039DC83406FC7EF87E422E4178772E0856BF97A064533390784",
+    "mtime": "2026-10-07 14:39:44"
+   },
+   {
+    "path": "test-reports-2026-10/harness/t9_newfindings_probe.py",
+    "exists": true,
+    "bytes": 18659,
+    "lines": 355,
+    "nonblank": 317,
+    "sha256": "0E0B9F63834698BC2A5E4C3978DE97B36F78A7EE709AB7298581BC5599D6140C",
+    "mtime": "2026-10-07 14:29:24"
+   },
+   {
+    "path": "test-reports-2026-10/harness/uat_chains.py",
+    "exists": true,
+    "bytes": 76405,
+    "lines": 1315,
+    "nonblank": 1223,
+    "sha256": "17D1C94A2144406FDC976786DD2B4B33586CD941E9A434921252124A6EB1FBFE",
+    "mtime": "2026-10-07 14:34:58"
+   },
+   {
+    "path": "test-reports-2026-10/harness/negative_matrix.py",
+    "exists": true,
+    "bytes": 58848,
+    "lines": 997,
+    "nonblank": 918,
+    "sha256": "25CE0A4BC5FCAF6311B2C57301FB302640B28E875C47B6B05DF377A5000CCA26",
+    "mtime": "2026-10-07 14:35:00"
+   },
+   {
+    "path": "test-reports-2026-10/harness/write_suite.py",
+    "exists": true,
+    "bytes": 72049,
+    "lines": 1369,
+    "nonblank": 1260,
+    "sha256": "839AACD9E0496499FF0646DBFF9626DA2DE15BC80D57CB1907F947033D870202",
+    "mtime": "2026-10-07 14:32:51"
+   },
+   {
+    "path": "test-reports-2026-10/harness/api_matrix.py",
+    "exists": true,
+    "bytes": 43168,
+    "lines": 837,
+    "nonblank": 770,
+    "sha256": "34D97A8858785E1BAC13BF44E741B08407755233E917E5741991FE46DA70A816",
+    "mtime": "2026-10-06 22:44:30"
+   },
+   {
+    "path": "test-reports-2026-10/harness/measure_coverage.py",
+    "exists": true,
+    "bytes": 24733,
+    "lines": 503,
+    "nonblank": 448,
+    "sha256": "B38CC25629050A43C1C21F5EBAB330CAC004CE294D56A23220EF2CF2D700D13D",
+    "mtime": "2026-10-07 13:42:17"
+   },
+   {
+    "path": "test-reports-2026-10/harness/fixtures.py",
+    "exists": true,
+    "bytes": 32355,
+    "lines": 628,
+    "nonblank": 557,
+    "sha256": "CBAD83775F86E866BDE62F00FE467DDCDAD36E9B9E387D532D33A1243A85AADB",
+    "mtime": "2026-10-06 22:19:06"
+   },
+   {
+    "path": "test-reports-2026-10/harness/w1_p01_probe.py",
+    "exists": true,
+    "bytes": 35208,
+    "lines": 670,
+    "nonblank": 604,
+    "sha256": "9069FA3460A955FE20E9EAEED6D51E3D165C125E0E339E781A77214907866F4E",
+    "mtime": "2026-10-07 14:01:54"
+   },
+   {
+    "path": "test-reports-2026-10/harness/w2w3_probe.py",
+    "exists": true,
+    "bytes": 69098,
+    "lines": 1264,
+    "nonblank": 1167,
+    "sha256": "38DAFB81CBEDCDEF7C72D6B547915DF0B3EA4F440AA3052BF8772908C2A56089",
+    "mtime": "2026-10-07 14:17:24"
+   },
+   {
+    "path": "test-reports-2026-10/harness/w4_probe.py",
+    "exists": true,
+    "bytes": 34257,
+    "lines": 630,
+    "nonblank": 583,
+    "sha256": "F72C5B6CCB52BF04FDD4DC12072DBB8862790BFE96A31CAD4164A5B343D95978",
+    "mtime": "2026-10-07 14:04:39"
+   },
+   {
+    "path": "test-reports-2026-10/harness/w4_http_contract.py",
+    "exists": true,
+    "bytes": 10229,
+    "lines": 250,
+    "nonblank": 223,
+    "sha256": "541359066522076464761A6EFA02768C12EBA57892D4D87125D031C26E860F02",
+    "mtime": "2026-10-07 13:58:38"
+   }
+  ],
+  "baseline_anchors": [
+   {
+    "path": "test-reports-2026-10/evidence/uat/uat_chains.json",
+    "exists": true,
+    "bytes": 33318,
+    "lines": 1231,
+    "nonblank": 1231,
+    "sha256": "360A8570BC0080A2984A59AD945B2C837AD96ACF7B55E6242AE7E2C6417DD23A",
+    "mtime": "2026-10-06 22:33:15"
+   },
+   {
+    "path": "test-reports-2026-10/evidence/harness/negative_matrix.json",
+    "exists": true,
+    "bytes": 24424,
+    "lines": 664,
+    "nonblank": 664,
+    "sha256": "B743C73F86F5EB5C0FBA38410119D8D3A6BDE5FBACDF214CFA0DB409EF5B7479",
+    "mtime": "2026-10-06 22:27:40"
+   },
+   {
+    "path": "test-reports-2026-10/evidence/analysis/assertion_ledger.json",
+    "exists": true,
+    "bytes": 60937,
+    "lines": 2355,
+    "nonblank": 2355,
+    "sha256": "C7C312734DD8E02486D26C3639D8D074CCFCD59BCEB002C13C7CC9587AC94092",
+    "mtime": "2026-10-06 23:04:36"
+   },
+   {
+    "path": "test-reports-2026-10/evidence/api/write_suite.json",
+    "exists": true,
+    "bytes": 73293,
+    "lines": 2886,
+    "nonblank": 2886,
+    "sha256": "B608117EBDCA2A6F74595F0DB4A010187D8834715CD5E70D5C1AAD85F4A3F403",
+    "mtime": "2026-10-06 22:45:49"
+   },
+   {
+    "path": "test-reports-2026-10/evidence/api/api_matrix.json",
+    "exists": true,
+    "bytes": 1342834,
+    "lines": 42574,
+    "nonblank": 42574,
+    "sha256": "8451BB6738CCB25C41794E7B9548969D0EDDC8FE6EAE855DCC5F1D1CC746CB86",
+    "mtime": "2026-10-06 22:46:19"
+   },
+   {
+    "path": "test-reports-2026-10/evidence/harness/coverage.json",
+    "exists": true,
+    "bytes": 236893,
+    "lines": 8974,
+    "nonblank": 8974,
+    "sha256": "5E2C9D4315971B31C83AFD7833C310501199C34F61BFD868EF07A6AEEF7BF1F0",
+    "mtime": "2026-10-06 22:25:07"
+   },
+   {
+    "path": "test-reports-2026-10/evidence/harness/gates.json",
+    "exists": true,
+    "bytes": 17537,
+    "lines": 380,
+    "nonblank": 380,
+    "sha256": "AED1B7F7D7CEDC8BAED3128CE459B0670E2D957F6A121056476CDB6F620E74B4",
+    "mtime": "2026-10-06 22:24:48"
+   },
+   {
+    "path": "test-reports-2026-10/evidence/improve/fix_plan.json",
+    "exists": true,
+    "bytes": 42302,
+    "lines": 681,
+    "nonblank": 675,
+    "sha256": "AB63B10B26284DF544ECD2449CB25A75779EEF77F668BB32B2B76E790A13AC4D",
+    "mtime": "2026-10-06 23:12:36"
+   },
+   {
+    "path": "test-reports-2026-10/evidence/improve/improve_plan.json",
+    "exists": true,
+    "bytes": 108667,
+    "lines": 3900,
+    "nonblank": 3900,
+    "sha256": "B05CBF2F552CC24BF66A1BC9A38C43AEE6B825EDE47038B0A69B13E9FB0D28C7",
+    "mtime": "2026-10-06 23:14:26"
+   },
+   {
+    "path": "test-reports-2026-10/26-阶段A收口-复核读数.json",
+    "exists": true,
+    "bytes": 11994,
+    "lines": 386,
+    "nonblank": 386,
+    "sha256": "CF0E2B14581D82072E087617B0CE3DBC1F4676897787DB6B14D6C6FA43D37319",
+    "mtime": "2026-10-07 14:27:57"
+   },
+   {
+    "path": "test-reports-2026-10/evidence/harness/t9-rega-final/t9-regression-ledger.json",
+    "exists": true,
+    "bytes": 118314,
+    "lines": 3868,
+    "nonblank": 3868,
+    "sha256": "6C43167E7244E787B9F8B8B2E8C734D555EE6B11CAC88763CDEC28D04CE78410",
+    "mtime": "2026-10-07 14:39:26"
+   },
+   {
+    "path": "test-reports-2026-10/evidence/harness/t9-rega-final/t9-regression-ledger.t9-rega-final.json",
+    "exists": true,
+    "bytes": 119007,
+    "lines": 3866,
+    "nonblank": 3866,
+    "sha256": "A609B0D78D350B49CF9B4ADC70A84FB8CAE1AF2D375F55308B3C1F07D49921E8",
+    "mtime": "2026-10-07 14:39:47"
+   },
+   {
+    "path": "test-reports-2026-10/evidence/harness/w2w3-uatdiff-final/uat_chains.before.json",
+    "exists": true,
+    "bytes": 29400,
+    "lines": 1231,
+    "nonblank": 1231,
+    "sha256": "0B2B9A35E8E13AA67B718191800AD80E6FF92635D12811B530860633F59B98F0",
+    "mtime": "2026-10-07 14:20:28"
+   },
+   {
+    "path": "test-reports-2026-10/evidence/harness/w2w3-uatdiff-final/uat_chains.after.json",
+    "exists": true,
+    "bytes": 30118,
+    "lines": 1270,
+    "nonblank": 1270,
+    "sha256": "2C9D656148D1A694F4C0E5D42EBFDB1E1D320080E13EFFC12CFDAB4408DEF63C",
+    "mtime": "2026-10-07 14:20:28"
+   },
+   {
+    "path": "test-reports-2026-10/07-测试与工程改进报告.md",
+    "exists": true,
+    "bytes": 55720,
+    "lines": 540,
+    "nonblank": 415,
+    "sha256": "2690B86ECBD5DF0EE4AAF6C8ABB7EFA3BD9F3B43E72F099833A10A061D9C473C",
+    "mtime": "2026-10-06 23:14:48"
+   },
+   {
+    "path": "test-reports-2026-10/26-阶段A收口报告.md",
+    "exists": true,
+    "bytes": 61776,
+    "lines": 466,
+    "nonblank": 362,
+    "sha256": "01514BB81B390A93EC6CE50FEAC465092CA4B1E73742424B736E8548952ABA0E",
+    "mtime": "2026-10-07 14:27:46"
+   },
+   {
+    "path": "test-reports-2026-10/26-修复后回归与断言账本.md",
+    "exists": true,
+    "bytes": 32133,
+    "lines": 368,
+    "nonblank": 294,
+    "sha256": "CF19B3BBC6CFFE04B9C17635787969988A0EFF9ED75D5F625C0A6A4815CCEBB0",
+    "mtime": "2026-10-07 14:41:26"
+   },
+   {
+    "path": "test-reports-2026-10/00b-裁定与纪律增补.md",
+    "exists": true,
+    "bytes": 73131,
+    "lines": 124,
+    "nonblank": 109,
+    "sha256": "45B7C18C70F1D4540F847818097A71C891EABB50D25AB819219164521D0E8E82",
+    "mtime": "2026-10-07 17:23:33"
+   },
+   {
+    "path": "test-reports-2026-10/07b-DEC-1-DEC-2-业务口径决策单.md",
+    "exists": true,
+    "bytes": 37310,
+    "lines": 485,
+    "nonblank": 402,
+    "sha256": "2E6CA4F0FFA6F46644D7C41A6079DBAB41ADD847EEEE17FCD282EB96D15CA310",
+    "mtime": "2026-10-07 13:10:58"
+   },
+   {
+    "path": "test-reports-2026-10/24-W4载体登记册.json",
+    "exists": true,
+    "bytes": 2521,
+    "lines": 55,
+    "nonblank": 55,
+    "sha256": "4D6DB71826792BF4175A828FE503DD8972CF6A6BF8DE581F86AE27EBA963E425",
+    "mtime": "2026-10-07 14:01:04"
+   }
+  ],
+  "harness_py_total": 39,
+  "harness_tracked": 43
+ },
+ "anchor_cross_check": [
+  {
+   "path": "test-reports-2026-10/evidence/uat/uat_chains.json",
+   "captain_bytes": 33318,
+   "captain_sha256": "360A8570BC0080A2984A59AD945B2C837AD96ACF7B55E6242AE7E2C6417DD23A",
+   "measured_bytes": 33318,
+   "measured_sha256": "360A8570BC0080A2984A59AD945B2C837AD96ACF7B55E6242AE7E2C6417DD23A",
+   "exists": true,
+   "verdict": "MATCH"
+  },
+  {
+   "path": "test-reports-2026-10/evidence/harness/negative_matrix.json",
+   "captain_bytes": 24424,
+   "captain_sha256": "B743C73F86F5EB5C0FBA38410119D8D3A6BDE5FBACDF214CFA0DB409EF5B7479",
+   "measured_bytes": 24424,
+   "measured_sha256": "B743C73F86F5EB5C0FBA38410119D8D3A6BDE5FBACDF214CFA0DB409EF5B7479",
+   "exists": true,
+   "verdict": "MATCH"
+  },
+  {
+   "path": "test-reports-2026-10/evidence/analysis/assertion_ledger.json",
+   "captain_bytes": 60937,
+   "captain_sha256": "C7C312734DD8E02486D26C3639D8D074CCFCD59BCEB002C13C7CC9587AC94092",
+   "measured_bytes": 60937,
+   "measured_sha256": "C7C312734DD8E02486D26C3639D8D074CCFCD59BCEB002C13C7CC9587AC94092",
+   "exists": true,
+   "verdict": "MATCH"
+  },
+  {
+   "path": "test-reports-2026-10/evidence/api/write_suite.json",
+   "captain_bytes": 73293,
+   "captain_sha256": "B608117EBDCA2A6F74595F0DB4A010187D8834715CD5E70D5C1AAD85F4A3F403",
+   "measured_bytes": 73293,
+   "measured_sha256": "B608117EBDCA2A6F74595F0DB4A010187D8834715CD5E70D5C1AAD85F4A3F403",
+   "exists": true,
+   "verdict": "MATCH"
+  },
+  {
+   "path": "test-reports-2026-10/evidence/harness/coverage.json",
+   "captain_bytes": 236893,
+   "captain_sha256": "5E2C9D4315971B31C83AFD7833C310501199C34F61BFD868EF07A6AEEF7BF1F0",
+   "measured_bytes": 236893,
+   "measured_sha256": "5E2C9D4315971B31C83AFD7833C310501199C34F61BFD868EF07A6AEEF7BF1F0",
+   "exists": true,
+   "verdict": "MATCH"
+  },
+  {
+   "path": "test-reports-2026-10/evidence/api/api_matrix.json",
+   "captain_bytes": 1342834,
+   "captain_sha256": "8451BB6738CCB25C41794E7B9548969D0EDDC8FE6EAE855DCC5F1D1CC746CB86",
+   "measured_bytes": 1342834,
+   "measured_sha256": "8451BB6738CCB25C41794E7B9548969D0EDDC8FE6EAE855DCC5F1D1CC746CB86",
+   "exists": true,
+   "verdict": "MATCH"
+  },
+  {
+   "path": "test-reports-2026-10/26-阶段A收口-复核读数.json",
+   "captain_bytes": 11994,
+   "captain_sha256": "CF0E2B14581D82072E087617B0CE3DBC1F4676897787DB6B14D6C6FA43D37319",
+   "measured_bytes": 11994,
+   "measured_sha256": "CF0E2B14581D82072E087617B0CE3DBC1F4676897787DB6B14D6C6FA43D37319",
+   "exists": true,
+   "verdict": "MATCH"
+  },
+  {
+   "path": "test-reports-2026-10/evidence/harness/t9-rega-final/ledger.json",
+   "captain_bytes": null,
+   "captain_sha256": null,
+   "measured_bytes": null,
+   "measured_sha256": null,
+   "exists": false,
+   "verdict": "MISSING_BOTH"
+  }
+ ],
+ "phase_a_file_delta": {
+  "added": [
+   "\"docs/test-reports/2026-10/01-\\345\\237\\272\\347\\272\\277\\344\\272\\213\\345\\256\\236\\346\\270\\205\\345\\215\\225.md\"",
+   "\"docs/test-reports/2026-10/02-\\346\\265\\213\\350\\257\\225\\345\\210\\206\\345\\261\\202\\347\\255\\226\\347\\225\\245\\344\\270\\216\\351\\200\\232\\350\\277\\207\\345\\210\\244\\346\\215\\256.md\"",
+   "\"docs/test-reports/2026-10/03-\\351\\234\\200\\346\\261\\202\\350\\277\\275\\346\\272\\257\\347\\237\\251\\351\\230\\265.md\"",
+   "\"docs/test-reports/2026-10/04-\\344\\270\\232\\345\\212\\241\\351\\252\\214\\346\\224\\266\\346\\240\\207\\345\\207\\206\\344\\270\\216\\347\\253\\257\\345\\210\\260\\347\\253\\257\\345\\210\\244\\346\\215\\256.md\"",
+   "\"docs/test-reports/2026-10/05-\\351\\252\\214\\350\\257\\201\\347\\233\\256\\346\\240\\207\\344\\270\\216\\351\\243\\216\\351\\231\\251\\347\\231\\273\\350\\256\\260\\345\\206\\214.md\"",
+   "\"docs/test-reports/2026-10/06-\\346\\265\\213\\350\\257\\225\\345\\267\\245\\345\\205\\267\\351\\223\\276\\350\\257\\204\\344\\274\\260.md\"",
+   "\"docs/test-reports/2026-10/07-\\345\\256\\236\\346\\265\\213Runbook\\344\\270\\216\\345\\217\\260\\350\\264\\246\\350\\247\\204\\350\\214\\203.md\"",
+   "\"test-reports-2026-10/00-\\347\\274\\226\\345\\217\\267\\347\\231\\273\\350\\256\\260\\345\\206\\214\\344\\270\\216\\346\\235\\203\\345\\250\\201\\350\\257\\264\\346\\230\\216.md\"",
+   "\"test-reports-2026-10/00b-\\350\\243\\201\\345\\256\\232\\344\\270\\216\\347\\272\\252\\345\\276\\213\\345\\242\\236\\350\\241\\245.md\"",
+   "\"test-reports-2026-10/01-\\351\\230\\266\\346\\256\\265\\344\\270\\200\\344\\272\\247\\345\\207\\272\\345\\206\\273\\347\\273\\223\\346\\270\\205\\345\\215\\225.manifest.json\"",
+   "\"test-reports-2026-10/01-\\351\\230\\266\\346\\256\\265\\344\\270\\200\\344\\272\\247\\345\\207\\272\\345\\206\\273\\347\\273\\223\\346\\270\\205\\345\\215\\225.md\"",
+   "\"test-reports-2026-10/02-\\346\\265\\213\\350\\257\\225\\350\\204\\232\\346\\211\\213\\346\\236\\266\\344\\270\\216\\350\\207\\252\\345\\212\\250\\345\\214\\226\\350\\257\\264\\346\\230\\216.md\"",
+   "\"test-reports-2026-10/03-\\346\\265\\213\\350\\257\\225\\350\\265\\204\\344\\272\\247\\345\\217\\257\\344\\277\\241\\345\\272\\246\\344\\270\\216\\347\\233\\262\\345\\214\\272\\350\\257\\204\\344\\274\\260.md\"",
+   "\"test-reports-2026-10/03b-\\346\\265\\213\\350\\257\\225\\350\\265\\204\\344\\272\\247\\350\\257\\204\\344\\274\\260\\350\\241\\245\\351\\201\\227.md\"",
+   "\"test-reports-2026-10/04-API\\345\\256\\236\\346\\265\\213\\347\\273\\223\\346\\236\\234.md\"",
+   "\"test-reports-2026-10/05-\\347\\253\\257\\345\\210\\260\\347\\253\\257\\351\\252\\214\\346\\224\\266\\345\\256\\236\\346\\265\\213.md\"",
+   "\"test-reports-2026-10/06-\\346\\265\\213\\350\\257\\225\\347\\273\\223\\346\\236\\234\\345\\210\\206\\346\\236\\220\\344\\270\\216\\347\\274\\272\\351\\231\\267\\345\\210\\206\\347\\272\\247.md\"",
+   "\"test-reports-2026-10/07-\\346\\265\\213\\350\\257\\225\\344\\270\\216\\345\\267\\245\\347\\250\\213\\346\\224\\271\\350\\277\\233\\346\\212\\245\\345\\221\\212.md\"",
+   "\"test-reports-2026-10/07b-DEC-1-DEC-2-\\344\\270\\232\\345\\212\\241\\345\\217\\243\\345\\276\\204\\345\\206\\263\\347\\255\\226\\345\\215\\225.md\"",
+   "\"test-reports-2026-10/08-\\346\\234\\200\\347\\273\\210\\346\\265\\213\\350\\257\\225\\346\\212\\245\\345\\221\\212.md\"",
+   "\"test-reports-2026-10/08-\\346\\265\\213\\350\\257\\225\\346\\200\\273\\346\\226\\271\\346\\241\\210.md\"",
+   "\"test-reports-2026-10/09-W0\\345\\217\\257\\344\\277\\241\\345\\272\\246\\345\\212\\240\\345\\233\\272\\350\\257\\264\\346\\230\\216.\\345\\216\\237\\345\\247\\213\\350\\276\\223\\345\\207\\272.txt\"",
+   "\"test-reports-2026-10/09-W0\\345\\217\\257\\344\\277\\241\\345\\272\\246\\345\\212\\240\\345\\233\\272\\350\\257\\264\\346\\230\\216.md\"",
+   "\"test-reports-2026-10/16-W2W3\\344\\277\\256\\345\\244\\215\\351\\252\\214\\346\\224\\266\\345\\210\\244\\346\\215\\256.md\"",
+   "\"test-reports-2026-10/17-W4W5\\344\\277\\256\\345\\244\\215\\351\\252\\214\\346\\224\\266\\345\\210\\244\\346\\215\\256.md\"",
+   "\"test-reports-2026-10/18-E02\\351\\227\\250\\347\\246\\201\\351\\200\\200\\345\\207\\272\\347\\240\\201\\345\\217\\257\\344\\277\\241\\345\\214\\226.\\345\\216\\237\\345\\247\\213\\350\\276\\223\\345\\207\\272.txt\"",
+   "\"test-reports-2026-10/18-E02\\351\\227\\250\\347\\246\\201\\351\\200\\200\\345\\207\\272\\347\\240\\201\\345\\217\\257\\344\\277\\241\\345\\214\\226.md\"",
+   "\"test-reports-2026-10/19-P01\\347\\262\\276\\347\\241\\256\\344\\277\\256\\346\\263\\225\\344\\270\\216\\351\\252\\214\\346\\224\\266\\345\\210\\244\\346\\215\\256.md\"",
+   "\"test-reports-2026-10/20-E03\\347\\262\\276\\347\\241\\256\\344\\277\\256\\346\\263\\225\\344\\270\\216\\351\\252\\214\\346\\224\\266\\345\\210\\244\\346\\215\\256.md\"",
+   "\"test-reports-2026-10/21-E04\\347\\262\\276\\347\\241\\256\\344\\277\\256\\346\\263\\225\\344\\270\\216\\351\\252\\214\\346\\224\\266\\345\\210\\244\\346\\215\\256.md\"",
+   "\"test-reports-2026-10/22-E03\\344\\270\\211\\347\\261\\273\\351\\200\\200\\345\\207\\272\\347\\240\\201\\345\\210\\206\\346\\265\\201.\\345\\216\\237\\345\\247\\213\\350\\276\\223\\345\\207\\272.txt\"",
+   "\"test-reports-2026-10/22-E03\\344\\270\\211\\347\\261\\273\\351\\200\\200\\345\\207\\272\\347\\240\\201\\345\\210\\206\\346\\265\\201.md\"",
+   "\"test-reports-2026-10/23-E04\\351\\227\\250\\347\\246\\201\\350\\277\\233CI.\\345\\216\\237\\345\\247\\213\\350\\276\\223\\345\\207\\272.txt\"",
+   "\"test-reports-2026-10/23-E04\\351\\227\\250\\347\\246\\201\\350\\277\\233CI.md\"",
+   "\"test-reports-2026-10/24-P01\\344\\277\\256\\345\\244\\215\\350\\257\\264\\346\\230\\216.\\345\\216\\237\\345\\247\\213\\350\\276\\223\\345\\207\\272.txt\"",
+   "\"test-reports-2026-10/24-P01\\344\\277\\256\\345\\244\\215\\350\\257\\264\\346\\230\\216.md\"",
+   "\"test-reports-2026-10/24-W4\\350\\275\\275\\344\\275\\223\\347\\231\\273\\350\\256\\260\\345\\206\\214.json\"",
+   "\"test-reports-2026-10/25-W2W3\\344\\277\\256\\345\\244\\215\\350\\257\\264\\346\\230\\216.\\345\\216\\237\\345\\247\\213\\350\\276\\223\\345\\207\\272.txt\"",
+   "\"test-reports-2026-10/25-W2W3\\344\\277\\256\\345\\244\\215\\350\\257\\264\\346\\230\\216.md\"",
+   "\"test-reports-2026-10/25-W4\\345\\274\\202\\345\\270\\270\\345\\207\\272\\345\\217\\243\\344\\270\\216\\344\\277\\241\\346\\201\\257\\346\\232\\264\\351\\234\\262\\344\\277\\256\\345\\244\\215.\\345\\216\\237\\345\\247\\213\\350\\276\\223\\345\\207\\272.txt\"",
+   "\"test-reports-2026-10/25-W4\\345\\274\\202\\345\\270\\270\\345\\207\\272\\345\\217\\243\\344\\270\\216\\344\\277\\241\\346\\201\\257\\346\\232\\264\\351\\234\\262\\344\\277\\256\\345\\244\\215.md\"",
+   "\"test-reports-2026-10/26-\\344\\277\\256\\345\\244\\215\\345\\220\\216\\345\\233\\236\\345\\275\\222\\344\\270\\216\\346\\226\\255\\350\\250\\200\\350\\264\\246\\346\\234\\254.md\"",
+   "\"test-reports-2026-10/26-\\351\\230\\266\\346\\256\\265A\\346\\224\\266\\345\\217\\243-\\345\\244\\215\\346\\240\\270\\350\\257\\273\\346\\225\\260.json\"",
+   "\"test-reports-2026-10/26-\\351\\230\\266\\346\\256\\265A\\346\\224\\266\\345\\217\\243\\346\\212\\245\\345\\221\\212.md\"",
+   "\"test-reports-2026-10/28-\\347\\254\\2542\\350\\275\\256\\346\\211\\247\\350\\241\\214\\347\\272\\252\\345\\276\\213.md\"",
+   "\"test-reports-2026-10/phase1-snapshot/00-\\347\\274\\226\\345\\217\\267\\347\\231\\273\\350\\256\\260\\345\\206\\214\\344\\270\\216\\346\\235\\203\\345\\250\\201\\350\\257\\264\\346\\230\\216.md\"",
+   "\"test-reports-2026-10/phase1-snapshot/01-\\345\\237\\272\\347\\272\\277\\344\\272\\213\\345\\256\\236\\346\\270\\205\\345\\215\\225.md\"",
+   "\"test-reports-2026-10/phase1-snapshot/02-\\344\\270\\232\\345\\212\\241\\351\\252\\214\\346\\224\\266\\346\\240\\207\\345\\207\\206\\344\\270\\216\\347\\253\\257\\345\\210\\260\\347\\253\\257\\345\\210\\244\\346\\215\\256.md\"",
+   "\"test-reports-2026-10/phase1-snapshot/02-\\346\\265\\213\\350\\257\\225\\345\\210\\206\\345\\261\\202\\347\\255\\226\\347\\225\\245\\344\\270\\216\\351\\200\\232\\350\\277\\207\\345\\210\\244\\346\\215\\256.md\"",
+   "\"test-reports-2026-10/phase1-snapshot/02-\\346\\265\\213\\350\\257\\225\\345\\267\\245\\345\\205\\267\\351\\223\\276\\350\\203\\275\\345\\212\\233\\350\\257\\204\\344\\274\\260\\344\\270\\216\\345\\267\\256\\350\\267\\235\\347\\237\\251\\351\\230\\265.md\"",
+   "\"test-reports-2026-10/phase1-snapshot/03-\\351\\234\\200\\346\\261\\202\\350\\277\\275\\346\\272\\257\\347\\237\\251\\351\\230\\265.md\"",
+   "\"test-reports-2026-10/phase1-snapshot/03-\\351\\252\\214\\350\\257\\201\\347\\233\\256\\346\\240\\207\\344\\270\\216\\351\\243\\216\\351\\231\\251\\347\\231\\273\\350\\256\\260.md\"",
+   "\"test-reports-2026-10/phase1-snapshot/04-\\344\\270\\232\\345\\212\\241\\351\\252\\214\\346\\224\\266\\346\\240\\207\\345\\207\\206\\344\\270\\216\\347\\253\\257\\345\\210\\260\\347\\253\\257\\345\\210\\244\\346\\215\\256.md\"",
+   "\"test-reports-2026-10/phase1-snapshot/05-\\351\\252\\214\\350\\257\\201\\347\\233\\256\\346\\240\\207\\344\\270\\216\\351\\243\\216\\351\\231\\251\\347\\231\\273\\350\\256\\260\\345\\206\\214.md\"",
+   "\"test-reports-2026-10/phase1-snapshot/06-\\346\\265\\213\\350\\257\\225\\345\\267\\245\\345\\205\\267\\351\\223\\276\\350\\257\\204\\344\\274\\260.md\"",
+   "\"test-reports-2026-10/phase1-snapshot/07-\\345\\256\\236\\346\\265\\213Runbook\\344\\270\\216\\345\\217\\260\\350\\264\\246\\350\\247\\204\\350\\214\\203.md\"",
+   "\"test-reports-2026-10/phase1-snapshot/08-\\346\\265\\213\\350\\257\\225\\346\\200\\273\\346\\226\\271\\346\\241\\210.md\"",
+   "docs/test-reports/2026-10/_evidence/2026-10-06-t7/00-run-manifest.json",
+   "docs/test-reports/_probe/check_doc.py",
+   "docs/test-reports/_probe/check_trace_matrix.py",
+   "docs/test-reports/_probe/collect_compact.py",
+   "docs/test-reports/_probe/collect_config.py",
+   "docs/test-reports/_probe/collect_exports.py",
+   "docs/test-reports/_probe/collect_facts.py",
+   "docs/test-reports/_probe/collect_models.py",
+   "docs/test-reports/_probe/collect_ro_db.py",
+   "docs/test-reports/_probe/collect_routes_table.py",
+   "docs/test-reports/_probe/collect_tooling.py",
+   "docs/test-reports/_probe/debug_links.py",
+   "docs/test-reports/_probe/dump_link_lines.py",
+   "docs/test-reports/_probe/fix_links.py",
+   "docs/test-reports/_probe/fix_links_list.py",
+   "docs/test-reports/_probe/probe_fixture_gaps.py",
+   "docs/test-reports/_probe/probe_targets.py",
+   "docs/test-reports/_probe/verify_acceptance_baseline.py",
+   "docs/test-reports/_probe/verify_corrections.py",
+   "scripts/check_model_refs.py",
+   "test-reports-2026-10/harness/_diag_quality_status.py",
+   "test-reports-2026-10/harness/_env.py",
+   "test-reports-2026-10/harness/analysis_ledger.py",
+   "test-reports-2026-10/harness/api_matrix.py",
+   "test-reports-2026-10/harness/captain_e01_audit.py",
+   "test-reports-2026-10/harness/captain_p01_probe.py",
+   "test-reports-2026-10/harness/captain_p01_sandbox.py",
+   "test-reports-2026-10/harness/captain_preflight_negtest.py",
+   "test-reports-2026-10/harness/captain_r2_anchors.py",
+   "test-reports-2026-10/harness/captain_r2_precheck.py",
+   "test-reports-2026-10/harness/captain_r2_status.py",
+   "test-reports-2026-10/harness/captain_r2_targets.py",
+   "test-reports-2026-10/harness/captain_snap_baseline_prefix.py",
+   "test-reports-2026-10/harness/check_changes.py",
+   "test-reports-2026-10/harness/ci_gates.py",
+   "test-reports-2026-10/harness/ci_lint.py",
+   "test-reports-2026-10/harness/coverage_drift.py",
+   "test-reports-2026-10/harness/evidence_hash.py",
+   "test-reports-2026-10/harness/final_recount.py",
+   "test-reports-2026-10/harness/fixtures.py",
+   "test-reports-2026-10/harness/improve_plan.py",
+   "test-reports-2026-10/harness/measure_coverage.py",
+   "test-reports-2026-10/harness/negative_matrix.py",
+   "test-reports-2026-10/harness/preflight_fields.py",
+   "test-reports-2026-10/harness/regression_preflight.py",
+   "test-reports-2026-10/harness/repro_defects.py",
+   "test-reports-2026-10/harness/run_gates.py",
+   "test-reports-2026-10/harness/t9_ledger.py",
+   "test-reports-2026-10/harness/t9_newfindings_probe.py",
+   "test-reports-2026-10/harness/t9_regression.py",
+   "test-reports-2026-10/harness/uat_chains.py",
+   "test-reports-2026-10/harness/uat_evidence.py",
+   "test-reports-2026-10/harness/verify_t4.py",
+   "test-reports-2026-10/harness/w0_e02_injection.py",
+   "test-reports-2026-10/harness/w0_e03_probe.py",
+   "test-reports-2026-10/harness/w0_guard_injection.py",
+   "test-reports-2026-10/harness/w1_p01_probe.py",
+   "test-reports-2026-10/harness/w1_p01_regress.py",
+   "test-reports-2026-10/harness/w2w3_probe.py",
+   "test-reports-2026-10/harness/w2w3_uatdiff.py",
+   "test-reports-2026-10/harness/w4_http_contract.py",
+   "test-reports-2026-10/harness/w4_probe.py",
+   "test-reports-2026-10/harness/write_suite.py",
+   "test-reports-2026-10/phase1-snapshot/_evidence/00-run-manifest.json"
+  ],
+  "added_harness_or_scripts": [
+   "scripts/check_model_refs.py",
+   "test-reports-2026-10/harness/_diag_quality_status.py",
+   "test-reports-2026-10/harness/_env.py",
+   "test-reports-2026-10/harness/analysis_ledger.py",
+   "test-reports-2026-10/harness/api_matrix.py",
+   "test-reports-2026-10/harness/captain_e01_audit.py",
+   "test-reports-2026-10/harness/captain_p01_probe.py",
+   "test-reports-2026-10/harness/captain_p01_sandbox.py",
+   "test-reports-2026-10/harness/captain_preflight_negtest.py",
+   "test-reports-2026-10/harness/captain_r2_anchors.py",
+   "test-reports-2026-10/harness/captain_r2_precheck.py",
+   "test-reports-2026-10/harness/captain_r2_status.py",
+   "test-reports-2026-10/harness/captain_r2_targets.py",
+   "test-reports-2026-10/harness/captain_snap_baseline_prefix.py",
+   "test-reports-2026-10/harness/check_changes.py",
+   "test-reports-2026-10/harness/ci_gates.py",
+   "test-reports-2026-10/harness/ci_lint.py",
+   "test-reports-2026-10/harness/coverage_drift.py",
+   "test-reports-2026-10/harness/evidence_hash.py",
+   "test-reports-2026-10/harness/final_recount.py",
+   "test-reports-2026-10/harness/fixtures.py",
+   "test-reports-2026-10/harness/improve_plan.py",
+   "test-reports-2026-10/harness/measure_coverage.py",
+   "test-reports-2026-10/harness/negative_matrix.py",
+   "test-reports-2026-10/harness/preflight_fields.py",
+   "test-reports-2026-10/harness/regression_preflight.py",
+   "test-reports-2026-10/harness/repro_defects.py",
+   "test-reports-2026-10/harness/run_gates.py",
+   "test-reports-2026-10/harness/t9_ledger.py",
+   "test-reports-2026-10/harness/t9_newfindings_probe.py",
+   "test-reports-2026-10/harness/t9_regression.py",
+   "test-reports-2026-10/harness/uat_chains.py",
+   "test-reports-2026-10/harness/uat_evidence.py",
+   "test-reports-2026-10/harness/verify_t4.py",
+   "test-reports-2026-10/harness/w0_e02_injection.py",
+   "test-reports-2026-10/harness/w0_e03_probe.py",
+   "test-reports-2026-10/harness/w0_guard_injection.py",
+   "test-reports-2026-10/harness/w1_p01_probe.py",
+   "test-reports-2026-10/harness/w1_p01_regress.py",
+   "test-reports-2026-10/harness/w2w3_probe.py",
+   "test-reports-2026-10/harness/w2w3_uatdiff.py",
+   "test-reports-2026-10/harness/w4_http_contract.py",
+   "test-reports-2026-10/harness/w4_probe.py",
+   "test-reports-2026-10/harness/write_suite.py",
+   "test-reports-2026-10/phase1-snapshot/_evidence/00-run-manifest.json"
+  ],
+  "changed_total": [
+   "\"docs/test-reports/2026-10/01-\\345\\237\\272\\347\\272\\277\\344\\272\\213\\345\\256\\236\\346\\270\\205\\345\\215\\225.md\"",
+   "\"docs/test-reports/2026-10/02-\\346\\265\\213\\350\\257\\225\\345\\210\\206\\345\\261\\202\\347\\255\\226\\347\\225\\245\\344\\270\\216\\351\\200\\232\\350\\277\\207\\345\\210\\244\\346\\215\\256.md\"",
+   "\"docs/test-reports/2026-10/03-\\351\\234\\200\\346\\261\\202\\350\\277\\275\\346\\272\\257\\347\\237\\251\\351\\230\\265.md\"",
+   "\"docs/test-reports/2026-10/04-\\344\\270\\232\\345\\212\\241\\351\\252\\214\\346\\224\\266\\346\\240\\207\\345\\207\\206\\344\\270\\216\\347\\253\\257\\345\\210\\260\\347\\253\\257\\345\\210\\244\\346\\215\\256.md\"",
+   "\"docs/test-reports/2026-10/05-\\351\\252\\214\\350\\257\\201\\347\\233\\256\\346\\240\\207\\344\\270\\216\\351\\243\\216\\351\\231\\251\\347\\231\\273\\350\\256\\260\\345\\206\\214.md\"",
+   "\"docs/test-reports/2026-10/06-\\346\\265\\213\\350\\257\\225\\345\\267\\245\\345\\205\\267\\351\\223\\276\\350\\257\\204\\344\\274\\260.md\"",
+   "\"docs/test-reports/2026-10/07-\\345\\256\\236\\346\\265\\213Runbook\\344\\270\\216\\345\\217\\260\\350\\264\\246\\350\\247\\204\\350\\214\\203.md\"",
+   "\"test-reports-2026-10/00-\\347\\274\\226\\345\\217\\267\\347\\231\\273\\350\\256\\260\\345\\206\\214\\344\\270\\216\\346\\235\\203\\345\\250\\201\\350\\257\\264\\346\\230\\216.md\"",
+   "\"test-reports-2026-10/00b-\\350\\243\\201\\345\\256\\232\\344\\270\\216\\347\\272\\252\\345\\276\\213\\345\\242\\236\\350\\241\\245.md\"",
+   "\"test-reports-2026-10/01-\\351\\230\\266\\346\\256\\265\\344\\270\\200\\344\\272\\247\\345\\207\\272\\345\\206\\273\\347\\273\\223\\346\\270\\205\\345\\215\\225.manifest.json\"",
+   "\"test-reports-2026-10/01-\\351\\230\\266\\346\\256\\265\\344\\270\\200\\344\\272\\247\\345\\207\\272\\345\\206\\273\\347\\273\\223\\346\\270\\205\\345\\215\\225.md\"",
+   "\"test-reports-2026-10/02-\\346\\265\\213\\350\\257\\225\\350\\204\\232\\346\\211\\213\\346\\236\\266\\344\\270\\216\\350\\207\\252\\345\\212\\250\\345\\214\\226\\350\\257\\264\\346\\230\\216.md\"",
+   "\"test-reports-2026-10/03-\\346\\265\\213\\350\\257\\225\\350\\265\\204\\344\\272\\247\\345\\217\\257\\344\\277\\241\\345\\272\\246\\344\\270\\216\\347\\233\\262\\345\\214\\272\\350\\257\\204\\344\\274\\260.md\"",
+   "\"test-reports-2026-10/03b-\\346\\265\\213\\350\\257\\225\\350\\265\\204\\344\\272\\247\\350\\257\\204\\344\\274\\260\\350\\241\\245\\351\\201\\227.md\"",
+   "\"test-reports-2026-10/04-API\\345\\256\\236\\346\\265\\213\\347\\273\\223\\346\\236\\234.md\"",
+   "\"test-reports-2026-10/05-\\347\\253\\257\\345\\210\\260\\347\\253\\257\\351\\252\\214\\346\\224\\266\\345\\256\\236\\346\\265\\213.md\"",
+   "\"test-reports-2026-10/06-\\346\\265\\213\\350\\257\\225\\347\\273\\223\\346\\236\\234\\345\\210\\206\\346\\236\\220\\344\\270\\216\\347\\274\\272\\351\\231\\267\\345\\210\\206\\347\\272\\247.md\"",
+   "\"test-reports-2026-10/07-\\346\\265\\213\\350\\257\\225\\344\\270\\216\\345\\267\\245\\347\\250\\213\\346\\224\\271\\350\\277\\233\\346\\212\\245\\345\\221\\212.md\"",
+   "\"test-reports-2026-10/07b-DEC-1-DEC-2-\\344\\270\\232\\345\\212\\241\\345\\217\\243\\345\\276\\204\\345\\206\\263\\347\\255\\226\\345\\215\\225.md\"",
+   "\"test-reports-2026-10/08-\\346\\234\\200\\347\\273\\210\\346\\265\\213\\350\\257\\225\\346\\212\\245\\345\\221\\212.md\"",
+   "\"test-reports-2026-10/08-\\346\\265\\213\\350\\257\\225\\346\\200\\273\\346\\226\\271\\346\\241\\210.md\"",
+   "\"test-reports-2026-10/09-W0\\345\\217\\257\\344\\277\\241\\345\\272\\246\\345\\212\\240\\345\\233\\272\\350\\257\\264\\346\\230\\216.\\345\\216\\237\\345\\247\\213\\350\\276\\223\\345\\207\\272.txt\"",
+   "\"test-reports-2026-10/09-W0\\345\\217\\257\\344\\277\\241\\345\\272\\246\\345\\212\\240\\345\\233\\272\\350\\257\\264\\346\\230\\216.md\"",
+   "\"test-reports-2026-10/16-W2W3\\344\\277\\256\\345\\244\\215\\351\\252\\214\\346\\224\\266\\345\\210\\244\\346\\215\\256.md\"",
+   "\"test-reports-2026-10/17-W4W5\\344\\277\\256\\345\\244\\215\\351\\252\\214\\346\\224\\266\\345\\210\\244\\346\\215\\256.md\"",
+   "\"test-reports-2026-10/18-E02\\351\\227\\250\\347\\246\\201\\351\\200\\200\\345\\207\\272\\347\\240\\201\\345\\217\\257\\344\\277\\241\\345\\214\\226.\\345\\216\\237\\345\\247\\213\\350\\276\\223\\345\\207\\272.txt\"",
+   "\"test-reports-2026-10/18-E02\\351\\227\\250\\347\\246\\201\\351\\200\\200\\345\\207\\272\\347\\240\\201\\345\\217\\257\\344\\277\\241\\345\\214\\226.md\"",
+   "\"test-reports-2026-10/19-P01\\347\\262\\276\\347\\241\\256\\344\\277\\256\\346\\263\\225\\344\\270\\216\\351\\252\\214\\346\\224\\266\\345\\210\\244\\346\\215\\256.md\"",
+   "\"test-reports-2026-10/20-E03\\347\\262\\276\\347\\241\\256\\344\\277\\256\\346\\263\\225\\344\\270\\216\\351\\252\\214\\346\\224\\266\\345\\210\\244\\346\\215\\256.md\"",
+   "\"test-reports-2026-10/21-E04\\347\\262\\276\\347\\241\\256\\344\\277\\256\\346\\263\\225\\344\\270\\216\\351\\252\\214\\346\\224\\266\\345\\210\\244\\346\\215\\256.md\"",
+   "\"test-reports-2026-10/22-E03\\344\\270\\211\\347\\261\\273\\351\\200\\200\\345\\207\\272\\347\\240\\201\\345\\210\\206\\346\\265\\201.\\345\\216\\237\\345\\247\\213\\350\\276\\223\\345\\207\\272.txt\"",
+   "\"test-reports-2026-10/22-E03\\344\\270\\211\\347\\261\\273\\351\\200\\200\\345\\207\\272\\347\\240\\201\\345\\210\\206\\346\\265\\201.md\"",
+   "\"test-reports-2026-10/23-E04\\351\\227\\250\\347\\246\\201\\350\\277\\233CI.\\345\\216\\237\\345\\247\\213\\350\\276\\223\\345\\207\\272.txt\"",
+   "\"test-reports-2026-10/23-E04\\351\\227\\250\\347\\246\\201\\350\\277\\233CI.md\"",
+   "\"test-reports-2026-10/24-P01\\344\\277\\256\\345\\244\\215\\350\\257\\264\\346\\230\\216.\\345\\216\\237\\345\\247\\213\\350\\276\\223\\345\\207\\272.txt\"",
+   "\"test-reports-2026-10/24-P01\\344\\277\\256\\345\\244\\215\\350\\257\\264\\346\\230\\216.md\"",
+   "\"test-reports-2026-10/24-W4\\350\\275\\275\\344\\275\\223\\347\\231\\273\\350\\256\\260\\345\\206\\214.json\"",
+   "\"test-reports-2026-10/25-W2W3\\344\\277\\256\\345\\244\\215\\350\\257\\264\\346\\230\\216.\\345\\216\\237\\345\\247\\213\\350\\276\\223\\345\\207\\272.txt\"",
+   "\"test-reports-2026-10/25-W2W3\\344\\277\\256\\345\\244\\215\\350\\257\\264\\346\\230\\216.md\"",
+   "\"test-reports-2026-10/25-W4\\345\\274\\202\\345\\270\\270\\345\\207\\272\\345\\217\\243\\344\\270\\216\\344\\277\\241\\346\\201\\257\\346\\232\\264\\351\\234\\262\\344\\277\\256\\345\\244\\215.\\345\\216\\237\\345\\247\\213\\350\\276\\223\\345\\207\\272.txt\"",
+   "\"test-reports-2026-10/25-W4\\345\\274\\202\\345\\270\\270\\345\\207\\272\\345\\217\\243\\344\\270\\216\\344\\277\\241\\346\\201\\257\\346\\232\\264\\351\\234\\262\\344\\277\\256\\345\\244\\215.md\"",
+   "\"test-reports-2026-10/26-\\344\\277\\256\\345\\244\\215\\345\\220\\216\\345\\233\\236\\345\\275\\222\\344\\270\\216\\346\\226\\255\\350\\250\\200\\350\\264\\246\\346\\234\\254.md\"",
+   "\"test-reports-2026-10/26-\\351\\230\\266\\346\\256\\265A\\346\\224\\266\\345\\217\\243-\\345\\244\\215\\346\\240\\270\\350\\257\\273\\346\\225\\260.json\"",
+   "\"test-reports-2026-10/26-\\351\\230\\266\\346\\256\\265A\\346\\224\\266\\345\\217\\243\\346\\212\\245\\345\\221\\212.md\"",
+   "\"test-reports-2026-10/28-\\347\\254\\2542\\350\\275\\256\\346\\211\\247\\350\\241\\214\\347\\272\\252\\345\\276\\213.md\"",
+   "\"test-reports-2026-10/phase1-snapshot/00-\\347\\274\\226\\345\\217\\267\\347\\231\\273\\350\\256\\260\\345\\206\\214\\344\\270\\216\\346\\235\\203\\345\\250\\201\\350\\257\\264\\346\\230\\216.md\"",
+   "\"test-reports-2026-10/phase1-snapshot/01-\\345\\237\\272\\347\\272\\277\\344\\272\\213\\345\\256\\236\\346\\270\\205\\345\\215\\225.md\"",
+   "\"test-reports-2026-10/phase1-snapshot/02-\\344\\270\\232\\345\\212\\241\\351\\252\\214\\346\\224\\266\\346\\240\\207\\345\\207\\206\\344\\270\\216\\347\\253\\257\\345\\210\\260\\347\\253\\257\\345\\210\\244\\346\\215\\256.md\"",
+   "\"test-reports-2026-10/phase1-snapshot/02-\\346\\265\\213\\350\\257\\225\\345\\210\\206\\345\\261\\202\\347\\255\\226\\347\\225\\245\\344\\270\\216\\351\\200\\232\\350\\277\\207\\345\\210\\244\\346\\215\\256.md\"",
+   "\"test-reports-2026-10/phase1-snapshot/02-\\346\\265\\213\\350\\257\\225\\345\\267\\245\\345\\205\\267\\351\\223\\276\\350\\203\\275\\345\\212\\233\\350\\257\\204\\344\\274\\260\\344\\270\\216\\345\\267\\256\\350\\267\\235\\347\\237\\251\\351\\230\\265.md\"",
+   "\"test-reports-2026-10/phase1-snapshot/03-\\351\\234\\200\\346\\261\\202\\350\\277\\275\\346\\272\\257\\347\\237\\251\\351\\230\\265.md\"",
+   "\"test-reports-2026-10/phase1-snapshot/03-\\351\\252\\214\\350\\257\\201\\347\\233\\256\\346\\240\\207\\344\\270\\216\\351\\243\\216\\351\\231\\251\\347\\231\\273\\350\\256\\260.md\"",
+   "\"test-reports-2026-10/phase1-snapshot/04-\\344\\270\\232\\345\\212\\241\\351\\252\\214\\346\\224\\266\\346\\240\\207\\345\\207\\206\\344\\270\\216\\347\\253\\257\\345\\210\\260\\347\\253\\257\\345\\210\\244\\346\\215\\256.md\"",
+   "\"test-reports-2026-10/phase1-snapshot/05-\\351\\252\\214\\350\\257\\201\\347\\233\\256\\346\\240\\207\\344\\270\\216\\351\\243\\216\\351\\231\\251\\347\\231\\273\\350\\256\\260\\345\\206\\214.md\"",
+   "\"test-reports-2026-10/phase1-snapshot/06-\\346\\265\\213\\350\\257\\225\\345\\267\\245\\345\\205\\267\\351\\223\\276\\350\\257\\204\\344\\274\\260.md\"",
+   "\"test-reports-2026-10/phase1-snapshot/07-\\345\\256\\236\\346\\265\\213Runbook\\344\\270\\216\\345\\217\\260\\350\\264\\246\\350\\247\\204\\350\\214\\203.md\"",
+   "\"test-reports-2026-10/phase1-snapshot/08-\\346\\265\\213\\350\\257\\225\\346\\200\\273\\346\\226\\271\\346\\241\\210.md\"",
+   ".github/workflows/docker-deploy.yml",
+   ".gitignore",
+   "Jenkinsfile",
+   "app/__init__.py",
+   "app/main/production_center.py",
+   "app/main/quality.py",
+   "app/main/routes.py",
+   "app/main/stock.py",
+   "app/models.py",
+   "app/services/mes_service.py",
+   "docs/test-reports/2026-10/_evidence/2026-10-06-t7/00-run-manifest.json",
+   "docs/test-reports/_probe/check_doc.py",
+   "docs/test-reports/_probe/check_trace_matrix.py",
+   "docs/test-reports/_probe/collect_compact.py",
+   "docs/test-reports/_probe/collect_config.py",
+   "docs/test-reports/_probe/collect_exports.py",
+   "docs/test-reports/_probe/collect_facts.py",
+   "docs/test-reports/_probe/collect_models.py",
+   "docs/test-reports/_probe/collect_ro_db.py",
+   "docs/test-reports/_probe/collect_routes_table.py",
+   "docs/test-reports/_probe/collect_tooling.py",
+   "docs/test-reports/_probe/debug_links.py",
+   "docs/test-reports/_probe/dump_link_lines.py",
+   "docs/test-reports/_probe/fix_links.py",
+   "docs/test-reports/_probe/fix_links_list.py",
+   "docs/test-reports/_probe/probe_fixture_gaps.py",
+   "docs/test-reports/_probe/probe_targets.py",
+   "docs/test-reports/_probe/verify_acceptance_baseline.py",
+   "docs/test-reports/_probe/verify_corrections.py",
+   "scripts/check_model_refs.py",
+   "scripts/permission_matrix.py",
+   "scripts/route_inventory.py",
+   "scripts/smoke_test.py",
+   "test-reports-2026-10/harness/_diag_quality_status.py",
+   "test-reports-2026-10/harness/_env.py",
+   "test-reports-2026-10/harness/analysis_ledger.py",
+   "test-reports-2026-10/harness/api_matrix.py",
+   "test-reports-2026-10/harness/captain_e01_audit.py",
+   "test-reports-2026-10/harness/captain_p01_probe.py",
+   "test-reports-2026-10/harness/captain_p01_sandbox.py",
+   "test-reports-2026-10/harness/captain_preflight_negtest.py",
+   "test-reports-2026-10/harness/captain_r2_anchors.py",
+   "test-reports-2026-10/harness/captain_r2_precheck.py",
+   "test-reports-2026-10/harness/captain_r2_status.py",
+   "test-reports-2026-10/harness/captain_r2_targets.py",
+   "test-reports-2026-10/harness/captain_snap_baseline_prefix.py",
+   "test-reports-2026-10/harness/check_changes.py",
+   "test-reports-2026-10/harness/ci_gates.py",
+   "test-reports-2026-10/harness/ci_lint.py",
+   "test-reports-2026-10/harness/coverage_drift.py",
+   "test-reports-2026-10/harness/evidence_hash.py",
+   "test-reports-2026-10/harness/final_recount.py",
+   "test-reports-2026-10/harness/fixtures.py",
+   "test-reports-2026-10/harness/improve_plan.py",
+   "test-reports-2026-10/harness/measure_coverage.py",
+   "test-reports-2026-10/harness/negative_matrix.py",
+   "test-reports-2026-10/harness/preflight_fields.py",
+   "test-reports-2026-10/harness/regression_preflight.py",
+   "test-reports-2026-10/harness/repro_defects.py",
+   "test-reports-2026-10/harness/run_gates.py",
+   "test-reports-2026-10/harness/t9_ledger.py",
+   "test-reports-2026-10/harness/t9_newfindings_probe.py",
+   "test-reports-2026-10/harness/t9_regression.py",
+   "test-reports-2026-10/harness/uat_chains.py",
+   "test-reports-2026-10/harness/uat_evidence.py",
+   "test-reports-2026-10/harness/verify_t4.py",
+   "test-reports-2026-10/harness/w0_e02_injection.py",
+   "test-reports-2026-10/harness/w0_e03_probe.py",
+   "test-reports-2026-10/harness/w0_guard_injection.py",
+   "test-reports-2026-10/harness/w1_p01_probe.py",
+   "test-reports-2026-10/harness/w1_p01_regress.py",
+   "test-reports-2026-10/harness/w2w3_probe.py",
+   "test-reports-2026-10/harness/w2w3_uatdiff.py",
+   "test-reports-2026-10/harness/w4_http_contract.py",
+   "test-reports-2026-10/harness/w4_probe.py",
+   "test-reports-2026-10/harness/write_suite.py",
+   "test-reports-2026-10/phase1-snapshot/_evidence/00-run-manifest.json"
+  ]
+ },
+ "coverage_artifacts": [
+  {
+   "path": "test-reports-2026-10/evidence/harness/coverage.json",
+   "run_id": "t2-repro-20261006",
+   "mtime": "2026-10-06 22:25:07",
+   "literal_covered": 6,
+   "covered_any": 14,
+   "uncovered_writable": 101,
+   "method_level_non_get": 155,
+   "probe_files_with_url_sites": [
+    "scripts/functional_test.py"
+   ]
+  },
+  {
+   "path": "test-reports-2026-10/evidence/harness/ci-captain-r2-healthcheck/coverage.json",
+   "run_id": "captain-r2-healthcheck",
+   "mtime": "2026-10-07 17:18:52",
+   "literal_covered": 6,
+   "covered_any": 14,
+   "uncovered_writable": 101,
+   "method_level_non_get": 155,
+   "probe_files_with_url_sites": [
+    "scripts/functional_test.py"
+   ]
+  },
+  {
+   "path": "test-reports-2026-10/evidence/harness/ci-w0-e04-t5-final/coverage.json",
+   "run_id": "w0-e04-t5-final",
+   "mtime": "2026-10-07 13:51:15",
+   "literal_covered": 6,
+   "covered_any": 14,
+   "uncovered_writable": 101,
+   "method_level_non_get": 155,
+   "probe_files_with_url_sites": [
+    "scripts/functional_test.py"
+   ]
+  },
+  {
+   "path": "test-reports-2026-10/evidence/harness/ci-w0-e04-t5-first/coverage.json",
+   "run_id": "w0-e04-t5-first",
+   "mtime": "2026-10-07 13:49:36",
+   "literal_covered": 6,
+   "covered_any": 14,
+   "uncovered_writable": 101,
+   "method_level_non_get": 155,
+   "probe_files_with_url_sites": [
+    "scripts/functional_test.py"
+   ]
+  },
+  {
+   "path": "test-reports-2026-10/evidence/harness/ci-w0-e04-t5-second/coverage.json",
+   "run_id": "w0-e04-t5-second",
+   "mtime": "2026-10-07 13:50:13",
+   "literal_covered": 6,
+   "covered_any": 14,
+   "uncovered_writable": 101,
+   "method_level_non_get": 155,
+   "probe_files_with_url_sites": [
+    "scripts/functional_test.py"
+   ]
+  },
+  {
+   "path": "test-reports-2026-10/evidence/harness/ci-wrapa-t10-ci/coverage.json",
+   "run_id": "wrapa-t10-ci",
+   "mtime": "2026-10-07 14:23:58",
+   "literal_covered": 6,
+   "covered_any": 14,
+   "uncovered_writable": 101,
+   "method_level_non_get": 155,
+   "probe_files_with_url_sites": [
+    "scripts/functional_test.py"
+   ]
+  },
+  {
+   "path": "test-reports-2026-10/evidence/harness/w0-e03-t4-chain/coverage.json",
+   "run_id": "w0-e03-t4-chain",
+   "mtime": "2026-10-07 13:42:05",
+   "literal_covered": 6,
+   "covered_any": 14,
+   "uncovered_writable": 101,
+   "method_level_non_get": 155,
+   "probe_files_with_url_sites": [
+    "scripts/functional_test.py"
+   ]
+  },
+  {
+   "path": "test-reports-2026-10/evidence/harness/w0-e03-t4b-chain/coverage.json",
+   "run_id": "w0-e03-t4b-chain",
+   "mtime": "2026-10-07 13:42:41",
+   "literal_covered": 6,
+   "covered_any": 14,
+   "uncovered_writable": 101,
+   "method_level_non_get": 155,
+   "probe_files_with_url_sites": [
+    "scripts/functional_test.py"
+   ]
+  },
+  {
+   "path": "test-reports-2026-10/evidence/_phaseB-prefreeze/20261007-132253/harness/coverage.json",
+   "run_id": "t2-repro-20261006",
+   "mtime": "2026-10-06 22:25:07",
+   "literal_covered": 6,
+   "covered_any": 14,
+   "uncovered_writable": 101,
+   "method_level_non_get": 155,
+   "probe_files_with_url_sites": [
+    "scripts/functional_test.py"
+   ]
+  },
+  {
+   "path": "test-reports-2026-10/evidence/_phaseB-prefreeze/20261007-142403/harness/coverage.json",
+   "run_id": "t2-repro-20261006",
+   "mtime": "2026-10-06 22:25:07",
+   "literal_covered": 6,
+   "covered_any": 14,
+   "uncovered_writable": 101,
+   "method_level_non_get": 155,
+   "probe_files_with_url_sites": [
+    "scripts/functional_test.py"
+   ]
+  },
+  {
+   "path": "test-reports-2026-10/evidence/_phaseB-prefreeze/20261007-142403/harness/ci-w0-e04-t5-final/coverage.json",
+   "run_id": "w0-e04-t5-final",
+   "mtime": "2026-10-07 13:51:15",
+   "literal_covered": 6,
+   "covered_any": 14,
+   "uncovered_writable": 101,
+   "method_level_non_get": 155,
+   "probe_files_with_url_sites": [
+    "scripts/functional_test.py"
+   ]
+  },
+  {
+   "path": "test-reports-2026-10/evidence/_phaseB-prefreeze/20261007-142403/harness/ci-w0-e04-t5-first/coverage.json",
+   "run_id": "w0-e04-t5-first",
+   "mtime": "2026-10-07 13:49:36",
+   "literal_covered": 6,
+   "covered_any": 14,
+   "uncovered_writable": 101,
+   "method_level_non_get": 155,
+   "probe_files_with_url_sites": [
+    "scripts/functional_test.py"
+   ]
+  },
+  {
+   "path": "test-reports-2026-10/evidence/_phaseB-prefreeze/20261007-142403/harness/ci-w0-e04-t5-second/coverage.json",
+   "run_id": "w0-e04-t5-second",
+   "mtime": "2026-10-07 13:50:13",
+   "literal_covered": 6,
+   "covered_any": 14,
+   "uncovered_writable": 101,
+   "method_level_non_get": 155,
+   "probe_files_with_url_sites": [
+    "scripts/functional_test.py"
+   ]
+  },
+  {
+   "path": "test-reports-2026-10/evidence/_phaseB-prefreeze/20261007-142403/harness/ci-wrapa-t10-ci/coverage.json",
+   "run_id": "wrapa-t10-ci",
+   "mtime": "2026-10-07 14:23:58",
+   "literal_covered": 6,
+   "covered_any": 14,
+   "uncovered_writable": 101,
+   "method_level_non_get": 155,
+   "probe_files_with_url_sites": [
+    "scripts/functional_test.py"
+   ]
+  },
+  {
+   "path": "test-reports-2026-10/evidence/_phaseB-prefreeze/20261007-142403/harness/w0-e03-t4-chain/coverage.json",
+   "run_id": "w0-e03-t4-chain",
+   "mtime": "2026-10-07 13:42:05",
+   "literal_covered": 6,
+   "covered_any": 14,
+   "uncovered_writable": 101,
+   "method_level_non_get": 155,
+   "probe_files_with_url_sites": [
+    "scripts/functional_test.py"
+   ]
+  },
+  {
+   "path": "test-reports-2026-10/evidence/_phaseB-prefreeze/20261007-142403/harness/w0-e03-t4b-chain/coverage.json",
+   "run_id": "w0-e03-t4b-chain",
+   "mtime": "2026-10-07 13:42:41",
+   "literal_covered": 6,
+   "covered_any": 14,
+   "uncovered_writable": 101,
+   "method_level_non_get": 155,
+   "probe_files_with_url_sites": [
+    "scripts/functional_test.py"
+   ]
+  }
+ ],
+ "uat_baseline_summary": {
+  "run_id": "t5-uat-final",
+  "started": "2026-10-06 22:33:13",
+  "finished": "2026-10-06 22:33:15",
+  "total": 40,
+  "passed": 34,
+  "failed": 6,
+  "blocked": 0,
+  "execution_errors": false
+ },
+ "real_db_before": {
+  "exists": true,
+  "sha256": "F5DA2306BC31CBAB098AAD3774016D320A9B9AA3546F93418196AE9900E0F065",
+  "bytes": 2531328,
+  "mtime": "2026-09-18 12:50:55",
+  "equals_frozen": true
+ },
+ "ast_recount": {
+  "get_json_without_silent": {
+   "tool": "reconcile_r2.get_json_without_silent()（AST，逐调用点）",
+   "t7_baseline": 39,
+   "now": 39,
+   "sites": [
+    {
+     "file": "app/main/equipment.py",
+     "line": 246,
+     "text": "data = request.get_json() or request.form"
+    },
+    {
+     "file": "app/main/production_center.py",
+     "line": 103,
+     "text": "data = request.get_json() or {}"
+    },
+    {
+     "file": "app/main/production_center.py",
+     "line": 188,
+     "text": "payload = request.get_json() or {}"
+    },
+    {
+     "file": "app/main/production_center.py",
+     "line": 318,
+     "text": "data = request.get_json() or {}"
+    },
+    {
+     "file": "app/main/quality.py",
+     "line": 241,
+     "text": "data = request.get_json()"
+    }
+   ]
+  },
+  "undefined_model_refs": {
+   "tool": "reconcile_r2.undefined_model_refs()（与 check_model_refs 同口径的独立实现）",
+   "t7_baseline": 2,
+   "now": 0,
+   "sites": []
+  },
+  "http_contract_sites": {
+   "tool": "harness/w4_http_contract.py::scan（AST，try 块 × 处理器不重抛）",
+   "sites_total": 10,
+   "sites_doc_scope": 0,
+   "sites_404_dimension": 0,
+   "sites_getjson_dimension": 10,
+   "site_404_list": [],
+   "site_getjson_list": [
+    {
+     "file": "app/main/routes.py",
+     "line": 1720,
+     "func": "add_bonus_penalty"
+    },
+    {
+     "file": "app/main/routes.py",
+     "line": 5367,
+     "func": "add_code_rule"
+    },
+    {
+     "file": "app/main/routes.py",
+     "line": 5420,
+     "func": "edit_code_rule"
+    },
+    {
+     "file": "app/main/routes.py",
+     "line": 6233,
+     "func": "auto_archive_inventory"
+    },
+    {
+     "file": "app/main/routes.py",
+     "line": 7026,
+     "func": "add_product"
+    },
+    {
+     "file": "app/main/routes.py",
+     "line": 8067,
+     "func": "add_production_order"
+    },
+    {
+     "file": "app/main/routes.py",
+     "line": 10080,
+     "func": "manage_delivery_batches"
+    },
+    {
+     "file": "app/main/routes.py",
+     "line": 10834,
+     "func": "update_consumable"
+    },
+    {
+     "file": "app/main/routes.py",
+     "line": 10976,
+     "func": "use_consumable"
+    },
+    {
+     "file": "app/main/routes.py",
+     "line": 11138,
+     "func": "update_consumable_category"
+    }
+   ]
+  }
+ },
+ "items": [
+  {
+   "id": "E-01",
+   "wave": "W0",
+   "level": "P0-前置",
+   "title": "证据只追加：evidence/** 全量纳入哈希基线 + save_evidence 按 run_id 分目录",
+   "verify_judge": "两次不同 HARNESS_RUN_ID 连跑：① 第一次的 6 个 .txt 原件仍在且哈希不变；② 第二次产出落在新目录；③ 每个 evidence 子目录都有 artifact_hashes.json 且文件数 = 目录文件数−1",
+   "search_domain": "文件名(递归): test-reports-2026-10/harness/*.py 找 evidence_hash.py；文件内容: harness/_env.py；文件名(递归): evidence/**/evidence_journal.jsonl",
+   "verdict": "HIT",
+   "verdict_auto": "HIT",
+   "verdict_override": null,
+   "checks_passed": 6,
+   "checks_total": 6,
+   "checks": [
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "test-reports-2026-10/harness/_env.py",
+     "regex": "EVIDENCE_DIR = os\\.path\\.join\\(EVIDENCE_ROOT, RUN_ID\\)",
+     "label": "run_id 分目录",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "test-reports-2026-10/harness/_env.py",
+       "line": 40,
+       "text": "EVIDENCE_DIR = os.path.join(EVIDENCE_ROOT, RUN_ID)"
+      }
+     ],
+     "hit_count": 1
+    },
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "test-reports-2026-10/harness/_env.py",
+     "regex": "def guard_write\\(",
+     "label": "写前守卫",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "test-reports-2026-10/harness/_env.py",
+       "line": 80,
+       "text": "def guard_write(path, run_id=None):"
+      }
+     ],
+     "hit_count": 1
+    },
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "test-reports-2026-10/harness/_env.py",
+     "regex": "def _append_journal\\(",
+     "label": "只追加台账",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "test-reports-2026-10/harness/_env.py",
+       "line": 98,
+       "text": "def _append_journal(directory, requested, written, renamed, text, run_id=None):"
+      }
+     ],
+     "hit_count": 1
+    },
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "test-reports-2026-10/harness/_env.py",
+     "regex": "def save_evidence\\(",
+     "label": "save_evidence",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "test-reports-2026-10/harness/_env.py",
+       "line": 272,
+       "text": "def save_evidence(filename, text, subdir=None, run_id=None, guard=True, journal=True):"
+      }
+     ],
+     "hit_count": 1
+    },
+    {
+     "kind": "file_exists",
+     "evidence_kind": "file_exists",
+     "pre_existing": false,
+     "target": "test-reports-2026-10/harness/evidence_hash.py",
+     "label": "哈希基线脚本",
+     "expect": "exists",
+     "ok": true,
+     "hits": [
+      {
+       "file": "test-reports-2026-10/harness/evidence_hash.py",
+       "line": null,
+       "text": "bytes=47681"
+      }
+     ]
+    },
+    {
+     "kind": "glob_exists",
+     "evidence_kind": "file_exists",
+     "pre_existing": false,
+     "target": "test-reports-2026-10/evidence/**/evidence_journal.jsonl",
+     "label": "台账已产生",
+     "expect": "exists",
+     "ok": true,
+     "hits": [
+      {
+       "file": "test-reports-2026-10/evidence/harness/captain-e02-final/evidence_journal.jsonl",
+       "line": null,
+       "text": ""
+      },
+      {
+       "file": "test-reports-2026-10/evidence/harness/captain-e02-v4/evidence_journal.jsonl",
+       "line": null,
+       "text": ""
+      },
+      {
+       "file": "test-reports-2026-10/evidence/harness/captain-e02-verify3/evidence_journal.jsonl",
+       "line": null,
+       "text": ""
+      }
+     ],
+     "hit_count": 225
+    }
+   ]
+  },
+  {
+   "id": "E-02",
+   "wave": "W0",
+   "level": "P0-前置",
+   "title": "门禁退出码可信化：probe_unexpected 计入失败；敏感性自检 EXC 计入未通过",
+   "verify_judge": "对抗复跑（t3 手法）：把 route_inventory_native_probe.expect_exit 改 0 后 run_gates 必须 **exit 1**；构造门禁抛异常时敏感性自检必须判**未通过**",
+   "search_domain": "文件内容: harness/run_gates.py",
+   "verdict": "HIT",
+   "verdict_auto": "HIT",
+   "verdict_override": null,
+   "checks_passed": 3,
+   "checks_total": 3,
+   "checks": [
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "test-reports-2026-10/harness/run_gates.py",
+     "regex": "exit_reasons\\.append\\(f\"probe_unexpected=",
+     "label": "probe_unexpected 入退出码",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "test-reports-2026-10/harness/run_gates.py",
+       "line": 448,
+       "text": "exit_reasons.append(f\"probe_unexpected={summary['probe_unexpected']}\")"
+      }
+     ],
+     "hit_count": 1
+    },
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "test-reports-2026-10/harness/run_gates.py",
+     "regex": "injections_errored",
+     "label": "EXC 单列",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "test-reports-2026-10/harness/run_gates.py",
+       "line": 408,
+       "text": "injections_errored = []"
+      },
+      {
+       "file": "test-reports-2026-10/harness/run_gates.py",
+       "line": 417,
+       "text": "injections_errored = sorted(k for k, v in injections.items()"
+      },
+      {
+       "file": "test-reports-2026-10/harness/run_gates.py",
+       "line": 421,
+       "text": "injections_ok = not injections_errored and all("
+      }
+     ],
+     "hit_count": 5
+    },
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "test-reports-2026-10/harness/run_gates.py",
+     "regex": "'sensitivity_ok': summary\\[.sensitivity_ok.\\]",
+     "label": "敏感性进语义块",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "test-reports-2026-10/harness/run_gates.py",
+       "line": 459,
+       "text": "'sensitivity_ok': summary['sensitivity_ok']},"
+      }
+     ],
+     "hit_count": 1
+    }
+   ]
+  },
+  {
+   "id": "E-03",
+   "wave": "W0",
+   "level": "P0-前置",
+   "title": "三类退出码分流：伪门禁补失败出口、报告型恒 0 不进链",
+   "verify_judge": "① 注入「匿名可访问」后 permission_matrix 必须 exit 1；② 加 --no-dump 后 smoke_test 在仓库根 JSON 只读时仍 exit 0；③ route_inventory/measure_coverage 的消费方是解析器而非退出码（CI 脚本里 grep 不到 `|| exit`）",
+   "search_domain": "文件内容: scripts/permission_matrix.py, scripts/smoke_test.py, scripts/route_inventory.py",
+   "verdict": "HIT",
+   "verdict_auto": "HIT",
+   "verdict_override": null,
+   "checks_passed": 6,
+   "checks_total": 6,
+   "checks": [
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "scripts/permission_matrix.py",
+     "regex": "code = 1 if anon_open else 0",
+     "label": "伪门禁失败出口",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "scripts/permission_matrix.py",
+       "line": 191,
+       "text": "code = 1 if anon_open else 0"
+      }
+     ],
+     "hit_count": 1
+    },
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "scripts/permission_matrix.py",
+     "regex": "\\[FAIL\\] 匿名可访问视图",
+     "label": "失败文案",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "scripts/permission_matrix.py",
+       "line": 11,
+       "text": "`anon_open == 0` ⇒ **exit 0**；`anon_open` 非空 ⇒ **exit 1**（并打印 `[FAIL] 匿名可访问视图 N 个（应为 0）`）。"
+      },
+      {
+       "file": "scripts/permission_matrix.py",
+       "line": 193,
+       "text": "print(f'[FAIL] 匿名可访问视图 {len(anon_open)} 个（应为 0）')"
+      }
+     ],
+     "hit_count": 2
+    },
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "scripts/permission_matrix.py",
+     "regex": "\\.tmp' / run_id\\(\\)",
+     "label": ".tmp/<RUN_ID> 落点",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "scripts/permission_matrix.py",
+       "line": 47,
+       "text": "return str(REPORTS / '.tmp' / run_id() / DUMP_NAME)"
+      }
+     ],
+     "hit_count": 1
+    },
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "scripts/smoke_test.py",
+     "regex": "--no-dump",
+     "label": "smoke --no-dump",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "scripts/smoke_test.py",
+       "line": 10,
+       "text": "`--out PATH` 可指定落点、`--no-dump` 完全跳过；**写盘失败只打印 `[WARN]`，绝不改变退出码**。"
+      },
+      {
+       "file": "scripts/smoke_test.py",
+       "line": 17,
+       "text": "python -B scripts/smoke_test.py --no-dump       # 不落盘（CI 推荐）"
+      },
+      {
+       "file": "scripts/smoke_test.py",
+       "line": 246,
+       "text": "print('\\n[--no-dump] 已跳过落盘（退出码只反映断言）')"
+      }
+     ],
+     "hit_count": 4
+    },
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "scripts/smoke_test.py",
+     "regex": "不影响退出码",
+     "label": "落盘失败不影响退出码",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "scripts/smoke_test.py",
+       "line": 115,
+       "text": "return False, (f'[WARN] 落盘失败（不影响退出码）: {e.__class__.__name__}: {e}')"
+      }
+     ],
+     "hit_count": 1
+    },
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "scripts/route_inventory.py",
+     "regex": "^\\s*return 0",
+     "label": "报告型保持恒 0",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "scripts/route_inventory.py",
+       "line": 64,
+       "text": "return 0"
+      }
+     ],
+     "hit_count": 1
+    }
+   ]
+  },
+  {
+   "id": "E-04",
+   "wave": "W0",
+   "level": "P0-前置",
+   "title": "门禁进 CI（Jenkinsfile 与 GitHub workflow 目前 0 条测试动作）",
+   "verify_judge": "在 CI 日志里能看到 4 项真闸门 exit 0 + 计数逐项相等；人为破坏（例如模板用未登记能力）⇒ CI 必须红灯",
+   "search_domain": "文件内容: Jenkinsfile, .github/workflows/docker-deploy.yml；文件名: harness/ci_gates.py, ci_lint.py",
+   "verdict": "HIT",
+   "verdict_auto": "HIT",
+   "verdict_override": null,
+   "checks_passed": 6,
+   "checks_total": 6,
+   "checks": [
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "Jenkinsfile",
+     "regex": "stage\\('门禁检查\\(E-04\\)'\\)",
+     "label": "Jenkins stage",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "Jenkinsfile",
+       "line": 90,
+       "text": "stage('门禁检查(E-04)') {"
+      }
+     ],
+     "hit_count": 1
+    },
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "Jenkinsfile",
+     "regex": "ci_gates\\.py --phase first",
+     "label": "Jenkins 调用入口",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "Jenkinsfile",
+       "line": 106,
+       "text": "\"${PY_EXE}\" -B test-reports-2026-10/harness/ci_gates.py --phase first --json test-reports-2026-10/evidence/harness/ci-build-%BUILD_NUMBER%/ci_gates.json"
+      }
+     ],
+     "hit_count": 1
+    },
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": ".github/workflows/docker-deploy.yml",
+     "regex": "^\\s*gate:",
+     "label": "GH gate job",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": ".github/workflows/docker-deploy.yml",
+       "line": 17,
+       "text": "gate:"
+      }
+     ],
+     "hit_count": 1
+    },
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": ".github/workflows/docker-deploy.yml",
+     "regex": "continue-on-error: true",
+     "label": "第一阶段 report-only",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": ".github/workflows/docker-deploy.yml",
+       "line": 15,
+       "text": "# 第一阶段（当前）：report-only —— continue-on-error: true，且 build-and-push **不** needs 本 job（不阻塞发布）"
+      },
+      {
+       "file": ".github/workflows/docker-deploy.yml",
+       "line": 19,
+       "text": "continue-on-error: true"
+      }
+     ],
+     "hit_count": 2
+    },
+    {
+     "kind": "file_exists",
+     "evidence_kind": "file_exists",
+     "pre_existing": false,
+     "target": "test-reports-2026-10/harness/ci_gates.py",
+     "label": "CI 等价入口",
+     "expect": "exists",
+     "ok": true,
+     "hits": [
+      {
+       "file": "test-reports-2026-10/harness/ci_gates.py",
+       "line": null,
+       "text": "bytes=18045"
+      }
+     ]
+    },
+    {
+     "kind": "file_exists",
+     "evidence_kind": "file_exists",
+     "pre_existing": false,
+     "target": "test-reports-2026-10/harness/ci_lint.py",
+     "label": "CI 配置自检",
+     "expect": "exists",
+     "ok": true,
+     "hits": [
+      {
+       "file": "test-reports-2026-10/harness/ci_lint.py",
+       "line": null,
+       "text": "bytes=15506"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "E-05",
+   "wave": "W0",
+   "level": "P1-前置",
+   "title": "环境三件套固化进 runbook：绝对解释器 + shim 前缀 + 强制 UTF-8",
+   "verify_judge": "runbook 里 3 条命令原样复制可跑通且 stdout 无 U+FFFD；台账 evidence_level 字段出现",
+   "search_domain": "文件内容: harness/_env.py；文件内容: docs/test-reports/2026-10/07-实测Runbook与台账规范.md",
+   "verdict": "HIT",
+   "verdict_auto": "HIT",
+   "verdict_override": null,
+   "checks_passed": 6,
+   "checks_total": 6,
+   "checks": [
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "test-reports-2026-10/harness/_env.py",
+     "regex": "PY_EXE = r'F:\\\\Miniconda\\\\envs\\\\wage\\\\python\\.exe'",
+     "label": "绝对解释器",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "test-reports-2026-10/harness/_env.py",
+       "line": 32,
+       "text": "PY_EXE = r'F:\\Miniconda\\envs\\wage\\python.exe'"
+      }
+     ],
+     "hit_count": 1
+    },
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "test-reports-2026-10/harness/_env.py",
+     "regex": "def interpreter\\(\\)",
+     "label": "interpreter()",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "test-reports-2026-10/harness/_env.py",
+       "line": 194,
+       "text": "def interpreter():"
+      }
+     ],
+     "hit_count": 1
+    },
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "test-reports-2026-10/harness/_env.py",
+     "regex": "env\\['PYTHONIOENCODING'\\] = 'utf-8'",
+     "label": "子进程编码",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "test-reports-2026-10/harness/_env.py",
+       "line": 212,
+       "text": "env['PYTHONIOENCODING'] = 'utf-8'"
+      }
+     ],
+     "hit_count": 1
+    },
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "test-reports-2026-10/harness/_env.py",
+     "regex": "env\\['PYTHONUTF8'\\] = '1'",
+     "label": "PYTHONUTF8",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "test-reports-2026-10/harness/_env.py",
+       "line": 213,
+       "text": "env['PYTHONUTF8'] = '1'"
+      }
+     ],
+     "hit_count": 1
+    },
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "test-reports-2026-10/harness/_env.py",
+     "regex": "'evidence_level': level",
+     "label": "evidence_level",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "test-reports-2026-10/harness/_env.py",
+       "line": 253,
+       "text": "'evidence_level': level,"
+      }
+     ],
+     "hit_count": 1
+    },
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "docs/test-reports/2026-10/07-实测Runbook与台账规范.md",
+     "regex": "_sandbox_compat",
+     "label": "runbook shim 纪律",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "docs/test-reports/2026-10/07-实测Runbook与台账规范.md",
+       "line": 30,
+       "text": "### R-4（执行纪律，captain 本轮同步，已并入本 Runbook）：**脚本一律加 `scripts/_sandbox_compat.py` 前缀，不区分「原生可跑 / 需垫片」**"
+      },
+      {
+       "file": "docs/test-reports/2026-10/07-实测Runbook与台账规范.md",
+       "line": 34,
+       "text": "| 规则 | 所有 `scripts/` 下脚本统一写成 `& $py -B scripts/_sandbox_compat.py scripts/<x>.py`；**唯一例外**是 3 个纯静态脚本（`check_templates` / `check_migration_heads` / `check_proper"
+      },
+      {
+       "file": "docs/test-reports/2026-10/07-实测Runbook与台账规范.md",
+       "line": 87,
+       "text": "| **CH-2 副本夹具** | 新建 `.py` 文件 + `& $py -B scripts/_sandbox_compat.py .analysis-scratch/<x>.py` | ✅ 可用：副本可写、可建表（§2.2） | 是**唯一**能做数据级测试（写入/造夹具/差分）的通道 |"
+      }
+     ],
+     "hit_count": 12
+    }
+   ]
+  },
+  {
+   "id": "P-01",
+   "wave": "W1",
+   "level": "blocker",
+   "title": "Consumable 未定义 ⇒ 易耗品两个写端点恒 500",
+   "verify_judge": "① POST /consumables/<id>/use 与 DELETE /consumables/<id> 返回非 500（200/403/404）；② 新门禁输出 0 处未定义引用（当前 2 处）",
+   "search_domain": "文件内容: app/main/routes.py（第 6 行模块级 import）",
+   "verdict": "HIT",
+   "verdict_auto": "HIT",
+   "verdict_override": null,
+   "checks_passed": 5,
+   "checks_total": 5,
+   "checks": [
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "app/main/routes.py",
+     "regex": "^from app\\.models import .*\\bConsumable\\b",
+     "label": "模块级导入 Consumable",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "app/main/routes.py",
+       "line": 6,
+       "text": "from app.models import Employee, ProcessPrice, ProductionRecord, BonusPenalty, AuditLog, ProcessPrice, User, TaskAssignment, SerialNumber, SalaryChange, Coeffic"
+      }
+     ],
+     "hit_count": 1
+    },
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "app/main/routes.py",
+     "regex": "\\bConsumableCategory\\b",
+     "label": "同批 ConsumableCategory",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "app/main/routes.py",
+       "line": 6,
+       "text": "from app.models import Employee, ProcessPrice, ProductionRecord, BonusPenalty, AuditLog, ProcessPrice, User, TaskAssignment, SerialNumber, SalaryChange, Coeffic"
+      },
+      {
+       "file": "app/main/routes.py",
+       "line": 10583,
+       "text": "from app.models import Consumable, ConsumableCategory"
+      },
+      {
+       "file": "app/main/routes.py",
+       "line": 10594,
+       "text": "query = query.join(ConsumableCategory).filter("
+      }
+     ],
+     "hit_count": 12
+    },
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "app/main/routes.py",
+     "regex": "def delete_consumable\\(",
+     "label": "delete_consumable",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "app/main/routes.py",
+       "line": 10915,
+       "text": "def delete_consumable(id):"
+      }
+     ],
+     "hit_count": 1
+    },
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "app/main/routes.py",
+     "regex": "def use_consumable\\(",
+     "label": "use_consumable",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "app/main/routes.py",
+       "line": 10967,
+       "text": "def use_consumable(id):"
+      }
+     ],
+     "hit_count": 1
+    },
+    {
+     "kind": "subprocess",
+     "evidence_kind": "behavior_verified",
+     "pre_existing": false,
+     "target": "python -B scripts/check_model_refs.py",
+     "label": "check_model_refs violations=0",
+     "expect": "exit 0",
+     "ok": true,
+     "cmd": [
+      "F:\\Miniconda\\envs\\wage\\python.exe",
+      "-B",
+      "scripts/check_model_refs.py"
+     ],
+     "exit_code": 0,
+     "hits": [
+      {
+       "file": "",
+       "line": null,
+       "text": "[model_refs] scanned 23 files, name_query_refs 602, violations 0"
+      },
+      {
+       "file": "",
+       "line": null,
+       "text": "RESULT: OK"
+      }
+     ],
+     "stderr_tail": []
+    }
+   ]
+  },
+  {
+   "id": "DEC-1",
+   "wave": "W2",
+   "level": "决策单（先于 P-03/P-02/P-07）",
+   "title": "quality_status 取值语义与复位口径裁定",
+   "verify_judge": "一张判定表逐格实测：{NULL, pending, pass, fail} × {正常报工, 报工后质检 fail} × {处置 done 后} ⇒ 入库/拒收结果与业务预期一致；尤其 NULL 与 pending 必须都能放行**未质检**产出（当前 pending 会 fg +0 死锁）",
+   "search_domain": "文件内容: 07b（判定表）+ **harness/w2w3_probe.py**（acceptance_matrix 机读）；（预检误判 PARTIAL 之因：搜索域只写 evidence/harness，漏搜 harness/ —— A-71 同类）",
+   "verdict": "HIT",
+   "verdict_auto": "HIT",
+   "verdict_override": null,
+   "checks_passed": 3,
+   "checks_total": 3,
+   "checks": [
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "test-reports-2026-10/07b-DEC-1-DEC-2-业务口径决策单.md",
+     "regex": "N1",
+     "label": "判定表 N1",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "test-reports-2026-10/07b-DEC-1-DEC-2-业务口径决策单.md",
+       "line": 120,
+       "text": "| `NULL` | N1 | 全新实例、无质检任务、无 NC | **入库**（基线实测 +4，不得回归） | `NULL`（不因放行而改写） | P0-2.4 / AC-15 阳性对照 |"
+      },
+      {
+       "file": "test-reports-2026-10/07b-DEC-1-DEC-2-业务口径决策单.md",
+       "line": 136,
+       "text": "**固化为常驻用例**：上表 14 格 → `negative_matrix` 的 `GP` 族（`GP-N1…F3`），每格至少包含"
+      },
+      {
+       "file": "test-reports-2026-10/07b-DEC-1-DEC-2-业务口径决策单.md",
+       "line": 379,
+       "text": "\"matrix_names\": [\"N1\",\"N2\",\"N3\",\"N4\",\"P1\",\"P2\",\"P3\",\"P4\",\"A1\",\"A2\",\"A3\",\"F1\",\"F2\",\"F3\"],"
+      }
+     ],
+     "hit_count": 4
+    },
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "test-reports-2026-10/07b-DEC-1-DEC-2-业务口径决策单.md",
+     "regex": "F3",
+     "label": "判定表 F3",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "test-reports-2026-10/07b-DEC-1-DEC-2-业务口径决策单.md",
+       "line": 133,
+       "text": "| `fail` | F3 | 处置 `scrap`（`status='scrapped'`） | **拒收**（报废终态） | `quality_status='pass'` 但 `status='scrapped'` | §1.3 |"
+      },
+      {
+       "file": "test-reports-2026-10/07b-DEC-1-DEC-2-业务口径决策单.md",
+       "line": 136,
+       "text": "**固化为常驻用例**：上表 14 格 → `negative_matrix` 的 `GP` 族（`GP-N1…F3`），每格至少包含"
+      },
+      {
+       "file": "test-reports-2026-10/07b-DEC-1-DEC-2-业务口径决策单.md",
+       "line": 379,
+       "text": "\"matrix_names\": [\"N1\",\"N2\",\"N3\",\"N4\",\"P1\",\"P2\",\"P3\",\"P4\",\"A1\",\"A2\",\"A3\",\"F1\",\"F2\",\"F3\"],"
+      }
+     ],
+     "hit_count": 4
+    },
+    {
+     "kind": "tree_content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "test-reports-2026-10/harness",
+     "exts": [
+      ".py",
+      ".json"
+     ],
+     "regex": "acceptance_matrix",
+     "label": "acceptance_matrix 机读",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "test-reports-2026-10/harness/w2w3_probe.py",
+       "line": 4,
+       "text": "- `07b-DEC-1-DEC-2-业务口径决策单.md`：14 格判定表 + 机读 `acceptance_matrix`；"
+      }
+     ],
+     "hit_count": 1
+    }
+   ]
+  },
+  {
+   "id": "P-03",
+   "wave": "W2",
+   "level": "high",
+   "title": "quality_status 零回写：质检结论不落实例字段",
+   "verify_judge": "fail：batch_item.quality_status 由 NULL → fail（当前仍 NULL，NC +0）；pass：→ pass；复位：处置 done 后可入库（当前 pending 实例 fg +0，必须转为放行）",
+   "search_domain": "文件内容: app/services/mes_service.py",
+   "verdict": "HIT",
+   "verdict_auto": "HIT",
+   "verdict_override": null,
+   "checks_passed": 3,
+   "checks_total": 3,
+   "checks": [
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "app/services/mes_service.py",
+     "regex": "def recompute_production_quality_status\\(",
+     "label": "回写函数",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "app/services/mes_service.py",
+       "line": 553,
+       "text": "def recompute_production_quality_status(batch_item, production_record=None):"
+      }
+     ],
+     "hit_count": 1
+    },
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "app/services/mes_service.py",
+     "regex": "batch_item\\.quality_status = value",
+     "label": "字段写入点",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "app/services/mes_service.py",
+       "line": 597,
+       "text": "batch_item.quality_status = value"
+      }
+     ],
+     "hit_count": 1
+    },
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "app/services/mes_service.py",
+     "regex": "def apply_production_record_result\\(",
+     "label": "报工结果入口",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "app/services/mes_service.py",
+       "line": 601,
+       "text": "def apply_production_record_result(record, task):"
+      }
+     ],
+     "hit_count": 1
+    }
+   ]
+  },
+  {
+   "id": "P-07",
+   "wave": "W2",
+   "level": "medium（修复强制约束）",
+   "title": "quality_status='pending' 永久锁死正常产出，无自动复位路径",
+   "verify_judge": "阳性对照：quality_status=NULL 新实例报工 fg +4（当前成立）；死锁回归：被写成 pending 的实例在任务完成后能自动入库（当前 fg +0，修复后必须 >0）",
+   "search_domain": "文件内容: app/services/mes_service.py（门禁顺序/复位路径）",
+   "verdict": "HIT",
+   "verdict_auto": "HIT",
+   "verdict_override": null,
+   "checks_passed": 3,
+   "checks_total": 3,
+   "checks": [
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "app/services/mes_service.py",
+     "regex": "def qc_gate_allows_output\\(",
+     "label": "门禁函数",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "app/services/mes_service.py",
+       "line": 157,
+       "text": "def qc_gate_allows_output(batch_item=None, workpieces=None, production_record=None):"
+      }
+     ],
+     "hit_count": 1
+    },
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "app/services/mes_service.py",
+     "regex": "def reset_quality_status_after_disposal\\(",
+     "label": "自动复位",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "app/services/mes_service.py",
+       "line": 646,
+       "text": "def reset_quality_status_after_disposal(nc):"
+      }
+     ],
+     "hit_count": 1
+    },
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "app/services/mes_service.py",
+     "regex": "scrapped",
+     "label": "scrapped 语义",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "app/services/mes_service.py",
+       "line": 163,
+       "text": "2. `status == 'scrapped'` ⇒ 拒（报废终态，优先级高于 `quality_status`）；"
+      },
+      {
+       "file": "app/services/mes_service.py",
+       "line": 201,
+       "text": "if (batch_item.status or '') == 'scrapped':"
+      },
+      {
+       "file": "app/services/mes_service.py",
+       "line": 236,
+       "text": "'scrap': 'scrapped',"
+      }
+     ],
+     "hit_count": 7
+    }
+   ]
+  },
+  {
+   "id": "P-02",
+   "wave": "W2",
+   "level": "high",
+   "title": "报工路径质检 fail 零落地：NC 增量恒 0",
+   "verify_judge": "报工后对 production_record 判 fail ⇒ nonconformity_records +1 且 status 属 open/pending_approval；对照工件路径 fail ⇒ NC +2（已有阳性对照）",
+   "search_domain": "文件内容: app/services/mes_service.py（production_record 分支）",
+   "verdict": "HIT",
+   "verdict_auto": "HIT",
+   "verdict_override": null,
+   "checks_passed": 2,
+   "checks_total": 2,
+   "checks": [
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "app/services/mes_service.py",
+     "regex": "target_type='production_record'",
+     "label": "报工维度 NC",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "app/services/mes_service.py",
+       "line": 633,
+       "text": "target_type='production_record',"
+      },
+      {
+       "file": "app/services/mes_service.py",
+       "line": 739,
+       "text": "`07b` DEC-1 §1.5：**自动写点唯一**（本函数）。`target_type='production_record'` 的产出维度"
+      }
+     ],
+     "hit_count": 2
+    },
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "app/services/mes_service.py",
+     "regex": "def create_inspection_task\\(",
+     "label": "NC 构造点",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "app/services/mes_service.py",
+       "line": 90,
+       "text": "def create_inspection_task(target_type, target_id, notes=''):"
+      }
+     ],
+     "hit_count": 1
+    }
+   ]
+  },
+  {
+   "id": "DEC-2",
+   "wave": "W3",
+   "level": "决策单（先于 P-04/P-05/P-06）",
+   "title": "返工识别口径与扣料 N 来源裁定",
+   "verify_judge": "返工件数判据：报工 10 件 → 判 fail → 返工任务 quantity 应等于不合格件数（当前恒 1）；扣料判据：料账由 5.0 → 5.0−N（当前 5.0→4.0，与「按 N」可分辨）；AC-29b 不为负 / AC-29c 不扣错料 / AC-29d 取不到不扣",
+   "search_domain": "文件内容: 07b（R1/R2 口径裁决）",
+   "verdict": "HIT",
+   "verdict_auto": "HIT",
+   "verdict_override": null,
+   "checks_passed": 2,
+   "checks_total": 2,
+   "checks": [
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "test-reports-2026-10/07b-DEC-1-DEC-2-业务口径决策单.md",
+     "regex": "R1",
+     "label": "返工识别 R1",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "test-reports-2026-10/07b-DEC-1-DEC-2-业务口径决策单.md",
+       "line": 204,
+       "text": "| R1 | 存在 `NonconformityRecord` 使 `rework_task_id == task.id` | **主判据**。`nc.rework_task_id` 在返工处置时写入（`mes_service.py:716`）⇒ 权威、无歧义、**不需要新列** |"
+      },
+      {
+       "file": "test-reports-2026-10/07b-DEC-1-DEC-2-业务口径决策单.md",
+       "line": 214,
+       "text": "| 新增 `ProductionRecord.is_rework` 列 | **本轮不采用**（可作为阶段 B 的显式化增强） | 需迁移 + `_ENSURED_COLUMNS` 登记 + 回填，成本高于 R1+R2；R1 已能唯一判定 |"
+      },
+      {
+       "file": "test-reports-2026-10/07b-DEC-1-DEC-2-业务口径决策单.md",
+       "line": 223,
+       "text": "若 开关 为 False ⇒ 从求和中剔除判据 R1∨R2 命中的生产记录"
+      }
+     ],
+     "hit_count": 4
+    },
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "test-reports-2026-10/07b-DEC-1-DEC-2-业务口径决策单.md",
+     "regex": "is_rework",
+     "label": "未采用新增列",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "test-reports-2026-10/07b-DEC-1-DEC-2-业务口径决策单.md",
+       "line": 214,
+       "text": "| 新增 `ProductionRecord.is_rework` 列 | **本轮不采用**（可作为阶段 B 的显式化增强） | 需迁移 + `_ENSURED_COLUMNS` 登记 + 回填，成本高于 R1+R2；R1 已能唯一判定 |"
+      },
+      {
+       "file": "test-reports-2026-10/07b-DEC-1-DEC-2-业务口径决策单.md",
+       "line": 286,
+       "text": "| 返工记录「识别为返工」 | 同一处（`is_rework_task` / `rework_task_ids`） | 禁止在模板/路由各写一份口径 |"
+      },
+      {
+       "file": "test-reports-2026-10/07b-DEC-1-DEC-2-业务口径决策单.md",
+       "line": 391,
+       "text": "\"新增 ProductionRecord.is_rework（本轮不采用，留阶段B）\""
+      }
+     ],
+     "hit_count": 3
+    }
+   ]
+  },
+  {
+   "id": "P-04",
+   "wave": "W3",
+   "level": "high（P0）",
+   "title": "quality.rework_counts_piecework 假开关（切换无效果）",
+   "verify_judge": "双向差分：开关 false→true 计件工资 delta != 0（当前 75.0→75.0 与 360.0→360.0 均为 0）；机制自检：真消费开关时 delta 必须变化（当前 +75/+300 证明差分机制本身有效）",
+   "search_domain": "文件内容: app/services/mes_service.py + app/models.py",
+   "verdict": "HIT",
+   "verdict_auto": "HIT",
+   "verdict_override": null,
+   "checks_passed": 3,
+   "checks_total": 3,
+   "checks": [
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "app/services/mes_service.py",
+     "regex": "SystemConfig\\.get\\('quality\\.rework_counts_piecework'",
+     "label": "唯一读取点",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "app/services/mes_service.py",
+       "line": 1763,
+       "text": "value = SystemConfig.get('quality.rework_counts_piecework', False)"
+      }
+     ],
+     "hit_count": 1
+    },
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "app/services/mes_service.py",
+     "regex": "def rework_counts_piecework\\(\\)",
+     "label": "共享口径函数",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "app/services/mes_service.py",
+       "line": 1761,
+       "text": "def rework_counts_piecework():"
+      }
+     ],
+     "hit_count": 1
+    },
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "app/models.py",
+     "regex": "rework_counts_piecework",
+     "label": "S2 同口径",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "app/models.py",
+       "line": 151,
+       "text": "# SystemConfig('quality.rework_counts_piecework') 决定；本属性不得再写一份过滤，"
+      },
+      {
+       "file": "app/models.py",
+       "line": 2606,
+       "text": "'key': 'quality.rework_counts_piecework',"
+      }
+     ],
+     "hit_count": 2
+    }
+   ]
+  },
+  {
+   "id": "P-05",
+   "wave": "W3",
+   "level": "high",
+   "title": "返工任务件数恒 1（与不合格件数脱钩）",
+   "verify_judge": "报工 10 件判 fail ⇒ 返工任务 quantity = 10（当前 1，且 task_rows_delta=1 证明任务确实被创建 ⇒ 不是「没触发」）",
+   "search_domain": "文件内容: app/services/mes_service.py",
+   "verdict": "HIT",
+   "verdict_auto": "HIT",
+   "verdict_override": null,
+   "checks_passed": 2,
+   "checks_total": 2,
+   "checks": [
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "app/services/mes_service.py",
+     "regex": "def rework_quantity_for\\(",
+     "label": "件数取值",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "app/services/mes_service.py",
+       "line": 1007,
+       "text": "def rework_quantity_for(nc, workpiece, explicit=None, production_record=None):"
+      }
+     ],
+     "hit_count": 1
+    },
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "app/services/mes_service.py",
+     "regex": "explicit",
+     "label": "显式参数优先",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "app/services/mes_service.py",
+       "line": 1007,
+       "text": "def rework_quantity_for(nc, workpiece, explicit=None, production_record=None):"
+      },
+      {
+       "file": "app/services/mes_service.py",
+       "line": 1012,
+       "text": "if explicit is not None and explicit != '':"
+      },
+      {
+       "file": "app/services/mes_service.py",
+       "line": 1014,
+       "text": "quantity = int(explicit)"
+      }
+     ],
+     "hit_count": 3
+    }
+   ]
+  },
+  {
+   "id": "P-06",
+   "wave": "W3",
+   "level": "high",
+   "title": "报废扣料硬编码 −1",
+   "verify_judge": "料账 5.0 → 5.0−N（当前 5.0→4.0）；AC-29b/c/d 三条子判据各自可观察",
+   "search_domain": "文件内容: app/services/mes_service.py + app/main/stock.py",
+   "verdict": "HIT",
+   "verdict_auto": "HIT",
+   "verdict_override": null,
+   "checks_passed": 3,
+   "checks_total": 3,
+   "checks": [
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "app/services/mes_service.py",
+     "regex": "def scrap_material_plan\\(",
+     "label": "逐料计划",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "app/services/mes_service.py",
+       "line": 673,
+       "text": "def scrap_material_plan(nc, workpiece=None):"
+      }
+     ],
+     "hit_count": 1
+    },
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "app/services/mes_service.py",
+     "regex": "def deduct_scrap_materials\\(",
+     "label": "逐料扣减",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "app/services/mes_service.py",
+       "line": 703,
+       "text": "def deduct_scrap_materials(plan, pieces=1, nc=None):"
+      }
+     ],
+     "hit_count": 1
+    },
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "app/main/stock.py",
+     "regex": "scrap_quantity",
+     "label": "stock 入参",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "app/main/stock.py",
+       "line": 94,
+       "text": "scrap_qty = data.get('scrap_quantity')"
+      },
+      {
+       "file": "app/main/stock.py",
+       "line": 102,
+       "text": "scrap_quantity=int(scrap_qty) if scrap_qty not in (None, '') else None,"
+      }
+     ],
+     "hit_count": 2
+    }
+   ]
+  },
+  {
+   "id": "P-09",
+   "wave": "W4",
+   "level": "high",
+   "title": "get_or_404 的 404 被 except Exception 吞成 500（本任务实测 17 处，非 10 处）",
+   "verify_judge": "对 17 处各发一次「不存在 id」请求 ⇒ 必须 404（当前 quality/production_center 的 10 处实测 500）；矩阵 C 违规数由 15 降为 2（仅剩异常 2 条）",
+   "search_domain": "文件内容: app/__init__.py + 三模块 _reraise_http；行为: harness/w4_http_contract.py::scan（doc 口径与 **404 维全量**）",
+   "verdict": "PARTIAL",
+   "verdict_auto": "HIT",
+   "verdict_override": {
+    "verdict": "PARTIAL",
+    "reason": "404 吞 500 的**吞咽面**已全清（doc 口径 17->0、全 app 404 维 0 处、w4_probe 18/18 均 404），但 P-09-a 第 2 款「404 必须是 JSON 载体」在其自己的残留项上未满足：R1/R6 的 GET 404 仍返回 HTML（26-阶段A收口报告 §5.3 第 7 项「残留 + 需口径裁定」）",
+    "command": "python -B test-reports-2026-10/harness/w4_http_contract.py --scope doc --expect 0  # 吞咽面=0；载体面见 26-阶段A收口报告.md §5.3-7"
+   },
+   "checks_passed": 7,
+   "checks_total": 7,
+   "checks": [
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "app/__init__.py",
+     "regex": "@app\\.errorhandler\\(HTTPException\\)",
+     "label": "统一 handler",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "app/__init__.py",
+       "line": 205,
+       "text": "@app.errorhandler(HTTPException)"
+      }
+     ],
+     "hit_count": 1
+    },
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "app/main/quality.py",
+     "regex": "_reraise_http",
+     "label": "quality 助手",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "app/main/quality.py",
+       "line": 16,
+       "text": "def _reraise_http(exc):"
+      },
+      {
+       "file": "app/main/quality.py",
+       "line": 334,
+       "text": "_reraise_http(e)"
+      },
+      {
+       "file": "app/main/quality.py",
+       "line": 498,
+       "text": "_reraise_http(e)"
+      }
+     ],
+     "hit_count": 10
+    },
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "app/main/production_center.py",
+     "regex": "_reraise_http",
+     "label": "production_center 助手",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "app/main/production_center.py",
+       "line": 17,
+       "text": "def _reraise_http(exc):"
+      },
+      {
+       "file": "app/main/production_center.py",
+       "line": 173,
+       "text": "_reraise_http(e)"
+      },
+      {
+       "file": "app/main/production_center.py",
+       "line": 223,
+       "text": "_reraise_http(e)"
+      }
+     ],
+     "hit_count": 5
+    },
+    {
+     "kind": "w4_site_count",
+     "evidence_kind": "behavior_verified",
+     "pre_existing": false,
+     "target": "harness/w4_http_contract.py::scan(app)",
+     "label": "doc 口径站点（P-09-c 的 17 处）== 0",
+     "expect": "== 0",
+     "ok": true,
+     "hits": [],
+     "value": 0
+    },
+    {
+     "kind": "w4_site_count",
+     "evidence_kind": "behavior_verified",
+     "pre_existing": false,
+     "target": "harness/w4_http_contract.py::scan(app)",
+     "label": "全 app 的 404 维站点 == 0",
+     "expect": "== 0",
+     "ok": true,
+     "hits": [],
+     "value": 0
+    },
+    {
+     "kind": "subprocess",
+     "evidence_kind": "behavior_verified",
+     "pre_existing": false,
+     "target": "python -B test-reports-2026-10/harness/w4_http_contract.py --scope doc --expect 0",
+     "label": "w4_http_contract doc 口径 exit 0",
+     "expect": "exit 0",
+     "ok": true,
+     "cmd": [
+      "F:\\Miniconda\\envs\\wage\\python.exe",
+      "-B",
+      "test-reports-2026-10/harness/w4_http_contract.py",
+      "--scope",
+      "doc",
+      "--expect",
+      "0"
+     ],
+     "exit_code": 0,
+     "hits": [
+      {
+       "file": "",
+       "line": null,
+       "text": "[w4_http_contract] 扫描根 = app  口径 = doc"
+      },
+      {
+       "file": "",
+       "line": null,
+       "text": "[w4_http_contract] 会吞成静默出口的站点 = 0（期望 0）"
+      },
+      {
+       "file": "",
+       "line": null,
+       "text": "[w4_http_contract] exit_code_semantics={\"rule\": \"sites == --expect -> exit 0 else 1\", \"sites\": 0, \"expected\": 0, \"code\": 0}"
+      }
+     ],
+     "stderr_tail": []
+    },
+    {
+     "kind": "subprocess",
+     "evidence_kind": "behavior_verified",
+     "pre_existing": false,
+     "target": "python -B test-reports-2026-10/harness/w4_http_contract.py --selftest",
+     "label": "判据自检（阴性用例非恒真）",
+     "expect": "exit 0",
+     "ok": true,
+     "cmd": [
+      "F:\\Miniconda\\envs\\wage\\python.exe",
+      "-B",
+      "test-reports-2026-10/harness/w4_http_contract.py",
+      "--selftest"
+     ],
+     "exit_code": 0,
+     "hits": [
+      {
+       "file": "",
+       "line": null,
+       "text": "[PASS] WT-N1 get_or_404 被裸捕 ⇒ 算站点（期望 1，实测 1）"
+      },
+      {
+       "file": "",
+       "line": null,
+       "text": "[PASS] WT-N2 get_json() 被裸捕 ⇒ 算站点（期望 1，实测 1）"
+      },
+      {
+       "file": "",
+       "line": null,
+       "text": "[PASS] WT-N3 first_or_404 + 裸 except ⇒ 算站点（期望 1，实测 1）"
+      },
+      {
+       "file": "",
+       "line": null,
+       "text": "[w4_http_contract] 自检 2/5 通过"
+      }
+     ],
+     "stderr_tail": []
+    }
+   ]
+  },
+  {
+   "id": "P-12",
+   "wave": "W4",
+   "level": "medium",
+   "title": "4xx 语义被包成 500（415 / KeyError）",
+   "verify_judge": "矩阵 D1 空体 15 条组合由 500 变为 4xx；E-6b① 部分更新仍「库不变」但返回 400 而非 500",
+   "search_domain": "文件内容: app/main/quality.py（显式 400）+ app/__init__.py（handler）；行为: w4_http_contract get_json 维站点数",
+   "verdict": "PARTIAL",
+   "verdict_auto": "PARTIAL",
+   "verdict_override": null,
+   "checks_passed": 2,
+   "checks_total": 3,
+   "checks": [
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "app/main/quality.py",
+     "regex": "请求数据为空",
+     "label": "显式 400 文案",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "app/main/quality.py",
+       "line": 243,
+       "text": "return jsonify({'success': False, 'message': '请求数据为空'}), 400"
+      },
+      {
+       "file": "app/main/quality.py",
+       "line": 602,
+       "text": "return jsonify({'success': False, 'message': '请求数据为空，请检查请求体'}), 400"
+      },
+      {
+       "file": "app/main/quality.py",
+       "line": 907,
+       "text": "return jsonify({'success': False, 'message': '请求数据为空'}), 400"
+      }
+     ],
+     "hit_count": 3
+    },
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "app/__init__.py",
+     "regex": "HTTPException",
+     "label": "统一 handler 兜 415",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "app/__init__.py",
+       "line": 2,
+       "text": "from werkzeug.exceptions import HTTPException"
+      },
+      {
+       "file": "app/__init__.py",
+       "line": 205,
+       "text": "@app.errorhandler(HTTPException)"
+      }
+     ],
+     "hit_count": 2
+    },
+    {
+     "kind": "w4_site_count",
+     "evidence_kind": "behavior_verified",
+     "pre_existing": false,
+     "target": "harness/w4_http_contract.py::scan(app)",
+     "label": "get_json 维站点（静态修复面）== 0",
+     "expect": "== 0",
+     "ok": false,
+     "hits": [],
+     "value": 10
+    }
+   ]
+  },
+  {
+   "id": "P-11",
+   "wave": "W4",
+   "level": "medium",
+   "title": "错误响应泄漏异常类名/完整 SQL/绑定参数（12 行）",
+   "verify_judge": "对矩阵 D 的 456 条请求，响应正文命中 sqlite3.|[SQL:|IntegrityError|Traceback 的次数为 0（当前 12）",
+   "search_domain": "文件内容: 三模块（详情进 logger，正文脱敏）",
+   "verdict": "HIT",
+   "verdict_auto": "HIT",
+   "verdict_override": null,
+   "checks_passed": 3,
+   "checks_total": 3,
+   "checks": [
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "app/main/quality.py",
+     "regex": "current_app\\.logger\\.(error|exception|warning)",
+     "label": "quality logger",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "app/main/quality.py",
+       "line": 336,
+       "text": "current_app.logger.error(f'创建质检模板失败：{str(e)}')"
+      },
+      {
+       "file": "app/main/quality.py",
+       "line": 500,
+       "text": "current_app.logger.error(f'管理质检模板失败：{str(e)}')"
+      },
+      {
+       "file": "app/main/quality.py",
+       "line": 651,
+       "text": "current_app.logger.error(f'创建质检任务失败：{str(e)}')"
+      }
+     ],
+     "hit_count": 12
+    },
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "app/main/routes.py",
+     "regex": "current_app\\.logger\\.(error|exception|warning)",
+     "label": "routes logger",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "app/main/routes.py",
+       "line": 159,
+       "text": "current_app.logger.error(f'读取工序分配规则失败：{str(e)}')"
+      },
+      {
+       "file": "app/main/routes.py",
+       "line": 180,
+       "text": "current_app.logger.error(f'列出工序分配规则失败：{str(e)}')"
+      },
+      {
+       "file": "app/main/routes.py",
+       "line": 238,
+       "text": "current_app.logger.error(f'保存工序分配规则失败：{str(e)}')"
+      }
+     ],
+     "hit_count": 12
+    },
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "app/main/production_center.py",
+     "regex": "current_app\\.logger\\.(error|exception|warning)",
+     "label": "production_center logger",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "app/main/production_center.py",
+       "line": 175,
+       "text": "current_app.logger.error(f'创建生产中心实例失败：{str(e)}')"
+      },
+      {
+       "file": "app/main/production_center.py",
+       "line": 225,
+       "text": "current_app.logger.error(f'保存技术拆解失败：{str(e)}')"
+      },
+      {
+       "file": "app/main/production_center.py",
+       "line": 305,
+       "text": "current_app.logger.error(f'获取实例详情失败：{str(e)}')"
+      }
+     ],
+     "hit_count": 5
+    }
+   ]
+  },
+  {
+   "id": "P-10",
+   "wave": "W4",
+   "level": "high",
+   "title": "删除有关联质检记录的质检任务 ⇒ NOT NULL 约束 500",
+   "verify_judge": "对已有记录的任务 DELETE ⇒ 400 + 可读原因（当前 500 + SQL 回显）；对无记录任务删除仍成功（W-QLT-9 已绿）",
+   "search_domain": "文件内容: app/main/quality.py 拒删守卫",
+   "verdict": "HIT",
+   "verdict_auto": "HIT",
+   "verdict_override": null,
+   "checks_passed": 2,
+   "checks_total": 2,
+   "checks": [
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "app/main/quality.py",
+     "regex": "拒删",
+     "label": "拒删守卫",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "app/main/quality.py",
+       "line": 1034,
+       "text": "# W4/P-10：已产生质检记录的任务**拒删**（400 + 可读原因，零副作用）。"
+      }
+     ],
+     "hit_count": 1
+    },
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "app/main/quality.py",
+     "regex": "inspection_records",
+     "label": "关联记录检查",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "app/main/quality.py",
+       "line": 1163,
+       "text": "def get_inspection_records():"
+      },
+      {
+       "file": "app/main/quality.py",
+       "line": 1371,
+       "text": "def export_inspection_records():"
+      }
+     ],
+     "hit_count": 2
+    }
+   ]
+  },
+  {
+   "id": "P-08",
+   "wave": "W5",
+   "level": "high",
+   "title": "/tasks/<id>/edit 的 notes 静默丢弃 + 审计 old==new",
+   "verify_judge": "响应 success:true ⇒ db 中 notes 必须变化（当前 db_notes_after_edit='OLD_NOTES'）；审计 old_data.notes != new_data.notes（当入参确实变化时）",
+   "search_domain": "文件内容: app/main/routes.py edit_task",
+   "verdict": "HIT",
+   "verdict_auto": "HIT",
+   "verdict_override": null,
+   "checks_passed": 1,
+   "checks_total": 1,
+   "checks": [
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "app/main/routes.py",
+     "regex": "task\\.notes = data\\.get\\('notes'",
+     "label": "notes 真写",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "app/main/routes.py",
+       "line": 4522,
+       "text": "task.notes = data.get('notes', task.notes)"
+      }
+     ],
+     "hit_count": 1
+    }
+   ]
+  },
+  {
+   "id": "P-13",
+   "wave": "W5",
+   "level": "low",
+   "title": "载体/命名契约不一致（/api/ 前缀下返回 HTML 与 xlsx）",
+   "verify_judge": "矩阵 E 的 47 条 JSON 契约面：非 JSON 载体数 = 已登记的 3 条（不在 /api/ 新增）",
+   "search_domain": "文件名+内容: 24-W4载体登记册.json",
+   "verdict": "HIT",
+   "verdict_auto": "HIT",
+   "verdict_override": null,
+   "checks_passed": 2,
+   "checks_total": 2,
+   "checks": [
+    {
+     "kind": "file_exists",
+     "evidence_kind": "file_exists",
+     "pre_existing": false,
+     "target": "test-reports-2026-10/24-W4载体登记册.json",
+     "label": "载体登记册",
+     "expect": "exists",
+     "ok": true,
+     "hits": [
+      {
+       "file": "test-reports-2026-10/24-W4载体登记册.json",
+       "line": null,
+       "text": "bytes=2521"
+      }
+     ]
+    },
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "test-reports-2026-10/24-W4载体登记册.json",
+     "regex": "\"",
+     "label": "登记册内容可解析",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "test-reports-2026-10/24-W4载体登记册.json",
+       "line": 2,
+       "text": "\"doc\": \"24-W4载体登记册\","
+      },
+      {
+       "file": "test-reports-2026-10/24-W4载体登记册.json",
+       "line": 3,
+       "text": "\"version\": \"1.0\","
+      },
+      {
+       "file": "test-reports-2026-10/24-W4载体登记册.json",
+       "line": 4,
+       "text": "\"date\": \"2026-10-07\","
+      }
+     ],
+     "hit_count": 12
+    }
+   ]
+  },
+  {
+   "id": "C-01",
+   "wave": "W6",
+   "level": "高（结构性空白）",
+   "title": "J 域通知与审计：本轮唯一全零触达域（AuditLog( 114 处调用 / 0 条断言）",
+   "verify_judge": "J-01…J-06 每条都有 expected/actual；断言计数从 0 起算并在报告中显式列出新增条数",
+   "search_domain": "文件内容: harness/**.py（**排除** reconcile_r2/captain_r2_*/improve_plan）搜 J 域断言构造；不含 evidence/**（度量产物不算资产）",
+   "verdict": "NOT_DONE",
+   "verdict_auto": "NOT_DONE",
+   "verdict_override": null,
+   "checks_passed": 0,
+   "checks_total": 3,
+   "checks": [
+    {
+     "kind": "tree_content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "test-reports-2026-10/harness",
+     "exts": [
+      ".py"
+     ],
+     "regex": "audit_delta|AuditLog 增量|audit.*increment",
+     "label": "J 域审计增量断言",
+     "expect": "hit",
+     "ok": false,
+     "hits": [],
+     "hit_count": 0
+    },
+    {
+     "kind": "glob_exists",
+     "evidence_kind": "file_exists",
+     "pre_existing": false,
+     "target": "test-reports-2026-10/harness/j_audit*.py",
+     "label": "J 域专用 harness",
+     "expect": "exists",
+     "ok": false,
+     "hits": [],
+     "hit_count": 0
+    },
+    {
+     "kind": "tree_content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "test-reports-2026-10/harness",
+     "exts": [
+      ".py"
+     ],
+     "regex": "通知.*幂等|重复推送|notification.*idempot",
+     "label": "通知幂等断言",
+     "expect": "hit",
+     "ok": false,
+     "hits": [],
+     "hit_count": 0
+    }
+   ]
+  },
+  {
+   "id": "C-02",
+   "wave": "W6",
+   "level": "高（结构性空白）",
+   "title": "并发与事务原子性：0 资产（rollback() 162 处 / 线程用例 0）",
+   "verify_judge": "AC-19/AC-52 各 1 组用例，含注入异常后的守恒断言（当前 0 载体 ⇒ 不可判定）",
+   "search_domain": "文件内容: harness/**.py 搜并发用例构造（排除自指脚本）",
+   "verdict": "PARTIAL",
+   "verdict_auto": "PARTIAL",
+   "verdict_override": null,
+   "checks_passed": 1,
+   "checks_total": 2,
+   "checks": [
+    {
+     "kind": "tree_content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "test-reports-2026-10/harness",
+     "exts": [
+      ".py"
+     ],
+     "regex": "\\bthreading\\b|\\bThread\\(",
+     "label": "并发用例",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "test-reports-2026-10/harness/captain_r2_w6rest.py",
+       "line": 43,
+       "text": "n, hits = count_in(files, r\"threading|Thread\\(|concurrent\\.futures\")"
+      }
+     ],
+     "hit_count": 1
+    },
+    {
+     "kind": "glob_exists",
+     "evidence_kind": "file_exists",
+     "pre_existing": false,
+     "target": "test-reports-2026-10/harness/*concurren*.py",
+     "label": "并发专用 harness",
+     "expect": "exists",
+     "ok": false,
+     "hits": [],
+     "hit_count": 0
+    }
+   ]
+  },
+  {
+   "id": "C-03",
+   "wave": "W6",
+   "level": "中",
+   "title": "CSRF 全场景（SameSite / token 重放 / 浏览器行为）与前端头链路",
+   "verify_judge": "非豁免面拦截率仍为 100%（当前 133/155 拦、22 豁免、0 未拦）；重放/过期必须被拒",
+   "search_domain": "文件内容: harness/**.py + app/**.py 搜 SameSite/token 重放（排除自指脚本）",
+   "verdict": "PARTIAL",
+   "verdict_auto": "PARTIAL",
+   "verdict_override": null,
+   "checks_passed": 1,
+   "checks_total": 2,
+   "checks": [
+    {
+     "kind": "tree_content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "test-reports-2026-10/harness",
+     "exts": [
+      ".py"
+     ],
+     "regex": "SameSite|samesite|SESSION_COOKIE|token.*重放",
+     "label": "CSRF 全场景用例",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "test-reports-2026-10/harness/captain_r2_w6rest.py",
+       "line": 51,
+       "text": "n, hits = count_in(files, r\"SameSite|csrf_token|CSRFError|csrf\\.exempt\")"
+      }
+     ],
+     "hit_count": 1
+    },
+    {
+     "kind": "tree_content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "app",
+     "exts": [
+      ".py"
+     ],
+     "regex": "SameSite|samesite",
+     "label": "应用侧 SameSite",
+     "expect": "hit",
+     "ok": false,
+     "hits": [],
+     "hit_count": 0
+    }
+   ]
+  },
+  {
+   "id": "C-04",
+   "wave": "W6",
+   "level": "中",
+   "title": "链级未覆盖补齐：链 A 全链 + 链 C C1/C2/C4/C5 + 链 B B0/B1/B2/B6/B7",
+   "verify_judge": "链 A/C/B 未覆盖项由 15 项降为 0（或显式登记剩余 blocked）；每链首尾真实库 SHA256 未变",
+   "search_domain": "文件内容: harness/**.py 搜链 A / C1C2C4C5 / B0B1B2B6B7 的**新增用例**（用例总数口径见 payload.uat_baseline_summary，基线 40）",
+   "verdict": "PARTIAL",
+   "verdict_auto": "PARTIAL",
+   "verdict_override": null,
+   "checks_passed": 1,
+   "checks_total": 2,
+   "checks": [
+    {
+     "kind": "tree_content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "test-reports-2026-10/harness",
+     "exts": [
+      ".py"
+     ],
+     "regex": "CHAIN_A|chain_a",
+     "label": "链 A 用例载体",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "test-reports-2026-10/harness/captain_r2_w6rest.py",
+       "line": 60,
+       "text": "w(\"  uat_chains.py 含 'chain_a'/'链A'/采购 相关: %s\" % bool(re.search(r\"chain_a|链A|purchase_requisition\", t)))"
+      }
+     ],
+     "hit_count": 1
+    },
+    {
+     "kind": "tree_content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "test-reports-2026-10/harness",
+     "exts": [
+      ".py"
+     ],
+     "regex": "\\bB0B1B2B6B7\\b",
+     "label": "链 B 缺口用例",
+     "expect": "hit",
+     "ok": false,
+     "hits": [],
+     "hit_count": 0
+    }
+   ]
+  },
+  {
+   "id": "C-05",
+   "wave": "W6",
+   "level": "高",
+   "title": "写端点命中补强：≥141 个非 GET 方法级端点无任何自动化 URL 命中",
+   "verify_judge": "coverage.json 的 literal_covered / covered_any 单调上升，且无回落（TL-03 漂移门禁）",
+   "search_domain": "文件名(递归): harness/*.py 找**新增命中补强探针**；覆盖数前后对照见 payload.coverage_artifacts （`coverage.json` 是**上一轮的度量输出**，不作为「新增覆盖」的证据）",
+   "verdict": "NOT_DONE",
+   "verdict_auto": "NOT_DONE",
+   "verdict_override": null,
+   "checks_passed": 0,
+   "checks_total": 3,
+   "checks": [
+    {
+     "kind": "glob_exists",
+     "evidence_kind": "file_exists",
+     "pre_existing": false,
+     "target": "test-reports-2026-10/harness/c05*.py",
+     "label": "C-05 专用探针",
+     "expect": "exists",
+     "ok": false,
+     "hits": [],
+     "hit_count": 0
+    },
+    {
+     "kind": "glob_exists",
+     "evidence_kind": "file_exists",
+     "pre_existing": false,
+     "target": "test-reports-2026-10/harness/*hit*.py",
+     "label": "命中补强探针（*hit*.py）",
+     "expect": "exists",
+     "ok": false,
+     "hits": [],
+     "hit_count": 0
+    },
+    {
+     "kind": "glob_exists",
+     "evidence_kind": "file_exists",
+     "pre_existing": false,
+     "target": "test-reports-2026-10/harness/*endpoint_coverage*.py",
+     "label": "端点覆盖探针",
+     "expect": "exists",
+     "ok": false,
+     "hits": [],
+     "hit_count": 0
+    }
+   ]
+  },
+  {
+   "id": "C-06",
+   "wave": "W6",
+   "level": "高",
+   "title": "四模块双层盲区：equipment / purchase_orders / shipments / stock 既无权限断言也无可达性命中",
+   "verify_judge": "四模块规则命中由 0 变为 >0；权限矩阵 allow/deny 均有记录",
+   "search_domain": "文件内容: harness/write_suite.py + uat_chains.py（**可达性命中**的面）+ harness/*blind*.py（新增用例）",
+   "verdict": "PARTIAL",
+   "verdict_auto": "NOT_DONE",
+   "verdict_override": {
+    "verdict": "PARTIAL",
+    "reason": "C-06 的**前提本身已过时**（07 写「既无权限断言也无可达性命中」，但可达性命中早已存在）⇒ 「可达性」面成立、「权限断言」面无判据 ⇒ 按 captain 独立读数判 PARTIAL；自动引擎给 NOT_DONE 是因为「C-06 自己的新增用例 = 0」——两种口径都在机读里保留",
+    "command": "grep -n \"purchase_orders/save\" test-reports-2026-10/harness/write_suite.py ; grep -n \"/shipments/create\" test-reports-2026-10/harness/uat_chains.py"
+   },
+   "checks_passed": 3,
+   "checks_total": 5,
+   "checks": [
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": true,
+     "target": "test-reports-2026-10/harness/write_suite.py",
+     "regex": "req\\('POST', '/purchase_orders/save'",
+     "label": "写套件已命中 /purchase_orders/save",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "test-reports-2026-10/harness/write_suite.py",
+       "line": 826,
+       "text": "r = c.req('POST', '/purchase_orders/save', data={"
+      }
+     ],
+     "hit_count": 1
+    },
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": true,
+     "target": "test-reports-2026-10/harness/write_suite.py",
+     "regex": "req\\('POST', '/equipment/save'",
+     "label": "写套件已命中 /equipment/save",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "test-reports-2026-10/harness/write_suite.py",
+       "line": 916,
+       "text": "r = c.req('POST', '/equipment/save', data={"
+      },
+      {
+       "file": "test-reports-2026-10/harness/write_suite.py",
+       "line": 927,
+       "text": "r = c.req('POST', '/equipment/save', data={"
+      }
+     ],
+     "hit_count": 2
+    },
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": true,
+     "target": "test-reports-2026-10/harness/uat_chains.py",
+     "regex": "/shipments/create",
+     "label": "端到端已命中 /shipments/create",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "test-reports-2026-10/harness/uat_chains.py",
+       "line": 1001,
+       "text": "r1 = call(client, 'post', '/shipments/create',"
+      }
+     ],
+     "hit_count": 1
+    },
+    {
+     "kind": "glob_exists",
+     "evidence_kind": "file_exists",
+     "pre_existing": false,
+     "target": "test-reports-2026-10/harness/c06*.py",
+     "label": "C-06 专用探针",
+     "expect": "exists",
+     "ok": false,
+     "hits": [],
+     "hit_count": 0
+    },
+    {
+     "kind": "glob_exists",
+     "evidence_kind": "file_exists",
+     "pre_existing": false,
+     "target": "test-reports-2026-10/harness/*blind*.py",
+     "label": "盲区探针（*blind*.py）",
+     "expect": "exists",
+     "ok": false,
+     "hits": [],
+     "hit_count": 0
+    }
+   ]
+  },
+  {
+   "id": "C-07",
+   "wave": "W6",
+   "level": "高（结构性）",
+   "title": "应用级「拒绝连真实库」硬闸 + 夹具正向判据（当前只有脚本级守卫）",
+   "verify_judge": "负例：显式把 URI 指向真实库启动必须失败；正例：副本启动成功；两条都进常驻用例",
+   "search_domain": "文件内容: app/**.py（应用级硬闸）+ harness/fixtures.py（夹具正向判据）",
+   "verdict": "NOT_DONE",
+   "verdict_auto": "NOT_DONE",
+   "verdict_override": null,
+   "checks_passed": 0,
+   "checks_total": 2,
+   "checks": [
+    {
+     "kind": "tree_content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "app",
+     "exts": [
+      ".py"
+     ],
+     "regex": "assert_real_db|real_db_guard|拒绝连真实库|is_production_db",
+     "label": "应用级硬闸",
+     "expect": "hit",
+     "ok": false,
+     "hits": [],
+     "hit_count": 0
+    },
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "test-reports-2026-10/harness/fixtures.py",
+     "regex": "assert.*\\.tmp.*run_id|\\.tmp.*run_id.*assert",
+     "label": "夹具正向判据（落在 .tmp/<run_id>）",
+     "expect": "hit",
+     "ok": false,
+     "hits": [],
+     "hit_count": 0
+    }
+   ]
+  },
+  {
+   "id": "C-08",
+   "wave": "W6",
+   "level": "中",
+   "title": "导入行级容错 / 导出零残留 / 上传目录清理（K-01/K-02/GAP-32/GAP-33）",
+   "verify_judge": "5 类坏行输入各自返回可读行号提示；导出后 uploads/temp 无新增残留",
+   "search_domain": "文件名(递归): harness/*.py 找导入容错/导出残留**新增用例**；内容: 排除自指脚本",
+   "verdict": "NOT_DONE",
+   "verdict_auto": "NOT_DONE",
+   "verdict_override": null,
+   "checks_passed": 0,
+   "checks_total": 3,
+   "checks": [
+    {
+     "kind": "glob_exists",
+     "evidence_kind": "file_exists",
+     "pre_existing": false,
+     "target": "test-reports-2026-10/harness/*import*.py",
+     "label": "导入容错探针",
+     "expect": "exists",
+     "ok": false,
+     "hits": [],
+     "hit_count": 0
+    },
+    {
+     "kind": "tree_content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "test-reports-2026-10/harness",
+     "exts": [
+      ".py"
+     ],
+     "regex": "坏行|行级容错|逐行容错",
+     "label": "坏行容错用例",
+     "expect": "hit",
+     "ok": false,
+     "hits": [],
+     "hit_count": 0
+    },
+    {
+     "kind": "tree_content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "test-reports-2026-10/harness",
+     "exts": [
+      ".py"
+     ],
+     "regex": "残留文件|leftover|temp.*残余",
+     "label": "导出零残留用例",
+     "expect": "hit",
+     "ok": false,
+     "hits": [],
+     "hit_count": 0
+    }
+   ]
+  },
+  {
+   "id": "C-09",
+   "wave": "W6",
+   "level": "中",
+   "title": "工价版本取值（GAP-21，P0）与三策略派工可区分（GAP-42）",
+   "verify_judge": "工价取值有期望数字断言；三策略在同一输入下产生**不同**分配结果（可区分）",
+   "search_domain": "文件名(递归): harness/*.py 找 GAP-21/GAP-42 判据；内容: 排除自指脚本与 captain 脚本",
+   "verdict": "NOT_DONE",
+   "verdict_auto": "NOT_DONE",
+   "verdict_override": null,
+   "checks_passed": 0,
+   "checks_total": 2,
+   "checks": [
+    {
+     "kind": "glob_exists",
+     "evidence_kind": "file_exists",
+     "pre_existing": false,
+     "target": "test-reports-2026-10/harness/*price*.py",
+     "label": "工价版本探针",
+     "expect": "exists",
+     "ok": false,
+     "hits": [],
+     "hit_count": 0
+    },
+    {
+     "kind": "tree_content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "test-reports-2026-10/harness",
+     "exts": [
+      ".py"
+     ],
+     "regex": "GAP-21|GAP-42|三策略",
+     "label": "GAP-21/42 判据",
+     "expect": "hit",
+     "ok": false,
+     "hits": [],
+     "hit_count": 0
+    }
+   ]
+  },
+  {
+   "id": "C-10",
+   "wave": "W6",
+   "level": "中",
+   "title": "夹具幂等与 fixtures_manifest 记账（T-04 / F-4）",
+   "verify_judge": "同一 run 内连续两次 seed_material_ledger 不抛 UNIQUE 冲突；fail 后 manifest.rows 非空且与实际行数一致",
+   "search_domain": "文件内容: harness/fixtures.py（幂等面：RUN_ID 副本命名；记账面：internal_number 后缀 / fixtures_manifest 台账产物）",
+   "verdict": "PARTIAL",
+   "verdict_auto": "PARTIAL",
+   "verdict_override": {
+    "verdict": "PARTIAL",
+    "reason": "幂等面成立（夹具库按 `<RUN_ID>` 命名、每 run 独立副本）；记账面未做（既有 `fixtures_manifest` 只是 RAW 键、非台账产物；T-04 的 internal_number RUN_ID 后缀未加）",
+    "command": "grep -n \"RUN_ID\" test-reports-2026-10/harness/fixtures.py ; grep -n \"internal_number=\" test-reports-2026-10/harness/fixtures.py ; ls test-reports-2026-10/**/fixtures_manifest*.json  # 不存在"
+   },
+   "checks_passed": 3,
+   "checks_total": 4,
+   "checks": [
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": true,
+     "target": "test-reports-2026-10/harness/fixtures.py",
+     "regex": "RUN_ID",
+     "label": "幂等面：夹具库按 <RUN_ID> 命名",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "test-reports-2026-10/harness/fixtures.py",
+       "line": 5,
+       "text": "1. **每个 run 一份自己的带时间戳副本**：``app_nv_<RUN_ID>.db``，落在 ``test-reports-2026-10/.tmp/<run_id>/``"
+      },
+      {
+       "file": "test-reports-2026-10/harness/fixtures.py",
+       "line": 107,
+       "text": "return {'run_id': __import__('_env').RUN_ID, 'copy_path': _COPY_PATH, 'rows': _MANIFEST}"
+      }
+     ],
+     "hit_count": 2
+    },
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "test-reports-2026-10/harness/fixtures.py",
+     "regex": "internal_number=f'_hvRAW\\{i \\+ 1\\}'",
+     "label": "T-04 未修：料账仍用固定编号（无 RUN_ID/序号后缀）",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "test-reports-2026-10/harness/fixtures.py",
+       "line": 179,
+       "text": "supplier_number=f'_hvSUP{i + 1}', internal_number=f'_hvRAW{i + 1}',"
+      }
+     ],
+     "hit_count": 1
+    },
+    {
+     "kind": "glob_exists",
+     "evidence_kind": "file_exists",
+     "pre_existing": false,
+     "target": "test-reports-2026-10/**/fixtures_manifest*.json",
+     "label": "manifest 台账**产物**",
+     "expect": "exists",
+     "ok": false,
+     "hits": [],
+     "hit_count": 0
+    },
+    {
+     "kind": "content",
+     "evidence_kind": "content_mention",
+     "pre_existing": true,
+     "target": "test-reports-2026-10/harness/uat_chains.py",
+     "regex": "RAW\\['fixtures_manifest'\\]",
+     "label": "manifest 只是 RAW 键（pre-existing）",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "test-reports-2026-10/harness/uat_chains.py",
+       "line": 1240,
+       "text": "RAW['fixtures_manifest'] = fixtures.manifest()"
+      }
+     ],
+     "hit_count": 1
+    }
+   ]
+  },
+  {
+   "id": "C-11",
+   "wave": "W6",
+   "level": "中",
+   "title": "不可判定项补用例：AC-15 / AC-16 / AC-29b,c,d / AC-44,45 / AC-56",
+   "verify_judge": "每条由「不可判定」变为 passed/failed 明确状态；不得以 blocked 计入通过",
+   "search_domain": "文件内容: evidence/analysis/*.json（账本条目，**度量产物不算资产**，此处只用于确认「条目是否登记」）",
+   "verdict": "NOT_DONE",
+   "verdict_auto": "NOT_DONE",
+   "verdict_override": null,
+   "checks_passed": 0,
+   "checks_total": 2,
+   "checks": [
+    {
+     "kind": "tree_content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "test-reports-2026-10/evidence/analysis",
+     "exts": [
+      ".json"
+     ],
+     "regex": "AC-44|AC-45|AC-56",
+     "label": "AC-44/45/56 账本条目",
+     "expect": "hit",
+     "ok": false,
+     "hits": [],
+     "hit_count": 0
+    },
+    {
+     "kind": "tree_content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "test-reports-2026-10/evidence/analysis",
+     "exts": [
+      ".json"
+     ],
+     "regex": "AC-15|AC-16",
+     "label": "AC-15/16 账本条目",
+     "expect": "hit",
+     "ok": false,
+     "hits": [],
+     "hit_count": 0
+    }
+   ]
+  },
+  {
+   "id": "TL-01",
+   "wave": "W7",
+   "level": "高",
+   "title": "新门禁 check_model_refs.py：`X.query` 中本模块不可解析的大写名（P-01 同类 NameError）",
+   "verify_judge": "修 P-01 后输出 0 处；故意删除任一模型的模块级 import ⇒ 必须非 0",
+   "search_domain": "文件名: scripts/check_model_refs.py；内容: harness/ci_gates.py（接入位是否**取消注释**）",
+   "verdict": "PARTIAL",
+   "verdict_auto": "PARTIAL",
+   "verdict_override": null,
+   "checks_passed": 2,
+   "checks_total": 3,
+   "checks": [
+    {
+     "kind": "file_exists",
+     "evidence_kind": "file_exists",
+     "pre_existing": false,
+     "target": "scripts/check_model_refs.py",
+     "label": "门禁脚本",
+     "expect": "exists",
+     "ok": true,
+     "hits": [
+      {
+       "file": "scripts/check_model_refs.py",
+       "line": null,
+       "text": "bytes=15465"
+      }
+     ]
+    },
+    {
+     "kind": "subprocess",
+     "evidence_kind": "behavior_verified",
+     "pre_existing": false,
+     "target": "python -B scripts/check_model_refs.py",
+     "label": "门禁实跑 exit 0",
+     "expect": "exit 0",
+     "ok": true,
+     "cmd": [
+      "F:\\Miniconda\\envs\\wage\\python.exe",
+      "-B",
+      "scripts/check_model_refs.py"
+     ],
+     "exit_code": 0,
+     "hits": [
+      {
+       "file": "",
+       "line": null,
+       "text": "[model_refs] scanned 23 files, name_query_refs 602, violations 0"
+      },
+      {
+       "file": "",
+       "line": null,
+       "text": "RESULT: OK"
+      }
+     ],
+     "stderr_tail": []
+    },
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "test-reports-2026-10/harness/ci_gates.py",
+     "regex": "^\\s*\\{'id': 'check_model_refs',\\s*'group': 'blocking'",
+     "label": "已进 CI 链（启用）",
+     "expect": "hit",
+     "ok": false,
+     "hits": [],
+     "hit_count": 0
+    }
+   ]
+  },
+  {
+   "id": "TL-02",
+   "wave": "W7",
+   "level": "高",
+   "title": "新门禁 check_http_contract.py（静态）：404 吞 500 站点 + 未用 silent 的 get_json",
+   "verify_judge": "清单文件与基线 diff；新增一处 `get_or_404` 在 try 内 ⇒ 非 0",
+   "search_domain": "文件名: scripts/check_http_contract.py（07 的落点）；文件名: harness/w4_http_contract.py（等价实现）；内容: ci_gates.py 接入位",
+   "verdict": "PARTIAL",
+   "verdict_auto": "PARTIAL",
+   "verdict_override": null,
+   "checks_passed": 2,
+   "checks_total": 4,
+   "checks": [
+    {
+     "kind": "file_exists",
+     "evidence_kind": "file_exists",
+     "pre_existing": false,
+     "target": "scripts/check_http_contract.py",
+     "label": "07 规定落点",
+     "expect": "exists",
+     "ok": false,
+     "hits": []
+    },
+    {
+     "kind": "file_exists",
+     "evidence_kind": "file_exists",
+     "pre_existing": false,
+     "target": "test-reports-2026-10/harness/w4_http_contract.py",
+     "label": "等价静态实现（harness）",
+     "expect": "exists",
+     "ok": true,
+     "hits": [
+      {
+       "file": "test-reports-2026-10/harness/w4_http_contract.py",
+       "line": null,
+       "text": "bytes=10229"
+      }
+     ]
+    },
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "test-reports-2026-10/harness/w4_http_contract.py",
+     "regex": "HTTP_CALLS = ",
+     "label": "404 站点判据实现",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "test-reports-2026-10/harness/w4_http_contract.py",
+       "line": 27,
+       "text": "HTTP_CALLS = ('get_or_404', 'first_or_404')"
+      }
+     ],
+     "hit_count": 1
+    },
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "test-reports-2026-10/harness/ci_gates.py",
+     "regex": "^\\s*\\{'id': 'check_http_contract',\\s*'group': 'blocking'",
+     "label": "已进 CI 链（启用）",
+     "expect": "hit",
+     "ok": false,
+     "hits": [],
+     "hit_count": 0
+    }
+   ]
+  },
+  {
+   "id": "TL-03",
+   "wave": "W7",
+   "level": "中",
+   "title": "覆盖漂移门禁 coverage_drift.py（解析 JSON，不用退出码）",
+   "verify_judge": "人为把 coverage 基线 +1 ⇒ 必须非 0；正常跑 ⇒ 0",
+   "search_domain": "文件名: harness/coverage_drift.py；内容: ci_gates.py 第 11 步（blocking）；行为: 实跑 exit 0",
+   "verdict": "HIT",
+   "verdict_auto": "HIT",
+   "verdict_override": null,
+   "checks_passed": 3,
+   "checks_total": 3,
+   "checks": [
+    {
+     "kind": "file_exists",
+     "evidence_kind": "file_exists",
+     "pre_existing": false,
+     "target": "test-reports-2026-10/harness/coverage_drift.py",
+     "label": "漂移门禁",
+     "expect": "exists",
+     "ok": true,
+     "hits": [
+      {
+       "file": "test-reports-2026-10/harness/coverage_drift.py",
+       "line": null,
+       "text": "bytes=11671"
+      }
+     ]
+    },
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "test-reports-2026-10/harness/ci_gates.py",
+     "regex": "'id': 'coverage_drift', 'group': 'blocking'",
+     "label": "已进 blocking",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "test-reports-2026-10/harness/ci_gates.py",
+       "line": 103,
+       "text": "{'id': 'coverage_drift', 'group': 'blocking', 'mode': 'coverage_drift',"
+      }
+     ],
+     "hit_count": 1
+    },
+    {
+     "kind": "subprocess",
+     "evidence_kind": "behavior_verified",
+     "pre_existing": false,
+     "target": "python -B test-reports-2026-10/harness/coverage_drift.py",
+     "label": "漂移判据 exit 0",
+     "expect": "exit 0",
+     "ok": true,
+     "cmd": [
+      "F:\\Miniconda\\envs\\wage\\python.exe",
+      "-B",
+      "test-reports-2026-10/harness/coverage_drift.py"
+     ],
+     "exit_code": 0,
+     "hits": [
+      {
+       "file": "",
+       "line": null,
+       "text": "[OK  ] D-7 smoke_test_plan 静态复现 148 / 未解析 9  实际=148 / 9"
+      },
+      {
+       "file": "",
+       "line": null,
+       "text": "[SKIP] D-8 route_inventory stdout（未提供 --routes-stdout）"
+      },
+      {
+       "file": "",
+       "line": null,
+       "text": "[coverage_drift] 判据 8/8 通过  => exit 0  原因=无（全绿）"
+      },
+      {
+       "file": "",
+       "line": null,
+       "text": "[e03] exit_code_semantics={\"script\": \"test-reports-2026-10/harness/coverage_drift.py\", \"class\": \"真闸门（报告型产物的判据层，TL-03 雏形）\", \"rule\": \"all checks passed -> exit 0; any failed -> exit 1\", \"inputs\": {\"failed_checks\": [], \"coverage\": \"D:\\\\workspace\\\\wage_management_system - bak\\\\test-reports-2026-10\\\\evidence\\\\harness\\\\coverage.json\", \"routes_stdout\": null}, \"code\": 0}"
+      }
+     ],
+     "stderr_tail": []
+    }
+   ]
+  },
+  {
+   "id": "TL-04",
+   "wave": "W7",
+   "level": "高",
+   "title": "证据哈希门禁 evidence_hash.py（全量基线 + 只追加校验）",
+   "verify_judge": "删掉任一 evidence 文件 ⇒ 非 0；新增文件 ⇒ 0 且清单更新",
+   "search_domain": "文件名+内容: harness/evidence_hash.py；内容: ci_gates.py 接入位是否启用",
+   "verdict": "PARTIAL",
+   "verdict_auto": "PARTIAL",
+   "verdict_override": null,
+   "checks_passed": 2,
+   "checks_total": 3,
+   "checks": [
+    {
+     "kind": "file_exists",
+     "evidence_kind": "file_exists",
+     "pre_existing": false,
+     "target": "test-reports-2026-10/harness/evidence_hash.py",
+     "label": "哈希门禁",
+     "expect": "exists",
+     "ok": true,
+     "hits": [
+      {
+       "file": "test-reports-2026-10/harness/evidence_hash.py",
+       "line": null,
+       "text": "bytes=47681"
+      }
+     ]
+    },
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "test-reports-2026-10/harness/evidence_hash.py",
+     "regex": "def freeze_target|'--strict-index'|def selftest",
+     "label": "实现（freeze/strict-index/selftest）",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "test-reports-2026-10/harness/evidence_hash.py",
+       "line": 186,
+       "text": "def freeze_target(directory, dir_files, run_id=RUN_ID):"
+      },
+      {
+       "file": "test-reports-2026-10/harness/evidence_hash.py",
+       "line": 615,
+       "text": "def selftest(root, run_id=RUN_ID, tee=None):"
+      },
+      {
+       "file": "test-reports-2026-10/harness/evidence_hash.py",
+       "line": 823,
+       "text": "ap.add_argument('--strict-index', action='store_true', help='把「目录完全没有索引快照」也算违规')"
+      }
+     ],
+     "hit_count": 3
+    },
+    {
+     "kind": "content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "test-reports-2026-10/harness/ci_gates.py",
+     "regex": "^\\s*\\{'id': 'evidence_hash'",
+     "label": "已进 CI 链（启用）",
+     "expect": "hit",
+     "ok": false,
+     "hits": [],
+     "hit_count": 0
+    }
+   ]
+  },
+  {
+   "id": "TL-05",
+   "wave": "W7",
+   "level": "中",
+   "title": "check_properties 扩展：实例属性访问（BL-7 语义盲区）",
+   "verify_judge": "注入一个 obj.not_a_column 用例 ⇒ 必须命中；现有仓库 ⇒ 0 漏报不增加",
+   "search_domain": "文件内容: scripts/check_properties.py（`:32-33` 是**「有意不检查实例属性」的边界声明** ⇒ 恰是 TL-05 要消除的盲区）；行为: 注入 `e = Employee(); e.not_a_column` 后跑门禁（`.tmp/<RUN_ID>/tl05probe/`，gitignored）——**TL-05 完成后该注入必须 exit 1**",
+   "verdict": "NOT_DONE",
+   "verdict_auto": "NOT_DONE",
+   "verdict_override": null,
+   "checks_passed": 1,
+   "checks_total": 2,
+   "checks": [
+    {
+     "kind": "content",
+     "evidence_kind": "content_mention",
+     "pre_existing": false,
+     "target": "scripts/check_properties.py",
+     "regex": "instance\\.property.*无法静态判定",
+     "label": "边界声明（提及）",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "scripts/check_properties.py",
+       "line": 33,
+       "text": "- 只认 `类名.属性名` 这种类级访问。`instance.property` 无法静态判定，不做检查。"
+      }
+     ],
+     "hit_count": 1
+    },
+    {
+     "kind": "subprocess",
+     "evidence_kind": "behavior_verified",
+     "pre_existing": false,
+     "target": "python -B scripts/check_properties.py --root test-reports-2026-10/.tmp/r2t1-reconcile3/tl05probe",
+     "label": "实例属性误用被门禁检出（要求 exit 1）",
+     "expect": "exit 1",
+     "ok": false,
+     "cmd": [
+      "F:\\Miniconda\\envs\\wage\\python.exe",
+      "-B",
+      "scripts/check_properties.py",
+      "--root",
+      "test-reports-2026-10/.tmp/r2t1-reconcile3/tl05probe"
+     ],
+     "exit_code": 0,
+     "hits": [
+      {
+       "file": "",
+       "line": null,
+       "text": "已扫描 1 个文件，模型类 74 个"
+      },
+      {
+       "file": "",
+       "line": null,
+       "text": "RESULT: OK（未发现把 @property / 不存在的列当数据库列用）"
+      }
+     ],
+     "stderr_tail": []
+    }
+   ]
+  },
+  {
+   "id": "TL-06",
+   "wave": "W7",
+   "level": "中",
+   "title": "口径守卫：每份报告顶部口径表 + 关键数字机器校验",
+   "verify_judge": "故意在文档里写 ≥135 ⇒ 校验脚本非 0",
+   "search_domain": "文件名: scripts/check_doc_claims.py；文件名(递归): harness/*.py 找口径守卫实现（排除自指脚本）",
+   "verdict": "NOT_DONE",
+   "verdict_auto": "NOT_DONE",
+   "verdict_override": null,
+   "checks_passed": 0,
+   "checks_total": 3,
+   "checks": [
+    {
+     "kind": "file_exists",
+     "evidence_kind": "file_exists",
+     "pre_existing": false,
+     "target": "scripts/check_doc_claims.py",
+     "label": "07 规定落点",
+     "expect": "exists",
+     "ok": false,
+     "hits": []
+    },
+    {
+     "kind": "tree_content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "test-reports-2026-10/harness",
+     "exts": [
+      ".py"
+     ],
+     "regex": "check_doc_claims|口径守卫",
+     "label": "口径守卫实现",
+     "expect": "hit",
+     "ok": false,
+     "hits": [],
+     "hit_count": 0
+    },
+    {
+     "kind": "tree_content",
+     "evidence_kind": "content_implementation",
+     "pre_existing": false,
+     "target": "scripts",
+     "exts": [
+      ".py"
+     ],
+     "regex": "check_doc_claims|口径守卫",
+     "label": "口径守卫实现",
+     "expect": "hit",
+     "ok": false,
+     "hits": [],
+     "hit_count": 0
+    }
+   ]
+  },
+  {
+   "id": "TL-07",
+   "wave": "W7",
+   "level": "低",
+   "title": "依赖可复现：requirements.txt 无精确钉版（23 条 >= / 0 条 ==；唯一的 == 是 sys_platform 环境标记）",
+   "verify_judge": "在干净环境按 lock 安装后可跑通 5 项静态门禁与 run_gates.py",
+   "search_domain": "文件名: requirements.lock；文件内容: requirements.txt（现状计数）",
+   "verdict": "NOT_DONE",
+   "verdict_auto": "NOT_DONE",
+   "verdict_override": null,
+   "checks_passed": 1,
+   "checks_total": 2,
+   "checks": [
+    {
+     "kind": "file_exists",
+     "evidence_kind": "file_exists",
+     "pre_existing": false,
+     "target": "requirements.lock",
+     "label": "lock 文件",
+     "expect": "exists",
+     "ok": false,
+     "hits": []
+    },
+    {
+     "kind": "content",
+     "evidence_kind": "content_mention",
+     "pre_existing": true,
+     "target": "requirements.txt",
+     "regex": "==",
+     "label": "唯一的 == 是环境标记（现状）",
+     "expect": "hit",
+     "ok": true,
+     "hits": [
+      {
+       "file": "requirements.txt",
+       "line": 50,
+       "text": "pywin32>=305; sys_platform == \"win32\""
+      }
+     ],
+     "hit_count": 1
+    }
+   ]
+  }
+ ],
+ "verdict_by_wave": {
+  "W0": {
+   "HIT": 5
+  },
+  "W1": {
+   "HIT": 1
+  },
+  "W2": {
+   "HIT": 4
+  },
+  "W3": {
+   "HIT": 4
+  },
+  "W4": {
+   "PARTIAL": 2,
+   "HIT": 2
+  },
+  "W5": {
+   "HIT": 2
+  },
+  "W6": {
+   "NOT_DONE": 6,
+   "PARTIAL": 5
+  },
+  "W7": {
+   "PARTIAL": 3,
+   "HIT": 1,
+   "NOT_DONE": 3
+  }
+ },
+ "counts": {
+  "items": 38,
+  "HIT": 19,
+  "PARTIAL": 10,
+  "NOT_DONE": 9,
+  "MISS": 0
+ }
+}

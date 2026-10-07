@@ -1,0 +1,159 @@
+{
+  "_README": "第2轮实测台账模板（ledger_version 2.0）。用法：复制本文件 -> 填 <...> 占位 -> 删掉所有 _ 前缀的注释键 -> 用 harness/t6_ledger_check.py 过 8 条校验 -> 经 _env.save_evidence('<RUN_ID>-ledger.json', ...) 落盘。本模板自带 1 条 HIT 样例（results[0]）用于展示完备字段形态，实际使用时替换。",
+  "_field_contract": "字段语义冻结于 40-第2轮实测Runbook与台账规范.md 第 4.2 节；新增字段只能追加，不得改义。",
+  "_forbidden": [
+    "verdict=HIT 而 evidence_kind in {file_exists, content_mention}",
+    "verdict=HIT 而无 behavior_flip_test.red_when_removed",
+    "覆盖类条目缺 coverage_delta",
+    "search_domain.exclude_basenames 为空或不含判定脚本自身",
+    "verdict in {PARTIAL, NOT_DONE} 而未在 gaps 里登记",
+    "artifact_index 里填了不存在的路径",
+    "db_invariant.sha256_before != sha256_after 或 != 钉死值",
+    "command 里出现裸 python / py / python3"
+  ],
+  "ledger_version": "2.0",
+  "run_id": "<RUN_ID 与 HARNESS_RUN_ID 一致>",
+  "task_id": "<tN>",
+  "attempt_id": "<attempt uuid>",
+  "operator": "<角色名>",
+  "started_at": "<2026-10-07T00:00:00+08:00>",
+  "finished_at": "<2026-10-07T00:00:00+08:00>",
+  "env": {
+    "workdir": "D:\\workspace\\wage_management_system - bak",
+    "git_head": "<git rev-parse HEAD>",
+    "app_tree": "<git rev-parse HEAD:app；冻结判据用这个，不用 HEAD>",
+    "python": "F:\\Miniconda\\envs\\wage\\python.exe (3.9.21)",
+    "sandbox": "DSH danger-full-access",
+    "temp_run_root": "test-reports-2026-10/.tmp/<RUN_ID>"
+  },
+  "db_invariant": {
+    "target": "app.db",
+    "pinned_sha256": "F5DA2306BC31CBAB098AAD3774016D320A9B9AA3546F93418196AE9900E0F065",
+    "sha256_before": "F5DA2306BC31CBAB098AAD3774016D320A9B9AA3546F93418196AE9900E0F065",
+    "sha256_after": "F5DA2306BC31CBAB098AAD3774016D320A9B9AA3546F93418196AE9900E0F065",
+    "verdict": "通过"
+  },
+  "production_freeze": {
+    "_note": "被测生产面的文件级冻结；与 t1（27-38条对账与阶段A终态冻结）的指纹逐项可比。",
+    "files": [
+      {
+        "path": "app/main/routes.py",
+        "bytes": 0,
+        "lines": 12155,
+        "sha256": "<大写十六进制>"
+      }
+    ]
+  },
+  "anchor_readings": [
+    {
+      "path": "test-reports-2026-10/evidence/uat/uat_chains.json",
+      "bytes": 33318,
+      "sha256": "360A8570BC0080A2984A59AD945B2C837AD96ACF7B55E6242AE7E2C6417DD23A",
+      "matches_captain": true
+    },
+    {
+      "path": "test-reports-2026-10/evidence/harness/negative_matrix.json",
+      "bytes": 24424,
+      "sha256": "B743C73F86F5EB5C0FBA38410119D8D3A6BDE5FBACDF214CFA0DB409EF5B7479",
+      "matches_captain": true
+    },
+    {
+      "path": "test-reports-2026-10/evidence/analysis/assertion_ledger.json",
+      "bytes": 60937,
+      "sha256": "C7C312734DD8E02486D26C3639D8D074CCFCD59BCEB002C13C7CC9587AC94092",
+      "matches_captain": true
+    },
+    {
+      "path": "test-reports-2026-10/evidence/api/write_suite.json",
+      "bytes": 73293,
+      "sha256": "B608117EBDCA2A6F74595F0DB4A010187D8834715CD5E70D5C1AAD85F4A3F403",
+      "matches_captain": true
+    },
+    {
+      "path": "test-reports-2026-10/evidence/harness/coverage.json",
+      "bytes": 236893,
+      "sha256": "5E2C9D4315971B31C83AFD7833C310501199C34F61BFD868EF07A6AEEF7BF1F0",
+      "matches_captain": true
+    },
+    {
+      "path": "test-reports-2026-10/evidence/api/api_matrix.json",
+      "bytes": 1342834,
+      "sha256": "8451BB6738CCB25C41794E7B9548969D0EDDC8FE6EAE855DCC5F1D1CC746CB86",
+      "matches_captain": true
+    },
+    {
+      "path": "test-reports-2026-10/26-阶段A收口-复核读数.json",
+      "bytes": 11994,
+      "sha256": "CF0E2B14581D82072E087617B0CE3DBC1F4676897787DB6B14D6C6FA43D37319",
+      "matches_captain": true
+    }
+  ],
+  "results": [
+    {
+      "id": "REG-c01-templates",
+      "wave": "REG",
+      "title": "check_templates 回归复验（含计数比对）",
+      "evidence_kind": "behavior_verified",
+      "verdict": "HIT",
+      "criterion": "exit==0 且 stdout 逐字含 87/44/40/44/5 与 RESULT: OK",
+      "command": "F:\\Miniconda\\envs\\wage\\python.exe -B scripts/check_templates.py",
+      "exit_code": 0,
+      "expected": "parsed 87 files / 44 declared / 40 used in templates / 44 used on routes / landing 5 / RESULT: OK",
+      "observed": "parsed 87 files / 44 declared / 40 used in templates / 44 used on routes / landing 5 / RESULT: OK",
+      "criterion_digest": "templates=87,capabilities=44,used_in_templates=40,used_on_routes=44,landing=5",
+      "reproducible": true,
+      "search_domain": {
+        "dirs": [
+          "app/templates",
+          "app/permissions.py",
+          "scripts/check_templates.py"
+        ],
+        "match": "content",
+        "exclude_basenames": [
+          "t6_ledger_check.py",
+          "check_templates.py",
+          "reconcile_r2.py",
+          "captain_r2_status.py",
+          "captain_r2_review.py",
+          "improve_plan.py",
+          "analysis_ledger.py"
+        ]
+      },
+      "behavior_flip_test": {
+        "question": "删掉它什么会变红？",
+        "answer": "把任一模板引用的 capability 从 app/permissions.py 的 CAPABILITIES 删除 => check_templates 报违规、exit 1；ci_gates 第 1 步 blocking_failed 指名 check_templates",
+        "red_when_removed": "ci_gates.py#check_templates（blocking）"
+      },
+      "coverage_delta": null,
+      "provenance": {
+        "source": "本 run 实跑",
+        "source_sha256": null,
+        "source_verdict": null,
+        "superseded_by": null
+      },
+      "postfix_verdict": "passed",
+      "rewrite_verdict": "passed",
+      "class": "unchanged_pass",
+      "class_basis": "基线 passed / 修复后 passed，计数逐项相同",
+      "postfix_evidence": "test-reports-2026-10/evidence/harness/<RUN_ID>/ci_gates_first.json",
+      "notes": ""
+    }
+  ],
+  "gaps": [
+    {
+      "id": "GAP-<RUN_ID>-1",
+      "item": "<未验证事项>",
+      "state": "unexecuted",
+      "reason": "<为什么没跑>",
+      "action": "<怎么补>",
+      "owner_wave": "阶段B / C-11"
+    }
+  ],
+  "artifact_index": [
+    {
+      "path": "test-reports-2026-10/evidence/harness/<RUN_ID>/<RUN_ID>-ledger.json",
+      "bytes": 0,
+      "sha256": "<大写十六进制>"
+    }
+  ]
+}

@@ -1,0 +1,254 @@
+{
+  "harness": "t5-tooling-assessment",
+  "task": "t5",
+  "run_id": "r2t5-tooling",
+  "measured_at_local": "2026-10-07",
+  "baseline_frozen_by": "t1 (r2t1-reconcile5)",
+  "production_face_unchanged": true,
+  "note_production_face": "本任务全程只读 app/ 与 scripts/；新增写盘仅 test-reports-2026-10/.tmp/r2t5-probe/**（gitignored 运行时目录）与 evidence/harness/r2t5-probe/**（新增，不触碰既有原件）。",
+
+  "ci_chain_roster": {
+    "source": "test-reports-2026-10/harness/ci_gates.py",
+    "roster_command": "python -B test-reports-2026-10/harness/ci_gates.py --list",
+    "roster_exit_code": 0,
+    "wired_steps": 11,
+    "blocking": ["check_templates", "check_migration_heads", "check_properties",
+                 "check_db_bootstrap", "run_gates", "functional_test",
+                 "permission_matrix", "coverage_drift"],
+    "report_only": ["smoke_test", "route_inventory", "measure_coverage"],
+    "reserved_unenabled_slots": 3,
+    "reserved_slot_lines": "ci_gates.py:109(TL-01) / :110(TL-02) / :111-112(TL-04)"
+  },
+
+  "slot_verdicts": [
+    {
+      "slot": "TL-01",
+      "slot_id": "check_model_refs",
+      "reserve_line": "test-reports-2026-10/harness/ci_gates.py:109",
+      "intended_group_in_reserve_comment": "blocking",
+      "asset_in_library": "scripts/check_model_refs.py",
+      "asset_present": true,
+      "target_path_in_slot_matches_reality": true,
+      "behavior_verified": true,
+      "evidence": {
+        "repo_run": {
+          "command": "python -B scripts/check_model_refs.py",
+          "exit_code": 0,
+          "stdout_key_line": "[model_refs] scanned 23 files, name_query_refs 602, violations 0",
+          "verdict_line": "RESULT: OK"
+        },
+        "selftest": {
+          "command": "python -B scripts/check_model_refs.py --selftest",
+          "exit_code": 0,
+          "result_line": "[selftest] result 13/13 all passed"
+        },
+        "injection_red_test": {
+          "injected_file": "test-reports-2026-10/.tmp/r2t5-probe/inj/t5_injected.py",
+          "injected_content": "def t5_bad(): return NotABoundModel.query.get(1)",
+          "command": "python -B scripts/check_model_refs.py --root test-reports-2026-10/.tmp/r2t5-probe/inj",
+          "exit_code": 1,
+          "hit_line": "t5_injected.py:5 [t5_bad] NotABoundModel.query -- no binding for \"NotABoundModel\" in this module",
+          "conclusion": "判据敏感：删掉绑定即变红（本任务独立复现，未引用 t1/t6 结论）"
+        },
+        "encoding_hazard_found": {
+          "observation": "PowerShell `Set-Content -Encoding UTF8` 在 Windows PowerShell 5.1 下写出 U+FEFF BOM；门禁把 BOM 头当作 syntax error 并报 `?.query -- invalid non-printable character U+FEFF`（exit 1）。",
+          "impact": "不损害门禁正确性（fail-closed），但会让「注入树报红」的证据失真为语法错误而非缺绑定。",
+          "mitigation": "注入/合成树一律用 Python io.open(..., encoding='utf-8', newline='\\n') 或 Set-Content -Encoding utf8NoBOM(PS7) 写盘。"
+        }
+      },
+      "must_not_pin": {
+        "field": "name_query_refs",
+        "observed_values": [574, 575, 602],
+        "reason": "随测试资产自增而漂移（A-74 同源风险）；expects 只钉 'violations 0' + 'RESULT: OK'。"
+      },
+      "verdict": "READY_NOW",
+      "activation_conditions": [
+        "① 把 ci_gates.py:109 注释变为 spec_steps 里的一条 blocking 步骤",
+        "② expects=['violations 0','RESULT: OK']，expect_exit=0；**勿钉** name_query_refs",
+        "③ 确认 argv 相对仓库根调用（ci_gates 以 REPO_ROOT 为 cwd，故 'scripts/check_model_refs.py' 形式成立）",
+        "④ 文档同步：AGENTS.md 的「必跑门禁」表补 check_model_refs 行（否则文档与执法面不一致）",
+        "⑤ 下游生效前提：Jenkinsfile:121-122 的 error() 仍是注释 ⇒ 当前只记 UNSTABLE，需按 A-63 第二步解除注释才是真阻塞"
+      ],
+      "confidence": "high",
+      "residual_risk": "low"
+    },
+    {
+      "slot": "TL-02",
+      "slot_id": "check_http_contract",
+      "reserve_line": "test-reports-2026-10/harness/ci_gates.py:110",
+      "intended_group_in_reserve_comment": "blocking",
+      "asset_in_library": "test-reports-2026-10/harness/w4_http_contract.py",
+      "asset_present": true,
+      "target_path_in_slot_matches_reality": false,
+      "target_path_problem": "槽位 argv 指向 scripts/check_http_contract.py，该文件**不存在**（Test-Path False）；等价判据在 harness/w4_http_contract.py。",
+      "behavior_verified": true,
+      "evidence": {
+        "doc_scope_run": {
+          "command": "python -B test-reports-2026-10/harness/w4_http_contract.py --roots app --scope doc",
+          "exit_code": 0,
+          "sites": 0,
+          "meaning": "DOC_SCOPE 允许表只含 17 个 P-09 函数 ⇒ 与 P-09 修后 0 一致"
+        },
+        "app_scope_run": {
+          "command": "python -B test-reports-2026-10/harness/w4_http_contract.py --roots app --scope app",
+          "exit_code": 1,
+          "sites": 10,
+          "pattern_breakdown": {"get_json()": 10, "get_or_404": 0, "first_or_404": 0},
+          "meaning": "存量 = P-12 残留的 10 个 get_json() 维站点（try 块口径），与 t1 的「10（try 块口径）」一致"
+        },
+        "selftest_defect": {
+          "command": "python -B test-reports-2026-10/harness/w4_http_contract.py --selftest",
+          "exit_code": 0,
+          "per_case_lines": "5 行全部 [PASS]（WT-P1/P2 期望 0 实测 0；WT-N1/N2/N3 期望 1 实测 1）",
+          "summary_line": "[w4_http_contract] 自检 2/5 通过",
+          "contradiction": "5 行 PASS 与统计行 2/5 自相矛盾",
+          "root_cause": "统计表达式的源片段为 `sum(1 for n, s, e in cases if len(SiteVisitor('<s>', s.splitlines()).sites) == e)` —— **漏调 visit()**，sites 恒为空 ⇒ 恒 0；只有 expect==0 的两个 case 被计入 ⇒ **恒报 2/5**，与判据是否敏感无关。",
+          "root_cause_proof": [
+            "AST 抽取该生成器表达式并求值 ⇒ sum=2/5（与真实输出一致）",
+            "同一批 5 个 case 逐项调用 visit() 后复算 ⇒ 5/5 全过",
+            "SiteVisitor('<s>', 单个 bad case 源码).sites == []（len 0）；调用 visit() 后 == 1"
+          ],
+          "impact": "① 统计显示行是恒假的「常数」，非恒真闸门，故不造成假绿；② **退出码仍可信**（由循环内 ok_all 累积决定，任一 case 变 FAIL ⇒ exit 1）；③ 但把该行纳入 CI expects 会得到恒不匹配的判据；④ 若下游误读「2/5」为「判据不敏感」，会错误地放行或误判本门禁不合格。",
+          "required_fix": "统计表达式补 .visit(ast.parse(s))，或直接复用循环内的计数变量（推荐后者）。"
+        },
+        "promotion_baseline_conflict": {
+          "problem": "--scope doc 下 P-12 的 10 个残留站点**不可见**（10 个站点函数 use_consumable/update_consumable_category 等均不在 DOC_SCOPE 允许表内）",
+          "consequence": "任何依赖 --scope doc 的阻塞判据都拦不住 P-12 复发；反之 --scope app 会立刻把 P-12 存量变成阻塞。",
+          "options": [
+            "A. --scope doc --expect 0 ⇒ 可立即 blocking，但**放弃 P-12 面**（须在文档写明这是 P-09 专线）",
+            "B. --scope app --expect 10 ⇒ 立即 blocking，基线登记为「10 处已登记 P-12 残留」；代价：P-12 存量清零前不得改这个数（与 C-12 目标冲突）",
+            "C. --scope app --expect 0 ⇒ 待 P-12 清零后再接（最干净，但依赖 W4 收尾）"
+          ],
+          "recommendation": "B + 显式登记（与 TL-04 的 report-only/白名单同构），把「10」写成具名基线并在清零时同步下调。"
+        }
+      },
+      "verdict": "CANNOT_ENABLE_AS_WRITTEN",
+      "activation_conditions": [
+        "① **先修 selftest 统计行**（补 visit() 或复用循环计数），否则该门禁的自证不可引用",
+        "② 二选一并在文档写明：把 harness/w4_http_contract.py 迁移为 scripts/check_http_contract.py，**或**改槽位 argv 指向 harness 路径并登记为「已由 w4_http_contract 承担」",
+        "③ 冻结存量清单（app 口径 10 个 get_json() 站点）并选定 --expect 基线（推荐 B）",
+        "④ 文档同步 + Jenkinsfile 第二阶段解除注释（同 TL-01-⑤）"
+      ],
+      "confidence": "high",
+      "residual_risk": "medium（存量基线口径与 P-12 收尾目标存在张力，须由 captain 裁定 B 或 C）"
+    },
+    {
+      "slot": "TL-04",
+      "slot_id": "evidence_hash",
+      "reserve_line": "test-reports-2026-10/harness/ci_gates.py:111-112",
+      "intended_group_in_reserve_comment": "report-only",
+      "asset_in_library": "test-reports-2026-10/harness/evidence_hash.py",
+      "asset_present": true,
+      "target_path_in_slot_matches_reality": true,
+      "behavior_verified": true,
+      "evidence": {
+        "default_verify": {
+          "command": "python -B test-reports-2026-10/harness/evidence_hash.py",
+          "exit_code": 1,
+          "verdict": "violation",
+          "counts": {"baseline_files": 2507, "current_files": 2727,
+                     "modified": 9, "deleted": 20, "journal_broken": 0, "added": 240,
+                     "index_missing": 29, "coverage_gap": 5, "phantom_entry": 4,
+                     "baseline_tampered": 0, "dirs_conform": 382, "dirs_total": 416},
+          "real_db_matches_pinned": true
+        },
+        "as_reserve_comment_states": {
+          "command": "python -B test-reports-2026-10/harness/evidence_hash.py --strict-index",
+          "would_be": "exit 1（index_missing=29 被计入违规），与「report-only 起步」的注释一致"
+        },
+        "violating_paths_are_all_captain_side": {
+          "modified_9": [
+            "captain-verification/p01-namespace-probe.txt (1192->1403 B)",
+            "harness/captain-e01-audit.json (6028->11056 B)",
+            "_phaseB-prefreeze/LATEST.txt",
+            "_phaseB-prefreeze/20261007-132253|142403|172654 各 2 条同源镜像"
+          ],
+          "deleted_20": [
+            "baseline-prefix/{e01-ab-compare,e01-verify,idx-conflict-check,idx-gap-check,idx-gap-detail}.txt（×4 份镜像：根 + 3 个 _phaseB-prefreeze 快照）"
+          ],
+          "phantom_entry_4": "上述 4 个 baseline-prefix 目录各 5 条「快照里有、目录里无」",
+          "all_product_or_harness_output_clean": true,
+          "modified_deleted_mtime": "2026-10-07 13:15 / 13:19（均早于 t1 冻结时刻 _phaseB-prefreeze/LATEST.txt = 17:26:54）",
+          "conclusion": "33 条路径级违规**全部落在 captain 侧文档/核验件与 baseline-prefix 目录**，无一条涉及产品代码或 harness 运行产物；时间戳显示其早于 t1 冻结 ⇒ 属**既有违规**而非本轮新产生。"
+        },
+        "strict_coverage_requirement": {
+          "parameter": "--no-strict-coverage",
+          "effect": "仅把 coverage_gap 降级为允许的 added；modified/deleted/journal_broken/index_missing/phantom 仍判 violation ⇒ 本任务实测加该开关后 verdict 仍为 violation / exit 1",
+          "meaning": "report-only 起步是**必须**的，不能靠加参数洗白。"
+        }
+      },
+      "verdict": "REPORT_ONLY_ONLY",
+      "activation_conditions": [
+        "① 按槽位注释原意接为 **report-only**，argv 精度修正：注释里写死了 --strict-index，但 index_missing=29 会让它恒 exit 1 —— 建议先按 report-only 只记录，不带 --strict-index",
+        "② 33 条基线违规须显式登记为白名单（modified 9 / deleted 20 / phantom 4），或由 captain 先处置其 baseline-prefix 与两项被原地改写的核验件",
+        "③ 补跑 --freeze 登记 29 个缺索引目录（否则 strict 模式永红）",
+        "④ A-63 的 7 处文档/旧基线同步清单：AGENTS.md:86、docs/开发进度与交接.md:174、docs/交付说明-P0P1.md、docs/开发与测试规划-2026-10-06.md:194-195/592-593、test-reports-2026-10/02-测试脚手架与自动化说明.md §3.1/§5.2、harness/improve_plan.py:662-671、harness/analysis_ledger.py:94",
+        "⑤ 转 blocking 的前提：②③ 完成 且 Jenkinsfile 第二阶段解除注释"
+      ],
+      "confidence": "high",
+      "residual_risk": "medium（白名单口径需 captain 裁定：不动既有违规 vs 先处置）"
+    }
+  ],
+
+  "cross_cutting_blocker": {
+    "id": "T5-B1",
+    "title": "整条 CI 门禁链处于「第一阶段观测」⇒ 三个接入位现在启用也不会阻塞任何构建",
+    "evidence": {
+      "file": "Jenkinsfile",
+      "lines": [110, 113, 116, 117, 120, 121, 122, 123, 124],
+      "detail": [
+        "Jenkinsfile:106 已接 ci_gates.py --phase first --json ...（入口已接线，不是缺失）",
+        "Jenkinsfile:112 error('门禁入口缺失...') 被注释，改为 currentBuild.result='UNSTABLE'",
+        "Jenkinsfile:122 error('[E-04] blocking 门禁失败...') 被注释，改为 currentBuild.result='UNSTABLE'",
+        "Jenkinsfile:117 report-only 失败亦记 UNSTABLE"
+      ]
+    },
+    "consequence": "启用 TL-01/TL-02/TL-04 只会增加 UNSTABLE 的条目数；若要「注入破坏 ⇒ 构建红灯」，必须同时完成 A-63 第二步（解除 Jenkinsfile:112/122 注释）并把 Jenkins stage 的失败出口从 UNSTABLE 改为 error()。",
+    "scope_note": "本任务**未改** Jenkinsfile（属 CI 配置，须 captain 独占调度）；此处仅登记为接入位的下游前提。",
+    "recommended_sequencing": [
+      "1. 先接 TL-01（唯一 READY_NOW，零前置）",
+      "2. 修 TL-02 的 selftest 统计行 + 裁定槽位落点与基线口径，再接",
+      "3. TL-04 以 report-only 接，白名单登记后再谈 blocking",
+      "4. 三者稳定后，统一解除 Jenkinsfile:112/122 注释（真阻塞）",
+      "5. smoke_test 按 A-63 第二步用 --phase second 晋升"
+    ]
+  },
+
+  "secondary_reserved_slot": {
+    "slot": "smoke_test-phase2",
+    "mechanism": "ci_gates --phase second 把 smoke_test 从 report-only 提升为 blocking",
+    "evidence": {
+      "file": "test-reports-2026-10/harness/ci_gates.py",
+      "lines": [48, 88, 92, 148, 151, 295],
+      "note": "第 48 行 SMOKE_PROMOTION_NOTE 仍是占位符「smoke_test 自 <待晋升日期> 起升为 blocking」⇒ 晋升未发生（日期未落）。"
+    },
+    "condition": "A-63 第二步：观测满 1 轮构建后，把占位日期落为实际日期并以 --phase second 跑 ci_gates；Jenkinsfile:106 的 --phase first 需同步改为 second。",
+    "verdict": "NOT_ACTIVATED_BY_DESIGN"
+  },
+
+  "baseline_gate_readings": [
+    {"gate": "check_templates", "command": "python -B scripts/check_templates.py", "exit_code": 0,
+     "key_lines": ["[templates] parsed 87 files",
+                   "[permissions] 44 declared / 40 used in templates / 44 used on routes",
+                   "[landing] 5 role landing endpoints", "RESULT: OK"]},
+    {"gate": "check_migration_heads", "command": "python -B scripts/check_migration_heads.py", "exit_code": 0,
+     "key_lines": ["HEADS=['p1nonctarget']", "head_count=1  revisions=35"]},
+    {"gate": "check_properties", "command": "python -B scripts/check_properties.py", "exit_code": 0,
+     "key_lines": ["已扫描 23 个文件，模型类 74 个", "RESULT: OK"]},
+    {"gate": "route_inventory", "command": "python -B scripts/route_inventory.py", "exit_code": 0,
+     "note": "报告型（恒 exit 0，E-03/A-30）：退出码无判据语义，stdout 交给 coverage_drift 的 D-8"}
+  ],
+
+  "not_covered": [
+    "未跑完整 ci_gates（含 functional_test / permission_manager / check_db_bootstrap / coverage_drift，实测耗时以小时计）⇒ 本任务只取 --list 的 roster 与各静态门禁的独立读数，未复验整链 exit 0。",
+    "未验证 TL-02 迁移到 scripts/ 后的行为（本任务不改脚本，只裁定条件）。",
+    "未验证 clean-room 下 requirements.lock 的可行性（TL-07，A-8 沙箱限制），本任务只确认 requirements.lock 不存在。",
+    "未改任何生产代码、未改 scripts/、未改 ci_gates.py 与 Jenkinsfile（接入位的**实施**属第 2 轮 B1 批次的实现任务）。",
+    "evidence_hash 的 33 条基线违规未逐条回原（只做路径归因 + mtime 归因）。"
+  ],
+
+  "artifacts": {
+    "tmp_probe_dir": "test-reports-2026-10/.tmp/r2t5-probe/（gitignored 运行时目录）",
+    "evidence_dir": "test-reports-2026-10/evidence/harness/r2t5-probe/（本任务新建，只追加）"
+  }
+}

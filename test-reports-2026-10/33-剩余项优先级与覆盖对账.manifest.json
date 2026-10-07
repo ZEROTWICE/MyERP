@@ -1,0 +1,1201 @@
+{
+ "harness": "t3_priorities_r2.py",
+ "task": "t3 剩余项优先级与覆盖对账",
+ "readonly": true,
+ "production_surface_untouched": true,
+ "inputs": {
+  "D:\\workspace\\wage_management_system - bak\\test-reports-2026-10\\evidence\\improve\\fix_plan.json": {
+   "bytes": 42302,
+   "sha256_16": "AB63B10B26284DF5"
+  },
+  "D:\\workspace\\wage_management_system - bak\\test-reports-2026-10\\27-38条对账与阶段A终态冻结.manifest.json": {
+   "bytes": 161607,
+   "sha256_16": "70AD0E1BEA0DDAF0"
+  },
+  "D:\\workspace\\wage_management_system - bak\\test-reports-2026-10\\phase1-snapshot\\03-需求追溯矩阵.md": {
+   "bytes": 81748,
+   "sha256_16": "9EA5D1501867A658"
+  },
+  "D:\\workspace\\wage_management_system - bak\\test-reports-2026-10\\phase1-snapshot\\02-业务验收标准与端到端判据.md": {
+   "bytes": 45832,
+   "sha256_16": "81C724F903DCD28A"
+  },
+  "D:\\workspace\\wage_management_system - bak\\test-reports-2026-10\\evidence\\uat\\uat_chains.json": {
+   "bytes": 33318,
+   "sha256_16": "360A8570BC0080A2"
+  },
+  "D:\\workspace\\wage_management_system - bak\\test-reports-2026-10\\evidence\\api\\write_suite.json": {
+   "bytes": 73293,
+   "sha256_16": "B608117EBDCA2A6F"
+  }
+ },
+ "residual_ledger": {
+  "count": 17,
+  "ids": [
+   "C-01",
+   "C-02",
+   "C-03",
+   "C-04",
+   "C-05",
+   "C-06",
+   "C-07",
+   "C-08",
+   "C-09",
+   "C-10",
+   "C-11",
+   "TL-01",
+   "TL-02",
+   "TL-04",
+   "TL-05",
+   "TL-06",
+   "TL-07"
+  ],
+  "caliber": {
+   "task_claim": 15,
+   "by_verdict_ne_hit": 17,
+   "by_w6w7_minus_hit": 17,
+   "by_38_minus_hit_count": 17,
+   "w6_minus_hit": 11,
+   "w7_minus_hit": 6,
+   "out_of_scope_partial": [
+    "P-09",
+    "P-12"
+   ],
+   "note": "任务书写「剩余 15 项（W6 11 + W7 剩4）」；按 38 条逐条 verdict 复算，in-scope 未完成 = W6 11（2 PARTIAL + 9 NOT_DONE）+ W7 6（TL-01/02/04 PARTIAL + TL-05/06/07 NOT_DONE）= 17。另 W4 的 P-09/P-12 两条 PARTIAL 也不在 HIT 里，但它们属 W0–W5（阶段A 交付面），不属本任务 in-scope ⇒ 否则 38−19=19。",
+   "consistent": true
+  },
+  "out_of_scope_partial": [
+   "P-09",
+   "P-12"
+  ]
+ },
+ "priority_model": {
+  "rule_source": "03-需求追溯矩阵 §5.1（I/R/C/D 四因子 + P0/P1/P2 定级 + D 降序→C 升序 排队）",
+  "factors": [
+   "I 业务破坏力",
+   "R 覆盖风险",
+   "C 取证成本",
+   "D 依赖阻断"
+  ],
+  "items": [
+   {
+    "id": "C-06",
+    "wave": "W6",
+    "title": "四模块双层盲区：equipment / purchase_orders / shipments / stock 既无权限断言也无可达性命中",
+    "src_level": "高",
+    "verdict": "PARTIAL",
+    "evidence_kind": "content_implementation",
+    "effort": "M",
+    "deps": [
+     "C-05"
+    ],
+    "factors": {
+     "I": 3,
+     "R": 2,
+     "C": 2,
+     "D": 1
+    },
+    "grade": "P0",
+    "covers": {
+     "reqs": [
+      "REQ-A-04"
+     ],
+     "acs": [
+      "AC-05"
+     ],
+     "gaps": [
+      "GAP-07"
+     ],
+     "ek": "behavior_verified"
+    },
+    "rank": 1
+   },
+   {
+    "id": "C-07",
+    "wave": "W6",
+    "title": "应用级「拒绝连真实库」硬闸 + 夹具正向判据（当前只有脚本级守卫）",
+    "src_level": "高（结构性）",
+    "verdict": "NOT_DONE",
+    "evidence_kind": null,
+    "effort": "M",
+    "deps": [],
+    "factors": {
+     "I": 3,
+     "R": 3,
+     "C": 2,
+     "D": 1
+    },
+    "grade": "P0",
+    "covers": {
+     "reqs": [
+      "REQ-K-05"
+     ],
+     "acs": [],
+     "gaps": [
+      "GAP-03"
+     ],
+     "ek": "behavior_verified",
+     "blocked": "落点 `app/__init__.py` 属**生产面**；阶段A 终态冻结（app/ tree c8f7d4ab…）⇒ 本轮不得改 app/，只能交付「可执行规格 + 注入判据」，落地须在生产修复窗口（阶段 C）"
+    },
+    "rank": 2
+   },
+   {
+    "id": "C-11",
+    "wave": "W6",
+    "title": "不可判定项补用例：AC-15 / AC-16 / AC-29b,c,d / AC-44,45 / AC-56",
+    "src_level": "中",
+    "verdict": "NOT_DONE",
+    "evidence_kind": null,
+    "effort": "M",
+    "deps": [
+     "P-03",
+     "P-07"
+    ],
+    "factors": {
+     "I": 3,
+     "R": 2,
+     "C": 2,
+     "D": 1
+    },
+    "grade": "P0",
+    "covers": {
+     "reqs": [
+      "REQ-F-02",
+      "REQ-F-06",
+      "REQ-F-07",
+      "REQ-G-05",
+      "REQ-G-06",
+      "REQ-H-02"
+     ],
+     "acs": [
+      "AC-15",
+      "AC-16",
+      "AC-29b",
+      "AC-29c",
+      "AC-29d",
+      "AC-44",
+      "AC-45",
+      "AC-56"
+     ],
+     "gaps": [
+      "GAP-16",
+      "GAP-17",
+      "GAP-39",
+      "GAP-36"
+     ],
+     "ek": "behavior_verified",
+     "note": "AC-15/16、AC-29b,c,d **已有载体未登记**（w2w3_probe.py 46/46）⇒ 本条一半是「回写账本」，不是新建用例；AC-44/45 另有 write_suite 载体但同样零账本条目"
+    },
+    "rank": 3
+   },
+   {
+    "id": "TL-05",
+    "wave": "W7",
+    "title": "check_properties 扩展：实例属性访问（BL-7 语义盲区）",
+    "src_level": "中",
+    "verdict": "NOT_DONE",
+    "evidence_kind": "content_mention",
+    "effort": "M",
+    "deps": [],
+    "factors": {
+     "I": 2,
+     "R": 3,
+     "C": 2,
+     "D": 1
+    },
+    "grade": "P0",
+    "covers": {
+     "reqs": [
+      "REQ-K-06"
+     ],
+     "acs": [
+      "AC-67"
+     ],
+     "gaps": [],
+     "ek": "behavior_verified"
+    },
+    "rank": 4
+   },
+   {
+    "id": "TL-06",
+    "wave": "W7",
+    "title": "口径守卫：每份报告顶部口径表 + 关键数字机器校验",
+    "src_level": "中",
+    "verdict": "NOT_DONE",
+    "evidence_kind": null,
+    "effort": "M",
+    "deps": [],
+    "factors": {
+     "I": 2,
+     "R": 3,
+     "C": 2,
+     "D": 1
+    },
+    "grade": "P0",
+    "covers": {
+     "reqs": [],
+     "acs": [],
+     "gaps": [],
+     "ek": "content_implementation"
+    },
+    "rank": 5
+   },
+   {
+    "id": "C-01",
+    "wave": "W6",
+    "title": "J 域通知与审计：本轮唯一全零触达域（AuditLog( 114 处调用 / 0 条断言）",
+    "src_level": "高（结构性空白）",
+    "verdict": "NOT_DONE",
+    "evidence_kind": null,
+    "effort": "L",
+    "deps": [
+     "P-11"
+    ],
+    "factors": {
+     "I": 3,
+     "R": 3,
+     "C": 3,
+     "D": 1
+    },
+    "grade": "P0",
+    "covers": {
+     "reqs": [
+      "REQ-J-01",
+      "REQ-J-02",
+      "REQ-J-03",
+      "REQ-J-04",
+      "REQ-J-05",
+      "REQ-J-06"
+     ],
+     "acs": [
+      "AC-48",
+      "AC-49",
+      "AC-50",
+      "AC-51",
+      "AC-52",
+      "AC-53",
+      "AC-19"
+     ],
+     "gaps": [
+      "GAP-31",
+      "GAP-24",
+      "GAP-41"
+     ],
+     "ek": "behavior_verified"
+    },
+    "rank": 6
+   },
+   {
+    "id": "C-02",
+    "wave": "W6",
+    "title": "并发与事务原子性：0 资产（rollback() 162 处 / 线程用例 0）",
+    "src_level": "高（结构性空白）",
+    "verdict": "NOT_DONE",
+    "evidence_kind": null,
+    "effort": "L",
+    "deps": [
+     "C-01"
+    ],
+    "factors": {
+     "I": 3,
+     "R": 3,
+     "C": 3,
+     "D": 1
+    },
+    "grade": "P0",
+    "covers": {
+     "reqs": [
+      "REQ-K-05"
+     ],
+     "acs": [
+      "AC-19",
+      "AC-52"
+     ],
+     "gaps": [
+      "GAP-24",
+      "GAP-03"
+     ],
+     "ek": "behavior_verified"
+    },
+    "rank": 7
+   },
+   {
+    "id": "C-04",
+    "wave": "W6",
+    "title": "链级未覆盖补齐：链 A 全链 + 链 C C1/C2/C4/C5 + 链 B B0/B1/B2/B6/B7",
+    "src_level": "中",
+    "verdict": "NOT_DONE",
+    "evidence_kind": null,
+    "effort": "L",
+    "deps": [
+     "C-01"
+    ],
+    "factors": {
+     "I": 3,
+     "R": 3,
+     "C": 3,
+     "D": 1
+    },
+    "grade": "P0",
+    "covers": {
+     "reqs": [
+      "REQ-D-01",
+      "REQ-D-02",
+      "REQ-D-04",
+      "REQ-C-01",
+      "REQ-G-03",
+      "REQ-G-06",
+      "REQ-E-06",
+      "REQ-B-06",
+      "REQ-B-01"
+     ],
+     "acs": [
+      "AC-37",
+      "AC-38",
+      "AC-43",
+      "AC-44",
+      "AC-45",
+      "AC-33",
+      "AC-34",
+      "AC-35",
+      "AC-09",
+      "AC-17"
+     ],
+     "gaps": [
+      "GAP-02",
+      "GAP-22",
+      "GAP-23",
+      "GAP-43",
+      "GAP-36",
+      "GAP-09"
+     ],
+     "ek": "behavior_verified"
+    },
+    "rank": 8
+   },
+   {
+    "id": "C-09",
+    "wave": "W6",
+    "title": "工价版本取值（GAP-21，P0）与三策略派工可区分（GAP-42）",
+    "src_level": "中",
+    "verdict": "NOT_DONE",
+    "evidence_kind": null,
+    "effort": "M",
+    "deps": [],
+    "factors": {
+     "I": 3,
+     "R": 2,
+     "C": 3,
+     "D": 1
+    },
+    "grade": "P0",
+    "covers": {
+     "reqs": [
+      "REQ-B-07"
+     ],
+     "acs": [
+      "AC-32"
+     ],
+     "gaps": [
+      "GAP-21",
+      "GAP-42"
+     ],
+     "ek": "behavior_verified"
+    },
+    "rank": 9
+   },
+   {
+    "id": "C-10",
+    "wave": "W6",
+    "title": "夹具幂等与 fixtures_manifest 记账（T-04 / F-4）",
+    "src_level": "中",
+    "verdict": "PARTIAL",
+    "evidence_kind": "content_implementation",
+    "effort": "S",
+    "deps": [
+     "E-01"
+    ],
+    "factors": {
+     "I": 2,
+     "R": 2,
+     "C": 1,
+     "D": 2
+    },
+    "grade": "P1",
+    "covers": {
+     "reqs": [],
+     "acs": [],
+     "gaps": [],
+     "ek": "content_implementation"
+    },
+    "rank": 10
+   },
+   {
+    "id": "TL-04",
+    "wave": "W7",
+    "title": "证据哈希门禁 evidence_hash.py（全量基线 + 只追加校验）",
+    "src_level": "高",
+    "verdict": "PARTIAL",
+    "evidence_kind": "content_implementation",
+    "effort": "S",
+    "deps": [
+     "E-01"
+    ],
+    "factors": {
+     "I": 2,
+     "R": 1,
+     "C": 1,
+     "D": 2
+    },
+    "grade": "P1",
+    "covers": {
+     "reqs": [
+      "REQ-L-02"
+     ],
+     "acs": [
+      "AC-66"
+     ],
+     "gaps": [],
+     "ek": "behavior_verified"
+    },
+    "rank": 11
+   },
+   {
+    "id": "C-03",
+    "wave": "W6",
+    "title": "CSRF 全场景（SameSite / token 重放 / 浏览器行为）与前端头链路",
+    "src_level": "中",
+    "verdict": "NOT_DONE",
+    "evidence_kind": null,
+    "effort": "M",
+    "deps": [
+     "E-04"
+    ],
+    "factors": {
+     "I": 2,
+     "R": 2,
+     "C": 2,
+     "D": 2
+    },
+    "grade": "P1",
+    "covers": {
+     "reqs": [],
+     "acs": [],
+     "gaps": [],
+     "ek": "behavior_verified",
+     "blocked": "前端/浏览器路径（CSRF 头链路、SameSite 生效形态）本机无浏览器环境 ⇒ 只能落「状态码 + 机读标记」的服务器侧场景；浏览器侧须显式登记 blocked（N-3）"
+    },
+    "rank": 12
+   },
+   {
+    "id": "TL-02",
+    "wave": "W7",
+    "title": "新门禁 check_http_contract.py（静态）：404 吞 500 站点 + 未用 silent 的 get_json",
+    "src_level": "高",
+    "verdict": "PARTIAL",
+    "evidence_kind": "content_implementation",
+    "effort": "M",
+    "deps": [
+     "TL-01"
+    ],
+    "factors": {
+     "I": 3,
+     "R": 1,
+     "C": 2,
+     "D": 2
+    },
+    "grade": "P1",
+    "covers": {
+     "reqs": [
+      "REQ-L-02",
+      "REQ-K-06"
+     ],
+     "acs": [
+      "AC-66",
+      "AC-10",
+      "AC-67"
+     ],
+     "gaps": [],
+     "ek": "behavior_verified"
+    },
+    "rank": 13
+   },
+   {
+    "id": "C-05",
+    "wave": "W6",
+    "title": "写端点命中补强：≥141 个非 GET 方法级端点无任何自动化 URL 命中",
+    "src_level": "高",
+    "verdict": "NOT_DONE",
+    "evidence_kind": null,
+    "effort": "L（分批）",
+    "deps": [
+     "E-04"
+    ],
+    "factors": {
+     "I": 2,
+     "R": 3,
+     "C": 3,
+     "D": 2
+    },
+    "grade": "P1",
+    "covers": {
+     "reqs": [
+      "REQ-A-04"
+     ],
+     "acs": [
+      "AC-05"
+     ],
+     "gaps": [
+      "GAP-07",
+      "GAP-06",
+      "GAP-26"
+     ],
+     "ek": "behavior_verified"
+    },
+    "rank": 14
+   },
+   {
+    "id": "TL-01",
+    "wave": "W7",
+    "title": "新门禁 check_model_refs.py：`X.query` 中本模块不可解析的大写名（P-01 同类 NameError）",
+    "src_level": "高",
+    "verdict": "PARTIAL",
+    "evidence_kind": "behavior_verified",
+    "effort": "S",
+    "deps": [],
+    "factors": {
+     "I": 3,
+     "R": 1,
+     "C": 1,
+     "D": 1
+    },
+    "grade": "P1",
+    "covers": {
+     "reqs": [
+      "REQ-L-02",
+      "REQ-K-06"
+     ],
+     "acs": [
+      "AC-66"
+     ],
+     "gaps": [],
+     "ek": "behavior_verified"
+    },
+    "rank": 15
+   },
+   {
+    "id": "C-08",
+    "wave": "W6",
+    "title": "导入行级容错 / 导出零残留 / 上传目录清理（K-01/K-02/GAP-32/GAP-33）",
+    "src_level": "中",
+    "verdict": "NOT_DONE",
+    "evidence_kind": null,
+    "effort": "M",
+    "deps": [],
+    "factors": {
+     "I": 2,
+     "R": 2,
+     "C": 2,
+     "D": 1
+    },
+    "grade": "P1",
+    "covers": {
+     "reqs": [
+      "REQ-K-01",
+      "REQ-K-02"
+     ],
+     "acs": [
+      "AC-11",
+      "AC-12"
+     ],
+     "gaps": [
+      "GAP-32",
+      "GAP-33"
+     ],
+     "ek": "behavior_verified",
+     "blocked": "「导出零临时文件残留」的轨二（核对系统 TEMP / `mkdtemp` 0o700 回收）需**非沙箱环境**（A-8/N-1）⇒ 轨一（静态 + 上传目录清理）可做，轨二显式 blocked"
+    },
+    "rank": 16
+   },
+   {
+    "id": "TL-07",
+    "wave": "W7",
+    "title": "依赖可复现：requirements.txt 无精确钉版（23 条 >= / 0 条 ==；唯一的 == 是 sys_platform 环境标记）",
+    "src_level": "低",
+    "verdict": "NOT_DONE",
+    "evidence_kind": "content_mention",
+    "effort": "S",
+    "deps": [
+     "E-04"
+    ],
+    "factors": {
+     "I": 1,
+     "R": 3,
+     "C": 2,
+     "D": 2
+    },
+    "grade": "P2",
+    "covers": {
+     "reqs": [],
+     "acs": [],
+     "gaps": [],
+     "ek": "file_exists"
+    },
+    "rank": 17
+   }
+  ],
+  "grade_counts": {
+   "P0": 9,
+   "P1": 7,
+   "P2": 1
+  }
+ },
+ "coverage": {
+  "req_dim": {
+   "total": 83,
+   "baseline_dist": {
+    "C": 22,
+    "P": 18,
+    "W": 2,
+    "G": 32,
+    "N": 6,
+    "B": 3,
+    "?": 0
+   },
+   "closed_by_residual": 27,
+   "closed_ids": [
+    "REQ-A-04",
+    "REQ-B-01",
+    "REQ-B-06",
+    "REQ-B-07",
+    "REQ-C-01",
+    "REQ-D-01",
+    "REQ-D-02",
+    "REQ-D-04",
+    "REQ-E-06",
+    "REQ-F-02",
+    "REQ-F-06",
+    "REQ-F-07",
+    "REQ-G-03",
+    "REQ-G-05",
+    "REQ-G-06",
+    "REQ-H-02",
+    "REQ-J-01",
+    "REQ-J-02",
+    "REQ-J-03",
+    "REQ-J-04",
+    "REQ-J-05",
+    "REQ-J-06",
+    "REQ-K-01",
+    "REQ-K-02",
+    "REQ-K-05",
+    "REQ-K-06",
+    "REQ-L-02"
+   ],
+   "closed_by_status": {
+    "P": 7,
+    "G": 17,
+    "C": 2,
+    "W": 1
+   },
+   "g_total": 32,
+   "g_closed": 17,
+   "wb_total": 5,
+   "wb_closed": 1,
+   "g_remaining": [
+    "REQ-A-08",
+    "REQ-A-09",
+    "REQ-B-03",
+    "REQ-B-05",
+    "REQ-E-07",
+    "REQ-E-08",
+    "REQ-F-01",
+    "REQ-F-03",
+    "REQ-F-08",
+    "REQ-F-09",
+    "REQ-G-07",
+    "REQ-I-02",
+    "REQ-L-01",
+    "REQ-M-02",
+    "REQ-M-03"
+   ]
+  },
+  "ac_dim": {
+   "total": 78,
+   "doc_baseline": {
+    "ok": 43,
+    "warn": 15,
+    "bad": 19,
+    "ref": 1,
+    "total": 78
+   },
+   "parsed_dist": {
+    "ok": 37,
+    "warn": 14,
+    "bad": 26,
+    "none": 1
+   },
+   "closed_by_residual": 30,
+   "closed_ids": [
+    "AC-05",
+    "AC-09",
+    "AC-10",
+    "AC-11",
+    "AC-12",
+    "AC-15",
+    "AC-16",
+    "AC-17",
+    "AC-19",
+    "AC-29b",
+    "AC-29c",
+    "AC-29d",
+    "AC-32",
+    "AC-33",
+    "AC-34",
+    "AC-35",
+    "AC-37",
+    "AC-38",
+    "AC-43",
+    "AC-44",
+    "AC-45",
+    "AC-48",
+    "AC-49",
+    "AC-50",
+    "AC-51",
+    "AC-52",
+    "AC-53",
+    "AC-56",
+    "AC-66",
+    "AC-67"
+   ],
+   "doc_vs_parsed_mismatch": true,
+   "note": "`04` §8.1 自述 ✅43/⚠15/❌19/对照1；本脚本按 §3 表行机械解析得到 ✅37/⚠14/❌26/无标记1 （AC-27）⇒ **`04` 的状态列与其自述合计不自洽**，属本轮新发现的第 6 次计数漂移，列为 t3 发现（不改 04，只在报告登记；`docs/` 树不可覆写）。",
+   "carrier_index": {
+    "level": "content_mention（仅证「有引用」，不证「已承载」）",
+    "scanned_files": [
+     "api_matrix.py",
+     "negative_matrix.py",
+     "t9_ledger.py",
+     "uat_chains.py",
+     "w2w3_probe.py",
+     "w2w3_uatdiff.py",
+     "w4_probe.py"
+    ],
+    "index": {
+     "AC-03": [
+      "api_matrix.py"
+     ],
+     "AC-04": [
+      "api_matrix.py",
+      "negative_matrix.py",
+      "t9_ledger.py",
+      "uat_chains.py",
+      "w2w3_probe.py",
+      "w2w3_uatdiff.py"
+     ],
+     "AC-10": [
+      "api_matrix.py"
+     ],
+     "AC-18": [
+      "negative_matrix.py",
+      "uat_chains.py",
+      "w2w3_probe.py",
+      "w2w3_uatdiff.py"
+     ],
+     "AC-12b": [
+      "uat_chains.py"
+     ],
+     "AC-12c": [
+      "uat_chains.py"
+     ],
+     "AC-13": [
+      "uat_chains.py",
+      "w2w3_probe.py"
+     ],
+     "AC-17": [
+      "uat_chains.py"
+     ],
+     "AC-25": [
+      "uat_chains.py",
+      "w2w3_probe.py"
+     ],
+     "AC-26": [
+      "uat_chains.py",
+      "w2w3_probe.py"
+     ],
+     "AC-27": [
+      "uat_chains.py",
+      "w2w3_probe.py"
+     ],
+     "AC-29": [
+      "uat_chains.py",
+      "w2w3_probe.py"
+     ],
+     "AC-29e": [
+      "uat_chains.py"
+     ],
+     "AC-30": [
+      "uat_chains.py",
+      "w2w3_probe.py"
+     ],
+     "AC-33": [
+      "uat_chains.py"
+     ],
+     "AC-40": [
+      "uat_chains.py"
+     ],
+     "AC-42": [
+      "uat_chains.py"
+     ],
+     "AC-43": [
+      "uat_chains.py"
+     ],
+     "AC-46": [
+      "uat_chains.py"
+     ],
+     "AC-15": [
+      "w2w3_probe.py"
+     ],
+     "AC-16": [
+      "w2w3_probe.py"
+     ],
+     "AC-22": [
+      "w2w3_probe.py"
+     ],
+     "AC-52": [
+      "w4_probe.py"
+     ]
+    },
+    "uat_tagged_all": [
+     "AC-12b",
+     "AC-12c",
+     "AC-13",
+     "AC-17",
+     "AC-18",
+     "AC-26",
+     "AC-27",
+     "AC-29",
+     "AC-29e",
+     "AC-30",
+     "AC-33",
+     "AC-40",
+     "AC-42",
+     "AC-43",
+     "AC-46"
+    ],
+    "uat_tagged_passed": [
+     "AC-12b",
+     "AC-12c",
+     "AC-17",
+     "AC-27",
+     "AC-29e",
+     "AC-33",
+     "AC-40",
+     "AC-42",
+     "AC-43",
+     "AC-46"
+    ]
+   },
+   "zero_carrier": [
+    "AC-01",
+    "AC-02",
+    "AC-05",
+    "AC-06",
+    "AC-07",
+    "AC-08",
+    "AC-09",
+    "AC-11",
+    "AC-12",
+    "AC-12d",
+    "AC-14",
+    "AC-19",
+    "AC-20",
+    "AC-21",
+    "AC-23",
+    "AC-24",
+    "AC-28",
+    "AC-29b",
+    "AC-29c",
+    "AC-29d",
+    "AC-31",
+    "AC-32",
+    "AC-34",
+    "AC-35",
+    "AC-36",
+    "AC-37",
+    "AC-38",
+    "AC-39",
+    "AC-41",
+    "AC-44",
+    "AC-45",
+    "AC-47",
+    "AC-48",
+    "AC-49",
+    "AC-50",
+    "AC-51",
+    "AC-53",
+    "AC-54",
+    "AC-54b",
+    "AC-55",
+    "AC-56",
+    "AC-57",
+    "AC-57b",
+    "AC-58",
+    "AC-59",
+    "AC-60",
+    "AC-61",
+    "AC-62",
+    "AC-63",
+    "AC-64",
+    "AC-65",
+    "AC-66",
+    "AC-67",
+    "AC-68",
+    "AC-69"
+   ],
+   "zero_carrier_of_closed": [
+    "AC-05",
+    "AC-09",
+    "AC-11",
+    "AC-12",
+    "AC-19",
+    "AC-29b",
+    "AC-29c",
+    "AC-29d",
+    "AC-32",
+    "AC-34",
+    "AC-35",
+    "AC-37",
+    "AC-38",
+    "AC-44",
+    "AC-45",
+    "AC-48",
+    "AC-49",
+    "AC-50",
+    "AC-51",
+    "AC-53",
+    "AC-56",
+    "AC-66",
+    "AC-67"
+   ],
+   "zero_carrier_note": "⚠ 这 **不是**「该 AC 没有判据」，而是「该 AC **没有显式 AC 编号标注**」。实测 `scripts/*.py` 对 `AC-\\d{2}` **零命中**（`grep -c` 全目录 0）⇒ 凡由 `functional_test.py` / 各静态门禁 / `api_matrix` 的**门禁编码**（gate / D-x / W-TASK-x / NV-x）承载的 AC，都不会出现在本索引里。本索引**只用于双向追溯**，不得当作覆盖率分子。",
+   "per_item_ac_status": {
+    "C-06": {
+     "AC-05": "✅"
+    },
+    "C-07": {},
+    "C-11": {
+     "AC-15": "⚠",
+     "AC-16": "✅",
+     "AC-29b": "❌",
+     "AC-29c": "❌",
+     "AC-29d": "❌",
+     "AC-44": "✅",
+     "AC-45": "✅",
+     "AC-56": "⚠"
+    },
+    "TL-05": {
+     "AC-67": "❌"
+    },
+    "TL-06": {},
+    "C-01": {
+     "AC-48": "⚠",
+     "AC-49": "❌",
+     "AC-50": "❌",
+     "AC-51": "❌",
+     "AC-52": "⚠",
+     "AC-53": "❌",
+     "AC-19": "❌"
+    },
+    "C-02": {
+     "AC-19": "❌",
+     "AC-52": "⚠"
+    },
+    "C-04": {
+     "AC-37": "✅",
+     "AC-38": "✅",
+     "AC-43": "✅",
+     "AC-44": "✅",
+     "AC-45": "✅",
+     "AC-33": "✅",
+     "AC-34": "✅",
+     "AC-35": "✅",
+     "AC-09": "✅",
+     "AC-17": "❌"
+    },
+    "C-09": {
+     "AC-32": "✅"
+    },
+    "C-10": {},
+    "TL-04": {
+     "AC-66": "⚠"
+    },
+    "C-03": {},
+    "TL-02": {
+     "AC-66": "⚠",
+     "AC-10": "✅",
+     "AC-67": "❌"
+    },
+    "C-05": {
+     "AC-05": "✅"
+    },
+    "TL-01": {
+     "AC-66": "⚠"
+    },
+    "C-08": {
+     "AC-11": "✅",
+     "AC-12": "✅"
+    },
+    "TL-07": {}
+   },
+   "ac_sym": {
+    "AC-01": "✅",
+    "AC-02": "✅",
+    "AC-03": "✅",
+    "AC-04": "✅",
+    "AC-05": "✅",
+    "AC-06": "✅",
+    "AC-07": "✅",
+    "AC-08": "✅",
+    "AC-09": "✅",
+    "AC-10": "✅",
+    "AC-11": "✅",
+    "AC-12": "✅",
+    "AC-12b": "✅",
+    "AC-12c": "⚠",
+    "AC-12d": "⚠",
+    "AC-13": "❌",
+    "AC-14": "⚠",
+    "AC-15": "⚠",
+    "AC-16": "✅",
+    "AC-17": "❌",
+    "AC-18": "❌",
+    "AC-19": "❌",
+    "AC-20": "⚠",
+    "AC-21": "❌",
+    "AC-22": "⚠",
+    "AC-23": "❌",
+    "AC-24": "⚠",
+    "AC-25": "❌",
+    "AC-26": "❌",
+    "AC-27": null,
+    "AC-28": "❌",
+    "AC-29": "❌",
+    "AC-29b": "❌",
+    "AC-29c": "❌",
+    "AC-29d": "❌",
+    "AC-29e": "⚠",
+    "AC-30": "❌",
+    "AC-31": "⚠",
+    "AC-32": "✅",
+    "AC-33": "✅",
+    "AC-34": "✅",
+    "AC-35": "✅",
+    "AC-36": "✅",
+    "AC-37": "✅",
+    "AC-38": "✅",
+    "AC-39": "✅",
+    "AC-40": "✅",
+    "AC-41": "✅",
+    "AC-42": "✅",
+    "AC-43": "✅",
+    "AC-44": "✅",
+    "AC-45": "✅",
+    "AC-46": "✅",
+    "AC-47": "✅",
+    "AC-48": "⚠",
+    "AC-49": "❌",
+    "AC-50": "❌",
+    "AC-51": "❌",
+    "AC-52": "⚠",
+    "AC-53": "❌",
+    "AC-54": "✅",
+    "AC-54b": "✅",
+    "AC-55": "✅",
+    "AC-56": "⚠",
+    "AC-57": "✅",
+    "AC-57b": "⚠",
+    "AC-58": "❌",
+    "AC-59": "❌",
+    "AC-60": "❌",
+    "AC-61": "❌",
+    "AC-62": "❌",
+    "AC-63": "✅",
+    "AC-64": "❌",
+    "AC-65": "❌",
+    "AC-66": "⚠",
+    "AC-67": "❌",
+    "AC-68": "✅",
+    "AC-69": "✅"
+   }
+  }
+ },
+ "assertions": [
+  {
+   "id": "A1",
+   "claim": "in-scope 剩余项集合三种算法一致且 = 17",
+   "ok": true,
+   "detail": "{\"task_claim\": 15, \"by_verdict_ne_hit\": 17, \"by_w6w7_minus_hit\": 17, \"by_38_minus_hit_count\": 17, \"w6_minus_hit\": 11, \"w7_minus_hit\": 6, \"out_of_scope_partial\": [\"P-09\", \"P-12\"], \"note\": \"任务书写「剩余 15 项（W6 11 + W7 剩4）」；按 38 条逐条 verdict 复算，in-scope 未完成 = W6 11（2 PARTIAL + 9 NOT_DONE）+ W7 6（TL-01/02/04 PARTIAL + TL-05/06/07 NOT_DONE）= 17。另 W4 的 P-09/P-12 两条 PARTIAL 也不在 HIT 里，但它们属 W0–W5（阶段A 交付面），不属本任务 in-scope ⇒ 否则 38−19=19。\", \"consistent\": true}"
+  },
+  {
+   "id": "A2",
+   "claim": "P0/P1/P2 每档都有条目且档位由 03 §5.1 规则可复算",
+   "ok": true,
+   "detail": "grades={\"P0\": [\"C-06\", \"C-07\", \"C-11\", \"TL-05\", \"TL-06\", \"C-01\", \"C-02\", \"C-04\", \"C-09\"], \"P1\": [\"C-10\", \"TL-04\", \"C-03\", \"TL-02\", \"C-05\", \"TL-01\", \"C-08\"], \"P2\": [\"TL-07\"]}"
+  },
+  {
+   "id": "A3",
+   "claim": "映射到的 REQ/AC 全部在权威文档中存在（无悬空引用）",
+   "ok": true,
+   "detail": "unknown_reqs=[] unknown_acs=[]"
+  },
+  {
+   "id": "A4",
+   "claim": "需求侧分母 = 83 且 C+P+W+G+N+B = 83",
+   "ok": true,
+   "detail": "{\"C\": 22, \"P\": 18, \"W\": 2, \"G\": 32, \"N\": 6, \"B\": 3, \"?\": 0}"
+  },
+  {
+   "id": "A5",
+   "claim": "判据侧分母 = 78 行（AC-01…AC-69 + 9 分条）",
+   "ok": true,
+   "detail": "parsed=78"
+  },
+  {
+   "id": "A6",
+   "claim": "每条剩余项都有因子、覆盖映射、验收证据级与非空理由",
+   "ok": true,
+   "detail": "items=17"
+  },
+  {
+   "id": "A7",
+   "claim": "AC 载体指数为单向口径且被测文件族非空（防自指/空口径）",
+   "ok": true,
+   "detail": "scanned=7 files, tagged ACs=23"
+  },
+  {
+   "id": "A8",
+   "claim": "自指脚本族已排除（本脚本与 captain_r2_*/reconcile_r2/improve_plan/analysis_ledger）",
+   "ok": true,
+   "detail": "{\"AC-03\": [\"api_matrix.py\"], \"AC-04\": [\"api_matrix.py\", \"negative_matrix.py\", \"t9_ledger.py\", \"uat_chains.py\", \"w2w3_probe.py\", \"w2w3_uatdiff.py\"], \"AC-10\": [\"api_matrix.py\"], \"AC-18\": [\"negative_matrix.py\", \"uat_chains.py\", \"w2w3_probe.py\", \"w2w3_uatdiff.py\"], \"AC-12b\": [\"uat_chains.py\"], \"AC-12c\": [\"uat_chains.py\"], \"AC-13\": [\"uat_chains.py\", \"w2w3_probe.py\"], \"AC-17\": [\"uat_chains.py\"], \"AC-25\""
+  }
+ ],
+ "failed_assertions": [],
+ "artifact": {
+  "id": "33",
+  "name": "剩余项优先级与覆盖对账",
+  "task": "t3",
+  "attempt_id": "70d62840-eb40-4bda-bcb3-d3205130bc6a",
+  "member": "需求优先级分析师",
+  "doc": "test-reports-2026-10/33-剩余项优先级与覆盖对账.md",
+  "evidence_dir": "test-reports-2026-10/evidence/harness/t3-priorities-r2/",
+  "harness": "test-reports-2026-10/harness/t3_priorities_r2.py",
+  "checks": {
+   "assertions": 8,
+   "passed": 8,
+   "selftest": "10/10",
+   "exit_code": 0
+  },
+  "readonly_declaration": "未改生产代码/模板/config.py/scripts 既有脚本/Jenkinsfile；未 import 应用、未连库、未发请求"
+ }
+}

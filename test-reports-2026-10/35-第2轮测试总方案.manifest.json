@@ -1,0 +1,243 @@
+{
+ "schema": "myerp-r2-masterplan/1.0",
+ "task": "t7 第2轮测试总方案定稿",
+ "attempt_id": "3ce5cb63-c1af-4445-bc30-fbac0b874725",
+ "run_id": "r2t7-masterplan",
+ "owner": "高级项目经理",
+ "produced_at": "2026-10-07",
+ "doc": "test-reports-2026-10/35-第2轮测试总方案（定稿）.md",
+ "readonly_declaration": "只读整合；未改生产代码/模板/配置/scripts 既有脚本/他人交付物/evidence 冻结件；未 import 应用/未连库/未发请求/未重跑产证据脚本",
+ "denominators": {
+  "total_items": 38,
+  "total_breakdown": {"HIT": 19, "PARTIAL": 7, "NOT_DONE": 12, "MISS": 0},
+  "fill_gap_denominator": 19,
+  "fill_gap_formula": "NOT_DONE 12 + PARTIAL 7",
+  "in_scope_residual": 17,
+  "in_scope_breakdown": {"W6": 11, "W7": 6},
+  "out_of_scope_partial": ["P-09", "P-12"],
+  "w6_ids": ["C-01", "C-02", "C-03", "C-04", "C-05", "C-06", "C-07", "C-08", "C-09", "C-10", "C-11"],
+  "w7_residual_ids": ["TL-01", "TL-02", "TL-04", "TL-05", "TL-06", "TL-07"],
+  "w7_hit_ids": ["TL-03"],
+  "sources": {
+   "counts": "test-reports-2026-10/27-38条对账与阶段A终态冻结.manifest.json#counts",
+   "residual": "test-reports-2026-10/33-剩余项优先级与覆盖对账.manifest.json#residual_ledger"
+  },
+  "caliber_warning": "三层分母并列，禁止互替；「剩余 15 项」为计数错误（A-87）"
+ },
+ "layer_accounting": {
+  "scope": "19 条待补齐项（12 NOT_DONE + 7 PARTIAL）",
+  "by_layer": {"L0": 0, "L1": 2, "L2": 0, "L3": 6, "L4": 3, "L5": 2, "L6": 6},
+  "layer_sum": 19,
+  "dedup_items": 16,
+  "cross_layer": {"C-02": ["L3", "L4"], "C-03": ["L3", "L5"], "C-08": ["L3", "L5"]},
+  "l0_zero_reason": "19 条中无一条能在「不运行应用逻辑」下被满足；TL-05 属元判据/执法，归 L6",
+  "notes": ["层记账是分工口径，不等于补齐分母 19 条", "用例只允许一个归属层；E 层为横切不计归属"]
+ },
+ "criteria_contract": {
+  "forms": {
+   "1": "file_exists / glob_exists（极弱，touch 即满足）",
+   "2": "content_mention（不作判据；边界声明是反证据）",
+   "3": "exit 0 + 计数逐项严格相等（强）",
+   "4": "集合相等 / 差集为空（强）",
+   "5": "前后两个数 Δ 断言（覆盖类唯一合法形态）",
+   "6": "守恒等式 / 差分（最强，需阴性对照）",
+   "7": "注入破坏 => 非 0（最强，门禁执法能力）"
+  },
+  "hit_min_form": 3,
+  "new_gate_requires_form": 7,
+  "coverage_requires_forms": [5, 6],
+  "evidence_kind_pairing": "content_implementation 单独 => 最高 PARTIAL；HIT 须 content_implementation + behavior_verified 同时成立",
+  "m0_prime": {
+   "a": "ci_gates --phase first exit 0 且 blocking_failed=[]",
+   "b": "故意改坏一条 => 对应步骤非 0（每条新步骤各 1 次）",
+   "c": "请求型 --no-dump => root_json_untouched.ok=true",
+   "d": "report-only 的 exit != 0 不得读成绿",
+   "e": "未执行 != 通过（blocked 单列）"
+  }
+ },
+ "priorities": {
+  "source": "test-reports-2026-10/33-剩余项优先级与覆盖对账.manifest.json#priority_model",
+  "grade_counts": {"P0": 9, "P1": 7, "P2": 1},
+  "rank_order": ["C-06", "C-07", "C-11", "TL-05", "TL-06", "C-01", "C-02", "C-04", "C-09", "C-10", "TL-04", "C-03", "TL-02", "C-05", "TL-01", "C-08", "TL-07"],
+  "grades": {
+   "C-06": "P0", "C-07": "P0", "C-11": "P0", "TL-05": "P0", "TL-06": "P0",
+   "C-01": "P0", "C-02": "P0", "C-04": "P0", "C-09": "P0",
+   "C-10": "P1", "TL-04": "P1", "C-03": "P1", "TL-02": "P1", "C-05": "P1", "TL-01": "P1", "C-08": "P1",
+   "TL-07": "P2"
+  },
+  "ruling_t7_1": "批次结构（含 B1 的前置性）优先于 rank；rank 用于同批内排序与资源争抢取舍",
+  "ruling_t3_1": "D 移出定级式、只留排队序（D=2 不再单独抬档）"
+ },
+ "toolchain_rulings": {
+  "TL-01": {"t5": "READY_NOW", "captain": "A-85 采纳；expects=['violations 0','RESULT: OK']；勿钉 name_query_refs", "installed_at_measure": "blocking", "outstanding": "注入 NotABoundModel.query => 非 0 + blocking_failed 指名"},
+  "TL-02": {"t5": "CANNOT_ENABLE_AS_WRITTEN", "captain": "A-85：落点=已由 harness/w4_http_contract.py 承担（不迁 scripts/）+ 口径 B（--scope app --expect 10 具名登记）+ 先修 selftest 统计行", "installed_at_measure": "blocking(--roots app --scope app --expect 10)", "outstanding": "selftest 统计行恒报 2/5（漏调 visit()）不得进 expects；P-12 清零时同步下调 10"},
+  "TL-04": {"t5": "REPORT_ONLY_ONLY", "captain": "A-85：report-only + 白名单，不动既有违规（A-52/A-55）", "installed_at_measure": "report-only(--no-strict-coverage + evidence_hash_whitelist)", "outstanding": "白名单零陈旧 + real_db_matches_pinned；禁止重基线化"},
+  "smoke_phase2": {"verdict": "NOT_ACTIVATED_BY_DESIGN", "promotion": "A-63 第二步：观测 1 轮全绿后落占位日期"},
+  "cross_cutting_block": {
+   "id": "T5-B1",
+   "state": "两条 CI 路径均在第一阶段观测 => 三接入位启用也不阻塞任何构建",
+   "jenkinsfile": "生效 error() = 0 行；注释 error() 位于 :111/:112/:121/:122；:113/:117/:123 实走 UNSTABLE",
+   "github": "docker-deploy.yml :19 continue-on-error: true；:57 build-and-push 无 needs: gate（needs 仅在 :16/:58 注释）",
+   "promotion_items": ["解除 Jenkinsfile:112/:122 注释", "删 .github/workflows/docker-deploy.yml:19 continue-on-error", "在 :57 build-and-push 加 needs: gate"],
+   "owner": "captain 独占",
+   "acceptance_scope_now": "ci_gates 层（blocking_failed 指名 + 退出码非 0）；构建层阻塞 = blocked"
+  },
+  "expects_prohibitions": ["name_query_refs 计数（574/575/602 已漂移）", "w4_http_contract --selftest 统计行（恒报 2/5）", "TL-02 --expect 10 必须具名登记并随清零下调"]
+ },
+ "ci_gates_measure": {
+  "measured_at": "2026-10-07 17:36:52",
+  "file_sha256": "0405AE25A42C8031(prefix)",
+  "bytes": 30494,
+  "lines": 504,
+  "list_exit": 0,
+  "steps": 14,
+  "blocking": 10,
+  "report_only": 4,
+  "in_flight": "t8 在途修改（git status: M harness/ci_gates.py, M harness/w4_http_contract.py）",
+  "baseline_11_steps_source": "29 §5 / 40 §3.3（阶段A 基线，引用须带时点）",
+  "note": "引用 ci_gates 结论必须带「步骤数 + 文件 SHA256 + 测量时点」"
+ },
+ "coverage_baseline": {
+  "source": "evidence/harness/coverage.json（锚点 5）",
+  "literal_covered": 6,
+  "any_covered": 14,
+  "uncovered_writable": 101,
+  "probes_whitelist": "harness/measure_coverage.py:44-62（写死 8 文件）",
+  "url_call_sites_nonzero": "仅 scripts/functional_test.py = 27（literal 10 / dynamic 17）；其余 6/8 为 0",
+  "grouping_upper_bounds": {"/api/*": 14, "/inventory/*": 14, "/products/*": 10, "/consumables/*": 6, "four_modules": 14, "others": 43},
+  "ruling": "C-05 HIT = 登记 PROBES + 前后两个数 + 移除探针必回落（A-83）"
+ },
+ "batches": {
+  "B0": {"content": "锚点再冻结 + regression_preflight preflight + 真库开工复核", "parallel": false},
+  "B1": {"content": "三接入位验收 + 注入证明", "parallel": ["B2"]},
+  "B2": {"content": "C-07 规格与判据 + C-02 事务原子性", "parallel": ["B1", "B3"]},
+  "B3": {"content": "V-04 硬前置 -> C-11/C-01/C-05/C-06/C-09", "parallel": "文件互斥内并行"},
+  "B4": {"content": "C-03/C-08/TL-05/TL-06/TL-07/C-04/资产修正", "parallel": "文件互斥内并行；V-12 与回归串行"},
+  "B5": {"content": "回归复验 + 断言账本 -> 新改进报告 -> 收口移交", "parallel": false}
+ },
+ "file_exclusivity": [
+  {"path": "harness/ci_gates.py", "tasks": ["V-01"], "rule": "独占"},
+  {"path": "harness/measure_coverage.py", "tasks": ["V-06"], "rule": "独占"},
+  {"path": "harness/fixtures.py", "tasks": ["V-04", "V-02"], "rule": "串行（V-04 先）"},
+  {"path": "scripts/check_properties.py", "tasks": ["V-13"], "rule": "独占"},
+  {"path": "harness/uat_chains.py", "tasks": ["V-12", "V-14"], "rule": "串行"},
+  {"path": "evidence/harness/coverage.json", "tasks": ["V-06", "V-14"], "rule": "串行 + --out 到本 run"},
+  {"path": "evidence/analysis/assertion_ledger.json", "tasks": ["V-08"], "rule": "独占（仅新 run 产物）"}
+ ],
+ "tasks": [
+  {"id": "V-01", "batch": "B1", "owner": "测试工具评估工程师", "kind": "implementation", "inScope": ["harness/ci_gates.py", "harness/t8-evidence-whitelist.json", "harness/w4_http_contract.py(仅修自证行)"], "depends": [], "acceptance": "步骤>=14 且 exit 0；每步 1 次注入破坏 => 该步非 0 且 blocking_failed 指名；TL-04 report-only 且白名单零陈旧；selftest 统计行已修且不进 expects；构建层阻塞登记 blocked", "verify": "ci_gates --phase first --json <run>/ci_gates.json ; ci_gates --only <id> 注入回放"},
+  {"id": "V-02", "batch": "B2", "owner": "测试自动化工程师", "kind": "implementation", "inScope": ["harness/r2_c07_probe.py(新建)"], "depends": [], "acceptance": "C-07-a/b/c 三判据；负例在 create_all 之前抛错；真库 SHA256 不变；实现面登记 blocked(生产面冻结)", "verify": "探针 --selftest + 负例/正例双跑 + 真库前后指纹"},
+  {"id": "V-03", "batch": "B2", "owner": "测试自动化工程师", "kind": "implementation", "inScope": ["harness/r2_c02_probe.py(新建)"], "depends": ["V-04"], "acceptance": "L3 注入 IntegrityError 后行数回到注入前（用例 0->>=1）；L4 链中断后台账守恒；不可重放部分登记 blocked", "verify": "双跑一致 + 不注入时行数必须变（阴性对照）"},
+  {"id": "V-04", "batch": "B3", "owner": "测试自动化工程师", "kind": "implementation", "inScope": ["harness/fixtures.py"], "depends": [], "acceptance": "fixtures_manifest 落盘且 rows 与实际行数逐表一致；同 run 连调两次不抛 UNIQUE；copy_path 含 RUN_ID 且真库不变（E-10.1..4）", "verify": "harness/cr_accept_criteria.py + 两次调用对拍"},
+  {"id": "V-05", "batch": "B3", "owner": "测试自动化工程师", "kind": "implementation", "inScope": ["harness/r2_audit_probe.py(新建)"], "depends": ["V-04"], "acceptance": ">=3 写端点 ΔAuditLog = 动作数（0->>0）；失败路径不得新增；登记抽样率", "verify": "探针 --selftest + 前后两个数"},
+  {"id": "V-06", "batch": "B3", "owner": "API 测试工程师", "kind": "implementation", "inScope": ["harness/measure_coverage.py(PROBES)", "harness/r2_write_hit_probe.py(新建)"], "depends": ["V-04"], "acceptance": "先登记 PROBES；literal 6->>=6+ΔL / any 14->>=14+ΔA / 101-><=101-Δ；移除探针必回落；coverage_drift.LOCKED 走有意更新三步", "verify": "measure_coverage --out <run>/coverage.json + coverage_drift --coverage + 回落实验"},
+  {"id": "V-07", "batch": "B3", "owner": "API 测试工程师", "kind": "implementation", "inScope": ["harness/r2_perm_matrix_probe.py(新建，复用 permission_matrix 口径)"], "depends": ["V-04"], "acceptance": "四模块各 >=1 allow + >=1 deny；注入移除 @require_capability => 对应断言转红；总 5xx=0", "verify": "断言矩阵 + 注入回放"},
+  {"id": "V-08", "batch": "B3", "owner": "测试结果分析师", "kind": "implementation", "inScope": ["evidence/analysis/assertion_ledger.*（新 run 产物）"], "depends": ["V-04"], "acceptance": "AC-15/16/29b,c,d 标 carrier_origin=pre-existing；AC-44/45/56/49 补条目并标来源；每条恰 1 条、status ∈ {passed,failed}；给 144->N", "verify": "harness/t6_ledger_check.py + 账本机检 R-1..R-5"},
+  {"id": "V-09", "batch": "B4", "owner": "API 测试工程师", "kind": "implementation", "inScope": ["harness/r2_csrf_probe.py(新建)"], "depends": ["V-07"], "acceptance": "拦截 133/133 保持；断状态码 + 机读标记；放宽某豁免 => 该条转红", "verify": "双跑 + 注入回放"},
+  {"id": "V-10", "batch": "B4", "owner": "测试自动化工程师", "kind": "implementation", "inScope": ["harness/r2_import_export_probe.py(新建)"], "depends": ["V-04"], "acceptance": "B-08.1/2/3 五元组；3 好+2 坏 => 新增 3/错误 2、全好 => 错误 0；TEMP_FOLDER 与 OS-temp 各一条；导出前后 uploads/temp 清单逐一相同", "verify": "探针 + 成对阴性对照"},
+  {"id": "V-11", "batch": "B4", "owner": "测试自动化工程师", "kind": "implementation", "inScope": ["harness/r2_price_strategy_probe.py(新建)"], "depends": ["V-04"], "acceptance": "D-09.1..4；工价两版含未来生效；三策略带 weight>=2 成员两两可区分；同策略两次稳定", "verify": "探针 + 权重对照实验"},
+  {"id": "V-12", "batch": "B4", "owner": "验收测试工程师", "kind": "implementation", "inScope": ["harness/uat_chains.py"], "depends": ["V-04"], "acceptance": "链 A 0->>=1 端到端通过；链总数 >40；不得改既有 40 链期望值；换 UAT_RUN_ID", "verify": "uat_chains.py 双跑 + 台账差分"},
+  {"id": "V-13", "batch": "B4", "owner": "测试工具评估工程师", "kind": "implementation", "inScope": ["scripts/check_properties.py", "scripts/check_doc_claims.py(新建)", "requirements.lock(新建)"], "depends": [], "acceptance": "TL-05 注入 e.not_a_column => exit 1 且既有期望值不漂移；TL-06 错误数字非 0/正确 0；TL-07 按 lock 安装后 6 项静态门禁 + run_gates 可跑", "verify": "--selftest + 注入回放（形态 7）"},
+  {"id": "V-14", "batch": "B5", "owner": "测试结果分析师", "kind": "verification", "inScope": ["evidence/regression-r2/**"], "depends": ["V-03", "V-04", "V-05", "V-07", "V-12"], "acceptance": "7 锚点未有意更新者不变；有意更新者留旧值+新值+触发 ID+命令；functional_test 109/0；uat 40 链 pass 不下降；app.db 不变", "verify": "regression_preflight preflight/verify + 锚点比对"},
+  {"id": "V-15", "batch": "B4", "owner": "测试自动化工程师", "kind": "implementation", "inScope": ["harness/w1_p01_probe.py", "harness/w2w3_uatdiff.py"], "depends": [], "acceptance": "修复前树改钉显式提交号（不依赖移动 HEAD）；负向对照恢复可复现；只改这两处不改判据口径", "verify": "两脚本双跑 + 与 functional_test 结果一致性"},
+  {"id": "V-16", "batch": "B5", "owner": "测试流程优化工程师", "kind": "work", "inScope": ["test-reports-2026-10/6x-第2轮改进报告（定稿）.md"], "depends": ["V-14"], "acceptance": "数字带三要素；已补/仍缺/新发现/工程化建议（含 A-63 第二步晋升条件与判据）；与第一轮 07 前后对照", "verify": "数字复算抽查 + t6_ledger_check.py"},
+  {"id": "V-17", "batch": "B5", "owner": "高级项目经理", "kind": "work", "inScope": ["收口报告", "阶段C移交计划"], "depends": ["V-16"], "acceptance": "改动面/指纹/回滚命令；不变量复核（真库 SHA256、零 schema）；未覆盖项清单完整", "verify": "回滚命令只读推演 + 指纹复核"}
+ ],
+ "minimal_deliverable_set": {
+  "must": ["B0", "V-01", "V-04", "V-14"],
+  "second_cut": ["V-02", "V-03"],
+  "third_cut": ["V-06", "V-07", "V-05"],
+  "last_cut": ["V-13", "V-12"],
+  "last_cut_scope": "V-13 只砍 TL-06/TL-07（TL-05 保留）；V-12 只砍链 B/C 缺口（链 A 不砍）",
+  "never_cut": ["锚点比对", "真库指纹复核(R-1)", "blocked 显式登记", "链 A"]
+ },
+ "blocked_register": [
+  {"id": "BL-1", "item": "前端/浏览器行为（含 CSRF SameSite 真行为、页面可用性）", "state": "blocked", "reason": "本机无浏览器自动化；tests/ 下 0 个 .py", "owner_wave": "阶段B"},
+  {"id": "BL-2", "item": "多进程 / 反代 / PG 主从 / pg_dump", "state": "blocked", "reason": "docker/pg_dump/psql 不在 PATH", "owner_wave": "阶段B"},
+  {"id": "BL-3", "item": "Jenkinsfile 的 Groovy 真解析", "state": "blocked", "reason": "本机无 JVM", "owner_wave": "阶段B"},
+  {"id": "BL-4", "item": "构建层阻塞（Jenkins error() 晋升 / GitHub needs: gate）", "state": "blocked", "reason": "A-63 第二步未做，captain 独占", "owner_wave": "阶段C"},
+  {"id": "BL-5", "item": "C-07 的实现（应用级硬闸落点 app/__init__.py:156-224）", "state": "blocked", "reason": "阶段A 生产面 tree c8f7d4ab… 冻结；本轮只交规格+判据", "owner_wave": "阶段C"},
+  {"id": "BL-6", "item": "C-08 导出零残留轨二（OS-temp 类）", "state": "blocked", "reason": "需非沙箱环境", "owner_wave": "阶段B"},
+  {"id": "BL-7", "item": "mkdtemp 目录回收（G-11）", "state": "blocked", "reason": "沙箱禁止 0o700 目录写入", "owner_wave": "阶段B"},
+  {"id": "BL-8", "item": "AC-19 / AC-48…53 / AC-29e / 多工件件数合计口径 / AC-52 审计回滚守恒", "state": "not_covered", "reason": "口径未定", "owner_wave": "阶段B（C-11 只登记不判）"},
+  {"id": "BL-9", "item": "verify_t4 的 44 条复核层", "state": "not_covered", "reason": "非产品断言", "owner_wave": "不计入通过数"},
+  {"id": "BL-10", "item": "AC ↔ 门禁编码映射（AC 载体指数 23/78 的覆盖率用法）", "state": "not_covered", "reason": "本轮未做；不得当覆盖率分子（A-73）", "owner_wave": "阶段B"},
+  {"id": "BL-11", "item": "REQ-F-01/F-03/E-07/E-08 的状态列回填", "state": "asset_defect", "reason": "产品修复已在位（w2w3_probe AC-13-a/AC-18-a 全绿），G 是状态列未回填而非产品未修", "owner_wave": "阶段C"},
+  {"id": "BL-12", "item": "fixtures.py:179 固定编号 _hvRAW{i+1}（T-04）", "state": "asset_defect", "reason": "已知残留，不因 C-10 HIT 而消失", "owner_wave": "阶段C"},
+  {"id": "BL-13", "item": "P-09/P-12 的 W4 残留面", "state": "not_covered", "reason": "属阶段A W0-W5 面，单列 out_of_scope", "owner_wave": "阶段C"},
+  {"id": "BL-14", "item": "为复现结论重跑 evidence/**", "state": "blocked", "reason": "A-40 禁止；复跑走 --out <run>/ + regression_preflight", "owner_wave": "持续"}
+ ],
+ "invariants": {
+  "measured_at": "2026-10-07（r2t7-masterplan）",
+  "git_head": "435dfc77d469477967f4481e6e2695b2bedabc78（移动值，不是基线）",
+  "app_tree_sha1": "c8f7d4abca1567b6219dbd77f22c82722f877ad6",
+  "production_diff_empty": true,
+  "production_diff_cmd": "git diff --stat 7e0a995..HEAD -- app scripts Jenkinsfile .github requirements.txt templates",
+  "real_db": {"bytes": 2531328, "sha256": "F5DA2306BC31CBAB098AAD3774016D320A9B9AA3546F93418196AE9900E0F065", "matches_pinned": true},
+  "tracked_modified": ["test-reports-2026-10/harness/ci_gates.py", "test-reports-2026-10/harness/w4_http_contract.py"],
+  "anthropic_anchor_count": 7,
+  "anchor_match": "7/7"
+ },
+ "input_fingerprints": {
+  "measured_at": "2026-10-07（bytes / Python splitlines 行数 / SHA256）",
+  "items": [
+   {"label": "t1 对账主文档", "path": "test-reports-2026-10/27-38条对账与阶段A终态冻结.md", "owner": "t1", "bytes": 50996, "lines": 456, "self_report": "一致"},
+   {"label": "t1 机读 manifest", "path": "test-reports-2026-10/27-38条对账与阶段A终态冻结.manifest.json", "owner": "t1", "bytes": 161607, "lines": 4394, "self_report": "counts 复算一致"},
+   {"label": "纪律书", "path": "test-reports-2026-10/28-第2轮执行纪律.md", "owner": "captain", "bytes": 7745, "lines": 134, "self_report": "一致"},
+   {"label": "事实底盘", "path": "test-reports-2026-10/29-第2轮事实底盘.md", "owner": "captain", "bytes": 9868, "lines": 125},
+   {"label": "方案初稿", "path": "test-reports-2026-10/30-第2轮测试方案.md", "owner": "captain", "bytes": 9645, "lines": 139},
+   {"label": "建队计划", "path": "test-reports-2026-10/31-第2轮实测队建队计划.md", "owner": "captain", "bytes": 9247, "lines": 137},
+   {"label": "改进报告", "path": "test-reports-2026-10/32-第2轮改进报告.md", "owner": "captain", "bytes": 11607, "lines": 174},
+   {"label": "t3 优先级", "path": "test-reports-2026-10/33-剩余项优先级与覆盖对账.md", "owner": "t3", "bytes": 25618, "lines": 327, "self_report": "bytes 一致"},
+   {"label": "t3 manifest", "path": "test-reports-2026-10/33-剩余项优先级与覆盖对账.manifest.json", "owner": "t3", "bytes": 26422, "lines": 1201, "self_report": "一致"},
+   {"label": "t4 业务判据", "path": "test-reports-2026-10/33-剩余项业务验收判据.md", "owner": "t4", "bytes": 33460, "lines": 222, "sha256": "B346C01E56B6C36BAEE81460D27D5FB8D1FDDD42C1C3E9B84BC57EF778F1A6B3", "self_report": "DRIFT: 自述 514C781A…（等长内容变更）"},
+   {"label": "t2 分层与判据契约", "path": "test-reports-2026-10/34-第2轮分层策略与判据契约.md", "owner": "t2", "bytes": 64258, "lines": 572, "sha256": "55A3BB55A0BC9AB0CB77D185B184267201F05E888905C80F1434BDAC19EE46F4", "self_report": "一致（初版 ECDA9FEE…/58717/556 已被补充说明取代）"},
+   {"label": "t6 runbook", "path": "test-reports-2026-10/40-第2轮实测Runbook与台账规范.md", "owner": "t6", "bytes": 54360, "lines": 663, "sha256": "968ABFAE364E7308DF2DBFBE7C5BD9364D52E2F8A3A619316A68C7E5F8CA0383", "self_report": "DRIFT: 自述 54074 B（行数一致）"},
+   {"label": "t6 台账模板", "path": "test-reports-2026-10/40-第2轮实测台账模板.json", "owner": "t6", "bytes": 6355, "lines": 159, "self_report": "一致"},
+   {"label": "t6 归档索引", "path": "test-reports-2026-10/50-第2轮证据归档索引.md", "owner": "t6", "bytes": 9340, "lines": 132, "self_report": "一致"},
+   {"label": "t5 裁定（人读/机读）", "path": "test-reports-2026-10/t5-工具链评估与三接入位裁定.md|.json", "owner": "t5", "bytes": 22590, "lines": 286},
+   {"label": "t6 台账校验器", "path": "test-reports-2026-10/harness/t6_ledger_check.py", "owner": "t6", "bytes": 11691, "lines": 268, "self_report": "一致"},
+   {"label": "t6 证据通道探针", "path": "test-reports-2026-10/harness/t6_runbook_selftest.py", "owner": "t6", "bytes": 3244, "lines": 73, "self_report": "一致"}
+  ],
+  "drifts": [
+   {"id": "N-1a", "path": "test-reports-2026-10/33-剩余项业务验收判据.md", "field": "sha256", "claimed": "514C781A36E51BD44731853BD6A50EE384597689FF6A3811D4E2D169BECB7FF9", "measured": "B346C01E56B6C36BAEE81460D27D5FB8D1FDDD42C1C3E9B84BC57EF778F1A6B3", "form": "等长内容变更（bytes/行数检查失效，只有哈希能发现）"},
+   {"id": "N-1b", "path": "test-reports-2026-10/40-第2轮实测Runbook与台账规范.md", "field": "bytes", "claimed": 54074, "measured": 54360, "form": "末次写入晚于作者末次自测（行数一致 663）"}
+  ]
+ },
+ "new_findings_t7": [
+  {"id": "N-1", "title": "自述指纹与实物不符 2 处（本战役第 7 类事故）", "impact": "定稿与后续引用一律以实测值为准 + 带测量时点；建议指纹由第三方在写完之后实算（40 §5.3 S-2）"},
+  {"id": "N-2", "title": "ci_gates.py 在定稿测量时点处于 t8 在途修改（29680 B/492 行 -> 30494 B/504 行）", "impact": "「11 步」口径已过时（实测 14 步）；引用 ci_gates 结论必须带「步骤数 + SHA256 + 时点」"},
+  {"id": "N-3", "title": "独立复现横切阻塞 T5-B1（Jenkinsfile 生效 error() = 0 行；GitHub :19 continue-on-error + :57 无 needs: gate）", "impact": "支持 A-85④：三接入位当前只到 ci_gates 层，构建层阻塞 = blocked"},
+  {"id": "N-4", "title": "「层记账 19/去重 16」与「剩余项 17/out_of_scope 2」是两套分母", "impact": "必须在总方案并列且标口径，否则再出现第 7 次计数漂移"}
+ ],
+ "rulings_t7": [
+  {"id": "t7-裁定-1", "content": "批次结构（含 B1 前置性）优先于 t3 rank；rank 用于同批内排序与资源争抢取舍", "basis": "B1 不改生产代码且是其余一切工作的执法网（t2 §5.1 P0 定义）"},
+  {"id": "t7-裁定-2", "content": "「剩余项」分母统一为 17（in-scope）+ 2（out_of_scope）；补齐分母 19；总数 38。三种口径并列、禁止互替", "basis": "27 manifest counts + 33(t3) K-1 + A-87"},
+  {"id": "t7-裁定-3", "content": "33- 前缀非真撞号（A-87），维持双文件现状；引用写完整文件名；实测阶段任务号用 V-01…V-17 不复用 t1…t10", "basis": "A-87 + 避免与规划队任务号混淆"},
+  {"id": "t7-裁定-4", "content": "引用 ci_gates 结论必须带「步骤数 + 文件 SHA256 + 测量时点」；「11 步」只能作为阶段A 基线引用", "basis": "N-2（t8 在途）"},
+  {"id": "t7-裁定-5", "content": "TL-01/02/04 的验收在 A-63 第二步完成前只能在 ci_gates 层成立；构建层阻塞登记 blocked，不得折算 pass", "basis": "T5-B1 + A-85④ + M0′-e"}
+ ],
+ "evidence": {
+  "authoritative_run_id": "r2t7-masterplan-final",
+  "dir": "test-reports-2026-10/evidence/harness/r2t7-masterplan-final/",
+  "files": ["t7-masterplan-check.txt", "t7-inputs.json", "evidence_journal.jsonl"],
+  "interim_run_id": "r2t7-masterplan",
+  "interim_note": "定稿过程中的中间一代（guard 改名保留，未覆盖）；判定顺序只认 evidence_journal.jsonl",
+  "probe": "test-reports-2026-10/harness/t7_masterplan_check.py",
+  "probe_modes": ["默认（输入对拍+不变量+执法面直读）", "--check-manifest <manifest>（自洽+实物对拍）", "--no-archive"]
+ },
+ "self_check": {
+  "assertions": [
+   {"name": "38 = 19 + 7 + 12 + 0", "ok": true},
+   {"name": "19 = 12 + 7", "ok": true},
+   {"name": "17 = 11 + 6", "ok": true},
+   {"name": "层记账 L1+L3+L4+L5+L6 = 19 且去重 16（跨层 3）", "ok": true},
+   {"name": "rank 集合 = W6 11 + W7 6（17 条唯一）且 P0 9/P1 7/P2 1", "ok": true},
+   {"name": "任务 V-01..V-17 唯一、每任务 inScope 非空、依赖指向存在任务", "ok": true},
+   {"name": "blocked 登记非空且每条含 reason 与 owner_wave", "ok": true},
+   {"name": "7 个回归锚点 7/7 MATCH", "ok": true},
+   {"name": "生产面 diff 为空且 HEAD:app = c8f7d4ab…", "ok": true},
+   {"name": "真实库 SHA256 = 钉值", "ok": true}
+  ]
+ }
+}
