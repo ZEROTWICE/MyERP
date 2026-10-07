@@ -36,3 +36,7 @@ tmp_p01/
 *.bak
 *.new
 *.backup
+
+# ---- 测试战役产出（E-04：CI 需要 harness 与规格文档，故跟踪；大数据与运行时产物不跟踪）----
+/test-reports-2026-10/.tmp/
+/test-reports-2026-10/evidence/

@@ -1,0 +1,225 @@
+{
+  "manifest": "t1-phase1-freeze",
+  "team": "myerp-test-exec",
+  "task": "t1",
+  "attempt_id": "b49a49d8-6c6b-48ca-bc7f-c1fb37928c0e",
+  "produced_by": "后端架构师",
+  "produced_at_local": "2026-10-06",
+  "workspace": "D:\\workspace\\wage_management_system - bak",
+  "git_head": "f60a54d07cfea3aa7c21111a7efa70c267b4b1c2",
+  "readonly_statement": "未修改任何生产代码/模板/配置/scripts 既有脚本；未改写 docs/ 树内任何文件；库访问一律 mode=ro URI 或 make_app() 副本",
+  "real_db": {
+    "path": "app.db",
+    "bytes": 2531328,
+    "sha256": "F5DA2306BC31CBAB098AAD3774016D320A9B9AA3546F93418196AE9900E0F065",
+    "checked_before": "F5DA2306BC31CBAB098AAD3774016D320A9B9AA3546F93418196AE9900E0F065",
+    "checked_after": "F5DA2306BC31CBAB098AAD3774016D320A9B9AA3546F93418196AE9900E0F065",
+    "unchanged": true
+  },
+  "line_count_convention": "total = 以 \\n 分隔的段数（含空行、尾换行不计为一行）；nonempty = 含非空白字符的行数",
+  "authoritative": [
+    {"id": "01", "file": "01-基线事实清单.md", "source": "docs/test-reports/2026-10/01-基线事实清单.md", "bytes": 70564, "total_lines": 812, "nonempty_lines": 618, "sha256": "F2C3EBD1A12080C8DFADBFAB72F9754E2B4FF7B0D16854B78B23ACC19FEBE4E7"},
+    {"id": "02", "file": "02-测试分层策略与通过判据.md", "source": "docs/test-reports/2026-10/02-测试分层策略与通过判据.md", "bytes": 46415, "total_lines": 539, "nonempty_lines": 423, "sha256": "F5EF9EB9357A593E5BF4F3250FB6325D4E6C56F885C4FD05AB8F57974DEF3564"},
+    {"id": "03", "file": "03-需求追溯矩阵.md", "source": "docs/test-reports/2026-10/03-需求追溯矩阵.md", "bytes": 81748, "total_lines": 744, "nonempty_lines": 598, "sha256": "9EA5D1501867A6588C9ED003A9BE8D97BCB6436A60551CA95EE4D739522DA365"},
+    {"id": "04", "file": "04-业务验收标准与端到端判据.md", "source": "docs/test-reports/2026-10/04-业务验收标准与端到端判据.md", "bytes": 45631, "total_lines": 425, "nonempty_lines": 344, "sha256": "176454F20D61CC3A7090F841B17FB0569838372B396653DEBDF8C700B073C009"},
+    {"id": "05", "file": "05-验证目标与风险登记册.md", "source": "docs/test-reports/2026-10/05-验证目标与风险登记册.md", "bytes": 59259, "total_lines": 449, "nonempty_lines": 363, "sha256": "0E649D190ACFB0437C70A642262B3EB05FA3EC9F18542C755672046C373D6499"},
+    {"id": "06", "file": "06-测试工具链评估.md", "source": "docs/test-reports/2026-10/06-测试工具链评估.md", "bytes": 53732, "total_lines": 453, "nonempty_lines": 348, "sha256": "CCEAAAEEA7D163262865F6F471A688385A65DF6E061DAFFD79B95E09A6426DFE"},
+    {"id": "07", "file": "07-实测Runbook与台账规范.md", "source": "docs/test-reports/2026-10/07-实测Runbook与台账规范.md", "bytes": 53118, "total_lines": 650, "nonempty_lines": 507, "sha256": "3B351A2BE8FFFA2E4D800FFD60204C9AC1DE8F9EC98A1D87F67CFFB71FE0EEBF"},
+    {"id": "08", "file": "08-测试总方案.md", "source": "test-reports-2026-10/08-测试总方案.md", "bytes": 51637, "total_lines": 595, "nonempty_lines": 459, "sha256": "8ABC0ABAE28958BE00CE714A5F644831D71C4E55B2AEE07044A0BA410FED0805"},
+    {"id": "00", "file": "00-编号登记册与权威说明.md", "source": "test-reports-2026-10/00-编号登记册与权威说明.md", "bytes": 20110, "total_lines": 138, "nonempty_lines": 110, "sha256": "BE411EBD36AB0AEB4B664FB3281FEB1936C213386BE79AE733F69BA5E7A63277", "note": "冻结期内被 captain 追加（112→138 行）；早期 112 行版不得引用"},
+    {"id": "EV-t7", "file": "_evidence/00-run-manifest.json", "source": "docs/test-reports/2026-10/_evidence/2026-10-06-t7/00-run-manifest.json", "bytes": 18952, "total_lines": 336, "nonempty_lines": 336, "sha256": "480EF18E19606897D3153C9CE94FA6D19E41FEC6EEE27568A57C01C6460885C3"}
+  ],
+  "superseded_must_not_cite": [
+    {"id": "SUP-02a", "file": "02-业务验收标准与端到端判据.md", "source": "docs/test-reports/2026-10/02-业务验收标准与端到端判据.md", "bytes": 45832, "total_lines": 432, "nonempty_lines": 348, "sha256": "81C724F903DCD28A773111241184E4EBC21FC6698E873D7292568837C51D5609", "replaced_by": "04-业务验收标准与端到端判据.md"},
+    {"id": "SUP-02b", "file": "02-测试工具链能力评估与差距矩阵.md", "source": "docs/test-reports/2026-10/02-测试工具链能力评估与差距矩阵.md", "bytes": 47017, "total_lines": 372, "nonempty_lines": 297, "sha256": "B45A0681882B3C0D2966E40C29B5FCEF8D8A902F595620A31D94C9F4B5B78172", "replaced_by": "06-测试工具链评估.md"},
+    {"id": "SUP-03", "file": "03-验证目标与风险登记.md", "source": "docs/test-reports/2026-10/03-验证目标与风险登记.md", "bytes": 901, "total_lines": 11, "nonempty_lines": 10, "sha256": "0D35254597B896F356BCCF6F87F9C5905B177CC99D0781E47D49B83887FCD3AC", "replaced_by": "05-验证目标与风险登记册.md"}
+  ],
+  "snapshot": {
+    "dir": "test-reports-2026-10/phase1-snapshot/",
+    "files": 13,
+    "all_source_equals_snapshot": true,
+    "verification": "逐文件 Get-FileHash 源/快照比对，SHA256 与字节数全部 MATCH=True"
+  },
+  "authority_order": [
+    "00-编号登记册与权威说明.md（冻结版 138 行）+ 本冻结清单",
+    "01-基线事实清单.md（数字，经本清单逐项复核；X-13 与「45 张」已被推翻）",
+    "04-业务验收标准与端到端判据.md（业务语义）",
+    "03-需求追溯矩阵.md §1 + §11.4（覆盖事实）",
+    "02 / 05 / 06 / 07 / 08（分层、风险、工具链、Runbook、总方案）"
+  ],
+  "frozen_facts": {
+    "templates_html": 87,
+    "capabilities_declared_AST": 44,
+    "capabilities_used_in_templates": 40,
+    "capabilities_used_on_routes": 44,
+    "capabilities_regex_variant_documented_as": 43,
+    "roles": 7,
+    "role_landing_endpoints": 5,
+    "routes_total_rules": 271,
+    "routes_get_no_arg": 104,
+    "routes_get_with_arg": 56,
+    "routes_non_get": 110,
+    "routes_static": 1,
+    "routes_dup_method_path": 0,
+    "method_level_total": 316,
+    "method_level_GET": 161,
+    "method_level_POST": 123,
+    "method_level_DELETE": 20,
+    "method_level_PUT": 12,
+    "non_get_method_level": 155,
+    "literal_api_path_rules": 52,
+    "model_classes": 74,
+    "db_tables_incl_alembic_version": 75,
+    "db_metadata_tables": 74,
+    "ensured_columns_tables": 10,
+    "ensured_columns_columns": 43,
+    "migration_heads": ["p1nonctarget"],
+    "migration_revisions": 35,
+    "db_total_rows_all_tables": 6713,
+    "db_total_rows_business": 6712,
+    "zero_row_tables": 49,
+    "nonzero_tables": 26,
+    "check_db_bootstrap": "64 accounts / 6712 rows / 0 tables skipped",
+    "functional_test": "109 passed / 0 failed",
+    "smoke_test": "148 GET x 8 identities = 1184 requests; no 5xx/exception/redirect-loop (stdout); exit=1 due to write denial",
+    "permission_matrix": "anonymous-accessible = 0; views without capability check = 5; exit=1 due to write denial; run() unconditionally return 0",
+    "views_without_login_required": 0,
+    "views_login_but_no_require_capability": 8,
+    "ac_count": 78,
+    "req_count": 83,
+    "tc_count": 49,
+    "gap_count": 45,
+    "gap_p0_effective": 29,
+    "orph_count": 4,
+    "routes_py_lines_splitlines": 12127,
+    "routes_py_newline_count": 12126,
+    "app_db_sha256": "F5DA2306BC31CBAB098AAD3774016D320A9B9AA3546F93418196AE9900E0F065"
+  },
+  "gate_runs": [
+    {"script": "scripts/check_templates.py", "mode": "native", "exit": 0, "key_output": "parsed 87 files / 44 declared / 40 used in templates / 44 used on routes / landing 5 / RESULT: OK"},
+    {"script": "scripts/check_migration_heads.py", "mode": "native", "exit": 0, "key_output": "HEADS=['p1nonctarget'] / head_count=1 revisions=35"},
+    {"script": "scripts/check_properties.py", "mode": "native", "exit": 0, "key_output": "scanned 23 files, model classes 74 / RESULT: OK"},
+    {"script": "scripts/route_inventory.py", "mode": "native", "exit": 1, "key_output": "PermissionError on shutil.copy2 to 0o700 mkdtemp dir (confirms register A-1)"},
+    {"script": "scripts/route_inventory.py", "mode": "shim", "exit": 0, "key_output": "total rules=271 / duplicate=0 / GET no-arg=104 GET with-arg=56 non-GET=110"},
+    {"script": "scripts/check_db_bootstrap.py", "mode": "shim", "exit": 0, "key_output": "64 accounts / 6712 rows / 0 tables skipped"},
+    {"script": "scripts/functional_test.py", "mode": "shim", "exit": 0, "key_output": "109 passed / 0 failed"},
+    {"script": "scripts/smoke_test.py", "mode": "shim", "exit": 1, "key_output": "148 GET x 8 identities; no 5xx/exception; PermissionError writing ../_smoke_results.json (pre-existing file); conclusion section complete in stdout"},
+    {"script": "scripts/permission_matrix.py", "mode": "shim", "exit": 1, "key_output": "anonymous-accessible=0; 5 views without capability check; PermissionError writing ../_permission_matrix.json; run() has no failure exit (line 132 return 0)"}
+  ],
+  "root_json_untouched": {
+    "_smoke_results.json": {"sha256": "D301835F077D2EDFFCB5DA4469C87A23C594D1E9EC75010594C3A812466A9762", "bytes": 135512, "unchanged_by_probes": true},
+    "_permission_matrix.json": {"sha256": "999A01209A8A56BBE7CF1FB5842FE4991762A91683DF97621650B11068B67C19", "bytes": 33679, "unchanged_by_probes": true}
+  },
+  "post_freeze_reconciliation": {
+    "recorded_at_local": "2026-10-06",
+    "recorded_by": "后端架构师",
+    "nature": "append-only 说明；不改变本清单任何既有数字与结论，未新增任何快照",
+    "captain_ruling": "00-编号登记册与权威说明.md 的冻结版（138 行 / 20110 B / SHA256 BE411EBD36AB0AEB…）此后不再修改；A-23 起的新增裁定迁出至 test-reports-2026-10/00b-裁定与纪律增补.md，并以该文件为现行有效口径",
+    "current_00_on_disk": {
+      "bytes": 20835,
+      "sha256": "FC2D95E8B683A13B3343AEF1CB44564BFE2ECFC4308864546D3630C9A5A38AB0",
+      "status": "已被 captain 追加 A-23（冻结失效的已知例外）；01 清单 §1.1/§1.2 与 phase1-snapshot/ 的完整 SHA256 锁表仍可作为 provenance 证据使用"
+    },
+    "snapshot_00_status": {
+      "path": "test-reports-2026-10/phase1-snapshot/00-编号登记册与权威说明.md",
+      "bytes": 20110,
+      "sha256": "BE411EBD36AB0AEB4B664FB3281FEB1936C213386BE79AE733F69BA5E7A63277",
+      "status": "自洽的冻结版快照；不作为内容权威（内容权威见 00b）",
+      "use_rule_for_stage2": "引用 00-系列口径时以 test-reports-2026-10/00b-裁定与纪律增补.md 为准（含 A-23 行数工具口径、A-24 D-2/D-3、A-25 GET 160/161、增补纪律 12–14）"
+    },
+    "captain_forced_rulings_adopted": {
+      "A-23": "行数权威工具 = Python splitlines()（PowerShell Get-Content 口径视为偏差）；引用行数必须写明工具与口径",
+      "A-24": "D-2（08 §0.2 的 12747 B 不再引用）与 D-3（app/main/sales_routes.py 1 字节，0 路由，全仓 0 引用）登记采纳",
+      "A-25": "方法级 GET 160 vs 161 分歧确认：url_map 重算 = 161，引用必须写明方法并标注分歧"
+    },
+    "verification_by_t1": {
+      "00b_exists": true,
+      "00b_bytes_at_check": 3189,
+      "snapshot_00_unchanged_since_freeze": "20110 B / BE411EBD…A277（与我冻结时记录一致，快照自身未被改动）",
+      "app_db_sha256_recheck": "F5DA2306BC31CBAB098AAD3774016D320A9B9AA3546F93418196AE9900E0F065（未变）"
+    }
+  },
+  "code_evidence_file_line": {
+    "quality_status_only_write": "app/main/routes.py:8899 (item.quality_status = data['quality_status'])",
+    "quality_status_declaration": "app/models.py:1466",
+    "qc_gate_definition": "app/services/mes_service.py:157",
+    "qc_gate_reject_paths": ["mes_service.py:170-175 (quality_status fail/pending/scrapped)", "mes_service.py:184-191 (unfinished inspection task)", "mes_service.py:192-197 (open NC record)"],
+    "qc_gate_call_site_missing_production_record": "app/services/mes_service.py:326 — qc_gate_allows_output(batch_item=item, workpieces=workpieces)",
+    "apply_inspection_result_early_return": "app/services/mes_service.py:421-422 (workpiece is None -> return)",
+    "nc_construct_workpiece_bound": "app/services/mes_service.py:454-466",
+    "shippable_stock_kinds": "app/services/mes_service.py:1080 = ('fg','wip_part'); used at :1150 and :1230",
+    "stock_filter_by_kind": "app/main/stock.py:20",
+    "request_script_write_sites": ["scripts/smoke_test.py:186", "scripts/permission_matrix.py:129"],
+    "request_script_failure_exits": {"smoke_test.py:190": "return 1 if errors else 0", "permission_matrix.py:132": "return 0 (unconditional)", "route_inventory.py:38": "return 0 (unconditional)"},
+    "csrf_disabled_in_tests": "scripts/_test_bootstrap.py:36 app.config['WTF_CSRF_ENABLED'] = False",
+    "copy_db_isolation_guard": "scripts/_test_bootstrap.py:41"
+  },
+  "environment_fingerprint": {
+    "interpreter": "F:\\Miniconda\\envs\\wage\\python.exe",
+    "python_version": "3.9.21",
+    "flask_version_in_venue": "3.1.2",
+    "import_flask": "OK",
+    "import_sqlalchemy": "OK",
+    "import_pytest": "FAIL ModuleNotFoundError",
+    "requirements_has_pytest": false,
+    "locale_getpreferredencoding": "cp936",
+    "tests_dir_py_files": 0
+  },
+  "drift_found": [
+    {"id": "D-1", "item": "00-编号登记册与权威说明.md", "from": "17190 B / 112 lines / 91EC0B7DC97B4F261E3AAAC56A30E30484EC8F4F5C825EDAA3586C48D881DD47", "to": "20110 B / 138 lines / BE411EBD36AB0AEB4B664FB3281FEB1936C213386BE79AE733F69BA5E7A63277", "ruling": "以 138 行版为冻结版"},
+    {"id": "D-2", "item": "08 §0.2 记录 00 为 12747 B", "ruling": "已过期，以本清单为准"},
+    {"id": "D-3", "item": "app/main/sales_routes.py", "value": "1 byte (single space)", "ruling": "只登记，不改动；可作 O 域（仓库卫生）证据"}
+  ],
+  "overturned_or_refined_claims": [
+    {"id": "R-1", "claim": "01 X-13: route_inventory 原生 exit 0", "ruling": "推翻：原生 exit 1（PermissionError），须加 shim", "evidence": "evidence/t1-gates-native.txt"},
+    {"id": "R-2", "claim": "01 §3.6: 零行表 45 张", "ruling": "改为 49 张", "evidence": "evidence/t1-verify-claims.out.txt"},
+    {"id": "R-3", "claim": "01 G-2: quality_status 无自动写入点 ⇒ 判失败后反而放行", "ruling": "前半成立；后半精确化为「门禁有多重拒绝路径，但报工路径缺少触发拒绝的数据」", "evidence": "mes_service.py:326/421-422/454-466"},
+    {"id": "R-13", "claim": "能力 43（正则）/44（AST）", "ruling": "须标口径：44 登记 / 40 模板使用 / 44 路由使用；43 为正则变体口径"},
+    {"id": "R-14", "claim": "方法级 GET 160", "ruling": "本清单 url_map 重算 161；非 GET 155 两法一致"},
+    {"id": "R-17", "claim": "08 §5.4 Jenkinsfile 降级 UNSTABLE", "ruling": "本轮未复核，引用须标注未复核"}
+  ],
+  "phase2_prerequisites_registered": [
+    {"id": "A-4", "text": "发货链必须先注入 stock_kind='fg' 行，否则候选为空是夹具缺陷"},
+    {"id": "A-10", "text": "料账夹具须放大到 >=5 行 / quantity >= 5，否则扣料判据零信息量"},
+    {"id": "A-14", "text": "子进程输出编码陷阱：GBK/UTF-8 静默乱码，evidence_level 须区分原文可信/可能乱码"},
+    {"id": "A-16", "text": "三条不可换序依赖：GAP-01 → 一切；GAP-14 → GAP-15；GAP-02 → D/E/F 端到端用例"},
+    {"id": "A-7", "text": "解释器一律绝对路径 F:\\Miniconda\\envs\\wage\\python.exe"},
+    {"id": "A-11", "text": "mkdtemp 必须经 scripts/_sandbox_compat.py；写盘判据是目标文件是否已存在"},
+    {"id": "A-15/A-20", "text": "严口径可信覆盖 ~12 条(14%)；F 域 0 条完整覆盖；无 AC 覆盖需求 8 条（B-07 提到 P0 首位）"}
+  ],
+  "not_done": [
+    "未重跑 check_trace_matrix.py（AC/REQ/TC/GAP 计数取自 03/08）",
+    "未逐条复核 05 的 V/R/F/C 四表",
+    "未复核 Jenkinsfile / PG 侧 / flask db 行为",
+    "未做任何代码修复（GAP-01 / permission_matrix 失败出口 / quality_status 回写 / 夹具族均属阶段二范围）"
+  ],
+  "t1_artifacts": {
+    "freeze_doc": {
+      "path": "test-reports-2026-10/01-阶段一产出冻结清单.md",
+      "bytes": 27586,
+      "total_lines": 231,
+      "nonempty_lines": 181,
+      "sha256": "68FAE22788BA1D3B0FEA6FBAC1887027A63F9704EF55F14EB4C717F79D0EBE82"
+    },
+    "snapshot_dir": "test-reports-2026-10/phase1-snapshot/",
+    "manifest": "test-reports-2026-10/01-阶段一产出冻结清单.manifest.json"
+  },
+  "evidence_files": [
+    "evidence/t1-gates-native.txt",
+    "evidence/t1-gates-shim.txt",
+    "evidence/t1-verify-claims.py",
+    "evidence/t1-verify-claims.out.txt",
+    "evidence/t1-verify-counts.py",
+    "evidence/t1-verify-counts.out.txt",
+    "evidence/t1-verify-routes.py",
+    "evidence/t1-verify-routes.out.txt",
+    "evidence/t1-misc.py",
+    "evidence/t1-misc.out.txt",
+    "evidence/t1-misc2.py",
+    "evidence/t1-misc2.out.txt",
+    "evidence/t1-cap43.py",
+    "evidence/t1-cap43.out.txt",
+    "evidence/t1-roles.py",
+    "evidence/t1-roles.out.txt"
+  ]
+}
