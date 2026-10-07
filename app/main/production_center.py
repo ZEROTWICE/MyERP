@@ -5,12 +5,19 @@ from app.permissions import require_capability
 from . import bp
 from sqlalchemy import or_, and_
 from datetime import datetime, date
+from werkzeug.exceptions import HTTPException
 
 from app.models import (
     Product, ProductionOrder, ProductionBatch, ProductionBatchItem,
     TaskAssignment, ProcessPrice, Employee, ProductionRecord, ProductionRecordMaterial,
     SerialNumber, AuditLog
 )
+
+
+def _reraise_http(exc):
+    """W4/P-09：HTTPException（404/415…）不得被 `except Exception` 吞成 500/200。"""
+    if isinstance(exc, HTTPException):
+        raise
 
 
 @bp.route('/production_center', methods=['GET'])
@@ -162,9 +169,11 @@ def api_create_instances():
             }
         })
     except Exception as e:
+        # W4/P-09：HTTPException（404/415）按语义出口，不得吞成 500/200
+        _reraise_http(e)
         db.session.rollback()
-        current_app.logger.error(f'创建生产中心实例失败: {str(e)}')
-        return jsonify({'success': False, 'message': f'创建失败：{str(e)}'}), 500
+        current_app.logger.error(f'创建生产中心实例失败：{str(e)}')
+        return jsonify({'success': False, 'message': '创建失败，请稍后重试或联系管理员'}), 500
 
 
 @bp.route('/api/production_center/items/<int:item_id>/tech_decomposition', methods=['POST'])
@@ -210,9 +219,11 @@ def api_save_tech_decomposition(item_id: int):
 
         return jsonify({'success': True, 'message': '保存成功'})
     except Exception as e:
+        # W4/P-09：HTTPException（404/415）按语义出口，不得吞成 500/200
+        _reraise_http(e)
         db.session.rollback()
-        current_app.logger.error(f'保存技术拆解失败: {str(e)}')
-        return jsonify({'success': False, 'message': f'保存失败：{str(e)}'}), 500
+        current_app.logger.error(f'保存技术拆解失败：{str(e)}')
+        return jsonify({'success': False, 'message': '保存失败，请稍后重试或联系管理员'}), 500
 
 
 @bp.route('/api/production_center/items/<int:item_id>/detail', methods=['GET'])
@@ -289,8 +300,10 @@ def api_item_detail(item_id: int):
             }
         })
     except Exception as e:
-        current_app.logger.error(f'获取实例详情失败: {str(e)}')
-        return jsonify({'success': False, 'message': f'获取失败：{str(e)}'}), 500
+        # W4/P-09：HTTPException（404/415）按语义出口，不得吞成 500/200
+        _reraise_http(e)
+        current_app.logger.error(f'获取实例详情失败：{str(e)}')
+        return jsonify({'success': False, 'message': '获取失败，请稍后重试或联系管理员'}), 500
 
 
 @bp.route('/api/production_center/items/<int:item_id>/execute_operation', methods=['POST'])
@@ -377,9 +390,11 @@ def api_execute_operation(item_id: int):
         db.session.commit()
         return jsonify({'success': True, 'message': '记录成功', 'data': {'record_id': prod_record.id}})
     except Exception as e:
+        # W4/P-09：HTTPException（404/415）按语义出口，不得吞成 500/200
+        _reraise_http(e)
         db.session.rollback()
-        current_app.logger.error(f'记录工序执行失败: {str(e)}')
-        return jsonify({'success': False, 'message': f'记录失败：{str(e)}'}), 500
+        current_app.logger.error(f'记录工序执行失败：{str(e)}')
+        return jsonify({'success': False, 'message': '记录失败，请稍后重试或联系管理员'}), 500
 
 
 @bp.route('/api/production/generate-codes', methods=['POST'])
@@ -432,7 +447,7 @@ def generate_batch_product_codes():
         })
     except Exception as e:
         db.session.rollback()
-        current_app.logger.error(f'生成批次产品编码失败: {str(e)}')
-        return jsonify({'success': False, 'message': f'生成失败：{str(e)}'}), 500
+        current_app.logger.error(f'生成批次产品编码失败：{str(e)}')
+        return jsonify({'success': False, 'message': '生成失败，请稍后重试或联系管理员'}), 500
 
 

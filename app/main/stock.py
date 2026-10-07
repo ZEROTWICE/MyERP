@@ -88,12 +88,18 @@ def dispose_nonconformity_api(id):
         action = (data.get('action') or data.get('type') or '').strip()
         proc = data.get('rework_process_id')
         emp = data.get('employee_id')
+        # DEC-2 §2.3/§2.4：返工件数与报废件数是**两个独立可选入参**（`16` §11 补记：不得合并）。
+        # 缺省即各自走默认口径；非法值（0/负数/非整数）由 mes_service 抛 ValueError ⇒ 下方 400。
+        rework_qty = data.get('rework_quantity')
+        scrap_qty = data.get('scrap_quantity')
         mes_service.dispose_nonconformity(
             nc, action,
             notes=data.get('notes') or '',
             scrap_cost=float(data.get('scrap_cost') or 0),
             rework_process_id=int(proc) if proc else None,
             employee_id=int(emp) if emp else None,
+            rework_quantity=int(rework_qty) if rework_qty not in (None, '') else None,
+            scrap_quantity=int(scrap_qty) if scrap_qty not in (None, '') else None,
         )
         db.session.commit()
         target_type, target_id = mes_service.nonconformity_target(nc)

@@ -7,11 +7,11 @@ from flask_login import current_user
 from app import db
 from app.models import (
     AuditLog, Equipment, EquipmentCapability, FinishedProduct, GoodsReceipt, InspectionTemplate,
-    InspectionTask, MaterialAllocation, NonconformityRecord, ProcessPrice, Product, ProductBOM,
-    ProductProcess, ProductionBatch, ProductionBatchItem, ProductionRecord, RawMaterial,
-    RawMaterialCategory, SerialNumber, Shipment, ShipmentItem, SystemConfig, Consumable,
-    ConsumableCategory, TaskAssignment, TaskWorkpiece, User, WorkCenterEquipment, Workpiece,
-    WorkpieceEvent,
+    InspectionTask, InspectionRecord, MaterialAllocation, NonconformityRecord, ProcessPrice,
+    Product, ProductBOM, ProductProcess, ProductionBatch, ProductionBatchItem, ProductionRecord,
+    ProductionRecordMaterial, RawMaterial, RawMaterialCategory, SerialNumber, Shipment,
+    ShipmentItem, SystemConfig, Consumable, ConsumableCategory, TaskAssignment, TaskWorkpiece,
+    User, WorkCenterEquipment, Workpiece, WorkpieceEvent,
 )
 
 
@@ -157,23 +157,21 @@ def batch_item_production_records(batch_item):
 def qc_gate_allows_output(batch_item=None, workpieces=None, production_record=None):
     """报工/批次产出的入库门禁：与 qc_gate_allows 同口径，但没有工件也能判。
 
-    拒绝条件（依据既有 qc_gate_allows / apply_inspection_result 口径）：
-      1. 批次实例已判定不合格（quality_status=fail）或质检未出结果（pending）；
-      2. 关联工件存在未处置的不合格或已报废（复用 workpiece_blocked）；
-      3. 产出对应的生产记录存在未完成的质检任务，或存在未闭环的不合格记录。
+    拒绝顺序（`07b` DEC-1 §1.4，**顺序本身是判据**：A2 拦得住、P1 放得行必须同时成立）：
+
+      1. `quality_status ∈ {fail, failed, rejected}` ⇒ 拒（质检不合格）；
+      2. `status == 'scrapped'` ⇒ 拒（报废终态，优先级高于 `quality_status`）；
+      3. `quality_status ∈ {pending, pending_inspection}` **且确有在办单据** ⇒ 拒（原因含复位动作）；
+      4. `record_ids` 存在在办质检任务 / 未闭环不合格记录 ⇒ 拒（本函数真正的「有单据」拒绝路径）；
+      5. 工件维度未处置不合格 / 未完成质检 ⇒ 拒；
+      6. 以上皆不命中 ⇒ **放行**。
+
+    ⚠ 序 3 是 `07b` DEC-1 §1.4 的**改判点**：`pending` **不再**是无条件拒绝（那正是死锁形态，
+    无自动复位路径 ⇒ 不可逆损失）。只有「确有在办单据」时才拒 —— 判定用的是与序 4 **同一套**
+    `record_ids`（本函数既有口径，不新增列/不改关联约定）。
 
     返回 (allowed, message)。
     """
-    if batch_item is not None:
-        code = batch_item.product_code or f'实例#{batch_item.id}'
-        quality_status = (batch_item.quality_status or '').strip().lower()
-        if quality_status in ('fail', 'failed', 'rejected'):
-            return False, f'实例 {code} 质检不合格，不得入正品库'
-        if quality_status in ('pending', 'pending_inspection'):
-            return False, f'实例 {code} 质检未出结果，不得入正品库'
-        if (batch_item.status or '') == 'scrapped':
-            return False, f'实例 {code} 已报废，不得入正品库'
-
     records = []
     if production_record is not None:
         records.append(production_record)
@@ -181,20 +179,37 @@ def qc_gate_allows_output(batch_item=None, workpieces=None, production_record=No
         records.extend(batch_item_production_records(batch_item))
     record_ids = [r.id for r in records if getattr(r, 'id', None)]
 
+    pending_task = None
+    open_nc = None
     if record_ids:
-        pending = InspectionTask.query.filter(
+        pending_task = InspectionTask.query.filter(
             InspectionTask.target_type == 'production_record',
             InspectionTask.target_id.in_(record_ids),
             InspectionTask.status.in_(['pending', 'in_progress']),
         ).first()
-        if pending is not None:
-            return False, '产出存在未完成的质检任务，不得入正品库'
         open_nc = NonconformityRecord.query.filter(
             NonconformityRecord.record_id.in_(record_ids),
             NonconformityRecord.status.in_(['open', 'pending_approval']),
         ).first()
-        if open_nc is not None:
-            return False, '产出存在未处置的不合格记录，不得入正品库'
+    has_open_documents = pending_task is not None or open_nc is not None
+
+    if batch_item is not None:
+        code = batch_item.product_code or f'实例#{batch_item.id}'
+        quality_status = (batch_item.quality_status or '').strip().lower()
+        if quality_status in ('fail', 'failed', 'rejected'):
+            return False, f'实例 {code} 质检不合格，不得入正品库'
+        if (batch_item.status or '') == 'scrapped':
+            return False, f'实例 {code} 已报废，不得入正品库'
+        if quality_status in ('pending', 'pending_inspection') and has_open_documents:
+            return False, (
+                f'实例 {code} 质检未出结果（存在在办质检任务或未闭环不合格单），不得入正品库；'
+                f'请在质检任务完成后重新报工，或由质检处置入口（/quality/nonconformities）完成处置'
+            )
+
+    if pending_task is not None:
+        return False, '产出存在未完成的质检任务，不得入正品库；请先完成质检任务后重新报工'
+    if open_nc is not None:
+        return False, '产出存在未处置的不合格记录，不得入正品库；请先在质检处置入口完成处置'
 
     for wp in workpieces or ():
         if workpiece_blocked(wp):
@@ -207,8 +222,12 @@ def qc_gate_allows_output(batch_item=None, workpieces=None, production_record=No
     return True, None
 
 
-def inbound_workpiece(workpiece, stock_kind='fg', inspector_name='系统', product=None):
-    """末道通过后入库。stock_kind: fg / wip_part / failed / scrap。"""
+def inbound_workpiece(workpiece, stock_kind='fg', inspector_name='系统', product=None, quantity=1):
+    """末道通过后入库。stock_kind: fg / wip_part / failed / scrap。
+
+    `quantity`：入库件数。默认 1（工件是单件身份，`models.py` 的 `Workpiece` 无数量列）；
+    报废处置时按**本次报废件数**（`07b` DEC-2 §2.4「同步」行：`mes_service.py:225` 原先写死 1）。
+    """
     product = product or (Product.query.get(workpiece.product_id) if workpiece.product_id else None)
     status_map = {
         'fg': 'in_stock',
@@ -216,13 +235,19 @@ def inbound_workpiece(workpiece, stock_kind='fg', inspector_name='系统', produ
         'failed': 'in_stock',
         'scrap': 'scrapped',
     }
+    try:
+        inbox_quantity = float(quantity)
+    except (TypeError, ValueError):
+        inbox_quantity = 1.0
+    if inbox_quantity <= 0:
+        inbox_quantity = 1.0
     fp = FinishedProduct(
         product_number=workpiece.code,
         production_date=date.today(),
         drawing_number=(product.drawing_number if product else '') or '-',
         model=(product.model if product else '') or '-',
         inspector=inspector_name or '系统',
-        quantity=1,
+        quantity=inbox_quantity,
         status=status_map.get(stock_kind, 'in_stock'),
         stock_kind=stock_kind,
         workpiece_id=workpiece.id,
@@ -400,8 +425,320 @@ def inbound_production_output(*, production_order=None, batch=None, batch_item=N
     return fp, None
 
 
+def production_records_of_batch_item(batch_item):
+    """实例的产出记录集：**任务关联**（`global_sn`，报工链主判据）∪ `notes` 软关联（回退）。
+
+    `07b` DEC-1 §1.7 的正更正：报工端点创建的 `ProductionRecord` **不写 notes**
+    （`routes.py:3392-3398`）⇒ 只按 notes 反查会**静默定位失败**。本函数是**读口径**的统一入口；
+    写点仍只有 `apply_inspection_result` 一处（§1.2 禁令 ②）。
+    """
+    if batch_item is None or batch_item.id is None:
+        return []
+    tasks = TaskAssignment.query.filter_by(batch_item_id=batch_item.id).all()
+    sns = {t.global_sn for t in tasks if t.global_sn}
+    out = []
+    if sns:
+        out.extend(ProductionRecord.query.filter(ProductionRecord.global_sn.in_(sns)).all())
+    for rec in batch_item_production_records(batch_item):
+        if all(getattr(rec, 'id', None) != getattr(r, 'id', None) for r in out):
+            out.append(rec)
+    return out
+
+
+def batch_item_for_production_record(production_record):
+    """产出 → 批次实例（`07b` DEC-1 §1.7 的**唯一**口径）。
+
+    主判据：`ProductionRecord.global_sn == TaskAssignment.global_sn` → `TaskAssignment.batch_item_id`；
+    回退：`ProductionRecord.notes` 内的 `{"batch_item_id": N}`（仅 `production_center.execute_operation`
+    写入，属防御性兼容）。两条都未命中 ⇒ `None`（调用方只记 warning 并跳过回写，不抛错、不猜归属）。
+    """
+    if production_record is None or not production_record.global_sn:
+        return None
+    linked_task = TaskAssignment.query.filter_by(global_sn=production_record.global_sn).first()
+    if linked_task is not None:
+        item = task_batch_item(linked_task)
+        if item is not None:
+            return item
+    notes = production_record.notes or ''
+    if '"batch_item_id"' in notes:
+        raw = notes.split('"batch_item_id"', 1)[1]
+        raw = raw.split(':', 1)[1] if ':' in raw else ''
+        digits = ''
+        for ch in raw.strip().lstrip('"'):
+            if ch.isdigit():
+                digits += ch
+            else:
+                break
+        if digits:
+            return ProductionBatchItem.query.get(int(digits))
+    return None
+
+
+def batch_item_for_nonconformity(nc, workpiece=None):
+    """不合格单 → 批次实例（自动复位/字段回写的作用域）。取不到返回 `None`（不猜归属）。"""
+    if nc is None:
+        return None
+    target_type, target_id = nonconformity_target(nc)
+    if target_type == 'production_record' and target_id:
+        pr = ProductionRecord.query.get(target_id)
+        if pr is not None:
+            item = batch_item_for_production_record(pr)
+            if item is not None:
+                return item
+    wp = workpiece
+    if wp is None and nc.workpiece_id:
+        wp = Workpiece.query.get(nc.workpiece_id)
+    if wp is not None:
+        if getattr(wp, 'batch_item_id', None):
+            item = ProductionBatchItem.query.get(wp.batch_item_id)
+            if item is not None:
+                return item
+        for link in TaskWorkpiece.query.filter_by(workpiece_id=wp.id).all():
+            task = TaskAssignment.query.get(link.task_id) if link.task_id else None
+            if task is not None and task.batch_item_id:
+                item = ProductionBatchItem.query.get(task.batch_item_id)
+                if item is not None:
+                    return item
+    return None
+
+
+def _latest_record(records):
+    return max(records, key=lambda r: (r.date or date.min, r.id or 0)) if records else None
+
+
+def production_record_for_nonconformity(nc, workpiece=None):
+    """不合格单的**来源生产记录**（DEC-2 §2.3 返工件数 / §2.4 报废扣料的取值载体）。
+
+    顺序：① 质检记录本身挂在产出上；② 工件所属实例的报工链（任务 `global_sn`）最新一条；
+    ③ 工件的任务-工件链接反查（无 `batch_item_id` 时）；④ 取不到 ⇒ `None`。
+    """
+    if nc is None:
+        return None
+    record = getattr(nc, 'record', None)
+    if record is None and nc.record_id:
+        record = InspectionRecord.query.get(nc.record_id)
+    task = getattr(record, 'task', None) if record is not None else None
+    if task is not None and (task.target_type or '') == 'production_record' and task.target_id:
+        pr = ProductionRecord.query.get(task.target_id)
+        if pr is not None:
+            return pr
+    target_type, target_id = nonconformity_target(nc)
+    if target_type == 'production_record' and target_id:
+        pr = ProductionRecord.query.get(target_id)
+        if pr is not None:
+            return pr
+    wp = workpiece
+    if wp is None and nc.workpiece_id:
+        wp = Workpiece.query.get(nc.workpiece_id)
+    item = None
+    if wp is not None and getattr(wp, 'batch_item_id', None):
+        item = ProductionBatchItem.query.get(wp.batch_item_id)
+    if item is None:
+        item = batch_item_for_nonconformity(nc, workpiece=wp)
+    if item is not None:
+        pr = _latest_record(production_records_of_batch_item(item))
+        if pr is not None:
+            return pr
+    if wp is not None:
+        task_ids = [l.task_id for l in TaskWorkpiece.query.filter_by(workpiece_id=wp.id).all()
+                    if l.task_id]
+        sns = {t.global_sn for t in TaskAssignment.query.filter(
+            TaskAssignment.id.in_(task_ids)).all() if t.global_sn} if task_ids else set()
+        if sns:
+            return _latest_record(ProductionRecord.query.filter(
+                ProductionRecord.global_sn.in_(sns)).all())
+    return None
+
+
+def recompute_production_quality_status(batch_item, production_record=None):
+    """按 `07b` DEC-1 §1.2 四值语义**复算并写** `quality_status`；返回写入值（无结论可判 ⇒ `None`）。
+
+    - `fail`   ：存在 fail 结论且其不合格单**未闭环**；
+    - `pending`：存在在办质检任务 / 未闭环不合格单；
+    - `pass`   ：无在办、无未闭环，且**至少有一条结论**（处置闭环后的复位即走这里）；
+    - 其余（无结论/无任务/无单据）⇒ **不动字段**（保持 `NULL`；RC-4 / AC-18-NEG）。
+    """
+    if batch_item is None:
+        return None
+    records = production_records_of_batch_item(batch_item)
+    if production_record is not None and all(
+            getattr(production_record, 'id', None) != getattr(r, 'id', None) for r in records):
+        records.append(production_record)
+    record_ids = [r.id for r in records if getattr(r, 'id', None)]
+    tasks = []
+    if record_ids:
+        tasks = InspectionTask.query.filter(
+            InspectionTask.target_type == 'production_record',
+            InspectionTask.target_id.in_(record_ids),
+        ).all()
+    task_ids = [t.id for t in tasks if t.id]
+    conclusions = []
+    if task_ids:
+        conclusions = InspectionRecord.query.filter(InspectionRecord.task_id.in_(task_ids)).all()
+    conclusion_ids = [c.id for c in conclusions if c.id]
+    open_nc = None
+    if conclusion_ids:
+        open_nc = NonconformityRecord.query.filter(
+            NonconformityRecord.record_id.in_(conclusion_ids),
+            NonconformityRecord.status.in_(('open', 'pending_approval')),
+        ).first()
+    in_process = any((t.status or '') in ('pending', 'in_progress') for t in tasks)
+    has_fail = any((c.result or '').strip().lower() in ('fail', 'failed', 'rejected')
+                   for c in conclusions)
+    if has_fail and open_nc is not None:
+        value = 'fail'
+    elif in_process or open_nc is not None:
+        value = 'pending'
+    elif conclusions:
+        value = 'pass'
+    else:
+        return None
+    if (batch_item.quality_status or '').strip().lower() != value:
+        batch_item.quality_status = value
+    return value
+
+
+def apply_production_record_result(record, task):
+    """P-02/P-03：产出（`production_record`）维度的质检结论落地。
+
+    `07b` DEC-1 §1.5：定位产出 → fail 时建不合格单 → 复算并写 `quality_status`（含 pass 回写）。
+    返回 `(production_record, batch_item, written_quality_status)`。
+    """
+    production_record = ProductionRecord.query.get(task.target_id) if task.target_id else None
+    if production_record is None:
+        current_app.logger.warning(
+            f'质检结论落地跳过：生产记录 {task.target_id} 不存在（质检记录 {record.id}）')
+        return None, None, None
+    item = batch_item_for_production_record(production_record)
+    if item is None:
+        # RC-7：定位失败不得静默 ⇒ warning + 跳过回写（不抛错、不猜归属）
+        current_app.logger.warning(
+            f'质检结论落地：生产记录 {production_record.id}'
+            f'（global_sn={production_record.global_sn}）定位不到批次实例，'
+            f'跳过 quality_status 回写（DEC-1 §1.7：global_sn 链与 notes 反查均未命中）')
+        return production_record, None, None
+    result = (record.result or '').strip().lower()
+    if result in ('fail', 'failed', 'rejected'):
+        existing = NonconformityRecord.query.filter_by(record_id=record.id).first()
+        if existing is None:
+            db.session.add(NonconformityRecord(
+                record_id=record.id,
+                type='rework',
+                handler_id=getattr(current_user, 'id', None) or default_inspector_id(),
+                handling_date=date.today(),
+                handling_result='待处置',
+                notes='质检不合格，等待返工/报废/让步',
+                status='open',
+                workpiece_id=None,
+                target_type='production_record',
+                target_id=production_record.id,
+            ))
+            db.session.flush()
+        else:
+            current_app.logger.info(
+                f'质检结论落地：质检记录 {record.id} 已有不合格单 {existing.id}，不重复建单')
+    value = recompute_production_quality_status(item, production_record)
+    current_app.logger.info(
+        f'质检结论落地：生产记录 {production_record.id} → 实例 {item.id} quality_status={value}')
+    return production_record, item, value
+
+
+def reset_quality_status_after_disposal(nc):
+    """P-07b（`07b` DEC-1 §1.5-4）：处置闭环（`done`/`approved`）后对该产出**复算**并写 `pass`。
+
+    **必须是链路自动动作**，不得要求人工 PUT（`routes.py` 的人工通道只作纠正）。
+    来料检路径由 `dispose_incoming_nonconformity` 独立闭环，不在本次修复面（`07b` §6）。
+    """
+    if nc is None or (nc.status or '') not in ('done', 'approved'):
+        return None
+    target_type, _target_id = nonconformity_target(nc)
+    if target_type == 'goods_receipt':
+        return None
+    workpiece = Workpiece.query.get(nc.workpiece_id) if nc.workpiece_id else None
+    item = batch_item_for_nonconformity(nc, workpiece=workpiece)
+    if item is None:
+        production_record = production_record_for_nonconformity(nc, workpiece=workpiece)
+        if production_record is not None:
+            item = batch_item_for_production_record(production_record)
+    if item is None:
+        current_app.logger.warning(
+            f'不合格单 {nc.id} 已闭环（{nc.status}），但定位不到批次实例 ⇒ 跳过 quality_status 自动复位')
+        return None
+    value = recompute_production_quality_status(item)
+    current_app.logger.info(
+        f'不合格单 {nc.id} 闭环（{nc.status}）后复算：实例 {item.id} quality_status={value}')
+    return value
+
+
+def scrap_material_plan(nc, workpiece=None):
+    """报废扣料清单（DEC-2 §2.4 取值链）：返回 `(production_record, [(raw_material_id, 单件量)])`。
+
+    ① `ProductionRecordMaterial` **逐行各自扣自己的 `raw_material_id`**（同料多行则合并求和）；
+    ② 无明细行时退回 `ProductionRecord.raw_material_quantity + raw_material_id`（视为单行消耗）；
+    ③ 两条都取不到 ⇒ **空清单**（调用方按「不扣料 + 未扣减说明」处理，AC-29d，**不得默认减 1**）。
+    """
+    production_record = production_record_for_nonconformity(nc, workpiece=workpiece)
+    plan = []
+    if production_record is not None:
+        rows = ProductionRecordMaterial.query.filter_by(
+            production_record_id=production_record.id).all()
+        merged = {}
+        for row in rows:
+            if not row.raw_material_id or not row.quantity:
+                continue
+            merged[row.raw_material_id] = merged.get(row.raw_material_id, 0.0) + float(row.quantity)
+        plan = sorted(merged.items())
+        if not plan and production_record.raw_material_id and production_record.raw_material_quantity:
+            plan = [(production_record.raw_material_id, float(production_record.raw_material_quantity))]
+    if not plan:
+        hint = ''
+        if workpiece is not None and getattr(workpiece, 'raw_material_id', None):
+            hint = f'（仅有工件料号 {workpiece.raw_material_id}，无消耗量）'
+        current_app.logger.warning(
+            f'报废处置未扣减：未找到产出的消耗明细（不合格单 {nc.id if nc else None}，'
+            f'生产记录 {getattr(production_record, "id", None)}）{hint}；按 AC-29d 不扣任何料')
+    return production_record, plan
+
+
+def deduct_scrap_materials(plan, pieces=1, nc=None):
+    """按计划逐料扣减：`扣量 = 单件量 × 报废件数`；夹紧到 0 并记 warning（AC-29b）。
+
+    返回 `[{raw_material_id, before, requested, after, clamped}]`。
+    """
+    try:
+        pieces = float(pieces)
+    except (TypeError, ValueError):
+        pieces = 1.0
+    if pieces <= 0:
+        pieces = 1.0
+    applied = []
+    for material_id, per_piece in plan:
+        material = RawMaterial.query.get(material_id)
+        if material is None:
+            current_app.logger.warning(
+                f'报废扣料跳过：物料 {material_id} 不存在（不合格单 {nc.id if nc else None}）')
+            continue
+        before = float(material.quantity or 0.0)
+        requested = float(per_piece) * pieces
+        after = before - requested
+        clamped = after < 0
+        if clamped:
+            after = 0.0
+            current_app.logger.warning(
+                f'报废扣料夹紧：物料 {material_id} 原量 {before}，请求扣减 {requested}，'
+                f'夹紧后 {after}（不合格单 {nc.id if nc else None}，件数 {pieces}）')
+        material.quantity = after
+        applied.append({'raw_material_id': material_id, 'before': before,
+                        'requested': requested, 'after': after, 'clamped': clamped})
+    return applied
+
+
 def apply_inspection_result(record):
-    """质检提交后的门禁与不合格处置入口。"""
+    """质检提交后的门禁与不合格处置入口。
+
+    `07b` DEC-1 §1.5：**自动写点唯一**（本函数）。`target_type='production_record'` 的产出维度
+    结论落地见 `apply_production_record_result`（在下方早返回之前分派）。
+    """
     task = record.task
     if not task:
         return
@@ -416,6 +753,11 @@ def apply_inspection_result(record):
     elif task.target_type == 'goods_receipt':
         # 来料检结论落到到货单：pass→可入库；fail→生成未闭环不合格单并拒收待处置
         apply_goods_receipt_result(task, record)
+        return
+    elif task.target_type == 'production_record':
+        # P-02/P-03：报工产出维度的结论落地（fail 建不合格单 + 复算 quality_status）。
+        # 定位链路按 `07b` §1.7 更正后的口径（global_sn → 任务 → batch_item_id）。
+        apply_production_record_result(record, task)
         return
 
     if workpiece is None:
@@ -649,13 +991,52 @@ def apply_lot_item_result(workpiece, record):
         workpiece.status = 'failed'
 
 
+def normalize_pieces(value, field='quantity'):
+    """件数入参归一：`None`/`''` ⇒ `1.0`；非正整数 ⇒ `ValueError`（走既有 400 通道）。"""
+    if value is None or value == '':
+        return 1.0
+    try:
+        pieces = int(value)
+    except (TypeError, ValueError):
+        raise ValueError(f'{field} 必须为正整数')
+    if pieces <= 0:
+        raise ValueError(f'{field} 必须为正整数')
+    return float(pieces)
+
+
+def rework_quantity_for(nc, workpiece, explicit=None, production_record=None):
+    """返工件数（DEC-2 §2.3）：**显式入参 > 来源生产记录 `quantity` > 兜底 1（必须留痕）**。
+
+    返回 `(件数, 留痕说明)`。禁令：不得**静默**写死 1（`07b` §2.3 / AC-30-c）。
+    """
+    if explicit is not None and explicit != '':
+        try:
+            quantity = int(explicit)
+        except (TypeError, ValueError):
+            raise ValueError('rework_quantity 必须为正整数')
+        if quantity <= 0:
+            raise ValueError('rework_quantity 必须为正整数')
+        return quantity, ''
+    if production_record is None:
+        production_record = production_record_for_nonconformity(nc, workpiece=workpiece)
+    if (production_record is not None and production_record.quantity
+            and int(production_record.quantity) > 0):
+        return int(production_record.quantity), (
+            f'件数取来源生产记录#{production_record.id}（quantity={production_record.quantity}）')
+    return 1, '件数取默认值1（未找到来源生产记录）'
+
+
 def dispose_nonconformity(nc, action, *, notes='', scrap_cost=0, rework_process_id=None,
-                          employee_id=None, target_date=None):
+                          employee_id=None, target_date=None, rework_quantity=None,
+                          scrap_quantity=None):
     """不合格处置总入口，按处置对象口径分流。
 
-    生产质检（target_type='workpiece' 或老数据带 workpiece_id）：action = rework / scrap / accept；
+    生产质检（target_type='workpiece' 或 'production_record'）：action = rework / scrap / accept；
     来料检（target_type='goods_receipt'）：action = return（退货）/ accept（让步接收）/ scrap（报废），
     见 dispose_incoming_nonconformity。
+
+    `rework_quantity` / `scrap_quantity`（DEC-2 §2.3 / §2.4，**两个独立入参，不得合并**，见 `16` §11）：
+    显式给出时优先；缺省时返工件数走「来源生产记录 → 兜底 1（留痕）」、报废件数默认 1。
     """
     target_type, _target_id = nonconformity_target(nc)
     if target_type == 'goods_receipt':
@@ -682,55 +1063,83 @@ def dispose_nonconformity(nc, action, *, notes='', scrap_cost=0, rework_process_
         if wp:
             wp.status = 'calcined' if wp.status == 'failed' else wp.status
             log_event(wp, 'concession', payload={'nc_id': nc.id})
+        reset_quality_status_after_disposal(nc)
         return nc
 
     if action == 'rework':
-        if not wp:
-            nc.status = 'done'
-            return nc
+        # P-05（DEC-2 §2.3）：件数 = 显式入参 > 来源生产记录 quantity > 兜底 1（必须留痕）
+        source_record = production_record_for_nonconformity(nc, workpiece=wp)
         process_id = rework_process_id
-        if not process_id:
+        if not process_id and wp:
             last = TaskWorkpiece.query.filter_by(workpiece_id=wp.id).order_by(TaskWorkpiece.id.desc()).first()
             process_id = last.task.process_id if last and last.task else None
-        if not process_id:
-            raise ValueError('返工需要指定工序')
+        if not process_id and source_record is not None:
+            process_id = source_record.process_id
         emp_id = employee_id
+        if not emp_id and source_record is not None:
+            emp_id = source_record.employee_id
         if not emp_id:
             from app.models import Employee
             emp = Employee.query.filter_by(user_id=current_user.id).first() or Employee.query.first()
             emp_id = emp.id if emp else None
-        if not emp_id:
-            raise ValueError('返工需要指定员工')
-        task = TaskAssignment(
-            employee_id=emp_id,
-            process_id=process_id,
-            target_date=target_date or date.today(),
-            quantity=1,
-            status='pending',
-            task_type='auto',
-            notes=f'返工 不合格单#{nc.id}',
-        )
-        db.session.add(task)
-        db.session.flush()
-        db.session.add(TaskWorkpiece(task_id=task.id, workpiece_id=wp.id, status='pending'))
-        nc.rework_task_id = task.id
+        quantity, quantity_note = rework_quantity_for(nc, wp, rework_quantity,
+                                                     production_record=source_record)
+        if process_id and emp_id:
+            task_notes = f'返工 不合格单#{nc.id}'
+            if quantity_note:
+                task_notes = f'{task_notes}；{quantity_note}'
+            task = TaskAssignment(
+                employee_id=emp_id,
+                process_id=process_id,
+                target_date=target_date or date.today(),
+                quantity=quantity,
+                status='pending',
+                task_type='auto',
+                notes=task_notes,
+            )
+            db.session.add(task)
+            db.session.flush()
+            if wp:
+                db.session.add(TaskWorkpiece(task_id=task.id, workpiece_id=wp.id, status='pending'))
+                wp.status = 'machining'
+            nc.rework_task_id = task.id
+            if wp:
+                log_event(wp, 'rework', task_id=task.id,
+                          payload={'nc_id': nc.id, 'quantity': quantity})
+            current_app.logger.info(
+                f'返工处置：不合格单 {nc.id} 新建返工任务 {task.id}，件数 {quantity}'
+                f'（{quantity_note or "显式入参"}）')
+        else:
+            # 既无工件也推不出工序/员工：保持既有「无工件即只闭环」语义，不臆造返工任务
+            current_app.logger.warning(
+                f'返工处置：不合格单 {nc.id} 无工件且无法确定工序/员工 ⇒ 只闭环、不建返工任务'
+                f'（件数口径 {quantity}{"；" + quantity_note if quantity_note else ""}）')
         nc.status = 'done'
-        wp.status = 'machining'
-        log_event(wp, 'rework', task_id=task.id, payload={'nc_id': nc.id})
+        reset_quality_status_after_disposal(nc)
         return nc
 
     if action == 'scrap':
+        pieces = normalize_pieces(scrap_quantity, field='scrap_quantity')
         nc.scrap_cost = scrap_cost or 0
         nc.status = 'done'
         if wp:
             wp.status = 'scrap'
             inbound_workpiece(wp, stock_kind='scrap',
-                              inspector_name=getattr(current_user, 'username', '系统'))
-            if wp.raw_material_id:
-                mat = RawMaterial.query.get(wp.raw_material_id)
-                if mat and mat.quantity > 0:
-                    mat.quantity = max(0, mat.quantity - 1)
-            log_event(wp, 'scrap', payload={'nc_id': nc.id, 'scrap_cost': nc.scrap_cost})
+                              inspector_name=getattr(current_user, 'username', '系统'),
+                              quantity=pieces)
+            log_event(wp, 'scrap', payload={'nc_id': nc.id, 'scrap_cost': nc.scrap_cost,
+                                            'pieces': pieces})
+        # P-06（DEC-2 §2.4）：逐行各扣各自物料；取不到消耗数据 ⇒ 不扣料 + 未扣减说明
+        _plan_record, plan = scrap_material_plan(nc, workpiece=wp)
+        applied = deduct_scrap_materials(plan, pieces=pieces, nc=nc)
+        item = batch_item_for_nonconformity(nc, workpiece=wp)
+        if item is not None:
+            # §1.3：报废是终态 —— 即使 quality_status 复位成 pass，门禁仍必须拒绝（RC-5/RC-11）
+            item.status = 'scrapped'
+        current_app.logger.info(
+            f'报废处置：不合格单 {nc.id} 件数 {pieces}，扣料 {applied}，'
+            f'实例状态 {getattr(item, "status", None)}')
+        reset_quality_status_after_disposal(nc)
         return nc
 
     raise ValueError('未知处置类型')
@@ -1324,3 +1733,102 @@ def pick_equipment_for_process(process_id, work_center_id=None):
     if capable_ids:
         q = q.filter(Equipment.id.in_(capable_ids))
     return q.first()
+
+
+# ============================================================================
+# 计件工资口径（`07b` DEC-2 §2.2 / §2.5，P-04）
+#
+# 为什么放在本模块而不是新建 `services/piecework.py`：`check_properties.py` 的**文件计数**
+# （`properties_files=23`）被 E-04 的 `run_gates.py` 锁在 `expected_lock` 里，新增一个
+# `app/**/*.py` 会让该锁定值漂移、连带 `ci_gates` 的 check_properties 期望行失配。
+# DEC-2 §2.5 明确允许「置于 `mes_service` 内只读函数」这一选项，故按该口径落地。
+#
+# 本段是整个仓库对 `quality.rework_counts_piecework` 的**唯一读取点**，也是「返工记录是否计入
+# 计件」的**唯一判定处**；S1（`routes.py` 主表）/ S2（`models.Employee.total_salary`）/
+# S3（员工详情当日）/ S4（员工详情当月）一律调用 `piecework_amount`，模板侧不得出现开关判断
+# （AC-04-e / AC-04-e2 / RC-17 / RC-19）。
+#
+# 返工识别（DEC-2 §2.2「反查优先」）：
+#   R1 主判据 `NonconformityRecord.rework_task_id == TaskAssignment.id`；
+#   R2 次判据 该任务 `global_sn` 与 `ProductionRecord.global_sn` 相等（报工链唯一关联键）；
+#   R3 辅助（`task_type=='auto'` 且 notes 以「返工 不合格单#」开头）**只作人工可读提示，不参与判定**
+#      —— `07b` 明确否决 `task_type=='auto'` 单判（批次自动派工同用该值，会误伤正常工时 / RC-16）。
+# ============================================================================
+
+REWORK_NOTE_PREFIX = '返工 不合格单#'
+
+
+def rework_counts_piecework():
+    """`quality.rework_counts_piecework` 的唯一读取点；行缺失时缺省 `False`（RC-18）。"""
+    value = SystemConfig.get('quality.rework_counts_piecework', False)
+    if isinstance(value, str):
+        return value.strip().lower() in ('1', 'true', 'yes', 'on')
+    return bool(value)
+
+
+def rework_task_ids():
+    """R1：被不合格单引用为「返工任务」的 `TaskAssignment.id` 集合。"""
+    rows = (NonconformityRecord.query
+            .with_entities(NonconformityRecord.rework_task_id)
+            .filter(NonconformityRecord.rework_task_id.isnot(None))
+            .all())
+    return {row[0] for row in rows if row[0]}
+
+
+def rework_task_global_sns():
+    """R1 → R2：返工任务的 `global_sn` 集合（返工任务报工产生的记录会带上该关联键）。"""
+    ids = rework_task_ids()
+    if not ids:
+        return set()
+    rows = (TaskAssignment.query.with_entities(TaskAssignment.global_sn)
+            .filter(TaskAssignment.id.in_(ids)).all())
+    return {row[0] for row in rows if row[0]}
+
+
+def rework_production_record_ids(records):
+    """`records` 中判定为返工的 `ProductionRecord.id` 集合（R1∨R2）。"""
+    sns = rework_task_global_sns()
+    if not sns:
+        return set()
+    return {r.id for r in records
+            if getattr(r, 'id', None) is not None and (getattr(r, 'global_sn', None) in sns)}
+
+
+def is_rework_task(task):
+    """R1 口径下该任务是否为返工任务（R3 仅作提示、不参与判定）。"""
+    if task is None or getattr(task, 'id', None) is None:
+        return False
+    return task.id in rework_task_ids()
+
+
+def rework_hint(task):
+    """R3：人工可读提示（**不参与判定**）。"""
+    if task is None:
+        return False
+    return ((getattr(task, 'task_type', None) == 'auto')
+            and (getattr(task, 'notes', '') or '').startswith(REWORK_NOTE_PREFIX))
+
+
+def piecework_breakdown(records):
+    """把一个生产记录集合拆成 `(计入金额, 被剔除金额, 返工记录 id 集合)`（未乘员工系数）。"""
+    records = list(records)
+    excluded = set() if rework_counts_piecework() else rework_production_record_ids(records)
+    counted = 0.0
+    dropped = 0.0
+    for record in records:
+        amount = record.quantity * record.process.price
+        if getattr(record, 'id', None) in excluded:
+            dropped += amount
+        else:
+            counted += amount
+    return counted, dropped, excluded
+
+
+def piecework_amount(records):
+    """计件金额（**唯一口径**，未乘系数）：开关开 ⇒ 全含；关 ⇒ 剔除返工记录。
+
+    与既有实现逐字同式（`record.quantity * record.process.price`），只多一层返工过滤
+    ⇒ 开关 `True` 时与修复前**完全等价**（回退安全）。
+    """
+    counted, _dropped, _excluded = piecework_breakdown(records)
+    return counted

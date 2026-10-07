@@ -147,8 +147,11 @@ class Employee(db.Model):
 
     @property
     def total_salary(self):
-        # 计件工资计算
-        piecework = sum(record.quantity * record.process.price for record in self.production_records)
+        # 计件工资计算（口径唯一：app.services.mes_service.piecework_amount —— 返工记录是否计入由
+        # SystemConfig('quality.rework_counts_piecework') 决定；本属性不得再写一份过滤，
+        # 否则会出现「主表变了、员工总工资没变」的不一致，见 07b DEC-2 §2.5 / AC-04-d）
+        from app.services.mes_service import piecework_amount  # 函数内导入：避免 models ↔ services 循环依赖
+        piecework = piecework_amount(list(self.production_records))
         # 奖金/罚款计算
         adjustments = sum(bp.amount if bp.type == 'bonus' else -bp.amount for bp in self.bonuses_penalties)
         # 总工资 = 基本工资 + 计件工资 * 系数 + 调整金额

@@ -9,7 +9,16 @@ from app.models import (
 )
 from app.permissions import require_capability
 from datetime import datetime, timedelta
+from werkzeug.exceptions import HTTPException
 from . import bp
+
+
+def _reraise_http(exc):
+    """W4/P-09：`get_or_404` / `first_or_404` / `get_json()` 抛出的 HTTPException 是
+    Exception 子类，被 `except Exception` 捕获后会变成 500（或带错误文案的 200）。
+    必须原样重抛，交给统一 HTTPException 处理器按语义出口（404/415/405…）。"""
+    if isinstance(exc, HTTPException):
+        raise
 
 # 分页白名单：与全站 handle_pagination_args（app/main/routes.py）的 per_page 口径逐值一致
 # （非数字 / 不在白名单 → 20）。这三个端点是 JSON API，且 routes.py 不在本模块的可改范围内，
@@ -321,9 +330,11 @@ def create_template():
         })
 
     except Exception as e:
+        # W4/P-09：HTTPException（404/415）按语义出口，不得吞成 500/200
+        _reraise_http(e)
         db.session.rollback()
-        current_app.logger.error(f'创建质检模板失败: {str(e)}')
-        return jsonify({'success': False, 'message': f'创建失败：{str(e)}'}), 500
+        current_app.logger.error(f'创建质检模板失败：{str(e)}')
+        return jsonify({'success': False, 'message': '创建失败，请稍后重试或联系管理员'}), 500
 
 @bp.route('/api/quality/templates/<int:template_id>', methods=['PUT', 'DELETE'])
 @login_required
@@ -405,11 +416,13 @@ def manage_template(template_id):
             }
 
             # 更新模板基本信息
-            template.template_code = data['template_code']
-            template.name = data['name']
-            template.type = data['type']
-            template.description = data.get('description', '')
-            template.is_active = data.get('is_active', True)
+            # W4/P-12-b：部分更新（未提供的字段保持原值；不得因缺字段 KeyError ⇒ 500，
+            # 也不得把 description/is_active 静默重置为默认值）
+            template.template_code = data.get('template_code', template.template_code)
+            template.name = data.get('name', template.name)
+            template.type = data.get('type', template.type)
+            template.description = data.get('description', template.description)
+            template.is_active = data.get('is_active', template.is_active)
 
             # 更新基本信息项目
             if 'base_items' in data:
@@ -481,9 +494,11 @@ def manage_template(template_id):
             })
 
     except Exception as e:
+        # W4/P-09：HTTPException（404/415）按语义出口，不得吞成 500/200
+        _reraise_http(e)
         db.session.rollback()
-        current_app.logger.error(f'管理质检模板失败: {str(e)}')
-        return jsonify({'success': False, 'message': f'操作失败：{str(e)}'}), 500
+        current_app.logger.error(f'管理质检模板失败：{str(e)}')
+        return jsonify({'success': False, 'message': '操作失败，请稍后重试或联系管理员'}), 500
 
 @bp.route('/api/quality/tasks', methods=['GET'])
 @login_required
@@ -580,7 +595,20 @@ def create_task():
 
     try:
         data = request.get_json()
-        
+
+        # W4/P-12-b：必填与取值域显式校验（原实现用 data['x'] 下标，缺字段/类型错会
+        # 抛 KeyError ⇒ 被 except Exception 吞成 500；此处一律 400 + 可读原因）
+        if not isinstance(data, dict) or not data:
+            return jsonify({'success': False, 'message': '请求数据为空，请检查请求体'}), 400
+        required_fields = ('type', 'inspection_target_id', 'inspector_id')
+        missing = [f for f in required_fields if not data.get(f)]
+        if missing:
+            return jsonify({'success': False,
+                            'message': '缺少必填字段：' + '、'.join(missing)}), 400
+        if data.get('type') not in ('product', 'production_record', 'material'):
+            return jsonify({'success': False,
+                            'message': 'type 取值不合法（应为 product / production_record / material）'}), 400
+
         # 创建任务
         task = InspectionTask(
             global_sn=SerialNumber.get_next_number(),
@@ -617,9 +645,11 @@ def create_task():
         })
 
     except Exception as e:
+        # W4/P-12：get_json() 的 415/400 必须按语义出口
+        _reraise_http(e)
         db.session.rollback()
-        current_app.logger.error(f'创建质检任务失败: {str(e)}')
-        return jsonify({'success': False, 'message': f'创建失败：{str(e)}'}), 500
+        current_app.logger.error(f'创建质检任务失败：{str(e)}')
+        return jsonify({'success': False, 'message': '创建失败，请稍后重试或联系管理员'}), 500
 
 @bp.route('/api/quality/tasks/<int:task_id>', methods=['PUT', 'DELETE'])
 @login_required
@@ -657,8 +687,8 @@ def get_inspectors():
             } for inspector in inspectors]
         })
     except Exception as e:
-        current_app.logger.error(f'获取质检员列表失败: {str(e)}')
-        return jsonify({'success': False, 'message': f'获取质检员列表失败：{str(e)}'}), 500
+        current_app.logger.error(f'获取质检员列表失败：{str(e)}')
+        return jsonify({'success': False, 'message': '获取质检员列表失败，请稍后重试或联系管理员'}), 500
 
 @bp.route('/api/quality/processes', methods=['GET'])
 @login_required
@@ -700,8 +730,8 @@ def get_processes():
             } for process in processes]
         })
     except Exception as e:
-        current_app.logger.error(f'获取工序列表失败: {str(e)}')
-        return jsonify({'success': False, 'message': f'获取工序列表失败：{str(e)}'}), 500
+        current_app.logger.error(f'获取工序列表失败：{str(e)}')
+        return jsonify({'success': False, 'message': '获取工序列表失败，请稍后重试或联系管理员'}), 500
 
 @bp.route('/api/quality/finished-products', methods=['GET'])
 @login_required
@@ -728,8 +758,8 @@ def get_finished_products():
             } for product in products]
         })
     except Exception as e:
-        current_app.logger.error(f'获取成品列表失败: {str(e)}')
-        return jsonify({'success': False, 'message': f'获取成品列表失败：{str(e)}'}), 500
+        current_app.logger.error(f'获取成品列表失败：{str(e)}')
+        return jsonify({'success': False, 'message': '获取成品列表失败，请稍后重试或联系管理员'}), 500
 
 @bp.route('/api/quality/production-records', methods=['GET'])
 @login_required
@@ -760,8 +790,8 @@ def get_production_records():
             } for record in records]
         })
     except Exception as e:
-        current_app.logger.error(f'获取生产记录列表失败: {str(e)}')
-        return jsonify({'success': False, 'message': f'获取生产记录列表失败：{str(e)}'}), 500
+        current_app.logger.error(f'获取生产记录列表失败：{str(e)}')
+        return jsonify({'success': False, 'message': '获取生产记录列表失败，请稍后重试或联系管理员'}), 500
 
 @bp.route('/api/quality/tasks/<int:task_id>/start-inspection', methods=['POST'])
 @login_required
@@ -857,9 +887,11 @@ def start_inspection(task_id):
         })
         
     except Exception as e:
+        # W4/P-09：HTTPException（404/415）按语义出口，不得吞成 500/200
+        _reraise_http(e)
         db.session.rollback()
-        current_app.logger.error(f'开始质检任务失败: {str(e)}')
-        return jsonify({'success': False, 'message': f'开始质检失败：{str(e)}'}), 500
+        current_app.logger.error(f'开始质检任务失败：{str(e)}')
+        return jsonify({'success': False, 'message': '开始质检失败，请稍后重试或联系管理员'}), 500
 
 @bp.route('/api/quality/records/<int:record_id>/submit', methods=['POST'])
 @login_required
@@ -900,7 +932,7 @@ def submit_inspection_record(record_id):
                         )
                         db.session.add(base_record)
                     except (ValueError, TypeError) as e:
-                        current_app.logger.warning(f'保存基本信息项目记录失败: item_id={item_id}, error={str(e)}')
+                        current_app.logger.warning(f'保存基本信息项目记录失败：{str(e)}')
                         continue
         
         # 保存检验项目记录
@@ -922,7 +954,7 @@ def submit_inspection_record(record_id):
                         )
                         db.session.add(item_record)
                     except (ValueError, TypeError) as e:
-                        current_app.logger.warning(f'保存检验项目记录失败: item_id={item_id}, error={str(e)}')
+                        current_app.logger.warning(f'保存检验项目记录失败：{str(e)}')
                         continue
         
         # 更新任务状态
@@ -963,9 +995,11 @@ def submit_inspection_record(record_id):
         })
         
     except Exception as e:
+        # W4/P-09：HTTPException（404/415）按语义出口，不得吞成 500/200
+        _reraise_http(e)
         db.session.rollback()
-        current_app.logger.error(f'提交质检记录失败: {str(e)}')
-        return jsonify({'success': False, 'message': f'提交失败：{str(e)}'}), 500
+        current_app.logger.error(f'提交质检记录失败：{str(e)}')
+        return jsonify({'success': False, 'message': '提交失败，请稍后重试或联系管理员'}), 500
 
 def get_inspection_target_name(task):
     """获取检验对象名称"""
@@ -984,7 +1018,7 @@ def get_inspection_target_name(task):
             return f'原材料：{material.material_name}' if material else '原材料：未知'
         return '未知'
     except Exception as e:
-        current_app.logger.error(f'获取检验对象名称失败: {str(e)}')
+        current_app.logger.error(f'获取检验对象名称失败：{str(e)}')
         return '未知'
 
 def delete_inspection_task(task_id):
@@ -996,6 +1030,17 @@ def delete_inspection_task(task_id):
         # 检查任务状态
         if task.status in ['in_progress', 'completed']:
             return jsonify({'success': False, 'message': '进行中或已完成的任务不能删除'}), 400
+
+        # W4/P-10：已产生质检记录的任务**拒删**（400 + 可读原因，零副作用）。
+        # 依据 17-W4W5 §5.2 裁定 A：质检记录是质量可追溯链条的一环，
+        # 「已有质检记录」在业务上等价于「已开始质检」⇒ 是既有状态规则的延伸，不新增限制面。
+        related_record = InspectionRecord.query.filter_by(task_id=task.id).first()
+        if related_record is not None:
+            return jsonify({
+                'success': False,
+                'message': '该任务已产生质检记录，不能删除；如需作废请先处理对应的质检记录',
+                'record_id': related_record.id,
+            }), 400
         
         # 保存旧数据用于审计日志
         old_data = {
@@ -1030,9 +1075,11 @@ def delete_inspection_task(task_id):
         })
         
     except Exception as e:
+        # W4/P-09：HTTPException（404/415）按语义出口，不得吞成 500/200
+        _reraise_http(e)
         db.session.rollback()
-        current_app.logger.error(f'删除质检任务失败: {str(e)}')
-        return jsonify({'success': False, 'message': f'删除失败：{str(e)}'}), 500
+        current_app.logger.error(f'删除质检任务失败：{str(e)}')
+        return jsonify({'success': False, 'message': '删除失败，请稍后重试或联系管理员'}), 500
 
 def update_task(task_id):
     """更新质检任务"""
@@ -1104,9 +1151,11 @@ def update_task(task_id):
         })
         
     except Exception as e:
+        # W4/P-09：HTTPException（404/415）按语义出口，不得吞成 500/200
+        _reraise_http(e)
         db.session.rollback()
-        current_app.logger.error(f'更新质检任务失败: {str(e)}')
-        return jsonify({'success': False, 'message': f'更新失败：{str(e)}'}), 500
+        current_app.logger.error(f'更新质检任务失败：{str(e)}')
+        return jsonify({'success': False, 'message': '更新失败，请稍后重试或联系管理员'}), 500
 
 @bp.route('/api/quality/records', methods=['GET'])
 @login_required
@@ -1212,8 +1261,8 @@ def get_inspection_records():
         })
         
     except Exception as e:
-        current_app.logger.error(f'获取质检记录列表失败: {str(e)}')
-        return jsonify({'success': False, 'message': f'获取记录列表失败：{str(e)}'}), 500
+        current_app.logger.error(f'获取质检记录列表失败：{str(e)}')
+        return jsonify({'success': False, 'message': '获取记录列表失败，请稍后重试或联系管理员'}), 500
 
 
 @bp.route('/api/quality/records/<int:record_id>', methods=['GET'])
@@ -1280,8 +1329,10 @@ def get_inspection_record_detail(record_id):
         })
         
     except Exception as e:
-        current_app.logger.error(f'获取质检记录详情失败: {str(e)}')
-        return jsonify({'success': False, 'message': f'获取记录详情失败：{str(e)}'}), 500
+        # W4/P-09：HTTPException（404/415）按语义出口，不得吞成 500/200
+        _reraise_http(e)
+        current_app.logger.error(f'获取质检记录详情失败：{str(e)}')
+        return jsonify({'success': False, 'message': '获取记录详情失败，请稍后重试或联系管理员'}), 500
 
 @bp.route('/api/quality/records/<int:record_id>/print', methods=['GET'])
 @login_required
@@ -1308,8 +1359,10 @@ def print_inspection_record(record_id):
         )
         
     except Exception as e:
-        current_app.logger.error(f'打印质检记录失败: {str(e)}')
-        return f'打印失败：{str(e)}', 500
+        # W4/P-09：HTTPException（404/415）按语义出口，不得吞成 500/200
+        _reraise_http(e)
+        current_app.logger.error(f'打印质检记录失败：{str(e)}')
+        return '打印失败，请稍后重试或联系管理员', 500
 
 
 @bp.route('/api/quality/records/export', methods=['GET'])
@@ -1429,8 +1482,8 @@ def export_inspection_records():
         )
         
     except Exception as e:
-        current_app.logger.error(f'导出质检记录失败: {str(e)}')
-        return jsonify({'success': False, 'message': f'导出失败：{str(e)}'}), 500
+        current_app.logger.error(f'导出质检记录失败：{str(e)}')
+        return jsonify({'success': False, 'message': '导出失败，请稍后重试或联系管理员'}), 500
 
 
 # ---------------------------------------------------------------------------
@@ -1518,7 +1571,7 @@ def export_inspection_tasks():
             download_name=filename,
         )
     except Exception as e:
-        current_app.logger.error(f'导出质检任务失败: {str(e)}')
+        current_app.logger.error(f'导出质检任务失败：{str(e)}')
         flash('导出失败，请重试', 'danger')
         return redirect(url_for('main.quality_tasks'))
 
@@ -1551,7 +1604,7 @@ def download_inspection_task_template():
             download_name='质检任务导入模板.xlsx',
         )
     except Exception as e:
-        current_app.logger.error(f'下载质检任务导入模板失败: {str(e)}')
+        current_app.logger.error(f'下载质检任务导入模板失败：{str(e)}')
         flash('下载模板失败，请重试', 'danger')
         return redirect(url_for('main.quality_tasks'))
 
@@ -1573,15 +1626,15 @@ def import_inspection_tasks():
     try:
         import pandas as pd
     except Exception as e:
-        current_app.logger.error(f'导入质检任务时加载 pandas 失败: {str(e)}')
+        current_app.logger.error(f'导入质检任务时加载 pandas 失败：{str(e)}')
         flash('导入失败：运行环境缺少 pandas 依赖', 'danger')
         return redirect(url_for('main.quality_tasks'))
 
     try:
         df = pd.read_excel(file)
     except Exception as e:
-        current_app.logger.error(f'质检任务导入文件解析失败: {str(e)}')
-        flash(f'文件解析失败：{str(e)}', 'danger')
+        current_app.logger.error(f'质检任务导入文件解析失败：{str(e)}')
+        flash('文件解析失败，请稍后重试或联系管理员', 'danger')
         return redirect(url_for('main.quality_tasks'))
 
     required_cols = (TASK_IMPORT_COL_TYPE, TASK_IMPORT_COL_TARGET, TASK_IMPORT_COL_INSPECTOR)
@@ -1665,8 +1718,8 @@ def import_inspection_tasks():
         db.session.commit()
     except Exception as e:
         db.session.rollback()
-        current_app.logger.error(f'导入质检任务失败: {str(e)}')
-        flash(f'导入失败：{str(e)}', 'danger')
+        current_app.logger.error(f'导入质检任务失败：{str(e)}')
+        flash('导入失败，请稍后重试或联系管理员', 'danger')
         return redirect(url_for('main.quality_tasks'))
 
     if created:

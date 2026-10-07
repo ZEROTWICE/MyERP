@@ -1,4 +1,5 @@
 from flask import Flask, flash, jsonify, redirect, request, url_for
+from werkzeug.exceptions import HTTPException
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
 from flask_migrate import Migrate
@@ -187,11 +188,31 @@ def create_app():
         flash(login.login_message, login.login_message_category)
         return redirect(url_for('auth.login', next=request.url))
 
-    @app.errorhandler(404)
-    def _not_found(e):
-        """JSON API 的 404 也要返回 JSON。get_or_404 重抛之后会走到这里。"""
+    #: 框架级 HTTP 异常的**可读中文原因**（W4/P-09/P-12：4xx 必须带可读原因且不得泄漏实现细节）
+    _HTTP_REASONS = {
+        400: '请求参数有误',
+        401: '请先登录',
+        403: '权限不足',
+        404: '资源不存在',
+        405: '该路径不支持此 HTTP 方法',
+        409: '资源状态冲突',
+        413: '请求体过大',
+        415: '请求的媒体类型不受支持，请改用 application/json',
+        422: '请求参数无法处理',
+        429: '请求过于频繁',
+    }
+
+    @app.errorhandler(HTTPException)
+    def _http_error(e):
+        """JSON 面（/api/、XHR、DELETE/PUT/PATCH）返回 JSON；页面面保持原响应。
+
+        `get_or_404` / `first_or_404` / `get_json()` 抛出的异常在端点内被
+        `_reraise_http` 重抛后走到这里（W4/P-09/P-12）——**不改变**端点自己
+        `jsonify(...), 400` 返回的业务提示（那些不经过 errorhandler，RC-15）。
+        """
         if permissions._wants_json():
-            return jsonify({'success': False, 'message': '资源不存在'}), 404
+            message = _HTTP_REASONS.get(e.code, e.description or e.name)
+            return jsonify({'success': False, 'message': message}), e.code
         return e.get_response()
 
     permissions.init_app(app)

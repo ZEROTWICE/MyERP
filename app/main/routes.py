@@ -3,7 +3,7 @@ from flask import render_template, redirect, url_for, flash, request, jsonify, c
 from flask_login import login_required, current_user
 from app import db, csrf
 from app.permissions import allowed_search_types, require_capability, can, can_any
-from app.models import Employee, ProcessPrice, ProductionRecord, BonusPenalty, AuditLog, ProcessPrice, User, TaskAssignment, SerialNumber, SalaryChange, CoefficientChange, EmployeeSalaryHistory, EmployeeCoefficientHistory, ProcessPriceGroup, FinishedProduct, RawMaterial, CodeRule, CodeGenerationLog, ProductionRecordMaterial, InspectionTemplate, InspectionBaseItem, InspectionItem, InspectionTask, InspectionRecord, Product, ProductBOM, ProductProcess, ProductionOrder, MaterialAllocation, ProductionBatch, ProductionBatchItem, Customer, CustomerAddress, SalesOrder, SalesOrderItem, SalesOrder, SalesOrderItem, ProcessAssignmentRule, ProcessAssignmentMember, SystemConfig, RawMaterialCategory, WorkCenter
+from app.models import Employee, ProcessPrice, ProductionRecord, BonusPenalty, AuditLog, ProcessPrice, User, TaskAssignment, SerialNumber, SalaryChange, CoefficientChange, EmployeeSalaryHistory, EmployeeCoefficientHistory, ProcessPriceGroup, FinishedProduct, RawMaterial, CodeRule, CodeGenerationLog, ProductionRecordMaterial, InspectionTemplate, InspectionBaseItem, InspectionItem, InspectionTask, InspectionRecord, Product, ProductBOM, ProductProcess, ProductionOrder, MaterialAllocation, ProductionBatch, ProductionBatchItem, Customer, CustomerAddress, SalesOrder, SalesOrderItem, SalesOrder, SalesOrderItem, ProcessAssignmentRule, ProcessAssignmentMember, SystemConfig, RawMaterialCategory, WorkCenter, Consumable, ConsumableCategory
 from datetime import datetime, timedelta, date
 from . import bp
 from app.main.forms import (
@@ -44,6 +44,9 @@ from .production_center import *
 from . import equipment, purchase, shipping, stock
 
 from app.services.search_service import SearchService
+# DEC-2 §2.5：计件金额的**唯一**口径函数（S1/S3/S4 与 models.Employee.total_salary 同源；
+# 返工是否计入由 SystemConfig('quality.rework_counts_piecework') 在该函数内唯一决定）
+from app.services.mes_service import piecework_amount
 
 
 def _reraise_http(exc):
@@ -153,8 +156,8 @@ def get_process_assignment(process_id):
         # 兼容：当迁移未执行导致表不存在时返回空配置，避免500
         if 'no such table' in str(e).lower():
             return jsonify({'success': True, 'data': None, 'message': '规则表未初始化，请先执行数据库迁移'}), 200
-        current_app.logger.error(f'读取工序分配规则失败: {str(e)}')
-        return jsonify({'success': False, 'message': f'读取失败：{str(e)}'}), 500
+        current_app.logger.error(f'读取工序分配规则失败：{str(e)}')
+        return jsonify({'success': False, 'message': '读取失败，请稍后重试或联系管理员'}), 500
 
 @bp.route('/api/process_assignment', methods=['GET'])
 @login_required
@@ -174,8 +177,8 @@ def list_process_assignments():
     except Exception as e:
         if 'no such table' in str(e).lower():
             return jsonify({'success': True, 'data': {}, 'message': '规则表未初始化，请先执行数据库迁移'}), 200
-        current_app.logger.error(f'列出工序分配规则失败: {str(e)}')
-        return jsonify({'success': False, 'message': f'读取失败：{str(e)}'}), 500
+        current_app.logger.error(f'列出工序分配规则失败：{str(e)}')
+        return jsonify({'success': False, 'message': '读取失败，请稍后重试或联系管理员'}), 500
 
 @bp.route('/api/process_assignment/<int:process_id>', methods=['POST'])
 @login_required
@@ -226,12 +229,14 @@ def save_process_assignment(process_id):
         db.session.commit()
         return jsonify({'success': True, 'message': '保存成功'})
     except Exception as e:
+        # W4/P-09：HTTPException（404/415）按语义出口，不得吞成 500/200
+        _reraise_http(e)
         db.session.rollback()
         # 兼容：当迁移未执行导致表不存在时，明确提示
         if 'no such table' in str(e).lower():
             return jsonify({'success': False, 'message': '规则表未初始化，请先执行数据库迁移（flask db upgrade）'}), 400
-        current_app.logger.error(f'保存工序分配规则失败: {str(e)}')
-        return jsonify({'success': False, 'message': f'保存失败：{str(e)}'}), 500
+        current_app.logger.error(f'保存工序分配规则失败：{str(e)}')
+        return jsonify({'success': False, 'message': '保存失败，请稍后重试或联系管理员'}), 500
 
 @bp.route('/api/process_assignment/bulk', methods=['POST'])
 @login_required
@@ -277,11 +282,13 @@ def save_process_assignment_bulk():
         db.session.commit()
         return jsonify({'success': True, 'message': '批量保存成功'})
     except Exception as e:
+        # W4/P-09：HTTPException（404/415）按语义出口，不得吞成 500/200
+        _reraise_http(e)
         db.session.rollback()
         if 'no such table' in str(e).lower():
             return jsonify({'success': False, 'message': '规则表未初始化，请先执行数据库迁移（flask db upgrade）'}), 400
-        current_app.logger.error(f'批量保存工序分配规则失败: {str(e)}')
-        return jsonify({'success': False, 'message': f'保存失败：{str(e)}'}), 500
+        current_app.logger.error(f'批量保存工序分配规则失败：{str(e)}')
+        return jsonify({'success': False, 'message': '保存失败，请稍后重试或联系管理员'}), 500
 
 def handle_pagination_args(f):
     @wraps(f)
@@ -390,7 +397,7 @@ def user_dashboard():
 
     # 计算当日工资
     daily_production = ProductionRecord.query.filter_by(employee_id=employee.id, date=today).all()
-    daily_piecework = sum(record.quantity * record.process.price for record in daily_production)
+    daily_piecework = piecework_amount(daily_production)
     daily_bonuses = BonusPenalty.query.filter_by(employee_id=employee.id)\
         .filter(db.func.date(BonusPenalty.date) == today).all()
     daily_adjustments = sum(bp.amount if bp.type == 'bonus' else -bp.amount for bp in daily_bonuses)
@@ -399,7 +406,7 @@ def user_dashboard():
     # 计算当月工资
     monthly_production = ProductionRecord.query.filter_by(employee_id=employee.id)\
         .filter(ProductionRecord.date >= current_month_start).all()
-    monthly_piecework = sum(record.quantity * record.process.price for record in monthly_production)
+    monthly_piecework = piecework_amount(monthly_production)
     monthly_bonuses = BonusPenalty.query.filter_by(employee_id=employee.id)\
         .filter(BonusPenalty.date >= datetime.combine(current_month_start, datetime.min.time())).all()
     monthly_adjustments = sum(bp.amount if bp.type == 'bonus' else -bp.amount for bp in monthly_bonuses)
@@ -511,7 +518,7 @@ def delete_employee(id):
         return jsonify({'success': True, 'message': '员工删除成功'})
     except SQLAlchemyError as e:
         db.session.rollback()
-        current_app.logger.error(f'删除员工失败: {str(e)}')
+        current_app.logger.error(f'删除员工失败：{str(e)}')
         return jsonify({'success': False, 'message': '删除失败，请重试'}), 500
 
 @bp.route('/employee/add', methods=['GET', 'POST'])
@@ -586,7 +593,7 @@ def add_employee():
             return redirect(url_for('main.manage_employees'))
         except SQLAlchemyError as e:
             db.session.rollback()
-            current_app.logger.error(f'添加员工失败: {str(e)}')
+            current_app.logger.error(f'添加员工失败：{str(e)}')
             flash('操作失败，请重试', 'danger')
             return render_template('main/employee_form.html', form=form, title='新增员工')
     
@@ -700,7 +707,7 @@ def edit_employee(id):
             return redirect(url_for('main.manage_employees'))
         except SQLAlchemyError as e:
             db.session.rollback()
-            current_app.logger.error(f'更新员工信息失败: {str(e)}')
+            current_app.logger.error(f'更新员工信息失败：{str(e)}')
             flash('操作失败，请重试', 'danger')
     
     # GET请求时，填充表单数据
@@ -903,7 +910,7 @@ def add_process_price():
             return redirect(url_for('main.process_prices'))
         except Exception as e:
             db.session.rollback()
-            current_app.logger.error(f'添加工序价格失败: {str(e)}')
+            current_app.logger.error(f'添加工序价格失败：{str(e)}')
             flash('操作失败，请重试', 'danger')
             return render_template('main/process_price_form.html', 
                                 form=form, 
@@ -1037,7 +1044,7 @@ def edit_process_price(id):
             return redirect(url_for('main.process_prices'))
         except Exception as e:
             db.session.rollback()
-            current_app.logger.error(f'修改工序价格失败: {str(e)}')
+            current_app.logger.error(f'修改工序价格失败：{str(e)}')
             flash('操作失败，请重试', 'danger')
             return render_template('main/process_price_form.html', 
                                 form=form, 
@@ -1123,7 +1130,7 @@ def delete_process_price(id):
         return jsonify({'success': True, 'message': '工序删除成功'})
     except SQLAlchemyError as e:
         db.session.rollback()
-        current_app.logger.error(f'删除工序失败: {str(e)}')
+        current_app.logger.error(f'删除工序失败：{str(e)}')
         return jsonify({'success': False, 'message': '删除失败，请重试'}), 500
 
 @bp.route('/salary/<int:employee_id>')
@@ -1308,8 +1315,8 @@ def manage_production_records():
             return redirect(url_for('main.manage_production_records'))
         except Exception as e:
             db.session.rollback()
-            current_app.logger.error(f'添加生产记录失败: {str(e)}')
-            flash(f'添加失败：{str(e)}', 'danger')
+            current_app.logger.error(f'添加生产记录失败：{str(e)}')
+            flash('添加失败，请稍后重试或联系管理员', 'danger')
             return redirect(url_for('main.manage_production_records'))
 
     # 处理搜索和排序
@@ -1363,7 +1370,7 @@ def manage_production_records():
                 search_conditions.append(ProductionRecord.id.in_(direct_record_ids))
                 
         except Exception as e:
-            current_app.logger.error(f'原材料搜索失败: {str(e)}')
+            current_app.logger.error(f'原材料搜索失败：{str(e)}')
             # 如果原材料搜索失败，继续使用基本搜索条件
         
         query = query.filter(db.or_(*search_conditions))
@@ -1504,7 +1511,7 @@ def delete_production_record(id):
         return jsonify({'success': True, 'message': '生产记录删除成功'})
     except SQLAlchemyError as e:
         db.session.rollback()
-        current_app.logger.error(f'删除生产记录失败: {str(e)}')
+        current_app.logger.error(f'删除生产记录失败：{str(e)}')
         return jsonify({'success': False, 'message': '删除失败，请重试'}), 500
 @bp.route('/bonus_penalties', methods=['GET', 'POST'])
 @login_required
@@ -1646,7 +1653,7 @@ def delete_bonus_penalty(id):
         return jsonify({'success': True, 'message': '记录删除成功'})
     except SQLAlchemyError as e:
         db.session.rollback()
-        current_app.logger.error(f'删除奖惩记录失败: {str(e)}')
+        current_app.logger.error(f'删除奖惩记录失败：{str(e)}')
         return jsonify({'success': False, 'message': '删除失败，请重试'}), 500
 
 @bp.route('/bonus_penalties/<int:id>/edit', methods=['POST'])
@@ -1751,7 +1758,7 @@ def add_bonus_penalty():
     except Exception as e:
         db.session.rollback()
         flash('添加失败，请重试', 'danger')
-        current_app.logger.error(f'添加奖金/罚款记录失败: {str(e)}')
+        current_app.logger.error(f'添加奖金/罚款记录失败：{str(e)}')
         return redirect(url_for('main.manage_bonus_penalties'))
 
 @bp.route('/salary_calculation', methods=['GET', 'POST'])
@@ -1812,7 +1819,7 @@ def salary_calculation():
             
             # 计算工资
             base_salary = employee.base_salary
-            piecework = sum(record.quantity * record.process.price for record in production_records)
+            piecework = piecework_amount(production_records)
             piecework = piecework * employee.coefficient
             bonus = sum(bp.amount for bp in bonus_penalty_records if bp.type == 'bonus')
             penalty = sum(bp.amount for bp in bonus_penalty_records if bp.type == 'penalty')
@@ -1912,7 +1919,7 @@ def download_employee_template():
                 os.remove(temp_path)
             except OSError:
                 pass
-        flash(f'下载模板失败：{str(e)}', 'danger')
+        flash('下载模板失败，请稍后重试或联系管理员', 'danger')
         return redirect(url_for('main.manage_employees'))
     finally:
         # 确保在请求结束后删除临时文件
@@ -1948,7 +1955,7 @@ def import_employees():
         try:
             employee_data = ExcelGenerator.parse_employee_data(temp_path)
         except Exception as e:
-            return jsonify({'success': False, 'message': f'Excel文件解析失败：{str(e)}。请检查文件格式是否正确。'})
+            return jsonify({'success': False, 'message': 'Excel文件解析失败，请稍后重试或联系管理员'})
         
         if not employee_data:
             return jsonify({'success': False, 'message': 'Excel文件中没有找到有效数据。请检查文件内容。'})
@@ -2135,7 +2142,7 @@ def import_employees():
                 db.session.rollback()
         except Exception as e:
             db.session.rollback()
-            return jsonify({'success': False, 'message': f'保存数据时发生错误：{str(e)}'})
+            return jsonify({'success': False, 'message': '保存数据时发生错误，请稍后重试或联系管理员'})
         
         # 构建返回消息
         message_parts = []
@@ -2168,7 +2175,7 @@ def import_employees():
             except OSError:
                 pass
         db.session.rollback()
-        return jsonify({'success': False, 'message': f'导入失败：{str(e)}'})
+        return jsonify({'success': False, 'message': '导入失败，请稍后重试或联系管理员'})
 
 def cleanup_temp_files():
     """清理超过5分钟的临时文件"""
@@ -2227,8 +2234,8 @@ def export_employees():
                 download_name=f'employees_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
             )
         except Exception as e:
-            current_app.logger.error(f'导出员工数据失败: {str(e)}')
-            flash(f'导出失败：{str(e)}', 'danger')
+            current_app.logger.error(f'导出员工数据失败：{str(e)}')
+            flash('导出失败，请稍后重试或联系管理员', 'danger')
             return redirect(url_for('main.manage_employees'))
 
     return render_template('main/export_form.html', title='导出员工数据', form=form)
@@ -2262,7 +2269,7 @@ def download_process_price_template():
                 os.remove(temp_path)
             except OSError:
                 pass
-        flash(f'下载模板失败：{str(e)}', 'danger')
+        flash('下载模板失败，请稍后重试或联系管理员', 'danger')
         return redirect(url_for('main.process_prices'))
     finally:
         # 确保在请求结束后删除临时文件
@@ -2297,7 +2304,7 @@ def import_process_prices():
         try:
             process_data = ExcelGenerator.parse_process_price_data(temp_path)
         except Exception as e:
-            return jsonify({'success': False, 'message': f'Excel文件解析失败：{str(e)}。请检查文件格式是否正确。'})
+            return jsonify({'success': False, 'message': 'Excel文件解析失败，请稍后重试或联系管理员'})
         
         if not process_data:
             return jsonify({'success': False, 'message': 'Excel文件中没有找到有效数据。请检查文件内容。'})
@@ -2448,7 +2455,7 @@ def import_process_prices():
             db.session.commit()
         except Exception as e:
             db.session.rollback()
-            return jsonify({'success': False, 'message': f'保存普通工序时发生错误：{str(e)}'})
+            return jsonify({'success': False, 'message': '保存普通工序时发生错误，请稍后重试或联系管理员'})
         
         # 第二遍：处理小计工序
         for i, data in enumerate(process_data, 1):
@@ -2548,7 +2555,7 @@ def import_process_prices():
                 db.session.rollback()
         except Exception as e:
             db.session.rollback()
-            return jsonify({'success': False, 'message': f'保存数据时发生错误：{str(e)}'})
+            return jsonify({'success': False, 'message': '保存数据时发生错误，请稍后重试或联系管理员'})
         
         # 构建返回消息
         message_parts = []
@@ -2582,7 +2589,7 @@ def import_process_prices():
         
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': f'导入过程中发生未预期的错误：{str(e)}'})
+        return jsonify({'success': False, 'message': '导入过程中发生未预期的错误，请稍后重试或联系管理员'})
     finally:
         # 清理临时文件
         if temp_path and os.path.exists(temp_path):
@@ -2623,8 +2630,8 @@ def export_process_prices():
                 download_name=f'processes_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
             )
         except Exception as e:
-            current_app.logger.error(f'导出工序数据失败: {str(e)}')
-            flash(f'导出失败：{str(e)}', 'danger')
+            current_app.logger.error(f'导出工序数据失败：{str(e)}')
+            flash('导出失败，请稍后重试或联系管理员', 'danger')
             return redirect(url_for('main.process_prices'))
 
     return render_template('main/export_form.html', title='导出工序数据', form=form)
@@ -2658,7 +2665,7 @@ def download_production_record_template():
                 os.remove(temp_path)
             except OSError:
                 pass
-        flash(f'下载模板失败：{str(e)}', 'danger')
+        flash('下载模板失败，请稍后重试或联系管理员', 'danger')
         return redirect(url_for('main.manage_production_records'))
     finally:
         # 确保在请求结束后删除临时文件
@@ -2752,7 +2759,7 @@ def import_production_records():
         })
         
     except Exception as e:
-        return jsonify({'success': False, 'message': f'导入失败：{str(e)}'})
+        return jsonify({'success': False, 'message': '导入失败，请稍后重试或联系管理员'})
 
 @bp.route('/production_records/export', methods=['GET', 'POST'])
 @login_required
@@ -2792,7 +2799,7 @@ def export_production_records():
                     os.remove(temp_path)
                 except OSError:
                     pass
-            flash(f'导出失败：{str(e)}', 'danger')
+            flash('导出失败，请稍后重试或联系管理员', 'danger')
             return redirect(url_for('main.manage_production_records'))
         finally:
             # 确保在请求结束后删除临时文件
@@ -2844,7 +2851,7 @@ def export_bonus_penalties():
                     os.remove(temp_path)
                 except OSError:
                     pass
-            flash(f'导出失败：{str(e)}', 'danger')
+            flash('导出失败，请稍后重试或联系管理员', 'danger')
             return redirect(url_for('main.manage_bonus_penalties'))
         finally:
             # 确保在请求结束后删除临时文件
@@ -3251,7 +3258,7 @@ def manage_tasks():
             return redirect(url_for('main.manage_tasks'))
         except Exception as e:
             db.session.rollback()
-            flash(f'任务分配失败：{str(e)}', 'danger')
+            flash('任务分配失败，请稍后重试或联系管理员', 'danger')
     
     # 从请求参数填充搜索表单
     search_form.search.data = request.args.get('search', '')
@@ -3465,7 +3472,7 @@ def update_task_status(id):
                         current_app.logger.warning(f'未找到可用的质检员，无法为生产记录 {production_record.global_sn} 创建质检任务')
                         
                 except Exception as e:
-                    current_app.logger.error(f'自动创建质检任务失败: {str(e)}')
+                    current_app.logger.error(f'自动创建质检任务失败：{str(e)}')
                     # 不影响主流程，继续执行
             
             # 添加原材料使用记录
@@ -3518,7 +3525,7 @@ def update_task_status(id):
                 if consumption['invalid']:
                     current_app.logger.warning(f'报工扣料明细被跳过：{consumption["invalid"]}')
             except Exception as e:
-                current_app.logger.error(f'报工扣料回写 MaterialAllocation 失败: {str(e)}')
+                current_app.logger.error(f'报工扣料回写 MaterialAllocation 失败：{str(e)}')
         else:
             # 如果任务还未完成，但已经开始，更新状态为进行中
             task.status = 'in_progress'
@@ -3650,7 +3657,7 @@ def update_task_status(id):
                 update_production_status_hierarchy()
                 
             except Exception as e:
-                current_app.logger.error(f'同步更新生产批次状态失败: {str(e)}')
+                current_app.logger.error(f'同步更新生产批次状态失败：{str(e)}')
                 # 不影响主流程，继续执行
         
         # 同步生产中心：若任务关联实例/批次则更新实例或批次下各实例的可视状态
@@ -3661,7 +3668,12 @@ def update_task_status(id):
             if task.batch_item_id:
                 bi = ProductionBatchItem.query.get(task.batch_item_id)
                 if bi:
-                    if task.status == 'completed' and bi.status != 'completed':
+                    if (bi.status or '') == 'scrapped':
+                        # DEC-1 §1.3：报废是**终态** —— 后续报工不得把它改回 completed/in_progress
+                        # （否则 quality_status 复位成 pass 后该产出会被放行，违反 RC-5/RC-11）
+                        current_app.logger.warning(
+                            f'实例 {bi.product_code} 已报废（终态），本次报工不同步实例状态')
+                    elif task.status == 'completed' and bi.status != 'completed':
                         bi.status = 'completed'
                     elif task.status in ['in_progress', 'pending'] and bi.status == 'pending':
                         bi.status = 'in_progress'
@@ -3743,8 +3755,8 @@ def update_task_status(id):
     except Exception as e:
         _reraise_http(e)
         db.session.rollback()
-        current_app.logger.error(f'更新任务状态失败: {str(e)}')
-        return jsonify({'success': False, 'message': f'更新失败：{str(e)}'}), 500
+        current_app.logger.error(f'更新任务状态失败：{str(e)}')
+        return jsonify({'success': False, 'message': '更新失败，请稍后重试或联系管理员'}), 500
 
 @bp.route('/tasks/<int:id>', methods=['DELETE'])
 @login_required
@@ -3786,7 +3798,7 @@ def delete_task(id):
     except Exception as e:
         _reraise_http(e)
         db.session.rollback()
-        return jsonify({'success': False, 'message': f'删除失败：{str(e)}'}), 500
+        return jsonify({'success': False, 'message': '删除失败，请稍后重试或联系管理员'}), 500
 
 @bp.route('/my_tasks')
 @login_required
@@ -3833,7 +3845,7 @@ def download_bonus_penalty_template():
                 os.remove(temp_path)
             except OSError:
                 pass
-        flash(f'下载模板失败：{str(e)}', 'danger')
+        flash('下载模板失败，请稍后重试或联系管理员', 'danger')
         return redirect(url_for('main.manage_bonus_penalties'))
     finally:
         # 确保在请求结束后删除临时文件
@@ -3928,7 +3940,7 @@ def import_bonus_penalties():
         })
         
     except Exception as e:
-        return jsonify({'success': False, 'message': f'导入失败：{str(e)}'})
+        return jsonify({'success': False, 'message': '导入失败，请稍后重试或联系管理员'})
 
 @bp.route('/tasks/template')
 @login_required
@@ -3959,7 +3971,7 @@ def download_task_template():
                 os.remove(temp_path)
             except OSError:
                 pass
-        flash(f'下载模板失败：{str(e)}', 'danger')
+        flash('下载模板失败，请稍后重试或联系管理员', 'danger')
         return redirect(url_for('main.manage_tasks'))
     finally:
         # 确保在请求结束后删除临时文件
@@ -4052,7 +4064,7 @@ def import_tasks():
         })
         
     except Exception as e:
-        return jsonify({'success': False, 'message': f'导入失败：{str(e)}'})
+        return jsonify({'success': False, 'message': '导入失败，请稍后重试或联系管理员'})
 @bp.route('/export_tasks', methods=['GET', 'POST'])
 @login_required
 @require_capability('task.manage')
@@ -4111,7 +4123,7 @@ def export_tasks():
                 mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
             )
         except Exception as e:
-            current_app.logger.error(f'导出任务数据失败(GET): {str(e)}')
+            current_app.logger.error(f'导出任务数据失败：{str(e)}')
             flash('导出失败，请重试', 'danger')
             return redirect(url_for('main.manage_tasks'))
 
@@ -4160,7 +4172,7 @@ def export_tasks():
                 mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
             )
         except Exception as e:
-            current_app.logger.error(f'导出任务数据失败: {str(e)}')
+            current_app.logger.error(f'导出任务数据失败：{str(e)}')
             flash('导出失败，请重试', 'danger')
             return redirect(url_for('main.manage_tasks'))
     
@@ -4266,8 +4278,8 @@ def rollback_audit_log(log_id):
     except Exception as e:
         _reraise_http(e)
         db.session.rollback()
-        current_app.logger.error(f'回滚失败: {str(e)}')
-        return jsonify({'success': False, 'message': f'回滚失败：{str(e)}'}), 500
+        current_app.logger.error(f'回滚失败：{str(e)}')
+        return jsonify({'success': False, 'message': '回滚失败，请稍后重试或联系管理员'}), 500
 
 @bp.route('/bonus_penalties/<int:id>', methods=['GET'])
 @login_required
@@ -4339,8 +4351,8 @@ def update_bonus_penalty(id):
     except Exception as e:
         _reraise_http(e)
         db.session.rollback()
-        current_app.logger.error(f'更新奖惩记录失败: {str(e)}')
-        return jsonify({'success': False, 'message': f'更新失败：{str(e)}'}), 500
+        current_app.logger.error(f'更新奖惩记录失败：{str(e)}')
+        return jsonify({'success': False, 'message': '更新失败，请稍后重试或联系管理员'}), 500
 
 @bp.route('/tasks/<int:id>', methods=['GET'])
 @login_required
@@ -4363,8 +4375,8 @@ def get_task(id):
         })
     except Exception as e:
         _reraise_http(e)
-        current_app.logger.error(f'获取任务失败: {str(e)}')
-        return jsonify({'success': False, 'message': f'获取失败：{str(e)}'}), 500
+        current_app.logger.error(f'获取任务失败：{str(e)}')
+        return jsonify({'success': False, 'message': '获取失败，请稍后重试或联系管理员'}), 500
 
 @bp.route('/tasks/add', methods=['POST'])
 @login_required
@@ -4441,9 +4453,11 @@ def add_task():
             }
         })
     except Exception as e:
+        # W4/P-09：HTTPException（404/415）按语义出口，不得吞成 500/200
+        _reraise_http(e)
         db.session.rollback()
-        current_app.logger.error(f'添加任务失败: {str(e)}')
-        return jsonify({'success': False, 'message': f'添加失败：{str(e)}'}), 500
+        current_app.logger.error(f'添加任务失败：{str(e)}')
+        return jsonify({'success': False, 'message': '添加失败，请稍后重试或联系管理员'}), 500
 
 @bp.route('/tasks/assignment/<int:id>', methods=['GET'])
 @login_required
@@ -4468,8 +4482,8 @@ def get_task_assignment(id):
         })
     except Exception as e:
         _reraise_http(e)
-        current_app.logger.error(f'获取任务分配详情失败: {str(e)}')
-        return jsonify({'success': False, 'message': f'获取失败：{str(e)}'}), 500
+        current_app.logger.error(f'获取任务分配详情失败：{str(e)}')
+        return jsonify({'success': False, 'message': '获取失败，请稍后重试或联系管理员'}), 500
 
 @bp.route('/tasks/<int:id>/edit', methods=['POST'])
 @login_required
@@ -4504,6 +4518,8 @@ def edit_task(id):
         task.employee_id = data.get('employee_id')
         task.process_id = data.get('process_id')
         task.quantity = data.get('quantity')
+        # W4/W5 P-08：备注必须真的落库；未提供 notes 时保持原值（缺省即保持，不得清空）
+        task.notes = data.get('notes', task.notes)
         
         # 更新状态
         new_status = data.get('status')
@@ -4553,8 +4569,8 @@ def edit_task(id):
     except Exception as e:
         _reraise_http(e)
         db.session.rollback()
-        current_app.logger.error(f'更新任务失败: {str(e)}')
-        return jsonify({'success': False, 'message': f'更新失败：{str(e)}'}), 500
+        current_app.logger.error(f'更新任务失败：{str(e)}')
+        return jsonify({'success': False, 'message': '更新失败，请稍后重试或联系管理员'}), 500
 
 @bp.route('/employee_salary_changes/<int:employee_id>')
 @login_required
@@ -4926,7 +4942,7 @@ def import_finished_products():
                 
                 success_count += 1
             except Exception as e:
-                error_messages.append(f'第{index+2}行导入失败：{str(e)}')
+                error_messages.append('第{index+2}行导入失败，请稍后重试或联系管理员')
         
         db.session.commit()
         
@@ -4939,7 +4955,7 @@ def import_finished_products():
         
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': f'导入失败：{str(e)}'})
+        return jsonify({'success': False, 'message': '导入失败，请稍后重试或联系管理员'})
     finally:
         # 清理临时文件
         if os.path.exists(temp_path):
@@ -5017,7 +5033,7 @@ def import_raw_materials():
                 
                 success_count += 1
             except Exception as e:
-                error_messages.append(f'第{index+2}行导入失败：{str(e)}')
+                error_messages.append('第{index+2}行导入失败，请稍后重试或联系管理员')
         
         db.session.commit()
         
@@ -5030,7 +5046,7 @@ def import_raw_materials():
         
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': f'导入失败：{str(e)}'})
+        return jsonify({'success': False, 'message': '导入失败，请稍后重试或联系管理员'})
     finally:
         # 清理临时文件
         if os.path.exists(temp_path):
@@ -5161,7 +5177,7 @@ def add_finished_product():
     
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': f'添加失败：{str(e)}'})
+        return jsonify({'success': False, 'message': '添加失败，请稍后重试或联系管理员'})
 
 @bp.route('/inventory/raw/add', methods=['POST'])
 @login_required
@@ -5265,7 +5281,7 @@ def add_raw_material():
     
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': f'添加失败：{str(e)}'})
+        return jsonify({'success': False, 'message': '添加失败，请稍后重试或联系管理员'})
 
 # ==================== 系统配置 ====================
 
@@ -5317,7 +5333,7 @@ def manage_system_configs():
             flash(f'已保存 {changed} 项配置' if changed else '配置未发生变化', 'success')
         except Exception as e:
             db.session.rollback()
-            current_app.logger.error(f'保存系统配置失败: {str(e)}')
+            current_app.logger.error(f'保存系统配置失败：{str(e)}')
             flash('保存失败，请重试', 'danger')
         return redirect(url_for('main.manage_system_configs'))
 
@@ -5388,7 +5404,7 @@ def add_code_rule():
             
         except Exception as e:
             db.session.rollback()
-            return jsonify({'success': False, 'message': f'添加失败：{str(e)}'})
+            return jsonify({'success': False, 'message': '添加失败，请稍后重试或联系管理员'})
     
     return render_template('main/code_rule_form.html', title='添加编码规则')
 
@@ -5444,7 +5460,7 @@ def edit_code_rule(rule_id):
             
         except Exception as e:
             db.session.rollback()
-            return jsonify({'success': False, 'message': f'更新失败：{str(e)}'})
+            return jsonify({'success': False, 'message': '更新失败，请稍后重试或联系管理员'})
     
     return render_template('main/code_rule_form.html', title='编辑编码规则', rule=rule)
 
@@ -5484,7 +5500,7 @@ def delete_code_rule(rule_id):
         
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': f'删除失败：{str(e)}'})
+        return jsonify({'success': False, 'message': '删除失败，请稍后重试或联系管理员'})
 
 @bp.route('/code_rules/<int:rule_id>/generate', methods=['POST'])
 @login_required
@@ -5517,7 +5533,7 @@ def generate_code(rule_id):
         
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': f'编码生成失败：{str(e)}'})
+        return jsonify({'success': False, 'message': '编码生成失败，请稍后重试或联系管理员'})
 
 @bp.route('/code_rules/available/product', methods=['GET'])
 @login_required
@@ -5543,7 +5559,7 @@ def get_available_product_rules():
         current_app.logger.error(f"获取产品编码规则时出错: {str(e)}")
         return jsonify({
             'success': False,
-            'message': f'获取编码规则失败: {str(e)}'
+            'message': '获取编码规则失败，请稍后重试或联系管理员'
         }), 500
 
 @bp.route('/code_rules/available/material', methods=['GET'])
@@ -5570,7 +5586,7 @@ def get_available_material_rules():
         current_app.logger.error(f"获取原材料编码规则时出错: {str(e)}")
         return jsonify({
             'success': False,
-            'message': f'获取编码规则失败: {str(e)}'
+            'message': '获取编码规则失败，请稍后重试或联系管理员'
         }), 500
 
 @bp.route('/inventory/finished/<int:id>', methods=['GET'])
@@ -5597,7 +5613,7 @@ def get_finished_product(id):
         })
     except Exception as e:
         _reraise_http(e)
-        return jsonify({'success': False, 'message': f'获取成品详情失败：{str(e)}'})
+        return jsonify({'success': False, 'message': '获取成品详情失败，请稍后重试或联系管理员'})
 
 @bp.route('/inventory/finished/<int:id>', methods=['PUT'])
 @login_required
@@ -5667,7 +5683,7 @@ def update_finished_product(id):
     except Exception as e:
         _reraise_http(e)
         db.session.rollback()
-        return jsonify({'success': False, 'message': f'更新失败：{str(e)}'})
+        return jsonify({'success': False, 'message': '更新失败，请稍后重试或联系管理员'})
 
 @bp.route('/inventory/raw/<int:id>', methods=['GET'])
 @login_required
@@ -5697,7 +5713,7 @@ def get_raw_material(id):
         })
     except Exception as e:
         _reraise_http(e)
-        return jsonify({'success': False, 'message': f'获取原材料详情失败：{str(e)}'})
+        return jsonify({'success': False, 'message': '获取原材料详情失败，请稍后重试或联系管理员'})
 
 @bp.route('/inventory/raw/<int:id>', methods=['PUT'])
 @login_required
@@ -5784,7 +5800,7 @@ def update_raw_material(id):
     except Exception as e:
         _reraise_http(e)
         db.session.rollback()
-        return jsonify({'success': False, 'message': f'更新失败：{str(e)}'})
+        return jsonify({'success': False, 'message': '更新失败，请稍后重试或联系管理员'})
 
 @bp.route('/process_prices/<int:id>', methods=['GET'])
 @login_required
@@ -5829,7 +5845,7 @@ def get_process_price(id):
         })
     except Exception as e:
         _reraise_http(e)
-        return jsonify({'success': False, 'message': f'获取工序详情失败：{str(e)}'}), 500
+        return jsonify({'success': False, 'message': '获取工序详情失败，请稍后重试或联系管理员'}), 500
 
 
 
@@ -5890,10 +5906,10 @@ def delete_raw_material(id):
     except Exception as e:
         _reraise_http(e)
         db.session.rollback()
-        current_app.logger.error(f'删除原材料失败: {str(e)}')
+        current_app.logger.error(f'删除原材料失败：{str(e)}')
         return jsonify({
             'success': False,
-            'message': f'删除失败：{str(e)}'
+            'message': '删除失败，请稍后重试或联系管理员'
         }), 500
 
 @bp.route('/inventory/finished/<int:id>', methods=['DELETE'])
@@ -5950,10 +5966,10 @@ def delete_finished_product(id):
     except Exception as e:
         _reraise_http(e)
         db.session.rollback()
-        current_app.logger.error(f'删除成品失败: {str(e)}')
+        current_app.logger.error(f'删除成品失败：{str(e)}')
         return jsonify({
             'success': False,
-            'message': f'删除失败：{str(e)}'
+            'message': '删除失败，请稍后重试或联系管理员'
         }), 500
 
 @bp.route('/tasks/<int:id>/get', methods=['GET'])
@@ -6006,7 +6022,7 @@ def get_task_details(id):
         })
     except Exception as e:
         _reraise_http(e)
-        return jsonify({'success': False, 'message': f'获取任务详情失败：{str(e)}'}), 500
+        return jsonify({'success': False, 'message': '获取任务详情失败，请稍后重试或联系管理员'}), 500
 
 @bp.route('/api/inventory/raw-materials')
 @login_required
@@ -6043,7 +6059,7 @@ def get_available_raw_materials():
     except Exception as e:
         return jsonify({
             'success': False,
-            'message': f'获取原材料列表失败: {str(e)}'
+            'message': '获取原材料列表失败，请稍后重试或联系管理员'
         }), 500
 
 @bp.route('/api/inventory/finished-products')
@@ -6096,7 +6112,7 @@ def get_available_finished_products():
     except Exception as e:
         return jsonify({
             'success': False,
-            'message': f'获取成品列表失败: {str(e)}'
+            'message': '获取成品列表失败，请稍后重试或联系管理员'
         }), 500
 
 @bp.route('/api/inventory/consumables')
@@ -6122,7 +6138,7 @@ def get_available_consumables():
         } for c in rows]
         return jsonify({'success': True, 'data': data})
     except Exception as e:
-        return jsonify({'success': False, 'message': f'获取易耗品列表失败: {str(e)}'}), 500
+        return jsonify({'success': False, 'message': '获取易耗品列表失败，请稍后重试或联系管理员'}), 500
 
 @bp.route('/inventory/raw/<int:id>/archive', methods=['POST'])
 @login_required
@@ -6161,10 +6177,10 @@ def toggle_raw_material_archive(id):
     except Exception as e:
         _reraise_http(e)
         db.session.rollback()
-        current_app.logger.error(f'原材料存档状态切换失败: {str(e)}')
+        current_app.logger.error(f'原材料存档状态切换失败：{str(e)}')
         return jsonify({
             'success': False,
-            'message': f'操作失败：{str(e)}'
+            'message': '操作失败，请稍后重试或联系管理员'
         }), 500
 @bp.route('/inventory/finished/<int:id>/archive', methods=['POST'])
 @login_required
@@ -6203,10 +6219,10 @@ def toggle_finished_product_archive(id):
     except Exception as e:
         _reraise_http(e)
         db.session.rollback()
-        current_app.logger.error(f'成品存档状态切换失败: {str(e)}')
+        current_app.logger.error(f'成品存档状态切换失败：{str(e)}')
         return jsonify({
             'success': False,
-            'message': f'操作失败：{str(e)}'
+            'message': '操作失败，请稍后重试或联系管理员'
         }), 500
 
 @bp.route('/inventory/auto-archive', methods=['POST'])
@@ -6259,7 +6275,7 @@ def auto_archive_inventory():
         
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': f'自动存档失败: {str(e)}'})
+        return jsonify({'success': False, 'message': '自动存档失败，请稍后重试或联系管理员'})
 
 
 @bp.route('/inventory/inbound', methods=['GET', 'POST'])
@@ -6424,7 +6440,7 @@ def inventory_inbound():
                         success_count += 1
                 
                 except Exception as e:
-                    error_messages.append(f'第 {row_index + 1} 行处理失败: {str(e)}')
+                    error_messages.append('第 {row_index + 1} 行处理失败，请稍后重试或联系管理员')
             
             # 提交数据库事务
             if success_count > 0:
@@ -6441,7 +6457,7 @@ def inventory_inbound():
             
         except Exception as e:
             db.session.rollback()
-            flash(f'批量入库失败: {str(e)}', 'danger')
+            flash('批量入库失败，请稍后重试或联系管理员', 'danger')
     
     return render_template('main/inventory_inbound.html', form=form)
 
@@ -6571,7 +6587,7 @@ def raw_material_inbound():
                     success_count += 1
                 
                 except Exception as e:
-                    error_messages.append(f'第 {row_index + 1} 行处理失败: {str(e)}')
+                    error_messages.append('第 {row_index + 1} 行处理失败，请稍后重试或联系管理员')
             
             # 提交数据库事务
             if success_count > 0:
@@ -6588,7 +6604,7 @@ def raw_material_inbound():
             
         except Exception as e:
             db.session.rollback()
-            flash(f'原材料批量入库失败: {str(e)}', 'danger')
+            flash('原材料批量入库失败，请稍后重试或联系管理员', 'danger')
     
     return render_template('main/raw_material_inbound.html', form=form)
 
@@ -6693,7 +6709,7 @@ def finished_product_inbound():
                     success_count += 1
                 
                 except Exception as e:
-                    error_messages.append(f'第 {row_index + 1} 行处理失败: {str(e)}')
+                    error_messages.append('第 {row_index + 1} 行处理失败，请稍后重试或联系管理员')
             
             # 提交数据库事务
             if success_count > 0:
@@ -6710,7 +6726,7 @@ def finished_product_inbound():
             
         except Exception as e:
             db.session.rollback()
-            flash(f'成品批量入库失败: {str(e)}', 'danger')
+            flash('成品批量入库失败，请稍后重试或联系管理员', 'danger')
     
     return render_template('main/finished_product_inbound.html', form=form)
 
@@ -6789,7 +6805,7 @@ def add_raw_material_category():
         
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': f'添加失败：{str(e)}'})
+        return jsonify({'success': False, 'message': '添加失败，请稍后重试或联系管理员'})
 
 
 @bp.route('/inventory/raw-material/categories/<int:category_id>', methods=['GET'])
@@ -6807,7 +6823,7 @@ def get_raw_material_category(category_id):
         })
     except Exception as e:
         _reraise_http(e)
-        return jsonify({'success': False, 'message': f'获取品类详情失败：{str(e)}'})
+        return jsonify({'success': False, 'message': '获取品类详情失败，请稍后重试或联系管理员'})
 
 
 @bp.route('/inventory/raw-material/categories/<int:category_id>', methods=['PUT'])
@@ -6878,7 +6894,7 @@ def update_raw_material_category(category_id):
     except Exception as e:
         _reraise_http(e)
         db.session.rollback()
-        return jsonify({'success': False, 'message': f'更新失败：{str(e)}'})
+        return jsonify({'success': False, 'message': '更新失败，请稍后重试或联系管理员'})
 
 
 @bp.route('/inventory/raw-material/categories/<int:category_id>', methods=['DELETE'])
@@ -6924,7 +6940,7 @@ def delete_raw_material_category(category_id):
     except Exception as e:
         _reraise_http(e)
         db.session.rollback()
-        return jsonify({'success': False, 'message': f'删除失败：{str(e)}'})
+        return jsonify({'success': False, 'message': '删除失败，请稍后重试或联系管理员'})
 
 
 @bp.route('/api/raw-material-categories', methods=['GET'])
@@ -6952,7 +6968,7 @@ def get_raw_material_categories_api():
         })
         
     except Exception as e:
-        return jsonify({'success': False, 'message': f'获取品类列表失败：{str(e)}'})
+        return jsonify({'success': False, 'message': '获取品类列表失败，请稍后重试或联系管理员'})
 # 产品管理路由
 @bp.route('/products')
 @login_required
@@ -7076,8 +7092,8 @@ def add_product():
         
     except Exception as e:
         db.session.rollback()
-        current_app.logger.error(f'添加产品失败: {str(e)}')
-        return jsonify({'success': False, 'message': f'添加失败: {str(e)}'}), 500
+        current_app.logger.error(f'添加产品失败：{str(e)}')
+        return jsonify({'success': False, 'message': '添加失败，请稍后重试或联系管理员'}), 500
 
 @bp.route('/products/<int:id>', methods=['GET'])
 @login_required
@@ -7111,7 +7127,7 @@ def get_product(id):
         
     except Exception as e:
         _reraise_http(e)
-        return jsonify({'success': False, 'message': f'获取产品详情失败: {str(e)}'})
+        return jsonify({'success': False, 'message': '获取产品详情失败，请稍后重试或联系管理员'})
 
 @bp.route('/products/<int:id>', methods=['PUT'])
 @login_required
@@ -7149,7 +7165,7 @@ def update_product(id):
     except Exception as e:
         _reraise_http(e)
         db.session.rollback()
-        return jsonify({'success': False, 'message': f'更新失败: {str(e)}'})
+        return jsonify({'success': False, 'message': '更新失败，请稍后重试或联系管理员'})
 
 @bp.route('/products/<int:id>', methods=['DELETE'])
 @login_required
@@ -7177,7 +7193,7 @@ def delete_product(id):
     except Exception as e:
         _reraise_http(e)
         db.session.rollback()
-        return jsonify({'success': False, 'message': f'删除失败: {str(e)}'})
+        return jsonify({'success': False, 'message': '删除失败，请稍后重试或联系管理员'})
 
 @bp.route('/products/<int:id>/bom')
 @login_required
@@ -7306,7 +7322,7 @@ def add_product_bom(product_id):
     except Exception as e:
         _reraise_http(e)
         db.session.rollback()
-        return jsonify({'success': False, 'message': f'添加失败: {str(e)}'})
+        return jsonify({'success': False, 'message': '添加失败，请稍后重试或联系管理员'})
 
 @bp.route('/products/<int:product_id>/bom/<int:bom_item_id>', methods=['GET'])
 @login_required
@@ -7335,7 +7351,9 @@ def get_product_bom_item(product_id, bom_item_id):
         })
         
     except Exception as e:
-        return jsonify({'success': False, 'message': f'获取BOM项详情失败: {str(e)}'})
+        # W4/P-09：HTTPException（404/415）按语义出口，不得吞成 500/200
+        _reraise_http(e)
+        return jsonify({'success': False, 'message': '获取BOM项详情失败，请稍后重试或联系管理员'})
 
 @bp.route('/products/<int:product_id>/bom/<int:bom_item_id>', methods=['PUT'])
 @login_required
@@ -7368,8 +7386,10 @@ def update_product_bom_item(product_id, bom_item_id):
         return jsonify({'success': True, 'message': 'BOM项更新成功'})
         
     except Exception as e:
+        # W4/P-09：HTTPException（404/415）按语义出口，不得吞成 500/200
+        _reraise_http(e)
         db.session.rollback()
-        return jsonify({'success': False, 'message': f'更新失败: {str(e)}'})
+        return jsonify({'success': False, 'message': '更新失败，请稍后重试或联系管理员'})
 
 @bp.route('/products/<int:product_id>/bom/<int:bom_item_id>', methods=['DELETE'])
 @login_required
@@ -7389,8 +7409,10 @@ def delete_product_bom_item(product_id, bom_item_id):
         return jsonify({'success': True, 'message': 'BOM项删除成功'})
         
     except Exception as e:
+        # W4/P-09：HTTPException（404/415）按语义出口，不得吞成 500/200
+        _reraise_http(e)
         db.session.rollback()
-        return jsonify({'success': False, 'message': f'删除失败: {str(e)}'})
+        return jsonify({'success': False, 'message': '删除失败，请稍后重试或联系管理员'})
 
 @bp.route('/products/<int:product_id>/processes')
 @login_required
@@ -7507,7 +7529,7 @@ def add_product_process(product_id):
     except Exception as e:
         _reraise_http(e)
         db.session.rollback()
-        return jsonify({'success': False, 'message': f'添加失败: {str(e)}'})
+        return jsonify({'success': False, 'message': '添加失败，请稍后重试或联系管理员'})
 
 @bp.route('/products/<int:product_id>/processes/<int:process_item_id>', methods=['DELETE'])
 @login_required
@@ -7527,8 +7549,10 @@ def delete_product_process(product_id, process_item_id):
         return jsonify({'success': True, 'message': '工序删除成功'})
         
     except Exception as e:
+        # W4/P-09：HTTPException（404/415）按语义出口，不得吞成 500/200
+        _reraise_http(e)
         db.session.rollback()
-        return jsonify({'success': False, 'message': f'删除失败: {str(e)}'})
+        return jsonify({'success': False, 'message': '删除失败，请稍后重试或联系管理员'})
 
 @bp.route('/products/<int:product_id>/processes/<int:process_item_id>', methods=['PUT'])
 @login_required
@@ -7574,8 +7598,10 @@ def update_product_process(product_id, process_item_id):
         return jsonify({'success': True, 'message': '工序更新成功'})
         
     except Exception as e:
+        # W4/P-09：HTTPException（404/415）按语义出口，不得吞成 500/200
+        _reraise_http(e)
         db.session.rollback()
-        return jsonify({'success': False, 'message': f'更新失败: {str(e)}'})
+        return jsonify({'success': False, 'message': '更新失败，请稍后重试或联系管理员'})
 
 @bp.route('/products/<int:product_id>/processes/<int:process_item_id>', methods=['GET'])
 @login_required
@@ -7609,7 +7635,9 @@ def get_product_process(product_id, process_item_id):
         })
         
     except Exception as e:
-        return jsonify({'success': False, 'message': f'获取工序详情失败: {str(e)}'})
+        # W4/P-09：HTTPException（404/415）按语义出口，不得吞成 500/200
+        _reraise_http(e)
+        return jsonify({'success': False, 'message': '获取工序详情失败，请稍后重试或联系管理员'})
 
 # ================== 产品Excel导入导出功能 ==================
 
@@ -7642,7 +7670,7 @@ def download_product_template():
                 os.remove(temp_path)
             except OSError:
                 pass
-        flash(f'下载模板失败：{str(e)}', 'danger')
+        flash('下载模板失败，请稍后重试或联系管理员', 'danger')
         return redirect(url_for('main.manage_products'))
     finally:
         # 确保在请求结束后删除临时文件
@@ -7875,8 +7903,8 @@ def import_products():
             
     except Exception as e:
         db.session.rollback()
-        current_app.logger.error(f'产品导入失败: {str(e)}')
-        return jsonify({'success': False, 'message': f'导入失败: {str(e)}'})
+        current_app.logger.error(f'产品导入失败：{str(e)}')
+        return jsonify({'success': False, 'message': '导入失败，请稍后重试或联系管理员'})
 
 @bp.route('/products/export', methods=['GET', 'POST'])
 @login_required  
@@ -7946,8 +7974,8 @@ def export_products():
             return jsonify({'success': False, 'message': '表单验证失败：' + '；'.join(errors)})
             
     except Exception as e:
-        current_app.logger.error(f'产品导出失败: {str(e)}')
-        return jsonify({'success': False, 'message': f'导出失败: {str(e)}'})
+        current_app.logger.error(f'产品导出失败：{str(e)}')
+        return jsonify({'success': False, 'message': '导出失败，请稍后重试或联系管理员'})
 
 @bp.route('/api/products/search')
 @login_required
@@ -7987,7 +8015,7 @@ def search_products():
         })
         
     except Exception as e:
-        return jsonify({'success': False, 'message': f'搜索失败: {str(e)}'})
+        return jsonify({'success': False, 'message': '搜索失败，请稍后重试或联系管理员'})
 
 # 生产订单管理路由
 @bp.route('/production_orders')
@@ -8077,7 +8105,7 @@ def add_production_order():
         
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': f'创建失败: {str(e)}'})
+        return jsonify({'success': False, 'message': '创建失败，请稍后重试或联系管理员'})
 
 @bp.route('/production_orders/<int:order_id>', methods=['GET'])
 @login_required
@@ -8147,7 +8175,7 @@ def delete_production_order(order_id):
     except Exception as e:
         _reraise_http(e)
         db.session.rollback()
-        return jsonify({'success': False, 'message': f'删除失败: {str(e)}'})
+        return jsonify({'success': False, 'message': '删除失败，请稍后重试或联系管理员'})
 
 @bp.route('/production_orders/<int:order_id>/edit', methods=['GET', 'POST'])
 @login_required
@@ -8283,7 +8311,7 @@ def edit_production_order(order_id):
             
         except Exception as e:
             db.session.rollback()
-            flash(f'修改失败: {str(e)}', 'error')
+            flash('修改失败，请稍后重试或联系管理员', 'error')
     
     elif request.method == 'GET':
         # 填充表单数据（所有12个规格字段）
@@ -8435,7 +8463,7 @@ def create_production_order_from_sales(order_id):
     except Exception as e:
         _reraise_http(e)
         db.session.rollback()
-        return jsonify({'success': False, 'message': f'创建失败: {str(e)}'})
+        return jsonify({'success': False, 'message': '创建失败，请稍后重试或联系管理员'})
 @bp.route('/sales_order_item/<int:item_id>/create_production_order', methods=['POST'])
 @login_required
 @require_capability('production_order.manage')
@@ -8552,7 +8580,7 @@ def create_production_order_from_item(item_id):
     except Exception as e:
         _reraise_http(e)
         db.session.rollback()
-        return jsonify({'success': False, 'message': f'创建失败: {str(e)}'})
+        return jsonify({'success': False, 'message': '创建失败，请稍后重试或联系管理员'})
 
 def check_and_handle_material_shortage(order, batch_quantity):
     """检查该订单在本次批次下的物料缺口，返回短缺清单。
@@ -8721,7 +8749,7 @@ def add_production_batch(order_id):
     except Exception as e:
         _reraise_http(e)
         db.session.rollback()
-        return jsonify({'success': False, 'message': f'创建失败: {str(e)}'})
+        return jsonify({'success': False, 'message': '创建失败，请稍后重试或联系管理员'})
 
 def create_tasks_for_production_batch(batch):
     """为生产批次自动创建生产任务"""
@@ -8745,7 +8773,7 @@ def create_tasks_for_production_batch(batch):
                 rule = ProcessAssignmentRule.query.filter_by(process_id=process_item.process_id, is_active=True).first()
             except Exception as e:
                 if 'no such table' not in str(e).lower():
-                    current_app.logger.warning(f'查询工序分配规则异常: {str(e)}')
+                    current_app.logger.warning(f'查询工序分配规则异常：{str(e)}')
             if rule:
                 members = rule.members.filter_by(is_active=True).order_by(ProcessAssignmentMember.sequence).all()
                 if members:
@@ -8852,7 +8880,7 @@ def create_tasks_for_production_batch(batch):
         return True
         
     except Exception as e:
-        current_app.logger.error(f'为生产批次 {batch.batch_number} 创建生产任务失败: {str(e)}')
+        current_app.logger.error(f'为生产批次 {batch.batch_number} 创建生产任务失败：{str(e)}')
         return False 
 
 @bp.route('/production_batches/<int:batch_id>')
@@ -8911,7 +8939,7 @@ def update_batch_item(item_id):
     except Exception as e:
         _reraise_http(e)
         db.session.rollback()
-        return jsonify({'success': False, 'message': f'更新失败: {str(e)}'})
+        return jsonify({'success': False, 'message': '更新失败，请稍后重试或联系管理员'})
 
 @bp.route('/production_batches/<int:batch_id>/status', methods=['PUT'])
 @login_required
@@ -8947,7 +8975,7 @@ def update_batch_status(batch_id):
                     if not created:
                         current_app.logger.warning(f'批次 {batch.batch_number} 开始生产时未能自动创建任务（可能无工序或无可用员工）')
             except Exception as e:
-                current_app.logger.error(f'批次 {batch.batch_number} 自动创建任务失败: {str(e)}')
+                current_app.logger.error(f'批次 {batch.batch_number} 自动创建任务失败：{str(e)}')
         elif new_status == 'completed':
             if not batch.end_date:
                 batch.end_date = datetime.now().date()
@@ -8973,7 +9001,7 @@ def update_batch_status(batch_id):
     except Exception as e:
         _reraise_http(e)
         db.session.rollback()
-        return jsonify({'success': False, 'message': f'状态更新失败: {str(e)}'})
+        return jsonify({'success': False, 'message': '状态更新失败，请稍后重试或联系管理员'})
 
 def update_production_status_hierarchy():
     """更新生产状态层次结构：批次项目 -> 批次 -> 订单"""
@@ -9049,7 +9077,7 @@ def update_production_status_hierarchy():
         
     except Exception as e:
         db.session.rollback()
-        current_app.logger.error(f'更新生产状态层次结构失败: {str(e)}')
+        current_app.logger.error(f'更新生产状态层次结构失败：{str(e)}')
         raise e
 
 # ==================== 客户管理 ====================
@@ -9150,7 +9178,7 @@ def add_customer():
             
         except Exception as e:
             db.session.rollback()
-            flash(f'新增客户失败：{str(e)}', 'danger')
+            flash('新增客户失败，请稍后重试或联系管理员', 'danger')
     
     return render_template('main/customer_form.html', form=form, title='新增客户')
 
@@ -9223,7 +9251,7 @@ def edit_customer(customer_id):
             
         except Exception as e:
             db.session.rollback()
-            flash(f'更新客户失败：{str(e)}', 'danger')
+            flash('更新客户失败，请稍后重试或联系管理员', 'danger')
     
     return render_template('main/customer_form.html', form=form, title='编辑客户', customer=customer)
 
@@ -9270,7 +9298,7 @@ def delete_customer(customer_id):
     except Exception as e:
         _reraise_http(e)
         db.session.rollback()
-        return jsonify({'success': False, 'message': f'删除失败：{str(e)}'})
+        return jsonify({'success': False, 'message': '删除失败，请稍后重试或联系管理员'})
 @bp.route('/customer/<int:customer_id>/address/add', methods=['GET', 'POST'])
 @login_required
 @require_capability('customer.manage')
@@ -9321,7 +9349,7 @@ def add_customer_address(customer_id):
             
         except Exception as e:
             db.session.rollback()
-            flash(f'新增地址失败：{str(e)}', 'danger')
+            flash('新增地址失败，请稍后重试或联系管理员', 'danger')
     
     return render_template('main/customer_address_form.html', 
                          form=form, 
@@ -9380,7 +9408,7 @@ def edit_customer_address(customer_id, address_id):
             
         except Exception as e:
             db.session.rollback()
-            flash(f'更新地址失败：{str(e)}', 'danger')
+            flash('更新地址失败，请稍后重试或联系管理员', 'danger')
     
     return render_template('main/customer_address_form.html', 
                          form=form, 
@@ -9433,7 +9461,7 @@ def delete_customer_address(customer_id, address_id):
     except Exception as e:
         _reraise_http(e)
         db.session.rollback()
-        return jsonify({'success': False, 'message': f'删除失败：{str(e)}'})
+        return jsonify({'success': False, 'message': '删除失败，请稍后重试或联系管理员'})
 
 @bp.route('/customer/<int:customer_id>/address/<int:address_id>/set_primary', methods=['POST'])
 @login_required
@@ -9473,7 +9501,7 @@ def set_primary_address(customer_id, address_id):
     except Exception as e:
         _reraise_http(e)
         db.session.rollback()
-        return jsonify({'success': False, 'message': f'设置失败：{str(e)}'})
+        return jsonify({'success': False, 'message': '设置失败，请稍后重试或联系管理员'})
 
 # ==================== 客户管理 API ====================
 
@@ -9514,7 +9542,7 @@ def api_search_customers():
         })
         
     except Exception as e:
-        return jsonify({'success': False, 'message': f'搜索失败：{str(e)}'})
+        return jsonify({'success': False, 'message': '搜索失败，请稍后重试或联系管理员'})
 
 # 客户地址列表 API 见下方 api_get_customer_addresses（同一 URL 曾重复注册两次，
 # 此处的旧实现已删除，保留支持 only_active 参数的那一个）
@@ -9620,7 +9648,7 @@ def add_sales_order():
             
         except Exception as e:
             db.session.rollback()
-            flash(f'新增失败：{str(e)}', 'danger')
+            flash('新增失败，请稍后重试或联系管理员', 'danger')
     
     return render_template('main/sales_order_form.html', form=form, title='新增销售订单')
 
@@ -9733,7 +9761,7 @@ def edit_sales_order(order_id):
             
         except Exception as e:
             db.session.rollback()
-            flash(f'更新失败：{str(e)}', 'danger')
+            flash('更新失败，请稍后重试或联系管理员', 'danger')
     
     return render_template('main/sales_order_form.html', form=form, title='编辑销售订单', order=order)
 
@@ -9776,7 +9804,7 @@ def delete_sales_order(order_id):
     except Exception as e:
         _reraise_http(e)
         db.session.rollback()
-        return jsonify({'success': False, 'message': f'删除失败：{str(e)}'})
+        return jsonify({'success': False, 'message': '删除失败，请稍后重试或联系管理员'})
 
 @bp.route('/sales_order/<int:order_id>/item/add', methods=['GET', 'POST'])
 @login_required
@@ -9890,7 +9918,7 @@ def add_sales_order_item(order_id):
             
         except Exception as e:
             db.session.rollback()
-            flash(f'新增失败：{str(e)}', 'danger')
+            flash('新增失败，请稍后重试或联系管理员', 'danger')
     
     return render_template('main/sales_order_item_form.html', form=form, title='新增订单行', order=order)
 
@@ -9977,7 +10005,7 @@ def edit_sales_order_item(item_id):
             
         except Exception as e:
             db.session.rollback()
-            flash(f'更新失败：{str(e)}', 'danger')
+            flash('更新失败，请稍后重试或联系管理员', 'danger')
     
     return render_template('main/sales_order_item_form.html', form=form, title='编辑订单行', 
                          order=order, order_item=order_item)
@@ -10025,7 +10053,7 @@ def delete_sales_order_item(item_id):
     except Exception as e:
         _reraise_http(e)
         db.session.rollback()
-        return jsonify({'success': False, 'message': f'删除失败：{str(e)}'})
+        return jsonify({'success': False, 'message': '删除失败，请稍后重试或联系管理员'})
 
 @bp.route('/sales_order_item/<int:item_id>/delivery_batches/manage', methods=['GET'])
 @login_required
@@ -10075,7 +10103,7 @@ def manage_delivery_batches(item_id):
             
         except Exception as e:
             db.session.rollback()
-            return jsonify({'success': False, 'message': f'设置失败：{str(e)}'})
+            return jsonify({'success': False, 'message': '设置失败，请稍后重试或联系管理员'})
     
     # GET请求返回当前分批信息
     return jsonify({
@@ -10132,7 +10160,7 @@ def api_search_sales_orders():
         })
         
     except Exception as e:
-        return jsonify({'success': False, 'message': f'搜索失败：{str(e)}'})
+        return jsonify({'success': False, 'message': '搜索失败，请稍后重试或联系管理员'})
 
 
 # ==================== 产品名称和图号选择 API ====================
@@ -10158,7 +10186,7 @@ def api_get_product_names():
         })
         
     except Exception as e:
-        return jsonify({'success': False, 'message': f'获取产品名称失败：{str(e)}'})
+        return jsonify({'success': False, 'message': '获取产品名称失败，请稍后重试或联系管理员'})
 
 @bp.route('/api/products/drawings-by-name')
 @login_required
@@ -10191,7 +10219,7 @@ def api_get_drawings_by_product_name():
         })
         
     except Exception as e:
-        return jsonify({'success': False, 'message': f'获取图号列表失败：{str(e)}'})
+        return jsonify({'success': False, 'message': '获取图号列表失败，请稍后重试或联系管理员'})
 
 # ==================== 客户地址选择 API ====================
 
@@ -10223,7 +10251,7 @@ def api_get_customer_addresses(customer_id):
         })
         
     except Exception as e:
-        return jsonify({'success': False, 'message': f'获取客户地址失败：{str(e)}'})
+        return jsonify({'success': False, 'message': '获取客户地址失败，请稍后重试或联系管理员'})
 
 @bp.route('/api/sales_orders/<int:order_id>/customer_addresses')
 @login_required
@@ -10255,7 +10283,7 @@ def api_get_sales_order_customer_addresses(order_id):
         
     except Exception as e:
         _reraise_http(e)
-        return jsonify({'success': False, 'message': f'获取客户地址失败：{str(e)}'}) 
+        return jsonify({'success': False, 'message': '获取客户地址失败，请稍后重试或联系管理员'}) 
 
 
 # ================== 通知系统路由 ==================
@@ -10335,7 +10363,7 @@ def add_notification_rule():
             
         except Exception as e:
             db.session.rollback()
-            flash(f'创建失败: {str(e)}', 'danger')
+            flash('创建失败，请稍后重试或联系管理员', 'danger')
     
     return render_template('main/add_notification_rule.html', form=form)
 
@@ -10381,7 +10409,7 @@ def api_recent_notifications():
         })
         
     except Exception as e:
-        current_app.logger.error(f'获取最近通知失败: {str(e)}')
+        current_app.logger.error(f'获取最近通知失败：{str(e)}')
         return jsonify({'success': False, 'message': '获取通知失败'}), 500
 
 
@@ -10429,8 +10457,8 @@ def api_chart_data_salary():
 
         return jsonify({'success': True, 'data': data})
     except Exception as e:
-        current_app.logger.error(f'获取工资统计数据失败: {str(e)}')
-        return jsonify({'success': False, 'message': f'获取工资统计数据失败: {str(e)}'})
+        current_app.logger.error(f'获取工资统计数据失败：{str(e)}')
+        return jsonify({'success': False, 'message': '获取工资统计数据失败，请稍后重试或联系管理员'})
 
 @bp.route('/api/chart-data/production')
 @login_required
@@ -10478,7 +10506,7 @@ def api_chart_data_production():
         
         return jsonify({'success': True, 'data': chart_data})
     except Exception as e:
-        return jsonify({'success': False, 'message': f'获取生产统计数据失败: {str(e)}'})
+        return jsonify({'success': False, 'message': '获取生产统计数据失败，请稍后重试或联系管理员'})
 
 @bp.route('/api/chart-data/department')
 @login_required
@@ -10507,7 +10535,7 @@ def api_chart_data_department():
         
         return jsonify({'success': True, 'data': data})
     except Exception as e:
-        return jsonify({'success': False, 'message': f'获取部门统计数据失败: {str(e)}'})
+        return jsonify({'success': False, 'message': '获取部门统计数据失败，请稍后重试或联系管理员'})
 
 @bp.route('/api/chart-data/task')
 @login_required
@@ -10540,7 +10568,7 @@ def api_chart_data_task():
         
         return jsonify({'success': True, 'data': data})
     except Exception as e:
-        return jsonify({'success': False, 'message': f'获取任务统计数据失败: {str(e)}'})
+        return jsonify({'success': False, 'message': '获取任务统计数据失败，请稍后重试或联系管理员'})
 
 
 # ==================== 易耗品管理路由 ====================
@@ -10738,8 +10766,8 @@ def consumable_inbound():
             
         except Exception as e:
             db.session.rollback()
-            current_app.logger.error(f'易耗品入库失败: {str(e)}')
-            flash(f'入库失败：{str(e)}', 'danger')
+            current_app.logger.error(f'易耗品入库失败：{str(e)}')
+            flash('入库失败，请稍后重试或联系管理员', 'danger')
     
     return render_template('main/consumable_inbound.html', form=form)
 
@@ -10878,8 +10906,8 @@ def update_consumable(id):
         
     except Exception as e:
         db.session.rollback()
-        current_app.logger.error(f'更新易耗品失败: {str(e)}')
-        return jsonify({'success': False, 'message': f'更新失败：{str(e)}'}), 500
+        current_app.logger.error(f'更新易耗品失败：{str(e)}')
+        return jsonify({'success': False, 'message': '更新失败，请稍后重试或联系管理员'}), 500
 @bp.route('/consumables/<int:id>', methods=['DELETE'])
 @login_required
 @require_capability('consumable.delete')
@@ -10930,8 +10958,8 @@ def delete_consumable(id):
     except Exception as e:
         _reraise_http(e)
         db.session.rollback()
-        current_app.logger.error(f'删除易耗品失败: {str(e)}')
-        return jsonify({'success': False, 'message': f'删除失败：{str(e)}'}), 500
+        current_app.logger.error(f'删除易耗品失败：{str(e)}')
+        return jsonify({'success': False, 'message': '删除失败，请稍后重试或联系管理员'}), 500
 
 @bp.route('/consumables/<int:id>/use', methods=['POST'])
 @login_required
@@ -10998,8 +11026,8 @@ def use_consumable(id):
         
     except Exception as e:
         db.session.rollback()
-        current_app.logger.error(f'使用易耗品失败: {str(e)}')
-        return jsonify({'success': False, 'message': f'使用失败：{str(e)}'}), 500
+        current_app.logger.error(f'使用易耗品失败：{str(e)}')
+        return jsonify({'success': False, 'message': '使用失败，请稍后重试或联系管理员'}), 500
 
 @bp.route('/consumables/categories')
 @login_required
@@ -11068,8 +11096,8 @@ def add_consumable_category():
             
         except Exception as e:
             db.session.rollback()
-            current_app.logger.error(f'添加易耗品品类失败: {str(e)}')
-            return jsonify({'success': False, 'message': f'添加失败：{str(e)}'}), 500
+            current_app.logger.error(f'添加易耗品品类失败：{str(e)}')
+            return jsonify({'success': False, 'message': '添加失败，请稍后重试或联系管理员'}), 500
     
     # 返回表单验证错误
     errors = []
@@ -11164,8 +11192,8 @@ def update_consumable_category(category_id):
         
     except Exception as e:
         db.session.rollback()
-        current_app.logger.error(f'更新易耗品品类失败: {str(e)}')
-        return jsonify({'success': False, 'message': f'更新失败：{str(e)}'}), 500
+        current_app.logger.error(f'更新易耗品品类失败：{str(e)}')
+        return jsonify({'success': False, 'message': '更新失败，请稍后重试或联系管理员'}), 500
 
 @bp.route('/consumables/categories/<int:category_id>', methods=['DELETE'])
 @login_required
@@ -11214,8 +11242,8 @@ def delete_consumable_category(category_id):
     except Exception as e:
         _reraise_http(e)
         db.session.rollback()
-        current_app.logger.error(f'删除易耗品品类失败: {str(e)}')
-        return jsonify({'success': False, 'message': f'删除失败：{str(e)}'}), 500
+        current_app.logger.error(f'删除易耗品品类失败：{str(e)}')
+        return jsonify({'success': False, 'message': '删除失败，请稍后重试或联系管理员'}), 500
 
 @bp.route('/api/consumable-categories', methods=['GET'])
 @login_required
@@ -11242,8 +11270,8 @@ def get_consumable_categories_api():
         })
         
     except Exception as e:
-        current_app.logger.error(f'获取易耗品品类列表失败: {str(e)}')
-        return jsonify({'success': False, 'message': f'获取失败：{str(e)}'}), 500
+        current_app.logger.error(f'获取易耗品品类列表失败：{str(e)}')
+        return jsonify({'success': False, 'message': '获取失败，请稍后重试或联系管理员'}), 500
 
 # ==================== 物料领用管理 ====================
 
@@ -11413,8 +11441,8 @@ def add_material_requisition():
             
         except Exception as e:
             db.session.rollback()
-            current_app.logger.error(f'创建物料领用记录失败: {str(e)}')
-            flash(f'创建失败：{str(e)}', 'danger')
+            current_app.logger.error(f'创建物料领用记录失败：{str(e)}')
+            flash('创建失败，请稍后重试或联系管理员', 'danger')
     
     return render_template('main/material_requisition_form.html', form=form, title='创建物料领用记录')
 
@@ -11477,8 +11505,8 @@ def approve_material_requisition(id):
     except Exception as e:
         _reraise_http(e)
         db.session.rollback()
-        current_app.logger.error(f'审批领用单失败: {str(e)}')
-        return _warehouse_reply(False, f'审批失败：{str(e)}', dest)
+        current_app.logger.error(f'审批领用单失败：{str(e)}')
+        return _warehouse_reply(False, '审批失败，请稍后重试或联系管理员', dest)
 
 
 @bp.route('/material_requisitions/<int:id>/reject', methods=['POST'])
@@ -11504,8 +11532,8 @@ def reject_material_requisition(id):
     except Exception as e:
         _reraise_http(e)
         db.session.rollback()
-        current_app.logger.error(f'拒绝领用单失败: {str(e)}')
-        return _warehouse_reply(False, f'操作失败：{str(e)}', dest)
+        current_app.logger.error(f'拒绝领用单失败：{str(e)}')
+        return _warehouse_reply(False, '操作失败，请稍后重试或联系管理员', dest)
 
 
 @bp.route('/material_requisitions/<int:id>/issue', methods=['POST'])
@@ -11531,8 +11559,8 @@ def issue_material_requisition(id):
     except Exception as e:
         _reraise_http(e)
         db.session.rollback()
-        current_app.logger.error(f'发料失败: {str(e)}')
-        return _warehouse_reply(False, f'发料失败：{str(e)}', dest)
+        current_app.logger.error(f'发料失败：{str(e)}')
+        return _warehouse_reply(False, '发料失败，请稍后重试或联系管理员', dest)
 
 
 @bp.route('/material_requisitions/<int:id>/cancel', methods=['POST'])
@@ -11556,8 +11584,8 @@ def cancel_material_requisition(id):
     except Exception as e:
         _reraise_http(e)
         db.session.rollback()
-        current_app.logger.error(f'取消领用单失败: {str(e)}')
-        return _warehouse_reply(False, f'取消失败：{str(e)}', dest)
+        current_app.logger.error(f'取消领用单失败：{str(e)}')
+        return _warehouse_reply(False, '取消失败，请稍后重试或联系管理员', dest)
 
 
 
@@ -11717,8 +11745,8 @@ def add_material_return():
             return redirect(url_for('main.material_return_detail', id=ret.id))
         except Exception as e:
             db.session.rollback()
-            current_app.logger.error(f'创建归还单失败: {str(e)}')
-            flash(f'创建失败：{str(e)}', 'danger')
+            current_app.logger.error(f'创建归还单失败：{str(e)}')
+            flash('创建失败，请稍后重试或联系管理员', 'danger')
     return render_template('main/material_return_form.html', form=form, title='新建物料归还')
 
 
@@ -11757,8 +11785,8 @@ def confirm_material_return(id):
     except Exception as e:
         _reraise_http(e)
         db.session.rollback()
-        current_app.logger.error(f'确认归还失败: {str(e)}')
-        return _warehouse_reply(False, f'确认失败：{str(e)}', dest)
+        current_app.logger.error(f'确认归还失败：{str(e)}')
+        return _warehouse_reply(False, '确认失败，请稍后重试或联系管理员', dest)
 
 
 @bp.route('/material_returns/<int:id>/reject', methods=['POST'])
@@ -11784,8 +11812,8 @@ def reject_material_return(id):
     except Exception as e:
         _reraise_http(e)
         db.session.rollback()
-        current_app.logger.error(f'拒绝归还失败: {str(e)}')
-        return _warehouse_reply(False, f'操作失败：{str(e)}', dest)
+        current_app.logger.error(f'拒绝归还失败：{str(e)}')
+        return _warehouse_reply(False, '操作失败，请稍后重试或联系管理员', dest)
 
 
 # ==================== 库存盘点管理 ====================
@@ -11892,8 +11920,8 @@ def add_inventory_count():
             return redirect(url_for('main.inventory_count_detail', id=count.id))
         except Exception as e:
             db.session.rollback()
-            current_app.logger.error(f'创建盘点失败: {str(e)}')
-            flash(f'创建失败：{str(e)}', 'danger')
+            current_app.logger.error(f'创建盘点失败：{str(e)}')
+            flash('创建失败，请稍后重试或联系管理员', 'danger')
     return render_template('main/inventory_count_form.html', form=form, title='新建库存盘点')
 
 
@@ -11923,7 +11951,7 @@ def start_inventory_count(id):
     except Exception as e:
         _reraise_http(e)
         db.session.rollback()
-        return _warehouse_reply(False, f'操作失败：{str(e)}', dest)
+        return _warehouse_reply(False, '操作失败，请稍后重试或联系管理员', dest)
 
 
 @bp.route('/inventory_counts/<int:id>/record', methods=['POST'])
@@ -11963,8 +11991,8 @@ def record_inventory_count(id):
     except Exception as e:
         _reraise_http(e)
         db.session.rollback()
-        current_app.logger.error(f'录入盘点失败: {str(e)}')
-        return _warehouse_reply(False, f'保存失败：{str(e)}', dest)
+        current_app.logger.error(f'录入盘点失败：{str(e)}')
+        return _warehouse_reply(False, '保存失败，请稍后重试或联系管理员', dest)
 
 
 @bp.route('/inventory_counts/<int:id>/complete', methods=['POST'])
@@ -11992,8 +12020,8 @@ def complete_inventory_count(id):
     except Exception as e:
         _reraise_http(e)
         db.session.rollback()
-        current_app.logger.error(f'完成盘点失败: {str(e)}')
-        return _warehouse_reply(False, f'完成失败：{str(e)}', dest)
+        current_app.logger.error(f'完成盘点失败：{str(e)}')
+        return _warehouse_reply(False, '完成失败，请稍后重试或联系管理员', dest)
 
 
 @bp.route('/inventory_counts/<int:id>/cancel', methods=['POST'])
@@ -12017,7 +12045,7 @@ def cancel_inventory_count(id):
     except Exception as e:
         _reraise_http(e)
         db.session.rollback()
-        return _warehouse_reply(False, f'取消失败：{str(e)}', dest)
+        return _warehouse_reply(False, '取消失败，请稍后重试或联系管理员', dest)
 
 # ==================== API接口 ====================
 @bp.route('/api/materials/search')
@@ -12123,5 +12151,5 @@ def api_search_materials():
         })
         
     except Exception as e:
-        current_app.logger.error(f'搜索物料失败: {str(e)}')
-        return jsonify({'success': False, 'message': f'搜索失败：{str(e)}'}), 500
+        current_app.logger.error(f'搜索物料失败：{str(e)}')
+        return jsonify({'success': False, 'message': '搜索失败，请稍后重试或联系管理员'}), 500
