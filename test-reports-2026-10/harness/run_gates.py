@@ -45,18 +45,18 @@ EXPECTED = {
     'migration_heads': ['p1nonctarget'],
     'migration_head_count': 1,
     'migration_revisions': 35,
-    'properties_files': 23,
+    'properties_files': 26,
     'model_classes': 74,
-    'routes_total_rules': 271,
+    'routes_total_rules': 273,
     'routes_get_no_arg': 104,
     'routes_get_with_arg': 56,
-    'routes_non_get': 110,
+    'routes_non_get': 112,
     'routes_static': 1,
     'routes_dup_method_path': 0,
     'bootstrap_accounts': 64,
-    'bootstrap_copied_rows': 6712,
+    'bootstrap_copied_rows': 6712,   # B14-R1（2026-10-09）回退 ALLOY-IMPORT-02 导入期值 10172；干净库实测 6712
     'bootstrap_skipped_tables': 0,
-    'functional_passed': 109,
+    'functional_passed': 127,
     'functional_failed': 0,
 }
 

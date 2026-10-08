@@ -236,6 +236,20 @@
       },
       "recompute_command": "& 'F:\\Miniconda\\envs\\wage\\python.exe' -B -c \"import hashlib;d=open(r'test-reports-2026-10/evidence/api/write_suite.out.txt','rb').read();print(len(d),hashlib.sha256(d).hexdigest().upper())\"   # 期望 22643 / 99B7B12F52415EF5F7DE08BE2B8CBDAFC8FDC35F2FB4BC12A11DAD1E3B86B0ED",
       "rollback": "同 api/write_suite.json（同一批次、同一触发）"
+    },
+    {
+      "kind": "modified",
+      "path": "harness/coverage.json",
+      "problem": "冻结覆盖档按 A-70 三步有意重基线：旧 236893 B / 5E2C9D4315971B31C83AFD7833C310501199C34F61BFD868EF07A6AEEF7BF1F0（读数 6/14/101）⇒ 新 244575 B / F0D37A6C72C9029C60B4124DAC5993E1E65321448C943555381C15ECD6BDB42D（读数 108/116/0）",
+      "attribution": "B13-00（t1 / gate-dev）用户授权的前置重基线；LOCKED 与路由锁一字未改；旧字节归档于 evidence/harness/_anchor-history/frozen-anchor-pre-b13-00.236893.5E2C9D43.json，登记册 evidence/harness/_anchor-history/coverage-anchor-history.json entry no=1/2",
+      "intentional_update": {
+        "old": {"bytes": 236893, "sha256": "5E2C9D4315971B31C83AFD7833C310501199C34F61BFD868EF07A6AEEF7BF1F0"},
+        "new": {"bytes": 244575, "sha256": "F0D37A6C72C9029C60B4124DAC5993E1E65321448C943555381C15ECD6BDB42D"},
+        "trigger": "批次12 结项登记事项 ①：冻结档仍是 A-70 之前的旧读数，与源码 LOCKED 108/116/0 互斥 ⇒ 直喂必假红",
+        "command": "HARNESS_RUN_ID=b13-00-rebaseline-20261008 F:\\Miniconda\\envs\\wage\\python.exe -B scripts/_sandbox_compat.py test-reports-2026-10/harness/measure_coverage.py --no-request-probes --out \"<仓库根>/test-reports-2026-10/evidence/harness/coverage.json\""
+      },
+      "recompute_command": "& 'F:\\Miniconda\\envs\\wage\\python.exe' -B -c \"import hashlib;d=open(r'test-reports-2026-10/evidence/harness/coverage.json','rb').read();print(len(d),hashlib.sha256(d).hexdigest().upper())\"",
+      "rollback": "① 若要回退：把 ANCHOR_READING 与 uat_chains.py 的 V12_ANCHORS 项改回 236893 / 5E2C9D43…BF1F0，并用归档副本恢复冻结档字节（_anchor-history 条目仍须保留）；② 若采纳本重基线：本批 1 条随之保留，但后续任何对 coverage.json 的再次原地重写必须再走 A-70 三步并追加登记（否则再次变红）。"
     }
   ],
   "violations_appended_meta": {
@@ -284,5 +298,25 @@
       "owner": "后续项，**不在 V-19 inScope**（`harness/write_suite.py` 与 `evidence/**` 均禁改）"
     },
     "exact_main_block_untouched": "本块不删改主块 violations[33] 与 wildcard_rules[1]（A-89 通配语义 / A-95 对称差集语义保持）；V-01 的 violations_appended_meta 亦未动"
+  },
+  "violations_appended_meta_b13_00": {
+    "count": 1,
+    "appended_by": "B13-00b（t15 / gate-dev）—— B13-00 重基线的必然收尾（report-only evidence_hash 由 exit 2 回到 exit 0）",
+    "appended_at": "2026-10-08 20:26",
+    "authorization": "用户已在 m00394 批准「批次13 前先做重基线化前置项」（captain 据此新立 t15）；补丁 JSON 逐字来源 = test-reports-2026-10/evidence/harness/b13-00-rebaseline-report.md §6「精确补丁」",
+    "trigger": "B13-00（t1）按 A-70 步骤① 有意重基线冻结覆盖档（236893 B / 5E2C9D43…BF1F0 → 244575 B / F0D37A6C…BDB42D）⇒ evidence_hash 冻结索引仍钉旧哈希 ⇒ 1 条未登记违规 modified|harness/coverage.json ⇒ `ci_gates --phase first --only evidence_hash` = checks 3/4、needle「whitelist no unregistered violation」FAIL、exit 2（追加前实测：unregistered_count=1、unregistered_first10=['modified|harness/coverage.json']、stale_count=0、stale_exact_count=0；机读报告 test-reports-2026-10/evidence/harness/ci-run-20261008-202545/evidence_hash.gate.json）",
+    "appended_total_note": "本批追加 1 条 ⇒ violations_appended 累计 5 条 = 2（V-01 / uat 对）+ 2（V-19 / write_suite 对）+ 1（本批 / coverage.json）。`registered_count` 仍只计主块 33 条、`wildcard_rules` 仍 1 条。主块 violations[33]、wildcard_rules[1]、violations_appended 前 4 条与两个既有 meta 块**逐字未改**（append-only）；本块是追加后唯一权威计数——既有 meta 块里的「累计 4 条」是其登记时点的历史快照，按 append-only 纪律不改写。",
+    "anti_laundering": "重跑 `evidence_hash.py --freeze` 不能洗白本条（EH-N7：`--freeze` 只补缺失索引、绝不覆盖既有索引）；唯一合法路径是本 append-only 登记。",
+    "recompute_commands": [
+      "& 'F:\\Miniconda\\envs\\wage\\python.exe' -B -c \"import hashlib;d=open(r'test-reports-2026-10/evidence/harness/coverage.json','rb').read();print(len(d),hashlib.sha256(d).hexdigest().upper())\"   # 期望 244575 / F0D37A6C72C9029C60B4124DAC5993E1E65321448C943555381C15ECD6BDB42D",
+      "& 'F:\\Miniconda\\envs\\wage\\python.exe' -B test-reports-2026-10\\harness\\ci_gates.py --phase first --only evidence_hash   # 期望 checks 4/4 / exit 0"
+    ],
+    "rollback_steps": [
+      "① 整体回退：`git checkout -- test-reports-2026-10/harness/t8-evidence-whitelist.json`（本批 1 条随之消失；主块 33 条、通配规则 1 条与两个既有 meta 块本就未动）",
+      "② 仅删本批：手工删除 violations_appended 末条（harness/coverage.json）与本块 violations_appended_meta_b13_00",
+      "③ 回退后预期：`--only evidence_hash` 回到 checks 3/4 / exit 2（设计口径，非回归）—— 覆盖档仍停在重基线后，而冻结索引未同步"
+    ],
+    "stale_semantics": "若 harness/coverage.json 的哈希回到 5E2C9D43…BF1F0（或冻结索引/比对基线被按 A-70 推进为新值）⇒ 本条违规消失 ⇒ 本块条目 stale ⇒ TL-04 失败（防悄悄放宽约束）；届时由 captain 决定移除本块，并与 B13-00 的 ANCHOR_READING / uat_chains.py V12_ANCHORS 同步",
+    "exact_main_block_untouched": "本块不删改主块 violations[33]、wildcard_rules[1]、violations_appended 前 4 条与两个既有 meta 块（append-only）"
   }
 }

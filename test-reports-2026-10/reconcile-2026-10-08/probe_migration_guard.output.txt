@@ -1,0 +1,50 @@
+口径 A：正则 create_table(\s*['"]name['"]) —— 字面表名
+口径 B：AST 调用 op.create_table / create_table 节点
+口径 C：守卫 = 该 create_table 调用位于某个引用 has_table/get_table_names 的 if 之内
+
+file                                                       litASTguard
+011e395c1aa4_add_sales_order_management_tables.py            2     2     0
+166a7ce7b905_add_customer_management_tables.py               2     2     0
+29e80e4970ac_add_product_mbom_tables.py                      3     3     0
+322346bd1261_add_production_order_and_batch_.py              5     5     0
+33c7d77643c1_remove_material_name_column_from_raw_.py        3     3     0
+9f02bbbbd492_update_raw_material_model_remove_.py            2     2     0
+a3f28e475446_add_sales_order_management_tables.py            3     3     0
+b1a01_add_system_config_and_task_completed_at.py             1     1     2
+c02604883c72_add_quality_management_tables.py               24    24     0
+c117632ece3d_remove_material_name_from_raw_material_.py      1     1     0
+c4863dae8be6_add_notification_system.py                      5     4     0
+c4b4caaebd94_add_raw_material_categories_table.py            1     1     0
+da_add_process_assignment_tables.py                          2     2     4
+p0p2messtables_add_create_all_tables.py                      0     1     1
+
+含 create_table 调用的文件数（AST）= 14
+含字面表名 create_table 的文件数（正则）= 13
+create_table 调用总数（AST）= 54
+字面表名调用总数（正则）= 54
+
+逐文件守卫 if 列表（引用 has_table / get_table_names 的 If）：
+  011e395c1aa4_add_sales_order_management_tables.py          guard_ifs=0
+  166a7ce7b905_add_customer_management_tables.py             guard_ifs=0
+  29e80e4970ac_add_product_mbom_tables.py                    guard_ifs=0
+  322346bd1261_add_production_order_and_batch_.py            guard_ifs=0
+  33c7d77643c1_remove_material_name_column_from_raw_.py      guard_ifs=0
+  9f02bbbbd492_update_raw_material_model_remove_.py          guard_ifs=0
+  a3f28e475446_add_sales_order_management_tables.py          guard_ifs=0
+  b1a01_add_system_config_and_task_completed_at.py           guard_ifs=2
+  c02604883c72_add_quality_management_tables.py              guard_ifs=0
+  c117632ece3d_remove_material_name_from_raw_material_.py    guard_ifs=0
+  c4863dae8be6_add_notification_system.py                    guard_ifs=0
+  c4b4caaebd94_add_raw_material_categories_table.py          guard_ifs=0
+  da_add_process_assignment_tables.py                        guard_ifs=4
+  p0p2messtables_add_create_all_tables.py                    guard_ifs=1
+
+=== p0p2messtables 的 upgrade() 体 ===
+--- upgrade() ---
+ 815 def upgrade():
+ 816     for name in _CREATION_ORDER:
+ 817         _ensure_table(name, _TABLES[name])
+--- downgrade() ---
+ 820 def downgrade():
+ 821     # 见模块 docstring：这些表的所有权在 db.create_all()，回退不做破坏性删除。
+ 822     pass

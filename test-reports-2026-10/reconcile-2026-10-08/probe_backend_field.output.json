@@ -1,0 +1,283 @@
+{
+  "copy_path": "C:\\Users\\RICHAR~1\\AppData\\Local\\Temp\\wms_test_uh31yknd\\app.db",
+  "tmp_dir": "C:\\Users\\RICHAR~1\\AppData\\Local\\Temp\\t3_probe_28grld_t",
+  "uploads_temp_dir": "C:\\Users\\RICHAR~1\\AppData\\Local\\Temp\\t3_probe_28grld_t\\uploads_temp",
+  "real_db_sha256_expected": "F5DA2306BC31CBAB098AAD3774016D320A9B9AA3546F93418196AE9900E0F065",
+  "A_P1_audit_log_readonly": {
+    "total": 73,
+    "target_id_is_null": 40,
+    "null_and_can_rollback_true": 10
+  },
+  "fixtures": {
+    "c1": {
+      "admin": 1,
+      "emp": 1,
+      "proc": 1,
+      "prod": 1,
+      "order": 12,
+      "batch": 10,
+      "bi": 24,
+      "task": 19,
+      "rec": 1,
+      "itask": 2,
+      "irec": 1,
+      "task_global_sn": "00019351",
+      "bi_clean": 26,
+      "rms": [
+        2,
+        3,
+        4
+      ]
+    },
+    "c2": {
+      "admin": 1,
+      "emp": 1,
+      "proc": 1,
+      "prod": 1,
+      "order": 13,
+      "batch": 11,
+      "bi": 25,
+      "task": 20,
+      "rec": 2,
+      "itask": 3,
+      "irec": 2,
+      "task_global_sn": "00019357"
+    }
+  },
+  "B_B4_01_03": {
+    "before": {
+      "nc_rows": 0,
+      "quality_status": null,
+      "gate": {
+        "allowed": true,
+        "reason": null,
+        "quality_status": null,
+        "status": "in_progress"
+      },
+      "gate_clean_control": {
+        "allowed": true,
+        "reason": null,
+        "quality_status": null,
+        "status": "in_progress"
+      }
+    },
+    "after": {
+      "return": {
+        "production_record": 1,
+        "batch_item": 24,
+        "written_quality_status": "fail"
+      },
+      "nc_created": {
+        "id": 1,
+        "target_type": "production_record",
+        "target_id": 1,
+        "workpiece_id": null,
+        "status": "open",
+        "type": "rework"
+      },
+      "nc_rows_delta": 1,
+      "quality_status": "fail",
+      "gate_after_fail": {
+        "allowed": false,
+        "reason": "实例 _t3_013826BI1 质检不合格，不得入正品库",
+        "quality_status": "fail",
+        "status": "in_progress"
+      },
+      "gate_clean_control": {
+        "allowed": true,
+        "reason": null,
+        "quality_status": null,
+        "status": "in_progress"
+      }
+    }
+  },
+  "C_B4_02": {
+    "gate_after_fail": {
+      "allowed": false,
+      "reason": "实例 _t3_013826BI1 质检不合格，不得入正品库",
+      "quality_status": "fail",
+      "status": "in_progress"
+    },
+    "gate_after_rework_done": {
+      "allowed": true,
+      "reason": null,
+      "quality_status": "pass",
+      "status": "in_progress"
+    }
+  },
+  "G_B5_01_02": {
+    "nc_id": 2,
+    "rework_task": {
+      "id": 21,
+      "quantity": 5,
+      "global_sn": "00019364",
+      "notes": "返工 不合格单#2"
+    },
+    "nc_rework_task_id": 21,
+    "rework_rec": {
+      "id": 3,
+      "global_sn": "00019364",
+      "quantity": 5
+    },
+    "normal_rec": {
+      "id": 4,
+      "global_sn": "00019365",
+      "quantity": 3
+    },
+    "R1R2_identified_rework_record_ids": [
+      3
+    ],
+    "price": 20.0,
+    "switch_off_readback": false,
+    "amount_off": 60.0,
+    "switch_on_readback": true,
+    "amount_on": 160.0,
+    "delta": 100.0,
+    "breakdown_off": {
+      "counted": 60.0,
+      "dropped": 100.0
+    },
+    "breakdown_on": {
+      "counted": 160.0,
+      "dropped": 0.0
+    }
+  },
+  "D_B5_05": {
+    "explicit_7": {
+      "quantity": 7,
+      "notes": "返工 不合格单#1"
+    },
+    "default_from_record": {
+      "quantity": 5,
+      "notes": "返工 不合格单#1；件数取来源生产记录#1（quantity=5）"
+    },
+    "source_record_quantity": 5
+  },
+  "E_B5_04": {
+    "consumption_rows": [
+      {
+        "raw_material_id": 2,
+        "per_piece": 3.0
+      },
+      {
+        "raw_material_id": 3,
+        "per_piece": 4.0
+      }
+    ],
+    "scrap_quantity": 2,
+    "expect_delta": {
+      "2": -6.0,
+      "3": -8.0,
+      "4": 0.0
+    },
+    "before": {
+      "2": 100.0,
+      "3": 100.0,
+      "4": 100.0
+    },
+    "after": {
+      "2": 94.0,
+      "3": 92.0,
+      "4": 100.0
+    },
+    "delta": {
+      "2": -6.0,
+      "3": -8.0,
+      "4": 0.0
+    },
+    "nc_scrap_cost": 12.5,
+    "nc_status": "done"
+  },
+  "F_P9": {
+    "scrap_ledger_rows_before": 0,
+    "scrap_ledger_rows_after": 1,
+    "scrap_rows_delta": 1,
+    "bi_status_after_scrap": "scrapped",
+    "gate_after_scrap": {
+      "allowed": false,
+      "reason": "实例 _t3_013826BI1 已报废，不得入正品库"
+    }
+  },
+  "H_P3_P4_employees_import": {
+    "status_code": 200,
+    "success_field": false,
+    "message_head": "数据验证失败，共发现2个错误：\n第5行数据错误：姓名长度不能超过50个字符\n第6行数据错误：职位长度不能超过50个字符",
+    "employee_delta": 0,
+    "residue_in_temp_folder": [
+      "t3_013826good_bad.xlsx"
+    ],
+    "residue_exists": true
+  },
+  "H_P4_tasks_import": {
+    "status_code": 200,
+    "body": {
+      "message": "导入失败，请稍后重试或联系管理员",
+      "success": false
+    },
+    "task_delta": 0,
+    "residue_exists": true,
+    "residue_files": [
+      "t3_013826broken.xlsx"
+    ]
+  },
+  "I_P1_behavior": {
+    "status_code": 200,
+    "body": {
+      "id": 4,
+      "message": "成功添加成品",
+      "success": true
+    },
+    "audit_rows_added": 1,
+    "log_id": 74,
+    "action": "添加成品",
+    "target_model": "FinishedProduct",
+    "target_id": 4,
+    "can_rollback": true,
+    "rollback_type": "add"
+  },
+  "I_P1_rollback_consequence": {
+    "log_id": 74,
+    "status_code": 200,
+    "body": {
+      "message": "回滚成功",
+      "success": true
+    }
+  },
+  "I_B7_05_edit_null_old_data": {
+    "log_id": 70,
+    "status_code": 400,
+    "body": {
+      "log_id": 70,
+      "message": "无法回滚：该审计行没有保存字段级快照（old_data IS NULL），回滚端点无法确定要恢复的字段值。为免留下半回滚数据，本次不做任何写入；此处不承诺回滚守恒（依据 recon-backend §7-4 的降级结论）。处置建议：按该行 details 指向的业务对象手工核对后补录。该行 can_rollback=1 只表示登记时标记为可回滚，不代表现在能自动回滚。",
+      "reason": "old_data_missing",
+      "rollback_type": "edit",
+      "success": false,
+      "target_id": 18,
+      "target_model": "TaskAssignment"
+    }
+  },
+  "I_B7_04_delete_rollback": {
+    "log_id": 2,
+    "status_code": 200,
+    "body": {
+      "message": "回滚成功",
+      "success": true
+    }
+  },
+  "J_B4_02_structure": {
+    "task_status": "pending",
+    "record_ids_via_notes_softlink": [],
+    "gate_without_production_record_report_path": {
+      "allowed": true,
+      "reason": null
+    },
+    "gate_with_production_record_qc_domain": {
+      "allowed": false,
+      "reason": "产出存在未完成的质检任务，不得入正品库；请先完成质检任务后重新报工"
+    },
+    "gate_after_quality_status_fail": {
+      "allowed": false,
+      "reason": "实例 _t3_013826BI3 质检不合格，不得入正品库"
+    }
+  }
+}

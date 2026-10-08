@@ -1,0 +1,63 @@
+{
+ "copy_path": "C:\\Users\\RICHAR~1\\AppData\\Local\\Temp\\wms_test_5uii2jx8\\app.db",
+ "tag": "_t6_032745",
+ "fixture": {
+  "employee_id": 1,
+  "employee_code": "YHGL0001",
+  "coefficient": 1.0,
+  "base_salary": 2000.0,
+  "process_id": 1,
+  "process_price": 20.0,
+  "normal_record": {
+   "id": 1,
+   "quantity": 3,
+   "global_sn": "00019348N"
+  },
+  "rework_record": {
+   "id": 2,
+   "quantity": 5,
+   "global_sn": "00019348R"
+  },
+  "rework_task": {
+   "id": 20,
+   "notes": "返工 不合格单#_probe__t6_032745"
+  },
+  "nc_id": 1,
+  "R1R2_identified": [
+   2
+  ],
+  "R3_hint_only": true
+ },
+ "criteria": {
+  "expected_nonrework": 60.0,
+  "expected_rework": 100.0,
+  "readings": {
+   "off": {
+    "switch_readback": false,
+    "S1_shared_amount": 60.0,
+    "S2_total_salary": 2060.0,
+    "S3_daily": 60.0,
+    "S4_monthly": 60.0
+   },
+   "on": {
+    "switch_readback": true,
+    "S1_shared_amount": 160.0,
+    "S2_total_salary": 2160.0,
+    "S3_daily": 160.0,
+    "S4_monthly": 160.0
+   }
+  },
+  "nonrework_off": 60.0,
+  "nonrework_on": 60.0
+ },
+ "verdict": {
+  "switch_readback_off": true,
+  "switch_readback_on": true,
+  "S1_delta_ne_0": true,
+  "S2_delta_ne_0": true,
+  "S3_delta_ne_0": true,
+  "S4_delta_ne_0": true,
+  "nonrework_unchanged": true
+ },
+ "switch_left_at": false
+}

@@ -1,0 +1,453 @@
+{
+  "real_db_sha256_before": "F5DA2306BC31CBAB098AAD3774016D320A9B9AA3546F93418196AE9900E0F065",
+  "real_db_sha256_expected": "F5DA2306BC31CBAB098AAD3774016D320A9B9AA3546F93418196AE9900E0F065",
+  "B1_current": {
+    "path": "D:\\workspace\\wage_management_system - bak\\app\\main\\routes.py",
+    "sha256": "00956C8C2D96EDD5A88A536483CDD4BF7E31F6BC9E426A588B75CA649319AD09",
+    "line_count": 12280,
+    "sites": {
+      "import_production_records": {
+        "lineno": 2809,
+        "end_lineno": 2885,
+        "pick_process_price_call_lines": [
+          2843
+        ],
+        "direct_ProcessPrice_query_lines": [],
+        "inline_effective_date_filter_in_code": false,
+        "code_text_filter_by_process_code_hits": 0,
+        "comment_text_filter_by_process_code_hits": 0
+      },
+      "import_bonus_penalties": {
+        "lineno": 3984,
+        "end_lineno": 4067,
+        "pick_process_price_call_lines": [
+          4026
+        ],
+        "direct_ProcessPrice_query_lines": [],
+        "inline_effective_date_filter_in_code": false,
+        "code_text_filter_by_process_code_hits": 0,
+        "comment_text_filter_by_process_code_hits": 1
+      },
+      "import_tasks": {
+        "lineno": 4111,
+        "end_lineno": 4192,
+        "pick_process_price_call_lines": [
+          4151
+        ],
+        "direct_ProcessPrice_query_lines": [],
+        "inline_effective_date_filter_in_code": false,
+        "code_text_filter_by_process_code_hits": 0,
+        "comment_text_filter_by_process_code_hits": 1
+      }
+    },
+    "module_ProcessPrice_query_hits": {
+      "187": "pick_process_price",
+      "218": "process_assignment_page",
+      "827": "process_prices",
+      "881": "process_prices",
+      "905": "add_process_price",
+      "928": "add_process_price",
+      "1014": "edit_process_price",
+      "1018": "edit_process_price",
+      "1064": "edit_process_price",
+      "1179": "delete_process_price",
+      "1257": "manage_production_records",
+      "1297": "manage_production_records",
+      "1388": "manage_production_records",
+      "1622": "manage_bonus_penalties",
+      "2529": "import_process_prices",
+      "2546": "import_process_prices",
+      "2602": "import_process_prices",
+      "2623": "import_process_prices",
+      "2628": "import_process_prices",
+      "2735": "export_process_prices",
+      "3253": "manage_tasks",
+      "3326": "manage_tasks",
+      "3533": "update_task_status",
+      "4516": "add_task",
+      "4625": "edit_task",
+      "5936": "get_process_price",
+      "7553": "product_processes"
+    },
+    "helper_def_lineno": 150
+  },
+  "B1_prefix_HEAD": {
+    "path": "D:\\workspace\\wage_management_system - bak\\.analysis-scratch\\t4_prefix_routes.py",
+    "sha256": "1D040DD2C6B54B07F6550D5F6B4E68BB53D30CE53F83AE3141B57A4BAFEB49BD",
+    "line_count": 12155,
+    "sites": {
+      "import_production_records": {
+        "lineno": 2681,
+        "end_lineno": 2762,
+        "pick_process_price_call_lines": [],
+        "direct_ProcessPrice_query_lines": [
+          2717
+        ],
+        "inline_effective_date_filter_in_code": true,
+        "code_text_filter_by_process_code_hits": 0,
+        "comment_text_filter_by_process_code_hits": 0
+      },
+      "import_bonus_penalties": {
+        "lineno": 3861,
+        "end_lineno": 3943,
+        "pick_process_price_call_lines": [],
+        "direct_ProcessPrice_query_lines": [
+          3902
+        ],
+        "inline_effective_date_filter_in_code": false,
+        "code_text_filter_by_process_code_hits": 1,
+        "comment_text_filter_by_process_code_hits": 0
+      },
+      "import_tasks": {
+        "lineno": 3987,
+        "end_lineno": 4067,
+        "pick_process_price_call_lines": [],
+        "direct_ProcessPrice_query_lines": [
+          4020
+        ],
+        "inline_effective_date_filter_in_code": false,
+        "code_text_filter_by_process_code_hits": 1,
+        "comment_text_filter_by_process_code_hits": 0
+      }
+    },
+    "module_ProcessPrice_query_hits": {
+      "135": "process_assignment_page",
+      "744": "process_prices",
+      "798": "process_prices",
+      "822": "add_process_price",
+      "845": "add_process_price",
+      "931": "edit_process_price",
+      "935": "edit_process_price",
+      "981": "edit_process_price",
+      "1096": "delete_process_price",
+      "1174": "manage_production_records",
+      "1214": "manage_production_records",
+      "1305": "manage_production_records",
+      "1539": "manage_bonus_penalties",
+      "2401": "import_process_prices",
+      "2418": "import_process_prices",
+      "2474": "import_process_prices",
+      "2495": "import_process_prices",
+      "2500": "import_process_prices",
+      "2607": "export_process_prices",
+      "2717": "import_production_records",
+      "3130": "manage_tasks",
+      "3203": "manage_tasks",
+      "3410": "update_task_status",
+      "3902": "import_bonus_penalties",
+      "4020": "import_tasks",
+      "4391": "add_task",
+      "4500": "edit_task",
+      "5811": "get_process_price",
+      "7428": "product_processes"
+    },
+    "helper_def_lineno": null
+  },
+  "B1_diff_removed_ProcessPrice_lines": [
+    "-                process_price = ProcessPrice.query.filter(",
+    "-                    ProcessPrice.process_code == data['process_code'],",
+    "-                    ProcessPrice.effective_date <= end_of_day + timedelta(days=1)",
+    "-                ).order_by(ProcessPrice.effective_date.desc()).first()",
+    "-                    process = ProcessPrice.query.filter_by(process_code=data['process_code']).first()",
+    "-                process = ProcessPrice.query.filter_by(process_code=data['process_code']).first()"
+  ],
+  "routes_py_sha256_at_probe_start": "00956C8C2D96EDD5A88A536483CDD4BF7E31F6BC9E426A588B75CA649319AD09",
+  "B1_module_hits_outside_helper": {
+    "218": "process_assignment_page",
+    "827": "process_prices",
+    "881": "process_prices",
+    "905": "add_process_price",
+    "928": "add_process_price",
+    "1014": "edit_process_price",
+    "1018": "edit_process_price",
+    "1064": "edit_process_price",
+    "1179": "delete_process_price",
+    "1257": "manage_production_records",
+    "1297": "manage_production_records",
+    "1388": "manage_production_records",
+    "1622": "manage_bonus_penalties",
+    "2529": "import_process_prices",
+    "2546": "import_process_prices",
+    "2602": "import_process_prices",
+    "2623": "import_process_prices",
+    "2628": "import_process_prices",
+    "2735": "export_process_prices",
+    "3253": "manage_tasks",
+    "3326": "manage_tasks",
+    "3533": "update_task_status",
+    "4516": "add_task",
+    "4625": "edit_task",
+    "5936": "get_process_price",
+    "7553": "product_processes"
+  },
+  "B1_prefix_summary": {
+    "import_production_records": {
+      "uses_helper": false,
+      "code_text_filter_by_process_code_hits": 0,
+      "has_inline_effective_date_filter": true
+    },
+    "import_bonus_penalties": {
+      "uses_helper": false,
+      "code_text_filter_by_process_code_hits": 1,
+      "has_inline_effective_date_filter": false
+    },
+    "import_tasks": {
+      "uses_helper": false,
+      "code_text_filter_by_process_code_hits": 1,
+      "has_inline_effective_date_filter": false
+    }
+  },
+  "db_copy_path": "C:\\Users\\RICHAR~1\\AppData\\Local\\Temp\\wms_test_v47051c6\\app.db",
+  "db_uri": "sqlite:///C:/Users/RICHAR~1/AppData/Local/Temp/wms_test_v47051c6/app.db",
+  "fixture": {
+    "employee_pk": 64,
+    "biz_day": "2026-10-09",
+    "today": "2026-10-08",
+    "price_ids": {
+      "old": 3487,
+      "new": 3488,
+      "far30": 3489,
+      "tol_d1_0000": 3490,
+      "tol_d1_2359": 3491,
+      "tol_d2_0000": 3492,
+      "far_only": 3493,
+      "d_plus_1_only": 3494
+    }
+  },
+  "B2_three_sites": {
+    "site1_production_records_import": {
+      "http_status": 200,
+      "body": {
+        "message": "成功导入 1 条记录",
+        "success": true
+      },
+      "records_delta": 1,
+      "expected_process_id": 3488,
+      "process_id_written": 3488
+    },
+    "site2_bonus_penalties_import": {
+      "http_status": 200,
+      "body": {
+        "message": "成功导入 1 条记录",
+        "success": true
+      },
+      "records_delta": 1,
+      "expected_process_id": 3488,
+      "process_id_written": 3488
+    },
+    "site3_tasks_import": {
+      "http_status": 200,
+      "body": {
+        "message": "成功导入 1 条记录",
+        "success": true
+      },
+      "records_delta": 1,
+      "expected_process_id": 3488,
+      "process_id_written": 3488
+    },
+    "all_three_equal": true
+  },
+  "B3_negative_and_boundary": {
+    "main_code_ignores_far30": {
+      "returned_id": 3488,
+      "expected": 3488,
+      "far_row_id": 3489,
+      "returned_price": 3.5,
+      "error": null
+    },
+    "tolerance_boundary": {
+      "business_day": "2026-10-09",
+      "d_plus_1_0000_id": 3490,
+      "d_plus_1_2359_id": 3491,
+      "d_plus_2_0000_id": 3492,
+      "returned_id": 3491,
+      "returned_price": 7.78,
+      "error": null,
+      "returned_is_latest_in_window_d_plus_1_2359": true,
+      "d_plus_2_excluded": true,
+      "strict_negative_control_81_line107_holds": false
+    },
+    "far_only_code": {
+      "returned_id": null,
+      "excluded": true,
+      "error": null,
+      "row_id": 3493
+    },
+    "strict_future_within_1day_tolerance": {
+      "business_day": "2026-10-09",
+      "row_effective_date": "2026-10-10",
+      "row_id": 3494,
+      "returned_id": 3494,
+      "returned_price": 6.66,
+      "error": null,
+      "strict_future_row_is_picked_by_helper": true,
+      "plan_81_line107_strict_wording_holds": false
+    },
+    "no_price_code": {
+      "returned_id": null,
+      "none_without_exception": true,
+      "error": null
+    },
+    "string_business_date": {
+      "returned_id": 3488,
+      "error": null,
+      "same_as_date_object": true
+    },
+    "datetime_midday_business_date": {
+      "returned_id": 3488,
+      "error": null
+    },
+    "none_and_garbage": {
+      "none_business_date_returned": null,
+      "none_error": null,
+      "garbage_returned": null,
+      "garbage_error": null
+    },
+    "http_negative": {
+      "production_records_import": {
+        "http_status": 200,
+        "records_delta": 0,
+        "body": {
+          "message": "成功导入 0 条记录，1 条记录导入失败：\n未找到工序 _T4R9011 在 2026-10-09 00:00:00 的价格",
+          "success": true
+        }
+      },
+      "tasks_import": {
+        "http_status": 200,
+        "records_delta": 0,
+        "body": {
+          "message": "成功导入 0 条记录，1 条记录导入失败：\n工序编号 _T4R9011 不存在",
+          "success": true
+        }
+      },
+      "bonus_penalties_import": {
+        "http_status": 200,
+        "records_delta": 1,
+        "process_id_written": null,
+        "body": {
+          "message": "成功导入 1 条记录",
+          "success": true
+        }
+      }
+    }
+  },
+  "B4_wage_chain": {
+    "fixture": {
+      "code": "_T4R9001",
+      "business_day": "2026-10-09",
+      "quantity": 10,
+      "old_price_id": 3487,
+      "new_price_id": 3488,
+      "old_price": 1.5,
+      "new_price": 3.5
+    },
+    "prefix_code_evidence": {
+      "routes_py_at_HEAD_sha256": "1D040DD2C6B54B07F6550D5F6B4E68BB53D30CE53F83AE3141B57A4BAFEB49BD",
+      "import_bonus_penalties_pre_fix_hits": {
+        "lineno": 3861,
+        "end_lineno": 3943,
+        "pick_process_price_call_lines": [],
+        "direct_ProcessPrice_query_lines": [
+          3902
+        ],
+        "inline_effective_date_filter_in_code": false,
+        "code_text_filter_by_process_code_hits": 1,
+        "comment_text_filter_by_process_code_hits": 0
+      },
+      "import_tasks_pre_fix_hits": {
+        "lineno": 3987,
+        "end_lineno": 4067,
+        "pick_process_price_call_lines": [],
+        "direct_ProcessPrice_query_lines": [
+          4020
+        ],
+        "inline_effective_date_filter_in_code": false,
+        "code_text_filter_by_process_code_hits": 1,
+        "comment_text_filter_by_process_code_hits": 0
+      },
+      "import_production_records_pre_fix_hits": {
+        "lineno": 2681,
+        "end_lineno": 2762,
+        "pick_process_price_call_lines": [],
+        "direct_ProcessPrice_query_lines": [
+          2717
+        ],
+        "inline_effective_date_filter_in_code": true,
+        "code_text_filter_by_process_code_hits": 0,
+        "comment_text_filter_by_process_code_hits": 0
+      },
+      "diff_removed_ProcessPrice_lines": [
+        "-                process_price = ProcessPrice.query.filter(",
+        "-                    ProcessPrice.process_code == data['process_code'],",
+        "-                    ProcessPrice.effective_date <= end_of_day + timedelta(days=1)",
+        "-                ).order_by(ProcessPrice.effective_date.desc()).first()",
+        "-                    process = ProcessPrice.query.filter_by(process_code=data['process_code']).first()",
+        "-                process = ProcessPrice.query.filter_by(process_code=data['process_code']).first()"
+      ]
+    },
+    "pre_fix_semantics_on_real_wage_chain": {
+      "import_http": 200,
+      "import_body": {
+        "message": "成功导入 1 条记录",
+        "success": true
+      },
+      "import_reading": {
+        "task_assignment_id": 20,
+        "process_id": 3487,
+        "quantity": 10
+      },
+      "report_http": 200,
+      "report_body": {
+        "message": "更新成功",
+        "success": true
+      },
+      "wage_reading": {
+        "production_record_id": 2,
+        "process_id": 3487,
+        "quantity": 10,
+        "date": "2026-10-08",
+        "unit_price": 1.5,
+        "piecework_amount": 15.0
+      }
+    },
+    "post_fix_on_real_wage_chain": {
+      "import_http": 200,
+      "import_body": {
+        "message": "成功导入 1 条记录",
+        "success": true
+      },
+      "import_reading": {
+        "task_assignment_id": 21,
+        "process_id": 3488,
+        "quantity": 10
+      },
+      "report_http": 200,
+      "report_body": {
+        "message": "更新成功",
+        "success": true
+      },
+      "wage_reading": {
+        "production_record_id": 3,
+        "process_id": 3488,
+        "quantity": 10,
+        "date": "2026-10-08",
+        "unit_price": 3.5,
+        "piecework_amount": 35.0
+      }
+    },
+    "piecework_delta": 20.0
+  },
+  "real_db_sha256_after": "F5DA2306BC31CBAB098AAD3774016D320A9B9AA3546F93418196AE9900E0F065",
+  "B5_real_db_unchanged": true,
+  "B5_schema": {
+    "real_object_count": 153,
+    "copy_object_count": 153,
+    "identical": true
+  },
+  "routes_py_sha256_at_probe_end": "00956C8C2D96EDD5A88A536483CDD4BF7E31F6BC9E426A588B75CA649319AD09",
+  "routes_py_modified_during_probe": false,
+  "checks": {
+    "failure_count": 0,
+    "failures": []
+  }
+}

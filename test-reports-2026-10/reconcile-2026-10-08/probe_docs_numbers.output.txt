@@ -1,0 +1,192 @@
+
+======================================================================
+1. migrations/versions 的 create_table 与表集合（口径：正则 create_table('name')）
+======================================================================
+migrations/versions/*.py 文件数 = 35
+含 create_table( 调用的文件数 = 13
+   011e395c1aa4_add_sales_order_management_tables.py       ct=2
+   166a7ce7b905_add_customer_management_tables.py          ct=2
+   29e80e4970ac_add_product_mbom_tables.py                 ct=3
+   322346bd1261_add_production_order_and_batch_.py         ct=5
+   33c7d77643c1_remove_material_name_column_from_raw_.py   ct=3
+   9f02bbbbd492_update_raw_material_model_remove_.py       ct=2
+   a3f28e475446_add_sales_order_management_tables.py       ct=3
+   b1a01_add_system_config_and_task_completed_at.py        ct=1
+   c02604883c72_add_quality_management_tables.py           ct=24
+   c117632ece3d_remove_material_name_from_raw_material_.py ct=1
+   c4863dae8be6_add_notification_system.py                 ct=5
+   c4b4caaebd94_add_raw_material_categories_table.py       ct=1
+   da_add_process_assignment_tables.py                     ct=2
+create_table 调用总数 = 54
+迁移里出现的唯一表名 = 49
+---- 逐文件是否有表存在性守卫（启发式） ----
+   011e395c1aa4_add_sales_order_management_tables.py       guarded=False
+   166a7ce7b905_add_customer_management_tables.py          guarded=False
+   29e80e4970ac_add_product_mbom_tables.py                 guarded=False
+   322346bd1261_add_production_order_and_batch_.py         guarded=False
+   33c7d77643c1_remove_material_name_column_from_raw_.py   guarded=False
+   9f02bbbbd492_update_raw_material_model_remove_.py       guarded=False
+   a3f28e475446_add_sales_order_management_tables.py       guarded=False
+   b1a01_add_system_config_and_task_completed_at.py        guarded=True
+   c02604883c72_add_quality_management_tables.py           guarded=False
+   c117632ece3d_remove_material_name_from_raw_material_.py guarded=False
+   c4863dae8be6_add_notification_system.py                 guarded=False
+   c4b4caaebd94_add_raw_material_categories_table.py       guarded=False
+   da_add_process_assignment_tables.py                     guarded=True
+
+======================================================================
+2. metadata 表集合 vs 迁移表集合（差集口径）
+======================================================================
+db.metadata.tables 数 = 74
+metadata 有、迁移无（差集） = 31
+   - consumable_categories
+   - consumables
+   - equipment
+   - equipment_capabilities
+   - equipment_downtime
+   - furnace_layout_cells
+   - furnace_layouts
+   - goods_receipt_items
+   - goods_receipts
+   - heat_lot_slots
+   - heat_lots
+   - inventory_count_items
+   - inventory_counts
+   - material_requisition_items
+   - material_requisitions
+   - material_return_items
+   - material_returns
+   - purchase_order_items
+   - purchase_orders
+   - purchase_requisition_items
+   - purchase_requisitions
+   - purchase_settlements
+   - shipment_items
+   - shipment_receipts
+   - shipments
+   - suppliers
+   - task_workpieces
+   - work_center_equipment
+   - work_centers
+   - workpiece_events
+   - workpieces
+迁移有、metadata 无 = 6
+   + _alembic_tmp_notification_rules
+   + _alembic_tmp_product_bom
+   + _alembic_tmp_raw_material
+   + delivery_schedules
+   + sales_order_delivery_batches
+   + sqlite_sequence
+app.db（只读打开）表数 = 75
+剔除 alembic_version 后 = 74
+真库表 ∉ 迁移 create_table = 31
+   - consumable_categories
+   - consumables
+   - equipment
+   - equipment_capabilities
+   - equipment_downtime
+   - furnace_layout_cells
+   - furnace_layouts
+   - goods_receipt_items
+   - goods_receipts
+   - heat_lot_slots
+   - heat_lots
+   - inventory_count_items
+   - inventory_counts
+   - material_requisition_items
+   - material_requisitions
+   - material_return_items
+   - material_returns
+   - purchase_order_items
+   - purchase_orders
+   - purchase_requisition_items
+   - purchase_requisitions
+   - purchase_settlements
+   - shipment_items
+   - shipment_receipts
+   - shipments
+   - suppliers
+   - task_workpieces
+   - work_center_equipment
+   - work_centers
+   - workpiece_events
+   - workpieces
+
+======================================================================
+3. _ENSURED_COLUMNS（AST 字面量口径）
+======================================================================
+_ENSURED_COLUMNS line=21 tables=10 cols=43
+   sales_order_items=6 task_assignment=9 production_orders=6 production_batches=6 products=1 product_processes=2 finished_product=3 nonconformity_records=8 raw_material_categories=1 consumable_categories=1
+
+======================================================================
+4. models.py 模型类数（check_properties 口径见门禁输出）
+======================================================================
+app/models.py ClassDef 数 = 74
+app/models.py 行数 = 3117
+
+======================================================================
+5. 落盘导入端点（口径：请求内有 file.save( 的视图函数）
+======================================================================
+routes.py                 7 个: [('import_employees', 1935), ('import_process_prices', 2284), ('import_production_records', 2681), ('import_bonus_penalties', 3861), ('import_tasks', 3987), ('save_temp_file', 5083), ('import_products', 7685)]
+
+======================================================================
+5b. 文本口径 file.save( / pd.read_excel( / save_temp_file(
+======================================================================
+quality.py                file.save=[] pd.read_excel=[1634] save_temp_file=[]
+routes.py                 file.save=[1952, 2301, 2697, 3877, 4003, 4116, 4165, 4893, 4980, 5087] pd.read_excel=[4896, 4983] save_temp_file=[5083, 7698]
+
+======================================================================
+6. io.BytesIO（文本口径 'BytesIO()'）
+======================================================================
+app\main\quality.py                           3 [1465, 1561, 1596]
+app\main\routes.py                            13 [1903, 2226, 2253, 2622, 2649, 2786, 2838, 3829, 3955, 4115, 4164, 7654, 7950]
+app\utils\excel_generator.py                  1 [612]
+BytesIO() 合计 = 17
+
+======================================================================
+7. 内联 current_user.role（AST 口径）
+======================================================================
+app\main\quality.py                           10 [46, 82, 104, 120, 529, 822, 911, 1217, 1277, 1347]
+app\main\routes.py                            5 [337, 340, 350, 654, 5983]
+Python 合计 = 15
+app/templates\main\quality\task_detail.html   1 [13]
+app/templates\main\quality\tasks.html         1 [340]
+模板合计 = 2
+
+======================================================================
+8. @bp.route 装饰器（AST 口径）
+======================================================================
+app\auth\routes.py                            4
+app\main\equipment.py                         15
+app\main\production_center.py                 7
+app\main\purchase.py                          13
+app\main\quality.py                           27
+app\main\routes.py                            192
+app\main\shipping.py                          6
+app\main\stock.py                             5
+TOTAL = 269
+
+======================================================================
+9. 模板 / 迁移文件数
+======================================================================
+app/templates 下 .html 文件数 = 87
+app/templates 下全部文件数 = 87
+
+======================================================================
+10. app/main/routes.py 行数（字节口径）
+======================================================================
+bytes=511969 splitlines=12155 LF=12155 CRLF=0 endswith_LF=True BOM=False
+
+======================================================================
+11. app/main 下文件清单与大小
+======================================================================
+   __init__.py               83 bytes
+   equipment.py              14388 bytes
+   forms.py                  50868 bytes
+   production_center.py      17887 bytes
+   purchase.py               22423 bytes
+   quality.py                70415 bytes
+   routes.py                 511969 bytes
+   sales_routes.py           1 bytes
+   shipping.py               11083 bytes
+   stock.py                  6208 bytes

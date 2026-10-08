@@ -1,0 +1,59 @@
+{
+ "real_db_sha256_before": "F5DA2306BC31CBAB098AAD3774016D320A9B9AA3546F93418196AE9900E0F065",
+ "real_db_sha256_expected": "F5DA2306BC31CBAB098AAD3774016D320A9B9AA3546F93418196AE9900E0F065",
+ "A1_parse": {
+  "four_col_keys": [
+   "date",
+   "employee_id",
+   "notes",
+   "process_code",
+   "quantity"
+  ],
+  "four_col_notes": null,
+  "five_col_notes": "夜班补录",
+  "five_col_blank_notes": null,
+  "all_dicts_have_notes": true,
+  "no_exception": true
+ },
+ "db_copy_path": "C:\\Users\\RICHAR~1\\AppData\\Local\\Temp\\dsh-SJEjSk\\wms_test_d1uf7c6j\\app.db",
+ "db_uri": "sqlite:///C:/Users/RICHAR~1/AppData/Local/Temp/dsh-SJEjSk/wms_test_d1uf7c6j/app.db",
+ "temp_folder_override": "D:\\workspace\\wage_management_system - bak\\.analysis-scratch\\t1_temp",
+ "temp_folder_default": "D:\\workspace\\wage_management_system - bak\\uploads\\temp",
+ "seeded": {
+  "employee_pk": 64,
+  "process_price_pk": 3487
+ },
+ "A3_negative_control": {
+  "http_status": 200,
+  "records_created": 0,
+  "message": "成功导入 0 条记录，3 条记录导入失败：\n处理记录时出错: 'notes'\n员工工号 _t1_EMP0000 不存在\n未找到工序 _T1P9999 在 2026-10-09 00:00:00 的价格"
+ },
+ "A2_A4_after_fix": {
+  "http_status": 200,
+  "records_created": 1,
+  "message": "成功导入 1 条记录，2 条记录导入失败：\n员工工号 _t1_EMP0000 不存在\n未找到工序 _T1P9999 在 2026-10-09 00:00:00 的价格"
+ },
+ "A2_hit_row": {
+  "record_id": 1,
+  "process_id": 3487,
+  "expected_process_id": 3487,
+  "process_id_matches_process_price": true,
+  "quantity": 7,
+  "notes": null,
+  "process_price_value": 1.25
+ },
+ "A4_bad_rows": {
+  "bad_employee_pk_rows": 0,
+  "bad_employee_not_created": true,
+  "has_line_prefixed_error": true,
+  "not_500": true
+ },
+ "real_db_sha256_after": "F5DA2306BC31CBAB098AAD3774016D320A9B9AA3546F93418196AE9900E0F065",
+ "A5_real_db_unchanged": true,
+ "A5_schema": {
+  "real_objects": 153,
+  "copy_objects": 153,
+  "copy_extra_objects": [],
+  "schema_identical": true
+ }
+}

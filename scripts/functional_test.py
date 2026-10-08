@@ -590,6 +590,206 @@ def test_search(app, users, pw, client_admin):
           f'HTTP {r.status_code} {sug}')
 
 
+# ------------------------------------------------- 合金钢辙叉工价/BOM 导入
+#: 夹具表头：工价标准页（序号/型号/图号/部件名称/工序名称/单价）与 48 页表格 B/E 型（9 列）
+ALLOY_PRICE_HEADER = ['序号', '型号', '图号', '部件名称', '工序名称', '单价', '备注']
+ALLOY_BOM_HEADER = ['序号', '图号', '名称', '单位', '数量', '材料', '单质量', '总质量', '备注']
+ALLOY_PRICE_FILE = '合金钢辙叉计件工价标准.xlsx'
+#: 夹具刻意用 ZZTEST* 合成键：真实库已含「合金钢辙叉」全量数据（48 父件 / 1033 子件 / 3534 工价），
+#: 若夹具复用真实图号/自然键，会命中既有行而变成「复用」而非「新建」，并且 `replace_existing=1`
+#: 会把真实父件的 BOM 明细删掉（副本内）——探针必须与真实数据内容解耦。
+ALLOY_BOM_FILE = '（99）ZZTESTBOM-01.xlsx'
+
+
+def _build_alloy_price_fixture(path):
+    """按工价标准原版式生成极小夹具：00- 目录页（须跳过）+ 1 页含 2 个明细块 2 小计 1 合计。"""
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    catalog = wb.active
+    catalog.title = '00-工价目录'
+    catalog.append(['编号', '类别', '名称', '规格 型号', '图 号', '单位'])
+    catalog.append([1, '合金钢辙叉', 'ZZTEST-01', 'ZZTEST-01', 'ZZTEST-01', '组'])
+    catalog.append(['整理：', '夹具', '日期：2025年6月3日'])
+
+    ws = wb.create_sheet('01-ZZTEST-01')
+    ws.append(['易亨公司合金钢辙叉计件工价 明细表-01'])
+    ws.append(['型号：ZZTEST-01   图号：ZZTEST-01    金额：45元/组'])
+    ws.append(ALLOY_PRICE_HEADER)
+    ws.append([1, 'ZZTEST-01', 'ZZTEST-01', '心轨', '下料', 10, None])
+    ws.append([2, 'ZZTEST-01', 'ZZTEST-01', '心轨', '粗铣', 20, None])
+    ws.append([3, None, None, '心轨加工费用小计', None, 30, None])
+    ws.append([4, 'ZZTEST-01', 'ZZTEST-01', '翼轨', '下料', 15, None])
+    ws.append([5, None, None, '翼轨加工费用小计', None, 15, None])
+    ws.append([6, None, None, '合计', None, 45, None])
+    ws.append(['编制：夹具', None, None, None, None, None, None])
+    wb.save(path)
+    return path
+
+
+def _build_alloy_bom_fixture(path):
+    """按 48 页表格 B/E 型（9 列）生成极小夹具：父件型号来自文件名，2 个直接子件。"""
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'Sheet1'
+    ws.append(['总图号：ZZTESTBOM-01'])
+    ws.append(ALLOY_BOM_HEADER)
+    ws.append([1, 'ZZTEST-B1', 'ZZTEST 螺栓M27x120', '个', 24, 'Q235', 1.2, 28.8, None])
+    ws.append([2, 'ZZTEST-B2', 'ZZTEST 橡胶垫板', '块', 2, '橡胶', 0.5, 1, None])
+    wb.save(path)
+    return path
+
+
+def _alloy_counts():
+    """(工价, 工价组合, 产品, BOM 明细) 四张表的当前行数。"""
+    from app.models import Product, ProductBOM, ProcessPrice, ProcessPriceGroup
+
+    return (ProcessPrice.query.count(), ProcessPriceGroup.query.count(),
+            Product.query.count(), ProductBOM.query.count())
+
+
+def test_alloy_price_import(app, client_admin):
+    print('\n== 合金钢辙叉工价导入 ==')
+    from io import BytesIO
+
+    tmp = tempfile.mkdtemp(prefix='alloy_price_')
+    try:
+        fixture = _build_alloy_price_fixture(os.path.join(tmp, ALLOY_PRICE_FILE))
+        with open(fixture, 'rb') as fh:
+            raw = fh.read()
+        with app.app_context():
+            before = _alloy_counts()
+
+        def post(dry_run, filename=ALLOY_PRICE_FILE, payload=None):
+            # 每次请求都要新的 BytesIO：上一次的已被 werkzeug 消费并关闭
+            body = raw if payload is None else payload
+            return client_admin.post('/process_prices/import_alloy',
+                                     data={'file': (BytesIO(body), filename),
+                                           'dry_run': '1' if dry_run else '0'},
+                                     content_type='multipart/form-data')
+
+        r = post(True)
+        rep = (r.get_json() or {}).get('data') or {}
+        check('工价 dry_run 返回工价报告',
+              r.status_code == 200 and rep.get('kind') == 'process_price',
+              f'HTTP {r.status_code} kind={rep.get("kind")}')
+        check('工价夹具解析 6 条', rep.get('total_rows') == 6, repr(rep.get('total_rows')))
+        check('工价 dry_run 零错误', (rep.get('errors') or {}).get('count') == 0,
+              repr((rep.get('errors') or {}).get('items')))
+        with app.app_context():
+            now = _alloy_counts()
+            check('工价 dry_run 不写库', now == before, f'{before} -> {now}')
+
+        r = post(False)
+        rep = (r.get_json() or {}).get('data') or {}
+        check('工价正式导入 3 普通 + 3 小计',
+              rep.get('normal_created') == 3 and rep.get('subtotal_created') == 3,
+              f"normal={rep.get('normal_created')} subtotal={rep.get('subtotal_created')}"
+              f" err={(rep.get('errors') or {}).get('items')}")
+        check('工价写库 6 条 + 组合 5 条',
+              rep.get('groups_created') == 5, repr(rep.get('groups_created')))
+        with app.app_context():
+            after = _alloy_counts()
+        check('工价写库行数与报告一致',
+              after[0] == before[0] + 6 and after[1] == before[1] + 5,
+              f'{before[:2]} -> {after[:2]}')
+
+        r = post(False)
+        rep = (r.get_json() or {}).get('data') or {}
+        with app.app_context():
+            again = _alloy_counts()
+        check('工价重复导入幂等（不升版本）',
+              rep.get('normal_unchanged') == 3 and rep.get('subtotal_unchanged') == 3
+              and again == after,
+              f"unchanged={rep.get('normal_unchanged')}/{rep.get('subtotal_unchanged')}"
+              f' {after} -> {again}')
+
+        r = post(False, filename='not-excel.txt', payload=b'hello')
+        body = r.get_json() or {}
+        check('工价拒绝非 Excel 文件',
+              body.get('success') is False and 'Excel' in (body.get('message') or ''),
+              f"HTTP {r.status_code} {body.get('message')}")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_alloy_bom_import(app, client_admin):
+    print('\n== 合金钢辙叉 BOM 导入 ==')
+    from io import BytesIO
+
+    from app.models import Product
+
+    tmp = tempfile.mkdtemp(prefix='alloy_bom_')
+    try:
+        fixture = _build_alloy_bom_fixture(os.path.join(tmp, ALLOY_BOM_FILE))
+        with open(fixture, 'rb') as fh:
+            raw = fh.read()
+        with app.app_context():
+            before = _alloy_counts()
+
+        def post(dry_run):
+            return client_admin.post('/products/import_bom_alloy',
+                                     data={'files': (BytesIO(raw), ALLOY_BOM_FILE),
+                                           'dry_run': '1' if dry_run else '0',
+                                           'replace_existing': '1'},
+                                     content_type='multipart/form-data')
+
+        r = post(True)
+        rep = (r.get_json() or {}).get('data') or {}
+        check('BOM dry_run 返回 BOM 报告',
+              r.status_code == 200 and rep.get('kind') == 'product_bom',
+              f'HTTP {r.status_code} kind={rep.get("kind")}')
+        check('BOM 夹具 1 父件 2 子件',
+              rep.get('parents_total') == 1 and rep.get('children_total') == 2,
+              f"parents={rep.get('parents_total')} children={rep.get('children_total')}")
+        check('BOM dry_run 零错误', (rep.get('errors') or {}).get('count') == 0,
+              repr((rep.get('errors') or {}).get('items')))
+        with app.app_context():
+            now = _alloy_counts()
+            check('BOM dry_run 不写库', now == before, f'{before} -> {now}')
+
+        r = post(False)
+        rep = (r.get_json() or {}).get('data') or {}
+        check('BOM 正式导入 1 父件 + 2 子件 + 2 明细',
+              rep.get('parents_created') == 1 and rep.get('children_created') == 2
+              and rep.get('bom_rows_created') == 2,
+              f"parents={rep.get('parents_created')} children={rep.get('children_created')}"
+              f" rows={rep.get('bom_rows_created')} err={(rep.get('errors') or {}).get('items')}")
+        with app.app_context():
+            after = _alloy_counts()
+            parent = Product.query.filter_by(product_name='ZZTESTBOM-01').first()
+        check('BOM 写库 3 产品 + 2 明细且父件可查',
+              after[2] == before[2] + 3 and after[3] == before[3] + 2 and parent is not None,
+              f'{before[2:]} -> {after[2:]} parent={getattr(parent, "product_code", None)}')
+
+        r = post(False)
+        rep = (r.get_json() or {}).get('data') or {}
+        with app.app_context():
+            again = _alloy_counts()
+        check('BOM 重复导入幂等（覆盖同父件明细）',
+              rep.get('bom_rows_removed') == 2 and rep.get('bom_rows_created') == 2 and again == after,
+              f"removed={rep.get('bom_rows_removed')} created={rep.get('bom_rows_created')}"
+              f' {after} -> {again}')
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_alloy_import_permission(client_user):
+    print('\n== 合金钢辙叉导入权限 ==')
+    from io import BytesIO
+
+    r = client_user.post('/process_prices/import_alloy',
+                         data={'file': (BytesIO(b'x'), 'a.xlsx')},
+                         content_type='multipart/form-data')
+    check('user 角色不能导入工价', r.status_code in (302, 403), f'HTTP {r.status_code}')
+    r = client_user.post('/products/import_bom_alloy',
+                         data={'files': (BytesIO(b'x'), 'a.xlsx')},
+                         content_type='multipart/form-data')
+    check('user 角色不能导入 BOM', r.status_code in (302, 403), f'HTTP {r.status_code}')
+
+
 def run():
     app, _ = make_app()
     users, pw = ensure_role_users(app)
@@ -611,6 +811,9 @@ def run():
     test_no_process_blocks_order(app, ca)
     test_requisition_issue_deducts(app, ca)
     test_inventory_count_adjusts(app, ca)
+    test_alloy_price_import(app, ca)
+    test_alloy_bom_import(app, ca)
+    test_alloy_import_permission(cu)
     test_ensure_schema_idempotent()
 
     print(f'\n================ 结果：{len(PASS)} 通过 / {len(FAIL)} 失败 ================')

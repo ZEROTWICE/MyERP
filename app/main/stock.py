@@ -81,11 +81,32 @@ def dispose_nonconformity_api(id):
     表单已渲染 csrf_token，原先的 @csrf.exempt 等于对跨站表单完全不设防，已删除。
     处置对象口径（target_type=workpiece / goods_receipt）由 mes_service.dispose_nonconformity
     按单据自动分流，动作不适用时返回 400 与明确提示。
+
+    B14-04：来料检（target_type=goods_receipt）只接受退货/让步接收/报废，请求返工在此处
+    即被拒绝（400 + 人读原因），既不进服务层的 ValueError 通道，也不会真的建返工任务。
     """
     try:
         nc = NonconformityRecord.query.get_or_404(id)
         data = request.get_json(silent=True) or request.form
         action = (data.get('action') or data.get('type') or '').strip()
+        # B14-04 服务端兜底：返工只适用于生产质检。界面（t1 的 nonconformities.html）对来料检
+        # 行已不渲染「返工」按钮，但**服务端不得依赖界面**（直接 POST / 旧表单 / 脚本仍可发）。
+        # 来料检口径的合法动作是 mes_service.INCOMING_NC_ACTIONS（退货/让步接收/报废），
+        # 取该常量而非另写一份，避免两处口径漂移；命中即 400 + 人读原因，绝不落进
+        # dispose_nonconformity 的生产分支去真的建返工任务。非来料检（workpiece /
+        # production_record / 老数据 None）一律不拦，保持既有三动作语义。
+        target_type, target_id = mes_service.nonconformity_target(nc)
+        if target_type == 'goods_receipt' and action not in mes_service.INCOMING_NC_ACTIONS:
+            allowed = '/'.join(mes_service.INCOMING_NC_LABELS.get(a, a)
+                               for a in mes_service.INCOMING_NC_ACTIONS)
+            return jsonify({
+                'success': False,
+                'message': (f'来料检不合格不支持「{action or "空动作"}」处置（不合格单 #{nc.id}，'
+                            f'到货单 #{target_id}）；来料检可选动作为：{allowed}。'
+                            f'返工仅适用于生产质检不合格单。'),
+                'target_type': target_type, 'target_id': target_id,
+                'allowed_actions': list(mes_service.INCOMING_NC_ACTIONS),
+            }), 400
         proc = data.get('rework_process_id')
         emp = data.get('employee_id')
         # DEC-2 §2.3/§2.4：返工件数与报废件数是**两个独立可选入参**（`16` §11 补记：不得合并）。
@@ -120,5 +141,15 @@ def dispose_nonconformity_api(id):
 @login_required
 @require_capability('quality.view')
 def manage_nonconformities():
-    items = NonconformityRecord.query.order_by(NonconformityRecord.id.desc()).limit(200).all()
-    return render_template('main/stock/nonconformities.html', items=items)
+    """不合格单列表（B14-05：支持按状态筛选）。
+
+    `status` 查询参数与前端（t1 的 nonconformities.html #ncStatusFilter）约定一致，语义为
+    **按 NonconformityRecord.status 精确相等筛选**；不带参数时保持既有全量视图与
+    `order_by(id.desc()).limit(200)`，不回归。筛选只经本路由的 query 参数实现，不新增路由。
+    """
+    status = (request.args.get('status') or '').strip()
+    query = NonconformityRecord.query
+    if status:
+        query = query.filter(NonconformityRecord.status == status)
+    items = query.order_by(NonconformityRecord.id.desc()).limit(200).all()
+    return render_template('main/stock/nonconformities.html', items=items, status=status)

@@ -1,0 +1,76 @@
+{
+  "checker": "check_t8_registration.py",
+  "task": "t8 / B12-05 登记件机检",
+  "target": "D:\\workspace\\wage_management_system - bak\\test-reports-2026-10\\B12-05-口径登记-N-12收窄与工资口径对照.md",
+  "target_bytes": 24005,
+  "P1_sentences": {
+    "positive_1": "不做金额台账",
+    "count_1": 7,
+    "positive_2": "库存台账行必须写",
+    "count_2": 11,
+    "both_present": true
+  },
+  "P2_two_state": {
+    "both_present_verdict": true,
+    "drop_sentence_2_verdict": false,
+    "drop_sentence_1_verdict": false,
+    "drop_both_verdict": false
+  },
+  "N1_legacy_wording": {
+    "pattern": "不做报废...台账（片段拼接，脚本不复述逐字原文）",
+    "hits": 0,
+    "quote_marked_occurrences": 6,
+    "note": "登记件允许「不做报废成本台账」以**带出处标注的原值引用**形态出现（§A.1 原值 + §A.3 引用），禁止的是去掉「金额」限定的连写旧措辞"
+  },
+  "N2_A13_blacklist": {
+    "source": "D:\\workspace\\wage_management_system - bak\\test-reports-2026-10\\reconcile-2026-10-08\\recon-arbitration.md §A-13",
+    "bullets_parsed": 6,
+    "derived_forbidden_tokens": [
+      "`can()` 110 处 / 28 文件",
+      "`app/main` 8 个模块",
+      "`BytesIO` 15 处",
+      "全仓 `BytesIO` 13 处",
+      "批次8 = 0/12",
+      "B7-06 已实现（未新增）"
+    ],
+    "hits_in_registration": {},
+    "hit_count": 0
+  },
+  "A1_anchors": {
+    "3487": 11,
+    "3488": 11,
+    "15.0": 7,
+    "F5DA2306BC31CBAB098AAD3774016D320A9B9AA3546F93418196AE9900E0F065": 2,
+    "§6.1": 5,
+    "§6.4": 3,
+    "业务流程现状与缺口.md": 5,
+    "81-": 26,
+    "不做金额台账": 7,
+    "库存台账行必须写": 11
+  },
+  "A1_all_anchors_present": true,
+  "A2_decision_items": {
+    "table_rows_with_default_path": 4,
+    "default_path_phrase_count": 8,
+    "user_decision_phrase_count": 9,
+    "has_A13_discipline_statement": true
+  },
+  "A3_append_only": {
+    "section_E_present": true,
+    "v1_empty_declared": true,
+    "add_only_rule_present": true,
+    "correction_format_rule_present": true
+  },
+  "verdict": {
+    "P1_both_sentences_present": true,
+    "P2_two_state_discriminates": true,
+    "N1_no_legacy_wording": true,
+    "N2_no_A13_blacklist_numbers": true,
+    "N2_a13_source_parsed": true,
+    "A1_all_anchors_present": true,
+    "A2_four_decision_rows": true,
+    "A2_default_path_at_least_4": true,
+    "A3_append_only_discipline": true
+  },
+  "RESULT": "OK"
+}

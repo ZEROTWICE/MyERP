@@ -1,0 +1,263 @@
+{
+ "tag": "_t5_033011",
+ "real_db_sha256_before": "F5DA2306BC31CBAB098AAD3774016D320A9B9AA3546F93418196AE9900E0F065",
+ "real_db_sha256_expected": "F5DA2306BC31CBAB098AAD3774016D320A9B9AA3546F93418196AE9900E0F065",
+ "copy_path": "C:\\Users\\RICHAR~1\\AppData\\Local\\Temp\\wms_test_clc31zzr\\app.db",
+ "db_uri": "sqlite:///C:/Users/RICHAR~1/AppData/Local/Temp/wms_test_clc31zzr/app.db",
+ "fixture": {
+  "employee_id": 1,
+  "employee_code": "YHGL0001",
+  "employee_name": "李银芳",
+  "coefficient": 1.0,
+  "base_salary": 2000.0,
+  "process_id": 1,
+  "process_price": 20.0,
+  "normal_record": {
+   "id": 1,
+   "quantity": 3,
+   "global_sn": "00019348N"
+  },
+  "rework_record": {
+   "id": 2,
+   "quantity": 5,
+   "global_sn": "00019348R"
+  },
+  "nc_id": 1,
+  "R1R2_identified": [
+   2
+  ]
+ },
+ "mtimes": {
+  "app/main/routes.py": "2026-10-08 03:22:52",
+  "app/services/mes_service.py": "2026-10-08 02:59:35",
+  "app/templates/main/salary_calculation.html": "2026-10-08 03:23:01"
+ },
+ "mes_service_newer_than_routes": false,
+ "my_declared_changed_paths": [
+  "app/main/routes.py",
+  "app/templates/main/salary_calculation.html"
+ ],
+ "calculation_unchanged": {
+  "mes_service_untouched_by_declaration": true,
+  "my_declared_changed_paths": [
+   "app/main/routes.py",
+   "app/templates/main/salary_calculation.html"
+  ],
+  "worktree_dirty_paths_overall": [
+   ".tmp/",
+   "app/main/routes.py",
+   "app/services/mes_service.py",
+   "app/templates/main/salary_calculation.html",
+   "app/utils/excel_generator.py",
+   "docs//344/272/244/346/216/245/346/217/220/347/244/272/350/257/215-/346/211/271/346/254/24112/345/274/200/345/267/245-2026-10-08.md",
+   "docs//344/272/244/346/216/245/346/217/220/347/244/272/350/257/215-/346/211/271/346/254/2413/345/274/200/345/267/245-2026-10-06.md",
+   "docs//345/274/200/345/217/221/344/270/216/346/265/213/350/257/225/350/247/204/345/210/222-2026-10-06.md",
+   "test-reports-2026-10/80-/345/274/200/345/217/221/344/270/216/351/234/200/346/261/202/346/226/207/346/241/243-/345/256/236/351/231/205/350/277/233/345/272/246/351/200/220/346/235/241/345/257/271/350/264/246.md",
+   "test-reports-2026-10/81-/345/220/216/347/273/255/345/274/200/345/217/221/344/270/216/346/265/213/350/257/225/350/247/204/345/210/222.md",
+   "test-reports-2026-10/B12-05-/345/217/243/345/276/204/347/231/273/350/256/260-N-12/346/224/266/347/252/204/344/270/216/345/267/245/350/265/204/345/217/243/345/276/204/345/257/271/347/205/247.md",
+   "test-reports-2026-10/harness/.tmp/",
+   "test-reports-2026-10/reconcile-2026-10-08/"
+  ],
+  "mes_service_worktree_sha256": "2CECDBD25EDDBB9988AF9DC219648ACB431FAAEA80EBE5065AEC16AA39C4BC4C",
+  "mes_service_head_sha256": "54A19270BD617268F4E4B475D906E4604AA6C276ED84575C330A7FF1B6694176",
+  "breakdown_source_sha256": "73B7DB142135B8483060746F675DC10AE17876EEF450CE8ACCDE85E070E376F5",
+  "amount_source_sha256": "7A34E31D384927CF1B822463F5CB0B11FF88057718AF6B7BCDA56E603DDCBF80",
+  "amount_still_drops_dropped": true,
+  "breakdown_still_pairwise": true,
+  "routes_amount_calls": 3,
+  "routes_breakdown_calls": 1,
+  "routes_rework_counts_accessor_calls": 1,
+  "routes_switch_key_read_sites": 0,
+  "routes_no_local_quantity_price_multiply": true
+ },
+ "head_error": "",
+ "switch_left_at": false,
+ "http": {
+  "A0_anonymous_api": {
+   "status": 302,
+   "content_type": "text/html; charset=utf-8",
+   "is_json": false,
+   "body_is_login_html": true,
+   "body": "<!doctype html>\n<html lang=en>\n<title>Redirecting...</title>\n<h1>Redirecting...</h1>\n<p>You should be redirected automat",
+   "location": "/auth/?next=http://localhost/salary_calculation?format%3Djson",
+   "blocked_by_login": true,
+   "no_payload_leaked": true
+  },
+  "A0b_login": {
+   "status": 302,
+   "location": "/"
+  },
+  "A1_page_off": {
+   "status": 200,
+   "content_type": "text/html; charset=utf-8",
+   "renderings": {
+    "has_normal_row": true,
+    "has_rework_row": true,
+    "has_split_heading": true,
+    "rework_excluded_visible": true,
+    "normal_badge_visible": true,
+    "shows_dropped_100": true
+   },
+   "has_employee_name": true
+  },
+  "A1_api_off": {
+   "status": 200,
+   "content_type": "application/json",
+   "is_json": true,
+   "body_has_html_tag": false,
+   "summary": {
+    "population": {
+     "coefficient": 1.0,
+     "counted": 60.0,
+     "department": "管理层",
+     "dropped": 100.0,
+     "employee_id": 1,
+     "employee_name": "李银芳",
+     "employee_no": "YHGL0001",
+     "excluded_record_ids": [
+      2
+     ],
+     "normal_quantity": 3.0,
+     "piecework": 60.0,
+     "rework_quantity": 5.0
+    },
+    "normal_record_flag": [
+     false
+    ],
+    "rework_record_flag": [
+     true
+    ],
+    "rework_record_amount": [
+     100.0
+    ],
+    "excluded_record_ids": [
+     2
+    ]
+   },
+   "switch_reported": false
+  },
+  "A2_page_on": {
+   "status": 200,
+   "renderings": {
+    "has_normal_row": true,
+    "has_rework_row": true,
+    "has_split_heading": true,
+    "rework_excluded_visible": false,
+    "normal_badge_visible": true,
+    "shows_dropped_100": true
+   }
+  },
+  "A2_api_on": {
+   "status": 200,
+   "summary": {
+    "population": {
+     "coefficient": 1.0,
+     "counted": 160.0,
+     "department": "管理层",
+     "dropped": 0.0,
+     "employee_id": 1,
+     "employee_name": "李银芳",
+     "employee_no": "YHGL0001",
+     "excluded_record_ids": [],
+     "normal_quantity": 8.0,
+     "piecework": 160.0,
+     "rework_quantity": 0.0
+    },
+    "normal_record_flag": [
+     false
+    ],
+    "rework_record_flag": [
+     false
+    ],
+    "rework_record_amount": [
+     100.0
+    ],
+    "excluded_record_ids": []
+   },
+   "switch_reported": true
+  },
+  "A3_nonrework_two_states": {
+   "off": 60.0,
+   "on": 60.0
+  },
+  "A4_legacy_vs_fixed": {
+   "switch_at_read": false,
+   "legacy_ignores_rework": 160.0,
+   "fixed_off_counted": 60.0,
+   "fixed_off_dropped": 100.0,
+   "delta": 100.0,
+   "excluded_ids": [
+    2
+   ]
+  },
+  "A5_url_map": {
+   "total_rules": 271,
+   "employee_breakdown_rules": [],
+   "api_salary_rules": [],
+   "has_new_rule": false
+  },
+  "A5_anonymous_page": {
+   "status": 302,
+   "location": "/auth/?next=http://localhost/salary_calculation",
+   "is_login_redirect": false
+  }
+ },
+ "verdict": {
+  "AC1_off_counted_60": true,
+  "AC1_off_dropped_100": true,
+  "AC1_on_counted_160": true,
+  "AC1_on_dropped_0": true,
+  "AC1_delta_100": true,
+  "AC1_rework_qty_x_price_eq_dropped": true,
+  "AC1_rework_row_flagged": true,
+  "AC1_off_excluded_ids_eq_rework_id": true,
+  "AC2_nonrework_two_states_equal_60": true,
+  "AC2b_legacy_160_vs_fixed_60": true,
+  "AC4_breakdown_unchanged": true,
+  "AC4_amount_single_source": true,
+  "AC4_switch_state_via_config_get_only": true,
+  "AC4_routes_no_local_multiply": true,
+  "AC4_no_new_switch_read_point": true,
+  "AC5_login_enforced_on_json_surface": true,
+  "AC5_api_content_type_json": true,
+  "AC5_page_renders_split": true,
+  "AC5_page_marks_rework": true,
+  "AC5_template_uses_can": true,
+  "AC5_no_new_url_map_rule": true
+ },
+ "all_passed": true,
+ "real_db_sha256_after": "F5DA2306BC31CBAB098AAD3774016D320A9B9AA3546F93418196AE9900E0F065",
+ "real_db_unchanged": true,
+ "t10_correction": {
+  "corrected_on": "2026-10-08",
+  "corrected_by": "verifier（非作者，t10 第二轮独立验证）",
+  "authority": [
+   "AC-04-e",
+   "test-reports-2026-10/harness/w2w3_probe.py:841-845(AST 直读点==1)",
+   "negative_matrix NV-2.3",
+   "t9 最小修复"
+  ],
+  "corrected_keys": {
+   "AC4_switch_state_via_config_get_only": {
+    "before": "parity['routes_switch_key_read_sites'] == 1",
+    "after": "parity['routes_switch_key_read_sites'] == 0",
+    "reason": "权威口径锁的是 SystemConfig.get 直读点恰 1 处且在 mes_service；routes.py 直读必须为 0"
+   },
+   "AC4_no_new_switch_read_point": {
+    "before": "parity['routes_no_new_rework_counts_read']（= routes.py 无访问器调用）",
+    "after": "parity['routes_rework_counts_accessor_calls'] == 1 and parity['routes_switch_key_read_sites'] == 0",
+    "reason": "routes.py 必须调用 mes_service.rework_counts_piecework() 访问器恰 1 处，且不得直读该键"
+   }
+  },
+  "behavior_criteria_untouched": true,
+  "independent_snapshot": {
+   "routes_switch_key_read_sites": 0,
+   "routes_rework_counts_accessor_calls": 1,
+   "routes_amount_calls": 3,
+   "mes_service_switch_read_sites": 1,
+   "mes_service_file": "app/services/mes_service.py",
+   "template_has_switch_literal": false
+  }
+ },
+ "t5_probe_source_corrected_by_t10": true
+}

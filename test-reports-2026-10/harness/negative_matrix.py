@@ -4,6 +4,9 @@
 
 1. **真实库防误写**：跑前/跑后真实 ``app.db`` SHA256 一致；并给一个**故意的负例**
    （试图把 URI 指向真实库时必须被拒）。
+   *（B14-R3 复标：NV-1.5 的校准钉在**引导前**字节副本 —— B14-08 起 ``create_app()`` 会向副本下发
+   默认质检模板（``inspection_templates`` +2 / ``inspection_items`` +7），引导后指纹必然偏离钉死值；
+   两时点口径与阴性对照见 ``test-reports-2026-10/B14-R3-NV1.5复标登记.md``。）*
 2. **假开关双向差分**：``quality.rework_counts_piecework`` 取 false / true 各跑同一返工场景，
    断言工资数字**不同**；非返工场景两次**相同**。*（若前者相同 ⇒ 暴露假开关，如实登记而不是改判据。）*
 3. **门禁阴性 + 阳性对照**：报工 ``production_record`` 路径质检 fail 后断言不合格单/门禁字段增量
@@ -86,15 +89,50 @@ out = {{
         'sqlite:///' + fake.replace('\\\\', '/'), fake),
 }}
 # 真实调用：_test_bootstrap 的最后一道闸在副本上必须放行
+import sqlite3
 import fixtures
 app, copy_path = fixtures.make_isolated_app('guardprobe')
+# B14-R3：两时点分开取指纹 —— ①引导前（字节复制刚完成、create_app 之前）②引导后
+out['pre_bootstrap_copy'] = fixtures.pre_bootstrap_copy()
 out['bootstrap_guard_passed_on_copy'] = bool(copy_path)
 out['app_uri'] = app.config['SQLALCHEMY_DATABASE_URI']
 out['copy_path_sha256'] = _env.sha256_file(copy_path)
+out['copy_path_bytes'] = os.path.getsize(copy_path)
 out['copy_is_real_file'] = os.path.samefile(copy_path, _env.REAL_DB)
 out['isolation_evidence_from_fixtures'] = getattr(fixtures, 'LAST_ISOLATION_EVIDENCE', None)
 import fixtures as _f
 out['last_isolation_evidence'] = getattr(_f, 'LAST_ISOLATION_EVIDENCE', None)
+
+
+def _ro_counts(path):
+    """只读（``mode=ro``）逐表行数：真实库与副本各读一次，用于归因引导后指纹偏离。"""
+    con = sqlite3.connect('file:' + path.replace(chr(92), '/') + '?mode=ro', uri=True)
+    try:
+        names = [r[0] for r in con.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")]
+        return {{n: con.execute('SELECT COUNT(*) FROM "' + n + '"').fetchone()[0] for n in names}}
+    finally:
+        con.close()
+
+
+def _ro_templates(path):
+    con = sqlite3.connect('file:' + path.replace(chr(92), '/') + '?mode=ro', uri=True)
+    try:
+        return [{{'id': r[0], 'code': r[1], 'type': r[2], 'active': r[3]}} for r in con.execute(
+            'SELECT id, template_code, type, is_active FROM inspection_templates ORDER BY id')]
+    finally:
+        con.close()
+
+
+_real_counts = _ro_counts(_env.REAL_DB)
+_copy_counts = _ro_counts(copy_path)
+out['seeding_deltas'] = {{t: _copy_counts[t] - _real_counts.get(t, 0)
+                         for t in sorted(_copy_counts)
+                         if _copy_counts[t] != _real_counts.get(t, 0)}}
+out['seeding_tables_only_in_copy'] = sorted(set(_copy_counts) - set(_real_counts))
+out['real_db_templates'] = _ro_templates(_env.REAL_DB)
+out['copy_templates'] = _ro_templates(copy_path)
+out['real_db_sha256_after_probe'] = _env.sha256_file(_env.REAL_DB)
 print('__GUARD__' + json.dumps(out, ensure_ascii=False))
 '''
 
@@ -150,18 +188,45 @@ def case1_real_db_guard(before_hash):
            note='副本与真实库同名（app.db）但位于本 run 的 .tmp 目录 ⇒ '
                 '「同名」不构成指向真实库。')
     fp = parsed.get('copy_fingerprint_equals_real') or {}
-    record('NV-1.5', '口径校准：副本指纹 == 真实库指纹（故指纹不能当拒绝判据）',
-           '副本 SHA256 与真实库钉死值相同 ⇒ 若用指纹拒绝，合法副本会被一并拒掉',
-           {'copy_sha256_equals_pinned': True, 'copy_is_real_file': False},
-           {'copy_sha256': parsed.get('copy_path_sha256'),
-            'pinned': REAL_DB_SHA256_EXPECTED,
+    # B14-R3 复标：把校准钉在「引导前」字节副本，并把「引导后」偏离与实测净增绑定
+    pre = parsed.get('pre_bootstrap_copy') or {}
+    pre_sha = pre.get('sha256')
+    post_sha = parsed.get('copy_path_sha256')
+    deltas = parsed.get('seeding_deltas') or {}
+    allowed_seed_tables = ('inspection_items', 'inspection_templates')
+    unattributed = sorted(t for t in deltas if t not in allowed_seed_tables)
+    post_deviates = bool(post_sha) and post_sha != REAL_DB_SHA256_EXPECTED
+    deviation_explained = post_deviates == bool(deltas)   # 指纹变 ⇔ 有实测写入（不许无解释漂移）
+    record('NV-1.5', '口径校准：引导前副本指纹 == 真实库钉死值；引导后偏离须由实测写入解释（B14-R3 复标）',
+           '两时点分开：①引导前字节副本 SHA256 == 钉死值 ⇒ 指纹不能当拒绝判据；'
+           '②引导后允许且必然偏离，且偏离只能由默认质检模板下发解释',
+           {'pre_bootstrap_sha256': REAL_DB_SHA256_EXPECTED,
+            'copy_is_real_file': False,
+            'post_bootstrap_sha256': '!= 钉死值（引导写入所致）',
+            'net_add_source': {'inspection_templates': '+2（SYS-QC-PROD-REC / SYS-QC-GOODS-REC）',
+                               'inspection_items': '+7'}},
+           {'pre_bootstrap': pre,
+            'post_bootstrap_sha256': post_sha,
+            'post_bootstrap_bytes': parsed.get('copy_path_bytes'),
             'samefile_with_real': parsed.get('copy_is_real_file'),
-            'fingerprint_guard_would_reject': fp.get('rejected')},
-           'passed' if parsed.get('copy_path_sha256') == REAL_DB_SHA256_EXPECTED
-           and parsed.get('copy_is_real_file') is False else 'failed',
+            'seeding_deltas': deltas,
+            'unattributed_deltas': unattributed,
+            'deviation_explained': deviation_explained,
+            'real_db_templates': parsed.get('real_db_templates'),
+            'copy_templates': parsed.get('copy_templates'),
+            'byte_copy_rejected_by_fingerprint_guard': fp.get('rejected'),
+            'real_db_sha256_after_probe': parsed.get('real_db_sha256_after_probe')},
+           'passed' if (pre_sha == REAL_DB_SHA256_EXPECTED
+                        and parsed.get('copy_is_real_file') is False
+                        and post_deviates and not unattributed and deviation_explained
+                        and all(v > 0 for v in deltas.values())) else 'failed',
            evidence=os.path.relpath(ev, REPO_ROOT),
-           note='这是本 harness 修正过一次的口径错误（初版用指纹当拒绝判据，'
-                '把自己的副本误判为真实库）——如实登记。')
+           note='B14-R3 复标：原判据用**引导后**指纹 == 钉死值，B14-08 启动下发默认质检模板'
+                '（app/__init__.py:247 _seed_system_configs -> InspectionTemplate.seed_defaults()，'
+                '副本 inspection_templates +2 / inspection_items +7）后该前提失效。'
+                '新判据把校准钉在**引导前**字节副本（PRE_BOOTSTRAP_COPY），并把引导后偏离与实测净增绑定：'
+                '指纹变 ⇔ 有写入，且写入只能落在 inspection_templates / inspection_items。'
+                '**不得据此放宽隔离保证**：copy_is_real_file（samefile）仍是硬判据，NV-1.2/1.3/1.4 未动。')
 
 
 # --------------------------------------------------------------- 用例 2：假开关双向差分

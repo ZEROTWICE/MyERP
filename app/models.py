@@ -746,10 +746,49 @@ class InspectionTemplate(db.Model):
     """质检模板"""
     __tablename__ = 'inspection_templates'
 
+    #: 初始化下发的模板类型（B14-08）。按已拍板方案 A，来料检用 `goods_receipt`
+    #: （不再用 `material`）；`production_record` 是生产质检的既定类型。
+    SEED_TEMPLATE_TYPES = ('production_record', 'goods_receipt')
+
+    #: B14-08 初始化模板定义：类型 -> {编码/名称/说明/检验项目列表}。
+    #: 编码带 `SYS-` 前缀，与用户在质检模板页手工创建的编码不会撞车。
+    SEED_TEMPLATES = (
+        {
+            'template_code': 'SYS-QC-PROD-REC',
+            'name': '生产质检（系统默认）',
+            'type': 'production_record',
+            'description': '系统初始化下发：生产记录质检默认模板，可自行修改或停用。',
+            'items': (
+                {'name': '外观', 'standard': '无裂纹、无锈蚀、无磕碰伤等外观缺陷',
+                 'inspection_method': '目视检查', 'unit': '', 'order_num': 1},
+                {'name': '尺寸', 'standard': '符合图纸/工艺卡标注尺寸及公差要求',
+                 'inspection_method': '量具测量', 'unit': 'mm', 'order_num': 2},
+                {'name': '材质/规格符合性', 'standard': '材质与规格与图纸、工艺要求一致',
+                 'inspection_method': '核对图纸与材质证明书', 'unit': '', 'order_num': 3},
+            ),
+        },
+        {
+            'template_code': 'SYS-QC-GOODS-REC',
+            'name': '来料检（系统默认）',
+            'type': 'goods_receipt',
+            'description': '系统初始化下发：来料检（到货单）默认模板，可自行修改或停用。',
+            'items': (
+                {'name': '外观', 'standard': '包装完好、无裂纹、无锈蚀、无磕碰伤等外观缺陷',
+                 'inspection_method': '目视检查', 'unit': '', 'order_num': 1},
+                {'name': '尺寸', 'standard': '符合采购订单/图纸标注尺寸及公差要求',
+                 'inspection_method': '量具测量', 'unit': 'mm', 'order_num': 2},
+                {'name': '材质/规格符合性', 'standard': '材质、规格与采购订单及随货质量证明一致',
+                 'inspection_method': '核对采购订单与材质证明书', 'unit': '', 'order_num': 3},
+                {'name': '到货数量', 'standard': '实收数量与到货单数量一致',
+                 'inspection_method': '点数/称重', 'unit': '件', 'order_num': 4},
+            ),
+        },
+    )
+
     id = db.Column(db.Integer, primary_key=True)
     template_code = db.Column(db.String(50), unique=True, nullable=False, comment='模板编码', index=True)
     name = db.Column(db.String(100), nullable=False, comment='模板名称')
-    type = db.Column(db.String(20), nullable=False, comment='模板类型(product/production_record/material)', index=True)
+    type = db.Column(db.String(20), nullable=False, comment='模板类型(product/production_record/goods_receipt)', index=True)
     description = db.Column(db.Text, comment='模板描述')
     is_active = db.Column(db.Boolean, default=True, comment='是否启用', index=True)
     created_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
@@ -761,8 +800,95 @@ class InspectionTemplate(db.Model):
     base_items = db.relationship('InspectionBaseItem', backref='template', lazy='dynamic')
     items = db.relationship('InspectionItem', backref='template', lazy='dynamic')
 
+    @classmethod
+    def seed_defaults(cls):
+        """补齐缺失的默认质检模板（B14-08）。**只补缺，不覆盖**。
+
+        空库上质检流程原本因 `inspection_templates` 零行而不可用（`mes_service.pick_template`
+        对任何类型都返回 `None`）——生产质检与来料检任务被创建后既选不到模板，也过不了
+        「模板类型必须与任务类型严格相等」的校验。这里在既有初始化路径
+        （`app/__init__.py::_seed_system_configs`）里下发两类各一套。
+
+        幂等与不覆盖口径（按 `type` 判定，不看编码）：
+          * 库里该 `type` 已有**任意**模板 ⇒ 整套跳过，不新增、不改写（用户的改名/改项一律保留）；
+          * 模板的检验项目只在模板**本次新建**时随行插入，之后不再触碰；
+          * 模板编码若已被别的模板占用（极老的库可能留下同名编码），只跳过该编码、不抛异常，
+            以免初始化整体失败。
+
+        返回 `{'templates': [...新建的 type...], 'items': n}`；无新增时两者为空/0。
+        """
+        from sqlalchemy.exc import IntegrityError
+
+        created_types = []
+        created_items = 0
+        need_commit = False
+
+        for spec in cls.SEED_TEMPLATES:
+            # 只按类型补缺：同类型已存在（哪怕是用户自建或改过的）就整套尊重现状
+            if cls.query.filter_by(type=spec['type']).first() is not None:
+                continue
+            if cls.query.filter_by(template_code=spec['template_code']).first() is not None:
+                # 编码被占但没有该类型的模板：可换名再来，但初始化不替用户改写已有行
+                continue
+
+            creator_id = _seed_creator_id()
+            if creator_id is None:
+                # 还没有任何账号（自举导入未发生或失败）：本轮不建，下次启动再补，
+                # 免得把 `created_by` 的外键写坏
+                continue
+
+            template = cls(
+                template_code=spec['template_code'],
+                name=spec['name'],
+                type=spec['type'],
+                description=spec.get('description', ''),
+                is_active=True,
+                created_by=creator_id,
+            )
+            db.session.add(template)
+            try:
+                db.session.flush()
+            except IntegrityError:
+                # 并发启动的另一个进程刚插进同编码/同类型：回滚这一笔，按已存在处理
+                db.session.rollback()
+                continue
+
+            for item_spec in spec.get('items', ()):
+                db.session.add(InspectionItem(
+                    template_id=template.id,
+                    name=item_spec['name'],
+                    description=item_spec.get('description', ''),
+                    notes='',
+                    inspection_method=item_spec.get('inspection_method', ''),
+                    standard=item_spec.get('standard', ''),
+                    unit=item_spec.get('unit', ''),
+                    order_num=item_spec.get('order_num', 0),
+                ))
+                created_items += 1
+
+            created_types.append(spec['type'])
+            need_commit = True
+
+        if need_commit:
+            db.session.commit()
+        return {'templates': created_types, 'items': created_items}
+
     def __repr__(self):
         return f'<InspectionTemplate {self.template_code}>'
+
+
+def _seed_creator_id():
+    """初始化下发数据用哪个账号登记 `created_by`（外键非空）。
+
+    优先管理员，其次 id 最小的账号；库里一个账号都没有时返回 `None`
+    （自举导入还没跑或失败），调用方应当跳过错过后面的启动再补。
+    """
+    from app.models import User
+    admin = User.query.filter_by(role='admin').order_by(User.id).first()
+    if admin is not None:
+        return admin.id
+    first = User.query.order_by(User.id).first()
+    return first.id if first is not None else None
 
 class InspectionBaseItem(db.Model):
     """质检基本信息项目"""

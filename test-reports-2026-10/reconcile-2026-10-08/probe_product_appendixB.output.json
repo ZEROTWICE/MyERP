@@ -1,0 +1,161 @@
+{
+ "D21_disk_write_calls": {
+  "rule": "grep 全 app/**/*.py：`file.save(` 或 `save_temp_file(`",
+  "hits": [
+   "app/main/routes.py:1952: file.save(temp_path)",
+   "app/main/routes.py:2301: file.save(temp_path)",
+   "app/main/routes.py:2697: file.save(temp_path)",
+   "app/main/routes.py:3877: file.save(temp_path)",
+   "app/main/routes.py:4003: file.save(temp_path)",
+   "app/main/routes.py:4116: excel_file.save(buf)",
+   "app/main/routes.py:4165: excel_file.save(buf)",
+   "app/main/routes.py:4893: file.save(temp_path)",
+   "app/main/routes.py:4980: file.save(temp_path)",
+   "app/main/routes.py:5083: def save_temp_file(file: FileStorage) -> str:",
+   "app/main/routes.py:5087: file.save(temp_path)",
+   "app/main/routes.py:7698: temp_path = save_temp_file(file)"
+  ]
+ },
+ "G_M_inspection_template": {
+  "rule": "grep `InspectionTemplate(` 与 `def <seed/init>`（全仓非 test 目录）",
+  "template_ctor": [
+   "app/models.py:745: class InspectionTemplate(db.Model):",
+   "app/main/quality.py:262: template = InspectionTemplate(",
+   "scripts/_test_bootstrap.py:133: tpl = get_or_make(M.InspectionTemplate, lambda: M.InspectionTemplate("
+  ],
+  "seed_funcs": [
+   "app/db_bootstrap.py:78: def seed_path_for(app):",
+   "app/db_bootstrap.py:85: def bootstrap_if_empty(app):",
+   "app/db_bootstrap.py:121: def _import_seed(app, engine, seed_path):",
+   "app/models.py:2722: def seed_defaults(cls):",
+   "app/__init__.py:142: def _seed_system_configs(app):",
+   "scripts/_test_bootstrap.py:69: def seed_fixtures(app):"
+  ],
+  "active_query": [
+   "app/main/quality.py:51: templates_count = InspectionTemplate.query.filter_by(is_active=True).count()",
+   "app/main/quality.py:87: templates_count = InspectionTemplate.query.filter_by(is_active=True).count()",
+   "app/main/quality.py:139: query = InspectionTemplate.query",
+   "app/main/quality.py:187: template = InspectionTemplate.query.get_or_404(template_id)",
+   "app/main/quality.py:255: if InspectionTemplate.query.filter_by(template_code=data['template_code']).first():",
+   "app/main/quality.py:347: template = InspectionTemplate.query.get_or_404(template_id)",
+   "app/main/quality.py:830: template = InspectionTemplate.query.get(template_id)",
+   "app/main/routes.py:3424: tmpl = InspectionTemplate.query.filter_by(type='production_record', is_active=True).first()",
+   "app/services/mes_service.py:87: return InspectionTemplate.query.filter_by(type=target_type, is_active=True).first()"
+  ]
+ },
+ "G_H_is_archived": {
+  "rule": "grep `is_archived`（app/**）",
+  "hits": [
+   "app/models.py:457: is_archived = db.Column(db.Boolean, default=False)  # 是否已存档",
+   "app/models.py:526: is_archived = db.Column(db.Boolean, default=False)  # 是否已存档",
+   "app/models.py:610: is_archived = db.Column(db.Boolean, default=False)  # 是否已存档",
+   "app/main/quality.py:744: db.or_(FinishedProduct.is_archived.is_(False), FinishedProduct.is_archived.is_(None))",
+   "app/main/routes.py:4797: query = query.filter(RawMaterial.is_archived.is_(False))",
+   "app/main/routes.py:4808: query = query.filter_by(is_archived=False)",
+   "app/main/routes.py:6125: query = Consumable.query.filter_by(is_archived=False)",
+   "app/main/routes.py:6153: old_archived = material.is_archived",
+   "app/main/routes.py:6154: material.is_archived = not material.is_archived",
+   "app/main/routes.py:6155: action = '存档' if material.is_archived else '取消存档'",
+   "app/main/routes.py:6166: old_data={'is_archived': old_archived},",
+   "app/main/routes.py:6167: new_data={'is_archived': material.is_archived}",
+   "app/main/routes.py:6195: old_archived = product.is_archived",
+   "app/main/routes.py:6196: product.is_archived = not product.is_archived",
+   "app/main/routes.py:6197: action = '存档' if product.is_archived else '取消存档'",
+   "app/main/routes.py:6208: old_data={'is_archived': old_archived},",
+   "app/main/routes.py:6209: new_data={'is_archived': product.is_archived}",
+   "app/main/routes.py:6247: db.or_(FinishedProduct.is_archived.is_(False), FinishedProduct.is_archived.is_(None))",
+   "app/main/routes.py:6254: db.or_(RawMaterial.is_archived.is_(False), RawMaterial.is_archived.is_(None))",
+   "app/main/routes.py:6261: product.is_archived = True",
+   "app/main/routes.py:6266: material.is_archived = True",
+   "app/main/routes.py:12065: raw_query = RawMaterial.query.filter_by(is_archived=False)",
+   "app/main/routes.py:12093: consumable_query = Consumable.query.filter_by(is_archived=False)",
+   "app/main/routes.py:12122: finished_query = FinishedProduct.query.filter_by(is_archived=False)",
+   "app/services/mes_service.py:1441: for m in RawMaterial.query.filter_by(is_archived=False, status='in_stock').all():",
+   "app/services/mes_service.py:1447: for m in Consumable.query.filter_by(is_archived=False, status='in_stock').all():",
+   "app/services/mes_service.py:1453: for m in FinishedProduct.query.filter_by(is_archived=False, status='in_stock').all():",
+   "app/services/mes_service.py:1562: db.or_(FinishedProduct.is_archived.is_(False),",
+   "app/services/mes_service.py:1563: FinishedProduct.is_archived.is_(None)),",
+   "app/services/mes_service.py:1617: is_archived=fp.is_archived,",
+   "app/services/mes_service.py:1643: if finished_product.is_archived:"
+  ]
+ },
+ "G_D_code_rule_log": {
+  "rule": "grep `CodeGenerationLog`（构造点 / 查询点）与相关路由",
+  "hits": [
+   "app/models.py:732: class CodeGenerationLog(db.Model):",
+   "app/models.py:1031: log = CodeGenerationLog(",
+   "app/main/routes.py:6: from app.models import Employee, ProcessPrice, ProductionRecord, BonusPenalty, AuditLog, ProcessPrice, User, TaskAssignm",
+   "app/main/routes.py:5518: log = CodeGenerationLog(",
+   "docs/test-reports/_probe/collect_models.py:53: AuditLog, BonusPenalty, CodeGenerationLog, CodeRule, Consumable, ConsumableCategory,"
+  ]
+ },
+ "G_B_delivery_batches": {
+  "rule": "grep `delivery_batches`（模型属性 / 路由 / 发货侧读取）",
+  "hits": [
+   "app/models.py:1716: delivery_batches = db.Column(db.Text)  # JSON格式: [{\"batch_no\": 1, \"delivery_date\": \"2025-01-15\", \"quantity\": 10, \"notes\"",
+   "app/models.py:1784: def delivery_batches_list(self):",
+   "app/models.py:1786: if self.delivery_batches:",
+   "app/models.py:1789: return json.loads(self.delivery_batches)",
+   "app/models.py:1794: def set_delivery_batches(self, batches):",
+   "app/models.py:1797: self.delivery_batches = json.dumps(batches, ensure_ascii=False)",
+   "app/models.py:1802: batches = self.delivery_batches_list",
+   "app/models.py:1839: batches = self.delivery_batches_list",
+   "app/main/routes.py:10058: @bp.route('/sales_order_item/<int:item_id>/delivery_batches/manage', methods=['GET'])",
+   "app/main/routes.py:10061: def manage_delivery_batches_page(item_id):",
+   "app/main/routes.py:10065: batches = order_item.delivery_batches_list",
+   "app/main/routes.py:10067: return render_template('main/delivery_batches.html',",
+   "app/main/routes.py:10070: @bp.route('/sales_order_item/<int:item_id>/delivery_batches', methods=['GET', 'POST'])",
+   "app/main/routes.py:10074: def manage_delivery_batches(item_id):",
+   "app/main/routes.py:10090: order_item.set_delivery_batches(batches)",
+   "app/main/routes.py:10118: 'batches': order_item.delivery_batches_list",
+   "migrations/versions/011e395c1aa4_add_sales_order_management_tables.py:38: op.drop_table('sales_order_delivery_batches')",
+   "migrations/versions/011e395c1aa4_add_sales_order_management_tables.py:146: op.create_table('sales_order_delivery_batches',",
+   "migrations/versions/83bfde43921e_add_specification_fields_to_sales_order_.py:21: with op.batch_alter_table('sales_order_delivery_batches', schema=None) as batch_op:",
+   "migrations/versions/83bfde43921e_add_specification_fields_to_sales_order_.py:43: with op.batch_alter_table('sales_order_delivery_batches', schema=None) as batch_op:",
+   "migrations/versions/a3f28e475446_add_sales_order_management_tables.py:71: op.create_table('sales_order_delivery_batches',",
+   "migrations/versions/a3f28e475446_add_sales_order_management_tables.py:107: op.drop_table('sales_order_delivery_batches')",
+   "migrations/versions/p0p2messtables_add_create_all_tables.py:27: ``delivery_schedules`` 与 ``sales_order_delivery_batches`` 只在"
+  ]
+ },
+ "G_A_purchase_switches": {
+  "rule": "grep `full_workflow_enabled` / `settlement_enabled`",
+  "hits": [
+   "app/models.py:2582: 'key': 'purchase.full_workflow_enabled',",
+   "app/models.py:2590: 'key': 'purchase.settlement_enabled',",
+   "app/main/purchase.py:20: return bool(SystemConfig.get('purchase.full_workflow_enabled', False))",
+   "app/main/purchase.py:24: return bool(SystemConfig.get('purchase.settlement_enabled', False))",
+   "app/main/purchase.py:199: 完整流程开关（purchase.full_workflow_enabled）只控制 UI 是否暴露请购入口；",
+   "docs/test-reports/_probe/verify_acceptance_baseline.py:112: for key in ('purchase.full_workflow_enabled', 'purchase.settlement_enabled',",
+   "scripts/functional_test.py:26: check('bool 解析', SystemConfig.get('purchase.full_workflow_enabled') is False,",
+   "scripts/functional_test.py:27: repr(SystemConfig.get('purchase.full_workflow_enabled')))",
+   "scripts/functional_test.py:35: changed = SystemConfig.set('purchase.full_workflow_enabled', True, user_id=1)",
+   "scripts/functional_test.py:39: check('set 后读到新值', SystemConfig.get('purchase.full_workflow_enabled') is True)",
+   "scripts/functional_test.py:43: again = SystemConfig.set('purchase.full_workflow_enabled', True, user_id=1)",
+   "scripts/functional_test.py:48: SystemConfig.get('purchase.settlement_enabled')  # 预热缓存",
+   "scripts/functional_test.py:49: SystemConfig.set('purchase.settlement_enabled', True, user_id=1)",
+   "scripts/functional_test.py:51: v = SystemConfig.get('purchase.settlement_enabled')",
+   "scripts/functional_test.py:55: SystemConfig.set('purchase.full_workflow_enabled', False, user_id=1)",
+   "scripts/functional_test.py:56: SystemConfig.set('purchase.settlement_enabled', False, user_id=1)",
+   "scripts/functional_test.py:67: data={'cfg__purchase.full_workflow_enabled': 'on'},",
+   "scripts/functional_test.py:78: 'purchase.full_workflow_enabled'],",
+   "scripts/functional_test.py:79: 'cfg__purchase.full_workflow_enabled': 'on'},",
+   "scripts/functional_test.py:84: full = SystemConfig.get('purchase.full_workflow_enabled')",
+   "scripts/functional_test.py:86: check('整页提交可开启开关', full is True, f'full_workflow_enabled={full!r}')",
+   "scripts/functional_test.py:88: SystemConfig.set('purchase.full_workflow_enabled', False, user_id=1)"
+  ]
+ },
+ "G_E_customer_delete": {
+  "rule": "grep 客户删除路由与关联订单校验",
+  "hits": [
+   "app/models.py:1666: customer = db.relationship('Customer', backref=db.backref('sales_orders', lazy='dynamic'))",
+   "app/main/routes.py:9261: def delete_customer(customer_id):",
+   "app/main/routes.py:9422: def delete_customer_address(customer_id, address_id):",
+   "app/main/routes.py:9641: details=f'新增销售订单：{order.order_number}（客户：{order.customer.customer_name}）'",
+   "app/main/routes.py:9790: details=f'删除销售订单：{order.order_number}（客户：{order.customer.customer_name}）',",
+   "app/main/routes.py:10260: \"\"\"获取销售订单对应客户的地址列表\"\"\"",
+   "scripts/functional_test.py:525: 'inventory', 'customers', 'sales_orders', 'production_orders'},",
+   "scripts/functional_test.py:528: 'customers', 'sales_orders', 'production_orders'},",
+   "scripts/functional_test.py:529: 'sales': {'customers', 'sales_orders'},"
+  ]
+ }
+}

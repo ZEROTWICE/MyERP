@@ -1,0 +1,338 @@
+{
+  "frozen_gate": {
+    "hits": [
+      423
+    ],
+    "text": "allowed, reason = qc_gate_allows_output(batch_item=item, workpieces=workpieces)"
+  },
+  "def_line": 271,
+  "call_lines": [
+    1208
+  ],
+  "body": {
+    "stock_kind='scrap'": true,
+    "status='scrapped'": true,
+    "quantity=": true,
+    "nc_id": true,
+    "#{nc_id}": true,
+    "workpiece_id=None": true
+  },
+  "app_numstat": [
+    [
+      "145",
+      "20",
+      "app/main/routes.py"
+    ],
+    [
+      "77",
+      "0",
+      "app/services/mes_service.py"
+    ],
+    [
+      "64",
+      "2",
+      "app/templates/main/salary_calculation.html"
+    ],
+    [
+      "4",
+      "1",
+      "app/utils/excel_generator.py"
+    ]
+  ],
+  "deletions": {
+    "app/main/routes.py": 20,
+    "app/services/mes_service.py": 0,
+    "app/templates/main/salary_calculation.html": 2,
+    "app/utils/excel_generator.py": 1
+  },
+  "b12_03_file_deletions": {
+    "app/services/mes_service.py": 0
+  },
+  "app_init_numstat": "",
+  "isolation": {
+    "uri": "sqlite:///C:/Users/RICHAR~1/AppData/Local/Temp/wms_test_y21pgump/app.db",
+    "copy_path": "C:\\Users\\RICHAR~1\\AppData\\Local\\Temp\\wms_test_y21pgump\\app.db",
+    "uri_on_copy": true,
+    "mes_service_file": "D:\\workspace\\wage_management_system - bak\\app\\services\\mes_service.py"
+  },
+  "scaffold": {
+    "tag": "_t7v",
+    "emp_id": 64,
+    "product_id": 2,
+    "batch_id": 10,
+    "process_id": 1,
+    "process_code": "YHGH509CZ2209I001"
+  },
+  "login_status": 302,
+  "nc_before": {
+    "nc_id": 1,
+    "workpiece_id": null,
+    "item_id": 24,
+    "record_id": 1,
+    "task_id": 19
+  },
+  "pre_fix": {
+    "workpiece_id": null,
+    "http": 200,
+    "body": {
+      "message": "处置已记录",
+      "status": "done",
+      "success": true,
+      "target_id": 1,
+      "target_type": "production_record"
+    },
+    "pieces_delta": 0.0,
+    "rows_delta": 0
+  },
+  "nc_after": {
+    "nc_id": 2,
+    "workpiece_id": null,
+    "item_id": 25,
+    "record_id": 2,
+    "task_id": 20
+  },
+  "post_fix": {
+    "http": 200,
+    "body": {
+      "message": "处置已记录",
+      "status": "done",
+      "success": true,
+      "target_id": 2,
+      "target_type": "production_record"
+    },
+    "pieces_delta": 3.0,
+    "rows_delta": 1,
+    "qty_per_piece": 1.0,
+    "new_row": {
+      "id": 3,
+      "quantity": 3,
+      "stock_kind": "scrap",
+      "status": "scrapped",
+      "workpiece_id": null,
+      "product_number": "_t7v_ITEM_912",
+      "product_id": 2,
+      "notes": "报工路径报废自动入账：不合格单 #2，实例 _t7v_ITEM_912，件数 3"
+    },
+    "nc_status": "done",
+    "item_status": "scrapped",
+    "item_quality_status": "pass"
+  },
+  "workpiece_path": {
+    "http": 200,
+    "body": {
+      "message": "处置已记录",
+      "status": "done",
+      "success": true,
+      "target_id": 1,
+      "target_type": "workpiece"
+    },
+    "pieces_delta": 1.0,
+    "rows_delta": 1,
+    "wp_status": "scrap",
+    "event_id": 2,
+    "event_payload": {
+      "nc_id": 3,
+      "scrap_cost": 5.0,
+      "pieces": 1.0
+    }
+  },
+  "real_db_sha": {
+    "before": "F5DA2306BC31CBAB098AAD3774016D320A9B9AA3546F93418196AE9900E0F065",
+    "after": "F5DA2306BC31CBAB098AAD3774016D320A9B9AA3546F93418196AE9900E0F065",
+    "expect": "F5DA2306BC31CBAB098AAD3774016D320A9B9AA3546F93418196AE9900E0F065"
+  },
+  "verdicts": [
+    {
+      "id": "S1_frozen_gate_line_verbatim_once",
+      "ok": true,
+      "detail": {
+        "hits": [
+          423
+        ],
+        "text": "allowed, reason = qc_gate_allows_output(batch_item=item, workpieces=workpieces)"
+      }
+    },
+    {
+      "id": "S2_def_once_and_single_call_site",
+      "ok": true,
+      "detail": {
+        "def": [
+          271,
+          "def inbound_production_scrap(*, nc=None, batch_item=None, production_record=None,"
+        ],
+        "calls": [
+          [
+            1208,
+            "inbound_production_scrap(nc=nc, quantity=pieces, inspector_name=operator_name())"
+          ]
+        ]
+      }
+    },
+    {
+      "id": "S3_new_func_writes_scrap_row_with_nc_backref",
+      "ok": true,
+      "detail": {
+        "stock_kind='scrap'": true,
+        "status='scrapped'": true,
+        "quantity=": true,
+        "nc_id": true,
+        "#{nc_id}": true,
+        "workpiece_id=None": true
+      }
+    },
+    {
+      "id": "S4_reviewed_file_deletions_zero_pure_insertion",
+      "ok": true,
+      "detail": {
+        "b12_03_file": {
+          "app/services/mes_service.py": 0
+        },
+        "all_touched_files": {
+          "app/main/routes.py": 20,
+          "app/services/mes_service.py": 0,
+          "app/templates/main/salary_calculation.html": 2,
+          "app/utils/excel_generator.py": 1
+        },
+        "note": "B12-03 唯一受改动文件 app/services/mes_service.py 删除行 = 0（纯新增）；同批其余文件的删除行（routes.py 20 / salary_calculation.html 2 / excel_generator.py 1）分别属 B12-01/04 取价改写、B12-04 明细页与 B12-02 notes 修复，不属本次评审对象、只登记不判"
+      }
+    },
+    {
+      "id": "S5_app_init_zero_diff",
+      "ok": true,
+      "detail": {
+        "numstat": ""
+      }
+    },
+    {
+      "id": "E0_running_on_db_copy",
+      "ok": true,
+      "detail": {
+        "uri": "sqlite:///C:/Users/RICHAR~1/AppData/Local/Temp/wms_test_y21pgump/app.db",
+        "copy_path": "C:\\Users\\RICHAR~1\\AppData\\Local\\Temp\\wms_test_y21pgump\\app.db",
+        "uri_on_copy": true,
+        "mes_service_file": "D:\\workspace\\wage_management_system - bak\\app\\services\\mes_service.py"
+      }
+    },
+    {
+      "id": "E1_login_ok",
+      "ok": true,
+      "detail": {
+        "status": 302
+      }
+    },
+    {
+      "id": "D1_pre_fix_pieces_delta_zero",
+      "ok": true,
+      "detail": {
+        "workpiece_id": null,
+        "http": 200,
+        "body": {
+          "message": "处置已记录",
+          "status": "done",
+          "success": true,
+          "target_id": 1,
+          "target_type": "production_record"
+        },
+        "pieces_delta": 0.0,
+        "rows_delta": 0
+      }
+    },
+    {
+      "id": "D2_post_fix_pieces_delta_3_by_pieces",
+      "ok": true,
+      "detail": {
+        "pieces_delta": 3.0,
+        "rows_delta": 1,
+        "qty_per_piece": 1.0
+      }
+    },
+    {
+      "id": "D3_scrap_row_semantics",
+      "ok": true,
+      "detail": {
+        "id": 3,
+        "quantity": 3,
+        "stock_kind": "scrap",
+        "status": "scrapped",
+        "workpiece_id": null,
+        "product_number": "_t7v_ITEM_912",
+        "product_id": 2,
+        "notes": "报工路径报废自动入账：不合格单 #2，实例 _t7v_ITEM_912，件数 3"
+      }
+    },
+    {
+      "id": "D4_notes_backrefers_nc",
+      "ok": true,
+      "detail": {
+        "notes": "报工路径报废自动入账：不合格单 #2，实例 _t7v_ITEM_912，件数 3",
+        "nc_id": 2
+      }
+    },
+    {
+      "id": "D5_nc_done_and_item_scrapped",
+      "ok": true,
+      "detail": {
+        "nc_status": "done",
+        "item_status": "scrapped",
+        "http": 200
+      }
+    },
+    {
+      "id": "C1_workpiece_pieces_delta_1_not_zero",
+      "ok": true,
+      "detail": {
+        "http": 200,
+        "body": {
+          "message": "处置已记录",
+          "status": "done",
+          "success": true,
+          "target_id": 1,
+          "target_type": "workpiece"
+        },
+        "pieces_delta": 1.0,
+        "rows_delta": 1,
+        "wp_status": "scrap",
+        "event_id": 2,
+        "event_payload": {
+          "nc_id": 3,
+          "scrap_cost": 5.0,
+          "pieces": 1.0
+        }
+      }
+    },
+    {
+      "id": "C2_workpiece_pieces_monotone_nonzero",
+      "ok": true,
+      "detail": {
+        "after_workpiece_path": 4.0,
+        "after_report_path": 3.0
+      }
+    },
+    {
+      "id": "C3_wp_status_scrap_and_event_payload_shape",
+      "ok": true,
+      "detail": {
+        "wp_status": "scrap",
+        "payload": {
+          "nc_id": 3,
+          "scrap_cost": 5.0,
+          "pieces": 1.0
+        }
+      }
+    },
+    {
+      "id": "F1_real_db_unchanged",
+      "ok": true,
+      "detail": {
+        "before": "F5DA2306BC31CBAB098AAD3774016D320A9B9AA3546F93418196AE9900E0F065",
+        "after": "F5DA2306BC31CBAB098AAD3774016D320A9B9AA3546F93418196AE9900E0F065",
+        "expect": "F5DA2306BC31CBAB098AAD3774016D320A9B9AA3546F93418196AE9900E0F065"
+      }
+    }
+  ],
+  "failed_verdicts": [],
+  "verdict_counts": {
+    "total": 16,
+    "failed": 0
+  }
+}

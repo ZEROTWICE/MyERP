@@ -39,15 +39,97 @@ def _patch_mkdtemp():
     return base
 
 
+# ----------------------------------------------------- B14-R3：引导前字节副本指纹
+#: 最近一次 ``make_isolated_app`` 截获的「真实库 -> 副本」字节复制指纹（**引导前**时点）。
+PRE_BOOTSTRAP_COPY = {}
+#: 全部截获记录（同一进程多次调用按序累积；供复核「哪一次复制被记了」）。
+_COPY_WATCH_HISTORY = []
+
+
+def _watch_real_db_copy():
+    """包住 ``shutil.copy2``：只截获「源 == 真实库」的那次复制，在**复制刚完成**时取副本指纹。
+
+    为什么必须钉在这一时刻（B14-R3）：``_test_bootstrap.make_app(fresh=True)`` 的序列是
+    ``shutil.copy2(REAL_DB, copy)`` → ``create_app()``；后者经
+    ``app/__init__.py:247 _seed_system_configs()`` → ``InspectionTemplate.seed_defaults()``（B14-08）
+    向副本下发默认质检模板 ⇒ **引导后**的副本指纹必然偏离真实库钉死值。
+    「副本逐字节等于真实库」这一前提**只在引导前成立** —— 判据必须钉在这一时点。
+    """
+    import shutil
+    orig = shutil.copy2
+    if getattr(orig, '_b14r3_watched', False):
+        return orig
+
+    def watched(src, dst, *args, **kwargs):
+        result = orig(src, dst, *args, **kwargs)
+        try:
+            is_real_src = os.path.samefile(src, REAL_DB)
+        except OSError:
+            is_real_src = False
+        if is_real_src and os.path.exists(dst):
+            _COPY_WATCH_HISTORY.append({
+                'src': str(src), 'dst': str(dst), 'sha256': sha256_file(dst),
+                'bytes': os.path.getsize(dst),
+                'captured_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'phase': 'pre_app_factory（字节复制完成、create_app 之前）',
+            })
+        return result
+
+    watched._b14r3_watched = True
+    shutil.copy2 = watched
+    return watched
+
+
+def _record_pre_bootstrap_copy(copy_path, since=0):
+    """从本次调用截获的记录里选出 ``PRE_BOOTSTRAP_COPY``（优先与返回副本同文件的那条）。"""
+    picked = None
+    for row in _COPY_WATCH_HISTORY[since:]:
+        try:
+            if os.path.samefile(row['dst'], copy_path):
+                picked = row
+        except OSError:
+            picked = row
+    if picked is None and len(_COPY_WATCH_HISTORY) > since:
+        picked = _COPY_WATCH_HISTORY[-1]
+    PRE_BOOTSTRAP_COPY.clear()
+    if picked:
+        PRE_BOOTSTRAP_COPY.update(picked)
+    return PRE_BOOTSTRAP_COPY
+
+
+def pre_bootstrap_copy():
+    """引导前的字节副本指纹（B14-R3）。未截获时给带 ``error`` 的占位 —— **绝不伪造读数**。"""
+    if not PRE_BOOTSTRAP_COPY:
+        return {'error': '未截获「真实库 -> 副本」的 shutil.copy2（未走 make_isolated_app？）'}
+    return dict(PRE_BOOTSTRAP_COPY)
+
+
+def _attach_pre_bootstrap_evidence():
+    """把引导前指纹并入 ``LAST_ISOLATION_EVIDENCE``（隔离自证的第二时点，供产物复核）。"""
+    ev = globals().get('LAST_ISOLATION_EVIDENCE')
+    if isinstance(ev, dict):
+        ev['pre_bootstrap_copy'] = pre_bootstrap_copy()
+    return ev
+
+
 def make_isolated_app(tag='nv'):
-    """返回 ``(app, copy_path)``，app 的 ``DATABASE_URL`` 一定指向本 run 的副本。"""
+    """返回 ``(app, copy_path)``，app 的 ``DATABASE_URL`` 一定指向本 run 的副本。
+
+    B14-R3：本函数同时记下**引导前**的字节副本指纹（``pre_bootstrap_copy()``）——
+    ``_test_bootstrap.make_app(fresh=True)`` 先 ``shutil.copy2`` 再 ``create_app()``，
+    而后者会下发默认质检模板（B14-08）⇒ 引导后的副本**不再**逐字节等于真实库。
+    """
     global _APP, _COPY_PATH
     assert_real_db_untouched('before make_isolated_app')
     _patch_mkdtemp()
+    _watch_real_db_copy()
+    seen = len(_COPY_WATCH_HISTORY)
     import _test_bootstrap
     app, path = _test_bootstrap.make_app(fresh=True)
     _APP, _COPY_PATH = app, path
+    _record_pre_bootstrap_copy(path, since=seen)
     assert_isolated(app); _open_ledger(app, tag)   # C-10：台账基线（逐表 COUNT/MAX(id)）+ 带 RUN_ID 的同 inode 副本别名
+    _attach_pre_bootstrap_evidence()
     return app, path
 
 

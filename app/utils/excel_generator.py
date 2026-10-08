@@ -337,7 +337,10 @@ class ExcelGenerator:
                 'date': row[0].value,
                 'employee_id': str(row[1].value).strip(),
                 'process_code': str(row[2].value).strip(),
-                'quantity': int(row[3].value)
+                'quantity': int(row[3].value),
+                # 模板只有 4 列（日期/工号/工序/数量），备注为可选第 5 列；缺失时取 None，
+                # 保持与路由 notes=data['notes'] 的键约定一致（缺键会 KeyError 致整批导入失败）
+                'notes': str(row[4].value).strip() if len(row) >= 5 and row[4].value else None
             })
         
         return data

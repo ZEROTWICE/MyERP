@@ -82,16 +82,38 @@ def default_inspector_id():
     return user.id if user else (getattr(current_user, 'id', None) or 1)
 
 
+# B14-07（方案A · 拍板项 4）：模板类型优先级链，`pick_template` 的唯一口径来源。
+# `goods_receipt` 有**自己的**模板类型（`type='goods_receipt'`，由初始化 seed 下发），
+# 必须优先命中；只有确实没有来料检模板时，才退回生产记录/物料/成品模板。
+# 工件/炉次沿用既有回退口径（同一张表，首项即自身类型）。
+_TEMPLATE_TYPE_CHAIN = {
+    'goods_receipt': ('goods_receipt', 'production_record', 'material', 'product'),
+    'workpiece': ('workpiece', 'production_record', 'material', 'product'),
+    'heat_lot': ('heat_lot', 'production_record', 'material', 'product'),
+}
+
+
 def pick_template(target_type):
-    """质检任务尽量绑模板，避免检验员每次手选。"""
-    return InspectionTemplate.query.filter_by(type=target_type, is_active=True).first()
+    """按类型取**启用**的质检模板；工件/炉次/来料检按优先级链回退。
+
+    B14-07（方案A）：`goods_receipt` 优先命中 `type='goods_receipt'` 的模板，不再被旧兜底链
+    一律绑成 `production_record` 模板 —— 否则质检确认口的类型严格相等校验
+    （`app/main/quality.py`）会因「任务 type=goods_receipt、模板 type=production_record」
+    而 400，形成"来料检任务永远确认不了"的死锁。
+
+    链上确实一套可用模板都没有时返回 `None`（任务 `template_id` 留空，由检验员手选），
+    **不**返回类型不符的模板。
+    """
+    for candidate in _TEMPLATE_TYPE_CHAIN.get(target_type, (target_type,)):
+        template = InspectionTemplate.query.filter_by(type=candidate, is_active=True).first()
+        if template is not None:
+            return template
+    return None
 
 
 def create_inspection_task(target_type, target_id, notes=''):
+    # 模板绑定口径统一由 pick_template 的类型优先级链决定（B14-07），此处不再另写回退分支
     template = pick_template(target_type)
-    # 模板类型可能只有 production_record/material/product，工件/炉次复用最近的生产记录模板
-    if template is None and target_type in ('workpiece', 'heat_lot', 'goods_receipt'):
-        template = pick_template('production_record') or pick_template('material') or pick_template('product')
     inspector_id = default_inspector_id()
     task = InspectionTask(
         global_sn=SerialNumber.get_next_number(),
@@ -264,6 +286,78 @@ def inbound_workpiece(workpiece, stock_kind='fg', inspector_name='系统', produ
     elif stock_kind == 'scrap':
         workpiece.status = 'scrap'
     log_event(workpiece, 'inbound', payload={'stock_kind': stock_kind, 'finished_product_id': None})
+    db.session.flush()
+    return fp
+
+
+def inbound_production_scrap(*, nc=None, batch_item=None, production_record=None,
+                             quantity=1, inspector_name=None, notes=''):
+    """报工路径（无工件）报废的库存台账行 —— 补 P-09 缺口（沿用既有 `stock_kind='scrap'`）。
+
+    为什么单开一支而不复用 `inbound_workpiece`：那条路径以 `Workpiece` 为身份载体
+    （`product_number=workpiece.code`、`workpiece_id=workpiece.id`，再改 `workpiece.status`），
+    而报工路径报废的 `NonconformityRecord.workpiece_id IS NULL`
+    （`dispose_nonconformity` 的 `wp is None` 分支），原先只扣料 + 置实例状态、**零台账行**。
+
+    归属解析逐级降级、不猜不抛错：`production_record`（缺省由 `nc` 反推）
+    → `batch_item_for_production_record` → `batch_item.batch.production_order.product`。
+    `notes` 回写不合格单 id，便于从台账行追溯处置单。
+
+    ⚠ 不新建表/列/库位：只写 `finished_product` 既有列，`stock_kind` 沿用 `'scrap'`。
+    """
+    record = production_record
+    if record is None and nc is not None:
+        record = production_record_for_nonconformity(nc)
+    item = batch_item
+    if item is None and record is not None:
+        item = batch_item_for_production_record(record)
+    order = None
+    if item is not None:
+        batch = getattr(item, 'batch', None)
+        order = getattr(batch, 'production_order', None) if batch is not None else None
+    product = getattr(order, 'product', None) if order is not None else None
+
+    try:
+        inbox_quantity = float(quantity)
+    except (TypeError, ValueError):
+        inbox_quantity = 1.0
+    if inbox_quantity <= 0:
+        inbox_quantity = 1.0
+
+    product_number = ''
+    if item is not None and getattr(item, 'product_code', None):
+        product_number = item.product_code
+    elif order is not None and getattr(order, 'order_number', None):
+        product_number = order.order_number
+    elif product is not None and getattr(product, 'product_code', None):
+        product_number = product.product_code
+    nc_id = getattr(nc, 'id', None)
+    if not product_number:
+        product_number = f'报废单{nc_id}' if nc_id is not None else '报废处置'
+        current_app.logger.warning(
+            f'报工路径报废：不合格单 {nc_id} 定位不到批次实例/订单 ⇒ 台账行产品号退化为 '
+            f'{product_number}（件数仍按 {inbox_quantity:g} 入账，不猜归属）')
+
+    note_text = notes or (
+        f'报工路径报废自动入账：不合格单 #{nc_id}，'
+        f'实例 {getattr(item, "product_code", None) or "-"}，件数 {inbox_quantity:g}')
+    if nc_id is not None and f'#{nc_id}' not in note_text:
+        note_text = f'{note_text}；不合格单#{nc_id}'
+
+    fp = FinishedProduct(
+        product_number=product_number,
+        production_date=date.today(),
+        drawing_number=(product.drawing_number if product is not None else '') or '-',
+        model=(product.model if product is not None else '') or '-',
+        inspector=inspector_name or operator_name() or '系统',
+        quantity=inbox_quantity,
+        status='scrapped',
+        stock_kind='scrap',
+        workpiece_id=None,
+        product_id=(product.id if product is not None else None),
+        notes=note_text,
+    )
+    db.session.add(fp)
     db.session.flush()
     return fp
 
@@ -931,6 +1025,55 @@ def _log_incoming_disposal(nc, action, status):
     ))
 
 
+def _notify_concession_pending_approval(nc, *, action_label, roles, source_label):
+    """B13-08：让步审批转 `pending_approval` 时给审批角色发一条通知。
+
+    接线口径与 B13-06 一致（同一模式，不另起一套）：
+
+    * **提交责任在调用方**：`NotificationService.create_notification` 自 B13-05 起只
+      add/flush、不自提交；本函数所在业务路径的调用方都在自身事务边界内 commit
+      （`app/main/stock.py` 生产处置入口、`app/main/purchase.py` 来料检处置入口），
+      故本函数**不新增任何 commit**。
+    * **幂等键**：`trigger_type` 取值 `'concession_approval'`（注册表键
+      `CONCESSION_APPROVAL`）+ `related_model='NonconformityRecord'`
+      + `related_id=nc.id`，复用 B13-07 的三键查询级去重 —— 同一不合格单重复转待审批
+      只会有 1 条通知（永久去重、无时间窗，与 B13-06 已登记偏差同口径）。
+    * **接收人**：按 `SystemConfig quality.concession_approver_roles` 逐角色解析
+      （`role:<role>`），与审批门槛同一数据源；规则表（NotificationRule）当前 0 行，
+      只靠 `_create_receivers_by_rules` 会静默地一个接收人都不建。
+    * **不吞异常**：通知写失败即本次事务失败，由调用方 rollback 并回 500
+      （不把已记录的处置谎报成功），与 B13-06 接线口径一致。
+    * `trigger_type` 走中央注册表 `NotificationService.TRIGGER_TYPES['CONCESSION_APPROVAL']`
+      （B13-08 收口时已补键），不再用字面量；键值仍是既有字符串口径
+      `'concession_approval'`。
+    """
+    # 函数内导入：避免 mes_service 与 notification_service 之间出现模块级环形导入。
+    from app.services.notification_service import NotificationService
+
+    role_list = [r for r in (roles or []) if isinstance(r, str)] or ['admin']
+    return NotificationService.create_notification(
+        trigger_type=NotificationService.TRIGGER_TYPES['CONCESSION_APPROVAL'],
+        title=f'让步审批待处理 - 不合格单#{nc.id}',
+        content=(f'{source_label}处置（{action_label}）需让步审批：不合格单#{nc.id} 已转待审批，'
+                 f'请审批角色（{"、".join(role_list)}）复核处理。'),
+        notification_type='warning',
+        priority='high',
+        related_model='NonconformityRecord',
+        related_id=nc.id,
+        receivers=[f'role:{r}' for r in role_list],
+        trigger_data={
+            'nonconformity_id': nc.id,
+            'action': nc.type,
+            'action_label': action_label,
+            'source': source_label,
+            'roles': role_list,
+            'target_type': nc.target_type,
+            'target_id': nc.target_id,
+            'operator_id': operator_id(),
+        },
+    )
+
+
 def dispose_incoming_nonconformity(nc, action, *, notes='', scrap_cost=0):
     """来料检不合格处置：return（退货）/ accept（让步接收）/ scrap（报废）。
 
@@ -961,6 +1104,11 @@ def dispose_incoming_nonconformity(nc, action, *, notes='', scrap_cost=0):
         if current_role() not in roles:
             nc.status = 'pending_approval'
             _log_incoming_disposal(nc, action, nc.status)
+            # B13-08 接线：本函数只 add/flush，提交在调用方
+            # （app/main/purchase.py dispose_goods_receipt_nonconformity 的 commit）。
+            _notify_concession_pending_approval(
+                nc, action_label=INCOMING_NC_LABELS.get(action, action),
+                roles=roles, source_label='来料检')
             return nc
         nc.status = 'approved'
         nc.approver_id = operator_id()
@@ -1056,6 +1204,10 @@ def dispose_nonconformity(nc, action, *, notes='', scrap_cost=0, rework_process_
         roles = SystemConfig.get('quality.concession_approver_roles', ['admin', 'manager']) or ['admin', 'manager']
         if getattr(current_user, 'role', None) not in roles:
             nc.status = 'pending_approval'
+            # B13-08 接线：本函数只 add/flush，提交在调用方
+            # （app/main/stock.py dispose_nonconformity_api 的 commit）。
+            _notify_concession_pending_approval(
+                nc, action_label='让步接收', roles=roles, source_label='生产质检')
             return nc
         nc.status = 'approved'
         nc.approver_id = current_user.id
@@ -1067,53 +1219,48 @@ def dispose_nonconformity(nc, action, *, notes='', scrap_cost=0, rework_process_
         return nc
 
     if action == 'rework':
+        # B14-03：返工**必须**显式给出工序与员工，缺任一项即拒绝（`ValueError` ⇒ 路由层 400）。
+        # 旧实现缺参时静默反推：工序取自 TaskWorkpiece / 来源生产记录，员工依次取自来源生产记录、
+        # 最后兜底「员工表第一条」——于是「请求没选人」会真的把返工任务派给一个与请求无关的员工。
+        # 此处一律要求显式入参，系统不再自动指派。
+        missing = []
+        if not rework_process_id:
+            missing.append('工序 rework_process_id')
+        if not employee_id:
+            missing.append('员工 employee_id')
+        if missing:
+            raise ValueError(
+                f'返工处置需显式选择{"、".join(missing)}（不合格单 #{nc.id}）；'
+                f'请在返工表单中选择工序与员工后重试，系统不再自动指派。'
+            )
         # P-05（DEC-2 §2.3）：件数 = 显式入参 > 来源生产记录 quantity > 兜底 1（必须留痕）
         source_record = production_record_for_nonconformity(nc, workpiece=wp)
-        process_id = rework_process_id
-        if not process_id and wp:
-            last = TaskWorkpiece.query.filter_by(workpiece_id=wp.id).order_by(TaskWorkpiece.id.desc()).first()
-            process_id = last.task.process_id if last and last.task else None
-        if not process_id and source_record is not None:
-            process_id = source_record.process_id
-        emp_id = employee_id
-        if not emp_id and source_record is not None:
-            emp_id = source_record.employee_id
-        if not emp_id:
-            from app.models import Employee
-            emp = Employee.query.filter_by(user_id=current_user.id).first() or Employee.query.first()
-            emp_id = emp.id if emp else None
         quantity, quantity_note = rework_quantity_for(nc, wp, rework_quantity,
                                                      production_record=source_record)
-        if process_id and emp_id:
-            task_notes = f'返工 不合格单#{nc.id}'
-            if quantity_note:
-                task_notes = f'{task_notes}；{quantity_note}'
-            task = TaskAssignment(
-                employee_id=emp_id,
-                process_id=process_id,
-                target_date=target_date or date.today(),
-                quantity=quantity,
-                status='pending',
-                task_type='auto',
-                notes=task_notes,
-            )
-            db.session.add(task)
-            db.session.flush()
-            if wp:
-                db.session.add(TaskWorkpiece(task_id=task.id, workpiece_id=wp.id, status='pending'))
-                wp.status = 'machining'
-            nc.rework_task_id = task.id
-            if wp:
-                log_event(wp, 'rework', task_id=task.id,
-                          payload={'nc_id': nc.id, 'quantity': quantity})
-            current_app.logger.info(
-                f'返工处置：不合格单 {nc.id} 新建返工任务 {task.id}，件数 {quantity}'
-                f'（{quantity_note or "显式入参"}）')
-        else:
-            # 既无工件也推不出工序/员工：保持既有「无工件即只闭环」语义，不臆造返工任务
-            current_app.logger.warning(
-                f'返工处置：不合格单 {nc.id} 无工件且无法确定工序/员工 ⇒ 只闭环、不建返工任务'
-                f'（件数口径 {quantity}{"；" + quantity_note if quantity_note else ""}）')
+        task_notes = f'返工 不合格单#{nc.id}'
+        if quantity_note:
+            task_notes = f'{task_notes}；{quantity_note}'
+        task = TaskAssignment(
+            employee_id=employee_id,
+            process_id=rework_process_id,
+            target_date=target_date or date.today(),
+            quantity=quantity,
+            status='pending',
+            task_type='auto',
+            notes=task_notes,
+        )
+        db.session.add(task)
+        db.session.flush()
+        if wp:
+            db.session.add(TaskWorkpiece(task_id=task.id, workpiece_id=wp.id, status='pending'))
+            wp.status = 'machining'
+        nc.rework_task_id = task.id
+        if wp:
+            log_event(wp, 'rework', task_id=task.id,
+                      payload={'nc_id': nc.id, 'quantity': quantity})
+        current_app.logger.info(
+            f'返工处置：不合格单 {nc.id} 新建返工任务 {task.id}，工序 {rework_process_id}，'
+            f'员工 {employee_id}，件数 {quantity}（{quantity_note or "显式入参"}）')
         nc.status = 'done'
         reset_quality_status_after_disposal(nc)
         return nc
@@ -1129,6 +1276,11 @@ def dispose_nonconformity(nc, action, *, notes='', scrap_cost=0, rework_process_
                               quantity=pieces)
             log_event(wp, 'scrap', payload={'nc_id': nc.id, 'scrap_cost': nc.scrap_cost,
                                             'pieces': pieces})
+        else:
+            # P-09 补口：报工路径报废的 workpiece_id IS NULL ⇒ 无 Workpiece 可承载台账行，
+            # 原先只扣料 + 置实例状态、库存台账零行。这里按件数补写 stock_kind='scrap'
+            # 台账行（notes 回写 nc.id 便于追溯），沿用既有库位，不新建表/列/库位。
+            inbound_production_scrap(nc=nc, quantity=pieces, inspector_name=operator_name())
         # P-06（DEC-2 §2.4）：逐行各扣各自物料；取不到消耗数据 ⇒ 不扣料 + 未扣减说明
         _plan_record, plan = scrap_material_plan(nc, workpiece=wp)
         applied = deduct_scrap_materials(plan, pieces=pieces, nc=nc)

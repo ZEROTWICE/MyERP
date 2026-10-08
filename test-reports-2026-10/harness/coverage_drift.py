@@ -9,14 +9,14 @@
 
 | id | 判据 | 期望 |
 | --- | --- | --- |
-| D-1 | `summary.rules_total` | `== 271`（路由总数，口径：`url_map.iter_rules()`） |
-| D-2 | `summary.method_level_non_get_total` | `>= 155`（非 GET 方法级，A-28：与方法级 155 同源） |
-| D-3 | `summary.writable_rules_non_get` | `== 153`（可写规则级，`153 != 155` 不可互替） |
+| D-1 | `summary.rules_total` | `== 273`（路由总数，口径：`url_map.iter_rules()`；**ALLOY-IMPORT-01 有意更新**：271 → 273） |
+| D-2 | `summary.method_level_non_get_total` | `>= 157`（非 GET 方法级；A-28 原记 `>= 155`；**ALLOY-IMPORT-01 有意更新**：155 → 157，与 `route_inventory` 的 `non-GET 110 → 112` 同源，+2 条新 POST 各 +1 方法级） |
+| D-3 | `summary.writable_rules_non_get` | `== 155`（可写规则级；**ALLOY-IMPORT-01 有意更新**：153 → 155，与 D-2 的 155 数值相同但口径不同，仍不可互替） |
 | D-4 | `summary.writable_literal_covered_by_all` | `>= 108`（字面量覆盖；**V-06/C-05 有意更新**：6 → 108） |
 | D-5 | `summary.writable_any_covered_by_all` | `>= 116`（含动态覆盖；**V-06/C-05 有意更新**：14 → 116） |
 | D-6 | `len(uncovered_writable)` | `<= 0`（无命中写端点；**V-06/C-05 有意更新**：101 → 0） |
 | D-7 | `smoke_test_plan.static_reproduction_targets` / `_unresolved` | `== 148` / `== 9` |
-| D-8 | `--routes-stdout`：`total rules` / `duplicate (method,path) registrations` | `== 271` / `== 0` |
+| D-8 | `--routes-stdout`：`total rules` / `duplicate (method,path) registrations` | `== 273` / `== 0` |
 
 用法（仓库根目录）——**CI 里报告型脚本与判据层的正确接法**：
 
@@ -49,8 +49,32 @@ V-14 的 G1 判定其「unchanged」）。而 `LOCKED` 已被 V-06/C-05 按 A-70
   `D-4/D-5/D-6 = 6/14/101 vs LOCKED 108/116/0` ⇒ `判据 5/8 通过 => exit 1`。
 * **新行为**：**缺 `--coverage` 即 fail loud** ⇒ 打印用法纠错 + 锚点留档读数（bytes/SHA256，**仅历史留档、
   不参与判据**）⇒ `exit 2`，并明写「**exit 2 = 未提供产物，不是回归**」。
-* **锚点与 `LOCKED` 均未改动**：`evidence/harness/coverage.json` 仍 236893 B /
-  `5E2C9D4315971B31C83AFD7833C310501199C34F61BFD868EF07A6AEEF7BF1F0`；`LOCKED` 三项仍 `108/116/0`。
+* **（历史事实 —— 2026-10-07 该次裁定时）锚点与 `LOCKED` 均未改动**：当时 `evidence/harness/coverage.json`
+  为 236893 B / `5E2C9D4315971B31C83AFD7833C310501199C34F61BFD868EF07A6AEEF7BF1F0`；`LOCKED` 三项仍 `108/116/0`。
+  「不要重生锚点」的当时理由（重生会推翻 V-14 G1 的「5 条锚点未变」结论）依然成立，因此 B13-00 重基线
+  **不是**抹掉旧读数，而是「归档旧字节 + append-only 登记 + 改登记读数」三件一起做 —— 见下一条。
+* **B13-00 重基线（2026-10-08，用户授权的前置项；仍走 A-70 三步，触发项 ID：B13-00）**：
+  冻结锚点已按 A-70 第 ① 步**在同一路径**重生成，覆盖读数由「旧值稿」`6/14/101` 变为 `108/116/0`
+  （`LOCKED` 自 V-06/C-05 起一直是 `108/116/0`，本次**未改判据**，只让产物档与判据口径一致）。
+  * 前值（「重基线前」）：**236893 B / `5E2C9D4315971B31C83AFD7833C310501199C34F61BFD868EF07A6AEEF7BF1F0`**
+    （mtime `2026-10-06 22:25:07.937`）⇒ 字节级副本归档于
+    `test-reports-2026-10/evidence/harness/_anchor-history/frozen-anchor-pre-b13-00.236893.5E2C9D43.json`，
+    并在 append-only 登记册 `…/_anchor-history/coverage-anchor-history.json` 记为 entry no=1「重基线前」。
+  * 后值（「重基线后」，= 下面的 `ANCHOR_READING`）：**244575 B /
+    `F0D37A6C72C9029C60B4124DAC5993E1E65321448C943555381C15ECD6BDB42D`**（登记册 entry no=2）。
+  * `LOCKED` 五项 / `UNCOVERED_WRITABLE_MAX` / `SMOKE_TARGETS` / `SMOKE_UNRESOLVED` / `ROUTE_RULES` /
+    `ROUTE_DUP` **一字未改**（本次只重基线「产物档」，不动「判据锁」）。
+  * A-110 教训复述：N-1 的根因是「同一文件既作冻结锚点、又被判据直接消费」。本次重基线后该文件与判据
+    口径一致，但**纪律不变**：以后新增/变更覆盖口径时，先出新证据稿、再改锁值、并让旧值稿报红。
+  * 命令（A-70 三步，仓库根目录，`<py>` = `F:\Miniconda\envs\wage\python.exe`）：
+    ① `& '<py>' -B scripts/_sandbox_compat.py test-reports-2026-10/harness/measure_coverage.py
+    --no-request-probes --out "<仓库根>/test-reports-2026-10/evidence/harness/coverage.json"`
+    （`HARNESS_RUN_ID=b13-00-rebaseline-20261008`）⇒ **exit 0**；
+    ② 同 ① 加 `--probes-exclude r2_c05_write_probe` ⇒ 读数**精确回落 `6/14/101`**（阴性对照）；
+    ③ `& '<py>' -B test-reports-2026-10/harness/coverage_drift.py --coverage <新稿>` ⇒ **exit 0**，
+    而喂「①的归档旧稿」或「②的回落稿」⇒ **exit 1**（D-4/D-5/D-6 三项 FAIL，判据 5/8）。
+  * 回退：把归档副本复制回 `evidence/harness/coverage.json`，并把 `ANCHOR_READING` 与本块文字改回旧值；
+    登记册**只允许再追加** entry no=3「回退」，不得删除既有 entry 或归档副本。
 * **复算命令（三条）**：
   ① `python -B test-reports-2026-10/harness/coverage_drift.py` ⇒ **exit 2**（用法错误，不是回归）；
   ② `python -B test-reports-2026-10/harness/measure_coverage.py --no-request-probes --out <run>/coverage.json`
@@ -79,8 +103,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REPORTS_ROOT = os.path.dirname(HERE)
 #: 冻结锚点（`29` §4 声明锚点之一；**只作历史留档**，不参与判据 —— 见 docstring 的 N-1 节）
 DEFAULT_COVERAGE = os.path.join(REPORTS_ROOT, 'evidence', 'harness', 'coverage.json')
-#: 锚点登记读数（字节 + SHA256 大写；A-51 口径），仅用于缺参时的留档打印
-ANCHOR_READING = (236893, '5E2C9D4315971B31C83AFD7833C310501199C34F61BFD868EF07A6AEEF7BF1F0')
+#: 锚点登记读数（字节 + SHA256 大写；A-51 口径），仅用于缺参时的留档打印。
+#: B13-00（2026-10-08）按 A-70 第 ① 步重基线冻结档：旧值 `236893 / 5E2C9D43…BF1F0` 已**字节归档**于
+#: `evidence/harness/_anchor-history/`（副本 + 登记册 entry no=1「重基线前」）⇒ 新值见下行（entry no=2）。
+ANCHOR_READING = (244575, 'F0D37A6C72C9029C60B4124DAC5993E1E65321448C943555381C15ECD6BDB42D')
 
 #: 锁死期望值（单一存放点；改这里 = 改判据，必须与 08/06/A-28/A-31 同步）
 #:
@@ -97,18 +123,52 @@ ANCHOR_READING = (236893, '5E2C9D4315971B31C83AFD7833C310501199C34F61BFD868EF07A
 #:        --coverage <run>\coverage.json [--routes-stdout <run>\route_inventory.txt]
 #: 判据：① 的产物 ⇒ exit 0；②（回落稿）与任何「旧值稿」⇒ exit 1（说明判据真的会红）。
 #: 回退：把本块三处期望值改回 6 / 14 / 101，并把 measure_coverage.PROBES 的第 9 项删除。
+#: ── B13-00（2026-10-08）：**只重基线「产物档」**（冻结 coverage.json），本块 LOCKED / 路由锁一并未改；
+#:    前值→新值与归档登记见 docstring 的 N-1 节「B13-00 重基线」条（`ANCHOR_READING` 同批更新）。
+#:
+#: ── A-70「有意更新三步」记录（ALLOY-IMPORT-01，2026-10-09）────────────────────────────────
+#: 触发项 ID：**ALLOY-IMPORT-01（「合金钢辙叉计件工价标准 + 48页表格 BOM」导入功能接入）** ——
+#:   新增 `app/utils/alloy_steel_price_converter.py`、`app/utils/alloy_steel_bom_converter.py`、
+#:   `app/services/alloy_steel_import_service.py`，以及 2 个写端点
+#:   `/process_prices/import_alloy`（`process.manage`）与 `/products/import_bom_alloy`（`product.import`）。
+#: 旧值 → 新值：`rules_total` 271 → **273**（`route_inventory` 口径，+2 条 POST）；
+#:            `writable_rules_non_get` 153 → **155**（+2 个新写端点）；
+#:            `method_level_non_get_total`（`>=` 型）155 → **157**（方法级非 GET；现场实测 157 =
+#:              旧锚点同口径 155 + 2 条新 POST；未放宽，只是把锁对齐到实测值）；
+#:            `ROUTE_RULES` 271 → **273**（D-8 与 D-1 同源，必须同改）。
+#: 命令（三条，仓库根目录，绝对路径解释器）：
+#:   ① & 'F:\Miniconda\envs\wage\python.exe' -B scripts\route_inventory.py
+#:        ⇒ 期望 `[routes] total rules=273` / `duplicate (method,path) registrations=0`
+#:   ② & 'F:\Miniconda\envs\wage\python.exe' -B test-reports-2026-10\harness\measure_coverage.py
+#:        --no-request-probes --out <run>\coverage.json
+#:        ⇒ 期望 summary.rules_total=273 / writable_rules_non_get=155
+#:   ③ & 'F:\Miniconda\envs\wage\python.exe' -B test-reports-2026-10\harness\coverage_drift.py
+#:        --coverage <run>\coverage.json --routes-stdout <run>\route_inventory.txt
+#:        ⇒ 期望 `判据 8/8 通过` / exit 0
+#: 判据：②的产物 + ①的 stdout ⇒ ③ exit 0；任何「旧值稿」（coverage.json 写 271/153 或 stdout 写
+#:   271）⇒ ③ exit 1（说明判据真的会红，未放宽）。
+#: D-6 说明：`uncovered_writable` 通过 `scripts/functional_test.py` 新增的 18 条合金钢导入探针满足
+#:   （两个新写端点均被字面量命中并**真调用**：工价先 dry_run 后正式导入 + 幂等复导；BOM 同）
+#:   ⇒ 0 → 0，判据未放宽，只是新端点自带覆盖。
+#: 同批有意更新（不在本文件，但同一触发项）：`run_gates.EXPECTED` 的 `properties_files` 23 → 26
+#:   （新增 3 个被 `check_properties.py` 扫描的文件）、`functional_passed` 109 → 127（+18 条断言）、
+#:   `routes_total_rules` 271 → 273、`routes_non_get` 110 → 112；`ci_gates.py` 第 688 / 701 / 715
+#:   行的三处 `expects` 字符串同步。
+#: 回退：本块四处期望值与 docstring 表 D-1/D-2/D-3/D-8、`synthetic_doc()`、`routes_ok`、自检例 CD-N3/N4/N5
+#:   一并改回 271 / 155 / 153 / 271，并回退上列 `run_gates.EXPECTED` 四项与 `ci_gates.py` 三行，
+#:   最后删除三份新模块与 2 个端点。冻结锚点 `evidence/harness/coverage.json` 不动（历史留档）。
 #: ────────────────────────────────────────────────────────────────────────────────
 LOCKED = {
-    'rules_total': ('==', 271),
-    'method_level_non_get_total': ('>=', 155),
-    'writable_rules_non_get': ('==', 153),
+    'rules_total': ('==', 273),
+    'method_level_non_get_total': ('>=', 157),
+    'writable_rules_non_get': ('==', 155),
     'writable_literal_covered_by_all': ('>=', 108),
     'writable_any_covered_by_all': ('>=', 116),
 }
 UNCOVERED_WRITABLE_MAX = 0
 SMOKE_TARGETS = 148
 SMOKE_UNRESOLVED = 9
-ROUTE_RULES = 271
+ROUTE_RULES = 273
 ROUTE_DUP = 0
 
 
@@ -169,13 +229,14 @@ def evaluate(doc, routes_text=None):
 def synthetic_doc():
     """自检用合成文档（**不读活体文件**，避免并发写入干扰阳性对照）。
 
-    基线值 = V-06/C-05 有意更新后的实测值（literal 108 / any 116 / uncovered 0）；
+    基线值 = V-06/C-05 有意更新（literal 108 / any 116 / uncovered 0）+ ALLOY-IMPORT-01 有意更新
+    （rules_total 273 / method_level_non_get_total 157 / writable_rules_non_get 155）后的实测值；
     阴性注入相对**该基线各降 1**（uncovered 是 `<=` 型 ⇒ 0 → 1 即漂移）。
     """
     return {
         'summary': {
-            'rules_total': 271, 'method_level_non_get_total': 155,
-            'writable_rules_non_get': 153, 'writable_literal_covered_by_all': 108,
+            'rules_total': 273, 'method_level_non_get_total': 157,
+            'writable_rules_non_get': 155, 'writable_literal_covered_by_all': 108,
             'writable_any_covered_by_all': 116,
         },
         'uncovered_writable': [],
@@ -186,7 +247,7 @@ def synthetic_doc():
 
 def selftest():
     """1 阳性 + 8 阴性注入：漂移必须被判失败（门禁敏感性）。"""
-    routes_ok = '[routes] total rules=271\nduplicate (method,path) registrations=0\n'
+    routes_ok = '[routes] total rules=273\nduplicate (method,path) registrations=0\n'
     results = []
 
     def case(cid, doc, routes, must_fail):
@@ -202,12 +263,12 @@ def selftest():
     case('CD-N1 字面量覆盖 基线-1', d, routes_ok, True)
     d = synthetic_doc(); d['summary']['writable_any_covered_by_all'] -= 1       # 基线 -> 基线-1
     case('CD-N2 含动态覆盖 基线-1', d, routes_ok, True)
-    d = synthetic_doc(); d['summary']['method_level_non_get_total'] = 154
-    case('CD-N3 非 GET 方法级 155→154', d, routes_ok, True)
-    d = synthetic_doc(); d['summary']['writable_rules_non_get'] = 152
-    case('CD-N4 可写规则级 153→152', d, routes_ok, True)
+    d = synthetic_doc(); d['summary']['method_level_non_get_total'] = 156
+    case('CD-N3 非 GET 方法级 157→156', d, routes_ok, True)
+    d = synthetic_doc(); d['summary']['writable_rules_non_get'] = 154
+    case('CD-N4 可写规则级 155→154', d, routes_ok, True)
     d = synthetic_doc(); d['summary']['rules_total'] = 272
-    case('CD-N5 路由总数 271→272', d, routes_ok, True)
+    case('CD-N5 路由总数 273→272', d, routes_ok, True)
     d = synthetic_doc(); d['uncovered_writable'] = d['uncovered_writable'] + [{'rule': '/new'}]
     case('CD-N6 无命中写端点 0→1', d, routes_ok, True)
     d = synthetic_doc(); d['smoke_test_plan']['static_reproduction_targets'] = 147

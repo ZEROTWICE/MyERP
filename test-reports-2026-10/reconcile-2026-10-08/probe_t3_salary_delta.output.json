@@ -1,0 +1,50 @@
+{
+ "real_db_sha256_before": "F5DA2306BC31CBAB098AAD3774016D320A9B9AA3546F93418196AE9900E0F065",
+ "real_db_sha256_expected": "F5DA2306BC31CBAB098AAD3774016D320A9B9AA3546F93418196AE9900E0F065",
+ "db_copy_path": "C:\\Users\\RICHAR~1\\AppData\\Local\\Temp\\wms_test_pj6b7il0\\app.db",
+ "db_uri": "sqlite:///C:/Users/RICHAR~1/AppData/Local/Temp/wms_test_pj6b7il0/app.db",
+ "same_fixture_reading": {
+  "process_code": "_T3S9001",
+  "business_date": "2026-10-09",
+  "pre_fix_semantics": {
+   "source": "ProcessPrice.query.filter_by(process_code).first()",
+   "process_price_id": 3487,
+   "unit_price": 2.5
+  },
+  "after_fix_semantics": {
+   "source": "pick_process_price(process_code, business_date)",
+   "process_price_id": 3488,
+   "unit_price": 4.0
+  },
+  "price_changed": true,
+  "delta_per_unit": 1.5
+ },
+ "end_to_end_same_row": {
+  "quantity": 10,
+  "pre_fix_import": {
+   "record_id": 1,
+   "process_id": 3487,
+   "quantity": 10,
+   "http_status": 200,
+   "unit_price": 2.5,
+   "piecework_amount": 25.0
+  },
+  "after_fix_import": {
+   "record_id": 2,
+   "process_id": 3488,
+   "quantity": 10,
+   "http_status": 200,
+   "unit_price": 4.0,
+   "piecework_amount": 40.0
+  },
+  "expected_old_id": 3487,
+  "expected_new_id": 3488,
+  "pre_fix_wrote_old_version": true,
+  "after_fix_wrote_new_version": true,
+  "piecework_amount_delta": 15.0,
+  "unit_price_delta": 1.5
+ },
+ "real_db_sha256_after": "F5DA2306BC31CBAB098AAD3774016D320A9B9AA3546F93418196AE9900E0F065",
+ "real_db_unchanged": true,
+ "schema_identical": true
+}

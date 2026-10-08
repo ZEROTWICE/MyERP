@@ -550,6 +550,44 @@ def _inj_script_fixture(ctx, step_id):
                                         '换成故意不合规的夹具：%s' % FIXTURE_LINES[step_id][0]}}
 
 
+#: B13-09 注入用的调用点正则（只认 `notify_*` **调用**，不认 `def notify_*` 定义与非调用引用）
+_NOTIFY_CALL_RE = re.compile(
+    r'(?<![\w.])notify_(?:process_change|spec_change|inventory_warning|task_assignment'
+    r'|raw_substitution)\s*\(')
+
+
+def _inj_check_notification_triggers(ctx):
+    """合成树 = 真 `notification_service.py` + 真 `routes.py` 副本，并把其中**全部触发器调用点注释掉**。
+
+    与真树当前是否已接线无关（注入树恒为 wired=0 < expect 4）⇒ `--expect 4` 下该步必红，
+    即「把接线调用点注释掉 ⇒ 门禁报红」的注入自证。
+    """
+    syn = _inj_fresh(ctx, 'check_notification_triggers')
+    app = os.path.join(syn, 'app')
+    fixtures, commented = [], 0
+    for rel in ('app/services/notification_service.py', 'app/main/routes.py'):
+        dst = _inj_copy(os.path.join(REPO_ROOT, rel.replace('/', os.sep)),
+                        os.path.join(app, rel.replace('/', os.sep)))
+        with open(dst, encoding='utf-8') as fh:
+            lines = fh.readlines()
+        out = []
+        for line in lines:
+            stripped = line.lstrip()
+            if (not stripped.startswith(('def ', 'async def '))
+                    and _NOTIFY_CALL_RE.search(line)):
+                out.append('# [V-01 注入] ' + line)
+                commented += 1
+            else:
+                out.append(line)
+        with open(dst, 'w', encoding='utf-8', newline='\n') as fh:
+            fh.writelines(out)
+        fixtures.append(_rel(dst))
+    return {'kind': 'real_input', 'append_argv': ['--root', app], 'fixtures': fixtures,
+            'evidence': {'tree': _rel(app), 'call_sites_commented': commented,
+                         'degradation': '通知触发器调用点全部注释掉（%d 处）⇒ wired 0 ≠ expect 4'
+                                        % commented}}
+
+
 #: 每步 1 次注入（形态 ⑦：只改输入路径，不动判据）——判据 ② 的机读依据
 INJECTIONS = {
     'check_templates': {'kind': 'real_input', 'builder': _inj_check_templates,
@@ -587,6 +625,10 @@ INJECTIONS = {
                             'how': '--roots 指向合成树（裸捕 get_json() 的 1 个站点）'},
     'evidence_hash': {'kind': 'real_input', 'builder': _inj_evidence_hash,
                       'how': '--evidence-root 指向「freeze 后篡改 1 个文件」的合成证据树'},
+    'check_notification_triggers': {
+        'kind': 'real_input', 'builder': _inj_check_notification_triggers,
+        'how': '--root 指向合成树（真 notification_service.py + 真 routes.py 副本，'
+               '其中全部 notify_* 调用点被注释掉）⇒ wired 0 ≠ expect 4'},
 }
 
 
@@ -643,7 +685,11 @@ def spec_steps(python_exe, check_templates_script=None,
         {'id': 'check_properties', 'group': 'blocking',
          'argv': [exe, '-B', os.path.join('scripts', 'check_properties.py')],
          'expect_exit': 0,
-         'expects': ['已扫描 23 个文件，模型类 74 个', 'RESULT: OK']},
+         'expects': ['已扫描 26 个文件，模型类 74 个', 'RESULT: OK']},
+        # B14-R1（2026-10-09）：回退 ALLOY-IMPORT-02 真库导入造成的期望漂移 —— 导入期曾把本步
+        # 期望串与 run_gates 的 bootstrap_copied_rows 一起抬到 10172（真库 +1080 产品 / +1728 BOM
+        # 明细等）。真实库已还原为导入前锚点（2531328 B / F5DA2306…0F065），故两处一起回退到
+        # 干净库现场实测值 6712（run ci-run-20261009-005619 的 ci_check_db_bootstrap.out:4）。
         {'id': 'check_db_bootstrap', 'group': 'blocking',
          'argv': [exe, '-B', shim, os.path.join('scripts', 'check_db_bootstrap.py')],
          'expect_exit': 0,
@@ -656,7 +702,7 @@ def spec_steps(python_exe, check_templates_script=None,
         {'id': 'functional_test', 'group': 'blocking',
          'argv': [exe, '-B', shim, os.path.join('scripts', 'functional_test.py')],
          'expect_exit': 0,
-         'expects': ['结果：109 通过 / 0 失败']},
+         'expects': ['结果：127 通过 / 0 失败']},
         {'id': 'permission_matrix', 'group': 'blocking', 'request': True,
          'argv': [exe, '-B', shim, os.path.join('scripts', 'permission_matrix.py'), '--no-dump'],
          'expect_exit': 0,
@@ -670,7 +716,7 @@ def spec_steps(python_exe, check_templates_script=None,
         {'id': 'route_inventory', 'group': 'report-only', 'capture_stdout': True,
          'argv': [exe, '-B', shim, os.path.join('scripts', 'route_inventory.py')],
          'expect_exit': 0,
-         'expects': ['[routes] total rules=271', 'duplicate (method,path) registrations=0'],
+         'expects': ['[routes] total rules=273', 'duplicate (method,path) registrations=0'],
          'note': '报告型（A-30）：退出码不作为判据；stdout 交给 coverage_drift 的 D-8'},
         {'id': 'measure_coverage', 'group': 'report-only', 'mode': 'coverage_json',
          'argv': [exe, '-B', os.path.join('test-reports-2026-10', 'harness', 'measure_coverage.py'),
@@ -682,6 +728,30 @@ def spec_steps(python_exe, check_templates_script=None,
          'expect_exit': 0,
          'expects': ['判据 8/8 通过'],
          'note': '报告型脚本产物的判据层（A-63：直接进 blocking）'},
+        # B13-09（blocking）：通知触发器**真的**被接线吗（AST：每个 `def notify_*` 至少 1 个
+        # 非定义处调用点）。目标态 = 5 个触发器里 4 个接线：
+        #   * `notify_inventory_warning` —— 按 §7.2 拍板项 6（min_stock 数据源仓库内不存在，
+        #     零 schema 变更的 SystemConfig 值由业务给）**永久豁免**，锚点 = 81-:860（同行共现
+        #     `notify_inventory_warning` + `只登记`）；
+        #   * 另 3 个由 t9/B13-06 接线，落线前用 `--pending-wiring` 显式登记（落线后自动消费、
+        #     不报红）⇒ **B13-06 落线前本步为红是正确读数**（plan :177「未接线 ⇒ exit 1」），
+        #     落线后 wired 4 == expect 4 自动转绿，无需再改本步。
+        # 【严禁】把 `--expect` 写成 5 或去掉 `--allow-unwired`：那会逼出「为凑数接线一个没有
+        # 数据源的触发器」的不诚实结果；也严禁为了变绿而放宽任何判据。
+        {'id': 'check_notification_triggers', 'group': 'blocking',
+         'argv': [exe, '-B', os.path.join('scripts', 'check_notification_triggers.py'),
+                  '--expect', '4',
+                  '--allow-unwired', 'notify_inventory_warning',
+                  '--pending-wiring', 'notify_process_change',
+                  '--pending-wiring', 'notify_spec_change',
+                  '--pending-wiring', 'notify_task_assignment'],
+         'expect_exit': 0,
+         'expects': ['triggers=5 wired=4 unwired=1 expect=4',
+                     'allow-unwired (permanent) anchor=test-reports-2026-10/81-',
+                     'RESULT: OK'],
+         'expect_absent': ['UNREGISTERED-TRIGGER'],
+         'note': 'B13-09 / G-11：通知触发器接线门禁（AST 调用点，非人读代码）。豁免与待办'
+                 '都在仓库内有可见锚点；永久豁免无法匿名、临时豁免被禁（UNREGISTERED-EXEMPTION）。'},
         # ---- A-85 接线：W7 三接入位（TL-01 / TL-02 / TL-04）由注释变实装 ------------
         # TL-01（blocking）。判据 = 违规数 0 + RESULT: OK + 两个已知坏点缺席。
         # 【严禁】把 name_query_refs 计数写进 expects —— 实测 574/575/602 三次漂移。

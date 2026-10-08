@@ -586,6 +586,26 @@ def get_task_detail(task_id):
         }
     })
 
+def _assert_add_audit_target(log, action, new_row_id):
+    """B13-01 不变量断言：`rollback_type='add'` ⇒ `target_id IS NOT NULL`。
+
+    `app/main/routes.py` 的同名同义断言在本模块不可 import（routes.py 用 `from .quality import *`
+    后再显式定义，本模块反向 import 会成环），故按同一口径就地实现：**必须在新行业务行
+    `flush()` 之后、`commit()` 之前调用**；违反时抛 `AssertionError` 并带可读原因，绝不静默。
+    """
+    if new_row_id is None or log.target_id is None:
+        detail = (
+            '审计不变量被破坏：rollback_type=add 的审计行没有 target_id（回滚端点按 target_id '
+            '找不到目标，会返回 404「目标记录不存在」）。成因：新建业务行后未先 db.session.flush() '
+            f'取主键就给 AuditLog(target_id=<新行>.id) 赋值（B13-01）。[action={action} '
+            f'target_model={log.target_model} new_row_id={new_row_id!r} '
+            f'audit_target_id={log.target_id!r}]'
+        )
+        current_app.logger.error('B13-01 审计不变量违反：%s', detail)
+        raise AssertionError(detail)
+    return log
+
+
 @bp.route('/api/quality/tasks', methods=['POST'])
 @login_required
 @require_capability('quality.task.manage')
@@ -605,9 +625,11 @@ def create_task():
         if missing:
             return jsonify({'success': False,
                             'message': '缺少必填字段：' + '、'.join(missing)}), 400
-        if data.get('type') not in ('product', 'production_record', 'material'):
+        # B14-07（方案 A）：goods_receipt（来料检）与 production_record 同级，取值域统一
+        # 取自模块级 _VALID_TASK_TYPES（与导入校验同一来源，避免两处白名单漂移）
+        if data.get('type') not in _VALID_TASK_TYPES:
             return jsonify({'success': False,
-                            'message': 'type 取值不合法（应为 product / production_record / material）'}), 400
+                            'message': 'type 取值不合法（应为 ' + ' / '.join(_VALID_TASK_TYPES) + '）'}), 400
 
         # 创建任务
         task = InspectionTask(
@@ -623,6 +645,8 @@ def create_task():
             status='pending'
         )
         db.session.add(task)
+        # B13-01：必须先 flush 取主键，否则下面 target_id=task.id 是 None ⇒ 审计行「假可回滚」
+        db.session.flush()  # 获取task.id
 
         # 记录审计日志
         log = AuditLog(
@@ -635,6 +659,8 @@ def create_task():
             target_id=task.id,
             new_data=data
         )
+        # B13-01 不变量断言：rollback_type='add' ⇒ target_id IS NOT NULL（违反即带原因抛错）
+        _assert_add_audit_target(log, '创建质检任务', task.id)
         db.session.add(log)
 
         db.session.commit()
@@ -1016,6 +1042,12 @@ def get_inspection_target_name(task):
         elif task.target_type == 'material':
             material = RawMaterial.query.get(task.target_id)
             return f'原材料：{material.material_name}' if material else '原材料：未知'
+        elif task.target_type == 'goods_receipt':
+            # B14-07（方案 A）：来料检的检验对象是到货单（与 submit_inspection_record 里
+            # target_type == 'goods_receipt' 的入库分支同一口径）
+            from app.models import GoodsReceipt
+            receipt = GoodsReceipt.query.get(task.target_id)
+            return f'到货单：{receipt.receipt_no}' if receipt else '到货单：未知'
         return '未知'
     except Exception as e:
         current_app.logger.error(f'获取检验对象名称失败：{str(e)}')
@@ -1310,6 +1342,28 @@ def get_inspection_record_detail(record_id):
                 'value': base_record.value
             })
         
+        # B14-06：不合格处置信息。原实现 record_data 里没有 nonconformity 键 ⇒ 前端
+        # records.html 的处置分支恒为假、永不显示（死分支）。字段集与
+        # print_record.html:167-196 保持同一口径。
+        # 注意 nonconformity_records 是 lazy='dynamic' 关系：真值判断恒为真、[0] 在空集上
+        # 会抛 IndexError ⇒ 必须用 .first()。无处置单时返回 null（前端据此隐藏容器）。
+        nonconformity = None
+        nc = record.nonconformity_records.first()
+        if nc is not None:
+            if nc.handler is not None:
+                handler_name = nc.handler.employee.name if nc.handler.employee else nc.handler.username
+            else:
+                handler_name = '未知'
+            nonconformity = {
+                'id': nc.id,
+                'type': nc.type or '',
+                'handler_name': handler_name,
+                'handling_date': nc.handling_date.strftime('%Y-%m-%d') if nc.handling_date else '',
+                'handling_result': nc.handling_result or '',
+                'notes': nc.notes or '',
+                'status': nc.status or ''
+            }
+
         record_data = {
             'id': record.id,
             'record_code': record.global_sn,
@@ -1320,7 +1374,8 @@ def get_inspection_record_detail(record_id):
             'result': record.result or 'pending',
             'notes': record.notes or '',
             'items': items,
-            'base_items': base_items
+            'base_items': base_items,
+            'nonconformity': nonconformity
         }
         
         return jsonify({
@@ -1444,7 +1499,8 @@ def export_inspection_records():
             type_names = {
                 'production_record': '生产记录质检',
                 'product': '成品质检',
-                'material': '原材料质检'
+                'material': '原材料质检',
+                'goods_receipt': '来料质检'
             }
             type_name = type_names.get(record.task.target_type if record.task else 'unknown', '未知')
             
@@ -1492,7 +1548,7 @@ def export_inspection_records():
 # （本仓库在 Windows 上出现过 send_file 之后临时文件被占用、WinError 32 删不掉的问题）。
 # ---------------------------------------------------------------------------
 
-TASK_IMPORT_COL_TYPE = '检验类型(product/production_record/material)'
+TASK_IMPORT_COL_TYPE = '检验类型(product/production_record/material/goods_receipt)'
 TASK_IMPORT_COL_TARGET = '检验对象ID'
 TASK_IMPORT_COL_INSPECTOR = '检验员用户名'
 TASK_IMPORT_COL_PRIORITY = '优先级'
@@ -1503,8 +1559,9 @@ _TASK_TYPE_NAMES = {
     'product': '成品质检',
     'production_record': '生产记录质检',
     'material': '原材料质检',
+    'goods_receipt': '来料质检',
 }
-_VALID_TASK_TYPES = ('product', 'production_record', 'material')
+_VALID_TASK_TYPES = ('product', 'production_record', 'material', 'goods_receipt')
 
 
 def _task_export_rows(query):
@@ -1653,7 +1710,7 @@ def import_inspection_tasks():
             lineno = idx + 2  # 第 1 行是表头
             target_type = str(row.get(TASK_IMPORT_COL_TYPE, '') or '').strip()
             if target_type not in _VALID_TASK_TYPES:
-                errors.append(f'第 {lineno} 行：检验类型必须是 product / production_record / material')
+                errors.append(f'第 {lineno} 行：检验类型必须是 ' + ' / '.join(_VALID_TASK_TYPES))
                 continue
 
             raw_target = row.get(TASK_IMPORT_COL_TARGET)

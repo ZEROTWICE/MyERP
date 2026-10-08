@@ -140,7 +140,14 @@ def _ensure_schema(app):
 
 
 def _seed_system_configs(app):
-    """补齐缺失的系统配置项（已存在的不覆盖）。"""
+    """补齐缺失的系统配置项与默认质检模板（已存在的不覆盖）。
+
+    B14-08：空库上 `inspection_templates` 原本零行，`mes_service.pick_template()`
+    对生产质检与来料检都返回 `None`，质检流程整条不可用。这里复用既有的
+    「只补缺不覆盖」初始化路径，把两类默认模板一并下发（幂等，重复启动不再插入，
+    也不改写用户改过的模板/项目）。顺序上本函数在 `db.create_all()` 与
+    `bootstrap_if_empty()` 之后执行，故登记 `created_by` 时账号已存在。
+    """
     try:
         from app.models import SystemConfig
         created = SystemConfig.seed_defaults()
@@ -149,6 +156,18 @@ def _seed_system_configs(app):
     except Exception as e:
         db.session.rollback()
         app.logger.error(f'初始化系统配置项失败: {e}')
+
+    try:
+        from app.models import InspectionTemplate
+        seeded = InspectionTemplate.seed_defaults()
+        if seeded['templates']:
+            app.logger.info(
+                f"已补齐默认质检模板 {len(seeded['templates'])} 套"
+                f"（{'/'.join(seeded['templates'])}，共 {seeded['items']} 个检验项目）"
+            )
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f'初始化默认质检模板失败: {e}')
 
 
 def create_app():

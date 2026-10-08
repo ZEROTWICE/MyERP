@@ -1,0 +1,551 @@
+{
+ "real_db_sha256_before": "F5DA2306BC31CBAB098AAD3774016D320A9B9AA3546F93418196AE9900E0F065",
+ "db_copy_path": "C:\\Users\\RICHAR~1\\AppData\\Local\\Temp\\wms_test_ua1mh77m\\app.db",
+ "db_uri": "sqlite:///C:/Users/RICHAR~1/AppData/Local/Temp/wms_test_ua1mh77m/app.db",
+ "temp_folder_effective": "D:\\workspace\\wage_management_system - bak\\uploads\\temp",
+ "temp_folder_is_real_uploads_temp": true,
+ "rules_total": 271,
+ "seeded": {
+  "employee_pk": 64,
+  "product_pk": 2,
+  "order_pk": 12,
+  "batch_pk": 10,
+  "item_pk": 24,
+  "raw_pk": 2,
+  "admin_user_pk": 1
+ },
+ "A_price_ids": {
+  "same_old": 3490,
+  "same_new": 3491,
+  "same_future": 3492,
+  "latest_old": 3493,
+  "latest_new": 3494,
+  "future_only": 3495,
+  "d1": 3496,
+  "d2": 3497
+ },
+ "A1_three_sites": {
+  "endpoints": [
+   "/production_records/import",
+   "/bonus_penalties/import",
+   "/tasks/import"
+  ],
+  "process_code": "_T6V_SAME",
+  "business_date": "2026-10-08",
+  "site1_process_id": 3491,
+  "site2_process_id": 3491,
+  "site3_process_id": 3491,
+  "expected": 3491,
+  "all_three_equal": true,
+  "http": [
+   200,
+   200,
+   200
+  ],
+  "messages": [
+   {
+    "message": "成功导入 1 条记录",
+    "success": true
+   },
+   {
+    "message": "成功导入 1 条记录",
+    "success": true
+   },
+   {
+    "message": "成功导入 1 条记录",
+    "success": true
+   }
+  ],
+  "task_delta": 18
+ },
+ "A2_multi_version": {
+  "process_code": "_T6V_LATEST",
+  "business_date": "2026-10-08",
+  "picked_id": 3494,
+  "picked_price": 2.22,
+  "expected_latest_id": 3494,
+  "older_id": 3493,
+  "negative_only_old_visible_picked_id": 3493,
+  "negative_only_old_visible_picked_price": 1.11
+ },
+ "A3_future_only": {
+  "helper_returns_none": true,
+  "endpoint_http": 200,
+  "endpoint_payload_message": "成功导入 0 条记录，1 条记录导入失败：\n未找到工序 _T6V_FUTURE 在 2026-10-08 00:00:00 的价格",
+  "endpoint_no_exception": true
+ },
+ "A4_no_price": {
+  "helper_returns_none": true,
+  "prod": {
+   "http": 200,
+   "payload": {
+    "message": "成功导入 0 条记录，1 条记录导入失败：\n未找到工序 _T6V_NOPRICE 在 2026-10-08 00:00:00 的价格",
+    "success": true
+   }
+  },
+  "bonus": {
+   "http": 200,
+   "payload": {
+    "message": "成功导入 1 条记录",
+    "success": true
+   }
+  },
+  "task": {
+   "http": 200,
+   "payload": {
+    "message": "成功导入 0 条记录，1 条记录导入失败：\n工序编号 _T6V_NOPRICE 不存在",
+    "success": true
+   }
+  }
+ },
+ "A5_tolerance_window": {
+  "D": "2026-10-08",
+  "D_plus_1_2359_selected_id": 3496,
+  "D_plus_1_2359_expected_id": 3496,
+  "D_plus_2_0001_selected": null,
+  "D_plus_2_0001_expected_none": true,
+  "known_deviation": "effective_date <= end_of_day + timedelta(days=1) 的既有容差窗口：业务日 +1 天 00:00~23:59 生效的价会被取到，D+2 起才排除"
+ },
+ "C_b12_02": {
+  "negative_control": {
+   "records_delta": 0,
+   "http": 200,
+   "message": "成功导入 0 条记录，3 条记录导入失败：\n处理记录时出错: 'notes'\n员工工号 _t6v_EMP_NOPE 不存在\n未找到工序 _T6V_NOPRICE 在 2026-10-08 00:00:00 的价格",
+   "message_has_notes_keyerror": true
+  },
+  "after_fix": {
+   "records_delta": 1,
+   "http": 200,
+   "message": "成功导入 1 条记录，2 条记录导入失败：\n员工工号 _t6v_EMP_NOPE 不存在\n未找到工序 _T6V_NOPRICE 在 2026-10-08 00:00:00 的价格"
+  },
+  "row_level_tolerance": {
+   "not_500": true,
+   "bad_employee_skipped": true,
+   "no_price_skipped": true,
+   "line_prefix_not_required": true,
+   "bad_rows_not_persisted": true
+  },
+  "temp_files_left": []
+ },
+ "D1_scrap_negative_post": {
+  "http": 200,
+  "payload": {
+   "message": "处置已记录",
+   "status": "done",
+   "success": true,
+   "target_id": 3,
+   "target_type": "production_record"
+  },
+  "scrap_rows_delta": 0,
+  "scrap_pieces_delta": 0.0
+ },
+ "D2_scrap_positive_post": {
+  "http": 200,
+  "payload": {
+   "message": "处置已记录",
+   "status": "done",
+   "success": true,
+   "target_id": 4,
+   "target_type": "production_record"
+  },
+  "scrap_rows_delta": 1,
+  "scrap_pieces_delta": 3.0,
+  "newest_scrap_rows": [
+   {
+    "id": 3,
+    "product_number": "_T6V-ITEM-1",
+    "quantity": 3,
+    "stock_kind": "scrap",
+    "status": "scrapped",
+    "workpiece_id": null,
+    "notes": "报工路径报废自动入账：不合格单 #2，实例 _T6V-ITEM-1，件数 3",
+    "product_id": 2,
+    "inspector": "_t_admin"
+   }
+  ],
+  "nc_after": {
+   "status": "done",
+   "type": "scrap",
+   "scrap_cost": 12.5
+  },
+  "batch_item_status_after": "scrapped",
+  "raw_quantity_after": 88.0,
+  "raw_before_expected": 100.0
+ },
+ "D3_workpiece_path": {
+  "http": 200,
+  "payload": {
+   "message": "处置已记录",
+   "status": "done",
+   "success": true,
+   "target_id": 1,
+   "target_type": "workpiece"
+  },
+  "scrap_pieces_before": 3.0,
+  "scrap_pieces_after": 4.0,
+  "scrap_pieces_delta": 1.0,
+  "workpiece_event_payload": {
+   "nc_id": 3,
+   "scrap_cost": 0,
+   "pieces": 1.0
+  },
+  "workpiece_status_after": "scrap"
+ },
+ "E_seeded": {
+  "employee_pk": 65,
+  "pp_sal": 3498,
+  "pr_normal": 5,
+  "pr_rework": 6,
+  "task_rw": 22,
+  "nc3": 4
+ },
+ "E_switch_initial": false,
+ "E_salary_two_states": {
+  "off": {
+   "http": 200,
+   "is_json": true,
+   "body_head": "{\"data\":[{\"coefficient\":1.0,\"counted\":60.0,\"department\":\"_t6v \\u90e8\\u95e8\",\"dropped\":100.0,\"employee_id\":65,\"employee_name\":\"_t6v \\u8ba1\\u4ef6\\u5458\\u5de5\",\"employee_no\":\"_t6v_EMP_SAL1\",\"excluded_record_ids\":[6],\"normal_quantity\":3.0,\"piecework\":60.0,\"records\":[{\"amount\":60.0,\"counted\":true,\"date\":\"2026-10-08\",\"is_rework\":false,\"price\":20.0,\"process_name\":\"_t6v \\u8ba1\\u4ef6\\u5de5\\u5e8f\",\"quantity",
+   "content_type": "application/json",
+   "row": {
+    "coefficient": 1.0,
+    "counted": 60.0,
+    "department": "_t6v 部门",
+    "dropped": 100.0,
+    "employee_id": 65,
+    "employee_name": "_t6v 计件员工",
+    "employee_no": "_t6v_EMP_SAL1",
+    "excluded_record_ids": [
+     6
+    ],
+    "normal_quantity": 3.0,
+    "piecework": 60.0,
+    "records": [
+     {
+      "amount": 60.0,
+      "counted": true,
+      "date": "2026-10-08",
+      "is_rework": false,
+      "price": 20.0,
+      "process_name": "_t6v 计件工序",
+      "quantity": 3,
+      "record_id": 5
+     },
+     {
+      "amount": 100.0,
+      "counted": false,
+      "date": "2026-10-08",
+      "is_rework": true,
+      "price": 20.0,
+      "process_name": "_t6v 计件工序",
+      "quantity": 5,
+      "record_id": 6
+     }
+    ],
+    "rework_quantity": 5.0
+   },
+   "switch_echo": false
+  },
+  "on": {
+   "http": 200,
+   "is_json": true,
+   "body_head": "{\"data\":[{\"coefficient\":1.0,\"counted\":160.0,\"department\":\"_t6v \\u90e8\\u95e8\",\"dropped\":0.0,\"employee_id\":65,\"employee_name\":\"_t6v \\u8ba1\\u4ef6\\u5458\\u5de5\",\"employee_no\":\"_t6v_EMP_SAL1\",\"excluded_record_ids\":[],\"normal_quantity\":8.0,\"piecework\":160.0,\"records\":[{\"amount\":60.0,\"counted\":true,\"date\":\"2026-10-08\",\"is_rework\":false,\"price\":20.0,\"process_name\":\"_t6v \\u8ba1\\u4ef6\\u5de5\\u5e8f\",\"quantity\"",
+   "content_type": "application/json",
+   "row": {
+    "coefficient": 1.0,
+    "counted": 160.0,
+    "department": "_t6v 部门",
+    "dropped": 0.0,
+    "employee_id": 65,
+    "employee_name": "_t6v 计件员工",
+    "employee_no": "_t6v_EMP_SAL1",
+    "excluded_record_ids": [],
+    "normal_quantity": 8.0,
+    "piecework": 160.0,
+    "records": [
+     {
+      "amount": 60.0,
+      "counted": true,
+      "date": "2026-10-08",
+      "is_rework": false,
+      "price": 20.0,
+      "process_name": "_t6v 计件工序",
+      "quantity": 3,
+      "record_id": 5
+     },
+     {
+      "amount": 100.0,
+      "counted": true,
+      "date": "2026-10-08",
+      "is_rework": false,
+      "price": 20.0,
+      "process_name": "_t6v 计件工序",
+      "quantity": 5,
+      "record_id": 6
+     }
+    ],
+    "rework_quantity": 0.0
+   },
+   "switch_echo": true
+  }
+ },
+ "E_quantity_semantics_observed": {
+  "normal_quantity_off": 3.0,
+  "normal_quantity_on": 8.0,
+  "rework_quantity_off": 5.0,
+  "rework_quantity_on": 0.0,
+  "per_row_is_rework_off": [
+   false,
+   true
+  ],
+  "per_row_is_rework_on": [
+   false,
+   false
+  ],
+  "note": "normal_quantity=未被剔除的产量、rework_quantity=被剔除的产量（沿用 piecework_breakdown 的 excluded 口径，与金额口径同源）。开关开 ⇒ excluded 为空 ⇒ rework_quantity=0 且 normal_quantity 含返工产量（8）：这两个聚合标签在「返工计件」开启时**不再表示「返工产量」**，返工身份只剩逐行 is_rework 可见（本实现逐行 is_rework 在开态也随 excluded 变为 false，故开态下页面「类别」列不再标红）。",
+  "severity": "low（不影响金额：counted/piecework 两态分别为 60/160，与开关语义一致；返工身份在金额口径关闭时由 dropped+excluded_record_ids+逐行标记完整暴露）"
+ },
+ "E_detail_page": {
+  "http": 200,
+  "html_has_split_block": true,
+  "html_has_dropped": true,
+  "html_has_excluded_record_ids": true,
+  "html_has_normal_quantity": true,
+  "html_has_rework_quantity": true,
+  "html_has_switch_echo": false,
+  "html_has_per_record_category": true,
+  "html_has_rework_badge": true,
+  "html_len": 40687
+ },
+ "E2_unauthenticated": {
+  "http": 302,
+  "location": "/auth/?next=http://localhost/salary_calculation?format%3Djson",
+  "content_type": "text/html; charset=utf-8",
+  "body_len": 309,
+  "body_has_salary_marker": true,
+  "body_head": "<!doctype html>\n<html lang=en>\n<title>Redirecting...</title>\n<h1>Redirecting...</h1>\n<p>You should be redirected automatically to the target URL: <a href=\"/auth/?next=http://localhost/salary_calculati",
+  "known_deviation": "未登录返回 302 → /auth/（非 401 JSON），因 _wants_json() 只认 /api/ 前缀"
+ },
+ "E3_invariant": {
+  "False": {
+   "counted": 60.0,
+   "dropped": 100.0,
+   "piecework_amount": 60.0,
+   "equal_within_1e-9": true
+  },
+  "True": {
+   "counted": 160.0,
+   "dropped": 0.0,
+   "piecework_amount": 160.0,
+   "equal_within_1e-9": true
+  }
+ },
+ "real_db_sha256_after": "F5DA2306BC31CBAB098AAD3774016D320A9B9AA3546F93418196AE9900E0F065",
+ "real_db_sha256_expected": "F5DA2306BC31CBAB098AAD3774016D320A9B9AA3546F93418196AE9900E0F065",
+ "schema": {
+  "real_objects": 153,
+  "copy_objects": 153,
+  "identical": true,
+  "copy_extra": []
+ },
+ "rules_total_end": 271,
+ "t6_acceptance_map": {
+  "B12-01_三端点一致": "A1（三个真实端点同 process_code/业务日 ⇒ process_id 全为 3491）",
+  "B12-01_多版本取最新": "A2（picked=3494 price=2.22；阴对照新版推 D+3 ⇒ 只能取到旧版 3493）",
+  "B12-01_仅未来价/无价格": "A3/A4（helper 均 None，三端点 HTTP 200 success=true，走既有文案）",
+  "B12-01_容差边界偏差": "A5（D+1 23:59 被取到 3496；D+2 00:01 被排除）",
+  "B12-02_修复两态": "C（真实 uploads/temp；阴 0 行含 KeyError 串，阳 +1 行）",
+  "B12-02_行级容错": "C.row_level_tolerance（坏行跳过、200 非 500、坏行未入库）",
+  "B12-03_件数差分": "D1/D2（阴 Δ=0；阳真实端点 Δ=+3.0，行 Δ=1，notes 含 #nc.id）",
+  "B12-03_有工件路径": "D3（件数 3→4，Δ=+1，WorkpieceEvent payload 三键不变）",
+  "B12-04_两态区分": "E/E2/E3/E4（60.0↔160.0 Δ=100；dropped/excluded 暴露；不变量不 500）",
+  "无 schema 变更": "收尾 schema.identical + 真库 SHA256 + check_migration_heads",
+  "路由不变量": "rules_total=271（我的探针实测）+ route_inventory total rules=271 + ci_gates coverage_drift blocking 绿"
+ },
+ "cross_harness_findings": {
+  "source": "冻结 P0-4 门禁（我用 --scenario all 自跑，非作者转述）",
+  "w2w3_probe": "43/46 passed，3 条 failed（report-only，不阻塞 ci_gates）",
+  "negative_matrix": "27/28 passed，1 条 failed：NV-2.3（与 w2w3 AC04-e 同一根因，exit 仍 0）",
+  "failed_ids": [
+   "AC04-e",
+   "AC04-e2",
+   "AC04-d-s34",
+   "NV-2.3"
+  ],
+  "root_cause": "B12-04（t5）在 app/main/routes.py 的 _piecework_detail 里直读 SystemConfig.get('quality.rework_counts_piecework', ...)（routes.py:86）⇒ 开关读取点 1→2（AC04-e/NV-2.3）；模板 app/templates/main/salary_calculation.html 出现 rework_counts_piecework 字样 ⇒ 工资模板命中 1（AC04-e2）；routes.py 内 piecework_amount( 调用数 3→4（AC04-d-s34）。",
+  "impact_on_b12_04_amounts": "无：counted/金额两态 60.0/160.0 与开关语义一致（E3 不变量成立）。",
+  "not_in_my_scope": "app/ 实现代码与 test-reports-2026-10/harness/** 都在我的 out-of-scope ⇒ 只登记，不改。"
+ },
+ "coverage_gaps": [
+  "未覆盖：真实浏览器/前端 JS 行为（只做 test_client 端点 + 模板字节断言）。",
+  "未覆盖：ExcelGenerator 第 4 个取价读点（app/utils/excel_generator.py:877 用 filter_by(process_code=..., is_current=True)，非本批范围，只登记）。",
+  "未覆盖：scrap 分支不吃 notes（app/main/stock.py:97 既有语义，非缺陷）。",
+  "已知偏差（不是回归）：未登录访问 /salary_calculation?format=json 返回 302 → /auth/ 而非 401 JSON（permissions._wants_json 只认 /api/ 前缀；已实测响应体 309 字节重定向页、无工资数据）。",
+  "已知偏差（不是回归）：helper 保留 effective_date <= end_of_day + timedelta(days=1) 容差 ⇒ 业务日 +1 天生效的价会被取到（A5 实测）。",
+  "语义观测（低）：开关打开时 normal_quantity/rework_quantity 随 excluded 归零/合并，不再表示「返工产量」；逐行 is_rework 亦随 excluded 变 false（详见 E_quantity_semantics_observed）。",
+  "本探针只跑 3 条 w2w3 相关 harness 的读数，harness 源码冻结、未改动。"
+ ],
+ "verdicts": [
+  {
+   "name": "TEMP_FOLDER 未做覆盖（真实 uploads/temp）",
+   "ok": true,
+   "detail": "D:\\workspace\\wage_management_system - bak\\uploads\\temp"
+  },
+  {
+   "name": "rules_total == 271（A-70 锁定）",
+   "ok": true,
+   "detail": "rules_total=271"
+  },
+  {
+   "name": "A1 三端点 process_id 相等",
+   "ok": true,
+   "detail": "3491/3491/3491"
+  },
+  {
+   "name": "A1 三端点都取到「业务日前 1 天生效」的新版（最新版，非旧版、非未来版）",
+   "ok": true,
+   "detail": "expected=3491 old=3490 future=3492"
+  },
+  {
+   "name": "A2 多版本取 effective_date 最新版",
+   "ok": true,
+   "detail": "picked=3494 expected=3494"
+  },
+  {
+   "name": "A2 阴对照：把新版推到 D+3 后只能取到旧版（证明取价确实按生效日排序而非 id/first）",
+   "ok": true,
+   "detail": "picked=3493 expected_old=3493"
+  },
+  {
+   "name": "A3 仅未来价 ⇒ helper 返回 None",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "A3 仅未来价 ⇒ 端点无异常（HTTP 200 且 success=true、走既有「未找到」文案）",
+   "ok": true,
+   "detail": "成功导入 0 条记录，1 条记录导入失败：\n未找到工序 _T6V_FUTURE 在 2026-10-08 00:00:00 的价格"
+  },
+  {
+   "name": "A4 无价格 ⇒ helper 返回 None",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "A4 无价格 ⇒ 三个端点都不 500（既有文案，无异常）",
+   "ok": true,
+   "detail": "200/200/200"
+  },
+  {
+   "name": "A5 容差窗口：D+1 23:59 生效价被取到（记录偏差，按基准口径）",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "A5 容差窗口：D+2 00:01 生效价被排除",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "C 阴态（等价修前）records_delta == 0 且错误串含 KeyError 文案",
+   "ok": true,
+   "detail": "delta=0"
+  },
+  {
+   "name": "C 阳态（修后同夹具）records_delta == +1 且坏行被跳过、非 500",
+   "ok": true,
+   "detail": "delta=1"
+  },
+  {
+   "name": "D1 阴态（等价修前）报工路径报废：台账行 Δ=0 且件数 Δ=0",
+   "ok": true,
+   "detail": "{\"http\": 200, \"payload\": {\"message\": \"处置已记录\", \"status\": \"done\", \"success\": true, \"target_id\": 3, \"target_type\": \"production_record\"}, \"scrap_rows_delta\": 0, \"scrap_pieces_delta\": 0.0}"
+  },
+  {
+   "name": "D2 阳态（修后）报工路径报废：真实端点 200，台账「件数」Δ=+3.0（按件数，非行数）",
+   "ok": true,
+   "detail": "pieces_delta=3.0 rows_delta=1"
+  },
+  {
+   "name": "D2 新台账行：stock_kind=scrap、workpiece_id IS NULL、notes 含不合格单 id、quantity=3",
+   "ok": true,
+   "detail": "[{\"id\": 3, \"product_number\": \"_T6V-ITEM-1\", \"quantity\": 3, \"stock_kind\": \"scrap\", \"status\": \"scrapped\", \"workpiece_id\": null, \"notes\": \"报工路径报废自动入账：不合格单 #2，实例 _T6V-ITEM-1，件数 3\", \"product_id\": 2, \"inspector\": \"_t_admin\"}]"
+  },
+  {
+   "name": "D3 有工件路径：台账件数不得由 1 变 0，且件数 Δ=+1（既有路径不回归）",
+   "ok": true,
+   "detail": "before=3.0 after=4.0"
+  },
+  {
+   "name": "D3 WorkpieceEvent(scrap) payload 仍为 {nc_id,scrap_cost,pieces}",
+   "ok": true,
+   "detail": "{\"nc_id\": 3, \"scrap_cost\": 0, \"pieces\": 1.0}"
+  },
+  {
+   "name": "E 明细 JSON 面：已登录 POST /salary_calculation?format=json 返回 JSON（非 HTML）",
+   "ok": true,
+   "detail": "off_http=200 on_http=200 ct=application/json"
+  },
+  {
+   "name": "E 开关 false：正常量 3 / 返工量 5，counted=60.0、dropped=100.0、excluded 含返工记录 id",
+   "ok": true,
+   "detail": "{\"coefficient\": 1.0, \"counted\": 60.0, \"department\": \"_t6v 部门\", \"dropped\": 100.0, \"employee_id\": 65, \"employee_name\": \"_t6v 计件员工\", \"employee_no\": \"_t6v_EMP_SAL1\", \"excluded_record_ids\": [6], \"normal_quantity\": 3.0, \"piecework\": 60.0, \"records\": [{\"amount\": 60.0, \"counted\": true, \"date\": \"2026-10-08\", \"is_rework\": false, \"price\": 20.0, \"process_name\": \"_t6v 计件工序\", \"quantity\": 3, \"record_id\": 5}, {\"amount\": 100.0, \"counted\": false, \"date\": \"2026-10-08\", \"is_rework\": true, \"price\": 20.0, \"process_name\": \"_t6v 计件工序\", \"quantity\": 5, \"record_id\": 6}], \"rework_quantity\": 5.0}"
+  },
+  {
+   "name": "E 开关 true：counted=160.0、dropped=0.0、excluded 为空（返工计入）",
+   "ok": true,
+   "detail": "{\"coefficient\": 1.0, \"counted\": 160.0, \"department\": \"_t6v 部门\", \"dropped\": 0.0, \"employee_id\": 65, \"employee_name\": \"_t6v 计件员工\", \"employee_no\": \"_t6v_EMP_SAL1\", \"excluded_record_ids\": [], \"normal_quantity\": 8.0, \"piecework\": 160.0, \"records\": [{\"amount\": 60.0, \"counted\": true, \"date\": \"2026-10-08\", \"is_rework\": false, \"price\": 20.0, \"process_name\": \"_t6v 计件工序\", \"quantity\": 3, \"record_id\": 5}, {\"amount\": 100.0, \"counted\": true, \"date\": \"2026-10-08\", \"is_rework\": false, \"price\": 20.0, \"process_name\": \"_t6v 计件工序\", \"quantity\": 5, \"record_id\": 6}], \"rework_quantity\": 0.0}"
+  },
+  {
+   "name": "E 两态可区分：counted Δ=100.0（60.0 → 160.0）；非返工产量两态均 3；剔除集只随开关变化",
+   "ok": true,
+   "detail": "off=60.0 on=160.0 normal=3.0/8.0 rework=5.0/0.0"
+  },
+  {
+   "name": "E 明细逐行暴露 is_rework / counted 标记（返工行 counted=false）",
+   "ok": true,
+   "detail": "[{\"amount\": 60.0, \"counted\": true, \"date\": \"2026-10-08\", \"is_rework\": false, \"price\": 20.0, \"process_name\": \"_t6v 计件工序\", \"quantity\": 3, \"record_id\": 5}, {\"amount\": 100.0, \"counted\": false, \"date\": \"2026-10-08\", \"is_rework\": true, \"price\": 20.0, \"process_name\": \"_t6v 计件工序\", \"quantity\": 5, \"record_id\": 6}]"
+  },
+  {
+   "name": "E 明细页 POST 200 且暴露 dropped 与排除集合的机器可读读数（实际属性名：data-dropped / data-excluded-record-ids / data-normal-quantity / data-rework-quantity / data-b12-04-split；另含逐行 data-is-rework）",
+   "ok": true,
+   "detail": "http=200"
+  },
+  {
+   "name": "E2 未登录该面 302 → /auth/（已知且接受的偏差，登记不判回归）",
+   "ok": true,
+   "detail": "http=302 loc=/auth/?next=http://localhost/salary_calculation?format%3Djson"
+  },
+  {
+   "name": "E2 未登录不泄漏任何工资数据（重定向体无 counted/piecework/excluded）",
+   "ok": true,
+   "detail": "body_len=309"
+  },
+  {
+   "name": "E3 不变量 piecework_amount == counted 在真实种子数据两态下都成立（不 raise、不 500）",
+   "ok": true,
+   "detail": "{\"False\": {\"counted\": 60.0, \"dropped\": 100.0, \"piecework_amount\": 60.0, \"equal_within_1e-9\": true}, \"True\": {\"counted\": 160.0, \"dropped\": 0.0, \"piecework_amount\": 160.0, \"equal_within_1e-9\": true}}"
+  },
+  {
+   "name": "E4 真实页面/接口在返工数据下不 500（一致性校验未误报）",
+   "ok": true,
+   "detail": "json_off=200 json_on=200 page=200"
+  },
+  {
+   "name": "收尾 真实 app.db SHA256 未变（= 期望值）",
+   "ok": true,
+   "detail": "F5DA2306BC31CBAB098AAD3774016D320A9B9AA3546F93418196AE9900E0F065"
+  },
+  {
+   "name": "收尾 schema 与真库逐表一致（无 DDL 变更）",
+   "ok": true,
+   "detail": "153 vs 153"
+  },
+  {
+   "name": "收尾 rules_total 仍为 271",
+   "ok": true,
+   "detail": "271"
+  }
+ ],
+ "failed_verdicts": [],
+ "RESULT": "OK"
+}

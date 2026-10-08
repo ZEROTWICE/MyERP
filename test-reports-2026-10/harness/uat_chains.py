@@ -27,6 +27,25 @@ import re
 import sys
 import time
 
+# ── 控制台编码护栏（B13-00 重基线化）────────────────────────────────────────
+# 判据文本含非 GBK 字符（如 uat_chains.py:908 P0-4.4 描述里的 U+2212 MINUS
+# SIGN「−1」）。在中文 Windows（cp936 控制台 / 重定向进管道）下 `print` 会抛
+# UnicodeEncodeError；而 `check()` 是「先 CHECKS.append 登记、后 print」，异常
+# 会让该段后续判据**静默消失**：实测 P0-4.4 打印崩溃 ⇒ P0-4.5 未登记 ⇒ 冻结
+# 基线 40 条被读成 39 条，并连带把 APPEND.1（baseline_count/digest）与
+# FLIP.SUM（blocked_rows=1）误判为红。
+# 处置：进程级固定 UTF-8 + errors='backslashreplace'——中文完整落盘，且任何
+# 字符都不再可能中断判据登记。判据数据只走 CHECKS/JSON，不依赖这段打印。
+for _stream_name in ('stdout', 'stderr'):
+    _stream = getattr(sys, _stream_name, None)
+    _reconfigure = getattr(_stream, 'reconfigure', None)
+    if _reconfigure is None:
+        continue
+    try:
+        _reconfigure(encoding='utf-8', errors='backslashreplace')
+    except (ValueError, OSError, LookupError):
+        pass
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPORTS_ROOT = os.path.dirname(HERE)
 REPO_ROOT = os.path.dirname(REPORTS_ROOT)
@@ -1178,8 +1197,8 @@ V12_ANCHORS = (
      'C7C312734DD8E02486D26C3639D8D074CCFCD59BCEB002C13C7CC9587AC94092'),
     ('test-reports-2026-10/evidence/api/write_suite.json', 73293,
      'B608117EBDCA2A6F74595F0DB4A010187D8834715CD5E70D5C1AAD85F4A3F403'),
-    ('test-reports-2026-10/evidence/harness/coverage.json', 236893,
-     '5E2C9D4315971B31C83AFD7833C310501199C34F61BFD868EF07A6AEEF7BF1F0'),
+    ('test-reports-2026-10/evidence/harness/coverage.json', 244575,
+     'F0D37A6C72C9029C60B4124DAC5993E1E65321448C943555381C15ECD6BDB42D'),
     ('test-reports-2026-10/evidence/api/api_matrix.json', 1342834,
      '8451BB6738CCB25C41794E7B9548969D0EDDC8FE6EAE855DCC5F1D1CC746CB86'),
     ('test-reports-2026-10/26-阶段A收口-复核读数.json', 11994,
@@ -1192,6 +1211,19 @@ V12_UAT_ANCHOR_OLD = {
     'archived_copy': 'test-reports-2026-10/evidence/_phaseB-prefreeze/20261007-220640/uat/uat_chains.json',
     'trigger': 'V-12 / t13 追加链 A + 链 B/C 缺口后重跑（40 条 -> 46+ 条）',
     'command': 'uat_chains.py（UAT_RUN_ID=本 run）',
+}
+#: B13-00（2026-10-08）有意更新登记：evidence/harness/coverage.json 覆盖读数锚点（旧值 + 触发 + 归档位置）
+#: 依据 = A-70「有意更新三步」；前值字节已归档、登记册 append-only 记 entry no=1「重基线前」。
+V12_COVERAGE_ANCHOR_OLD = {
+    'bytes': 236893,
+    'sha256': '5E2C9D4315971B31C83AFD7833C310501199C34F61BFD868EF07A6AEEF7BF1F0',
+    'archived_copy': 'test-reports-2026-10/evidence/harness/_anchor-history/'
+                     'frozen-anchor-pre-b13-00.236893.5E2C9D43.json',
+    'registry': 'test-reports-2026-10/evidence/harness/_anchor-history/coverage-anchor-history.json',
+    'trigger': 'B13-00：冻结 coverage.json 仍是 A-70 之前的旧读数（6/14/101），与 LOCKED 108/116/0 互斥 '
+               '⇒ 直喂该档必假红（D-4/D-5/D-6）；用户授权在批次13 开工前重基线化。',
+    'command': "& '<py>' -B scripts/_sandbox_compat.py test-reports-2026-10/harness/measure_coverage.py "
+               '--no-request-probes --out "<仓库根>/test-reports-2026-10/evidence/harness/coverage.json"',
 }
 
 V12 = {'chain_a': {}, 'chain_b': {}, 'chain_c': {}, 'steps': [], 'other_steps': [],
@@ -2861,6 +2893,16 @@ def v12_build_ledger(result, summary):
             anchor_readings.append({'path': rel, 'bytes': sig['bytes'], 'sha256': sig['sha256'],
                                     'matches_captain': (sig['bytes'] == by
                                                         and sig['sha256'] == sha)})
+    # B13-00：coverage.json 这一锚点在 2026-10-08 被**有意更新**（A-70 三步），单独补 note 留痕。
+    for row in anchor_readings:
+        if row.get('path') == 'test-reports-2026-10/evidence/harness/coverage.json':
+            row['note'] = (
+                f"B13-00 有意更新（A-70 三步，2026-10-08）：旧 {V12_COVERAGE_ANCHOR_OLD['bytes']}/"
+                f"{V12_COVERAGE_ANCHOR_OLD['sha256']} -> 新 {row['bytes']}/{row['sha256']}；"
+                f"触发 = {V12_COVERAGE_ANCHOR_OLD['trigger']}；旧字节归档于 "
+                f"{V12_COVERAGE_ANCHOR_OLD['archived_copy']}（登记册 "
+                f"{V12_COVERAGE_ANCHOR_OLD['registry']} entry no=1「重基线前」）；"
+                f"命令 = {V12_COVERAGE_ANCHOR_OLD['command']}")
     artifacts = []
     for p in (V12.get('artifacts') or {}).values():
         artifacts.append(_v12_file_sig(p))

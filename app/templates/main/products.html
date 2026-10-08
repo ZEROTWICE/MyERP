@@ -19,11 +19,15 @@
         <button type="button" class="btn btn-success" onclick="document.getElementById('importFile').click()">
             <i class="fas fa-file-import"></i> 导入产品
         </button>
+        <button type="button" class="btn btn-outline-success" onclick="document.getElementById('importAlloyBomFiles').click()" title="导入「48页表格」BOM：可一次选中全部 48 个文件">
+            <i class="fas fa-file-excel"></i> 导入合金钢辙叉 BOM
+        </button>
         {% endif %}
         <button type="button" class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#exportProductModal">
             <i class="fas fa-file-export"></i> 导出产品
         </button>
         <input type="file" id="importFile" style="display: none" accept=".xlsx,.xls" onchange="importProducts(this)">
+        <input type="file" id="importAlloyBomFiles" style="display: none" accept=".xlsx,.xlsm" multiple onchange="importAlloyBom(this)">
     </div>
     {% endif %}
 
@@ -390,6 +394,7 @@
     </div>
 </div>
 
+<script src="{{ url_for('static', filename='js/alloy-steel-import.js') }}"></script>
 <script>
 // 添加产品
 function submitProduct() {
@@ -810,6 +815,73 @@ document.getElementById('importProductModal').addEventListener('hidden.bs.modal'
     document.getElementById('importProgress').style.display = 'none';
     document.getElementById('importResult').style.display = 'none';
 });
+
+// ---- 「48页表格」BOM 导入（每个文件一个型号总成，可一次上传全部 48 个）----
+// 与上面的「导入产品」模板不同：这条走原始 BOM 表，文件名即父件型号，
+// 子件按 图号 → 代码 → 名称 复用/新建 Product，再挂 ProductBOM。
+function importAlloyBom(input) {
+    const files = Array.from(input.files || []);
+    input.value = '';  // 立刻清空，同一批文件再选一次也能触发 change
+    if (!files.length) return;
+    const bad = files.filter(f => !/\.(xlsx|xlsm)$/i.test(f.name));
+    if (bad.length) {
+        Swal.fire({icon: 'error', title: '文件类型不支持', html: '只支持 .xlsx / .xlsm：<br>' + bad.map(f => escapeHtmlText(f.name)).join('<br>')});
+        return;
+    }
+    Swal.fire({
+        title: '导入合金钢辙叉 BOM',
+        html: `共选中 <b>${files.length}</b> 个文件<br><span style="font-size:.9em;color:#666">每个文件的文件名即父件型号；子件按 图号 → 代码 → 名称 复用或新建</span>`,
+        icon: 'question',
+        showDenyButton: true,
+        showCancelButton: true,
+        confirmButtonText: '正式导入',
+        denyButtonText: '先试运行（只出报告）',
+        cancelButtonText: '取消'
+    }).then(r => {
+        if (r.isConfirmed) uploadAlloyBom(files, false);
+        else if (r.isDenied) uploadAlloyBom(files, true);
+    });
+}
+
+function escapeHtmlText(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function uploadAlloyBom(files, dryRun) {
+    const formData = new FormData();
+    files.forEach(f => formData.append('files', f));
+    formData.append('dry_run', dryRun ? '1' : '0');
+    formData.append('replace_existing', '1');
+    formData.append('csrf_token', '{{ csrf_token() }}');
+
+    Swal.fire({
+        title: dryRun ? '正在试运行…' : '正在导入…',
+        html: `共 ${files.length} 个文件，请勿关闭页面`,
+        allowOutsideClick: false,
+        allowEscapeKey: false,
+        didOpen: () => Swal.showLoading()
+    });
+    fetch('{{ url_for("main.import_alloy_bom") }}', {
+        method: 'POST',
+        body: formData,
+        credentials: 'same-origin',
+        headers: {'X-CSRFToken': '{{ csrf_token() }}'}
+    })
+    .then(response => response.json())
+    .then(data => {
+        Swal.close();
+        if (!data.data) {
+            Swal.fire({icon: 'error', title: '导入失败', text: data.message || '服务器未返回报告'});
+            return;
+        }
+        showAlloyImportReport(data, dryRun, 'BOM');
+    })
+    .catch(error => {
+        Swal.close();
+        Swal.fire({icon: 'error', title: '导入失败', text: '网络错误或服务器异常，请重试'});
+        console.error('Alloy BOM import error:', error);
+    });
+}
 </script>
 
 <!-- 导入产品模态框 -->

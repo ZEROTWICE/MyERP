@@ -1,0 +1,578 @@
+# 80 · 开发与需求文档 × 实际进度 逐条对账总表（2026-10-08）
+
+| 项 | 值 |
+| --- | --- |
+| 交付物 | `test-reports-2026-10/80-开发与需求文档-实际进度逐条对账.md`（**新建**；本任务是「被取消的 t8」的重启件 t12） |
+| 作者 | 高级项目经理2（队 `myerp-reconcile-plan`）｜任务 `t12`／attempt `bd4846ac-f07e-44b2-868b-611e37d94f37` |
+| 产出时点 | 2026-10-08（本机本地时间） |
+| 工作目录 | `D:\workspace\wage_management_system - bak` |
+| 解释器 | `F:\Miniconda\envs\wage\python.exe`（Python 3.9.21） |
+| 对账对象 | `docs/开发与测试规划-2026-10-06.md` §1（批次3–11，**82 条 B 编号**）｜`test-reports-2026-10/70-第2轮收口与阶段C移交.md` §4/§10｜阶段C 产品问题 P1–P12｜文档漂移 D1–D24 + `AGENTS.md` |
+| 唯一事实来源 | **当前工作区源码**（源码与文档冲突时以源码为准，冲突一律登记为「文档漂移」） |
+| 输入稿（8 份，全部存在，**无领域未覆盖**） | `reconcile-2026-10-08/` 下：`00-共享事实底盘.md`（W0/t1）、`recon-arch.md`（W1/t2）、`recon-backend.md`（W2/t11）、`recon-frontend.md`（W3/t4）、`recon-requirements.md`（W4/t5）、`recon-product.md`（W5/t6）、`recon-docs.md`（W6/t7）、`recon-arbitration.md`（captain 仲裁件） |
+| 只读声明 | **未修改任何既有文件**（`app/`、`app/templates/`、`scripts/`、`docs/`、`AGENTS.md`、8 份输入稿全部只读）；本次唯一新增 = 本文件。`git status --porcelain --untracked-files=no` = **0 行** |
+| 真实库不变量（开工/收尾两次同值） | `app.db` = **2531328 B** / SHA256 = `F5DA2306BC31CBAB098AAD3774016D320A9B9AA3546F93418196AE9900E0F065` / mtime **2026-09-18 12:50:55** |
+| git HEAD | `534ce70b204c767feee551e8fd04e538374b1de8` |
+
+---
+
+## 0. 判定档位与引用纪律（本表自守，不得放宽）
+
+### 0.1 状态词（实现侧，五值，逐条只用其一）
+
+| 状态 | 判据 | 反例（不得判此） |
+| --- | --- | --- |
+| **已实现** | 有 `file:line` **且** 有行为读数（Δ/差分/调用图）或可复跑命令读数 | 「文件存在」「有函数定义」 |
+| **部分实现** | 主干在位，但计划的**某个具名判据**未满足（分支不可达 / 消费方缺失 / 文档未同步） | 把「缺前端」当整条已实现 |
+| **未实现** | 计划要求的落点**不存在**，或存在但**零调用点/零断言**（有探测无判据也算未实现） | 「有配置项」当「开关生效」 |
+| **计划内不做/不改/销项/不可本机做** | 计划明文「默认不做」，或计划前提已被源码证伪因而该条目应作废，或环境不具可做性（已登记） | 与「没做」混算 |
+| **无法核实** | 静态树不可判定，且需 git 历史／语义判读／浏览器／外部环境（**写明原因**） | 猜 |
+
+### 0.2 引用纪律（对下游 81- 与复核件的强制要求）
+
+1. **`file_exists` 级证据不判「已实现」**；`blocked`（A-63 第二步构建层晋升、C-07 实现）**不得折算 pass**；`smoke_test` **不得当验收替代品**。
+2. **同一事实不得出现两个数**：凡路由数／模板数／能力数／内联 role 数／`can()` 数／`BytesIO` 数／`_ENSURED_COLUMNS` 列数／create_all 差集，**必须连口径一起写**（口径分歧的历史见 `00-共享事实底盘.md` §6）。本文件 §5.3 为唯一数字表。
+3. 领域稿之间冲突**以 `recon-arbitration.md` 为准**；该件未覆盖的新冲突一律在本文件 §6 登记为「**待 captain 追加裁定**」，**本文件不单方面挑一个当结论**（§6 中凡同时给出源码实测读数者，仅为「源码侧取证」的呈现，不构成裁定）。
+4. 本文件引用他人读数时标注来源稿；**本次作者亲自复跑/取行的项**在证据格内标 `[本表实测]`。
+
+### 0.3 本次作者独立复核（`[本表实测]`，全部只读）
+
+| # | 复核项 | 命令/方法 | 读数 |
+| --- | --- | --- | --- |
+| V-1 | 真库三值（开工/收尾） | `(Get-Item app.db).Length` / `Get-FileHash` / `LastWriteTime` | `2531328` / `F5DA2306…0E0F065` / `2026-09-18 12:50:55`（两次一致） |
+| V-2 | 受跟踪文件修改数 | `git status --porcelain --untracked-files=no` | **0 行** |
+| V-3 | 未跟踪残留 | `git status --porcelain` | 4 条：`_probe_tmp/`、`docs/交接提示词-批次3开工-2026-10-06.md`、`docs/开发与测试规划-2026-10-06.md`、`test-reports-2026-10/reconcile-2026-10-08/`（+ 本文件产出后为 5 条） |
+| V-4 | 规划文档 B 编号完整性 | 正则扫 `docs/开发与测试规划-2026-10-06.md` 全文去重 | **84 个唯一串 = 82 条 + 2 个祖先标签**（`B3-07`、`B10-01`，前者出现在 B3-01 的「原编号前移」说明、后者出现在 v1.1 的「拆为 a/b/c」说明）⇒ **实条目 82 条**（清单见 §2.0） |
+| V-5 | `app/main` 含 `@bp.route` 的模块 | AST 逐文件 | **7 个模块 / 265 条**：`routes.py` 192、`quality.py` 27、`equipment.py` 15、`purchase.py` 13、`production_center.py` 7、`shipping.py` 6、`stock.py` 5（`sales_routes.py` 0、`forms.py`/`__init__.py` 0） |
+| V-6 | 内联 `current_user.role`（文本行口径） | 逐行扫 `app/**` | 命中 **Python 16 行**（其中 `app/permissions.py:7` 为 **docstring** ⇒ **代码实为 15 处**）+ **模板 2 行**（`quality/tasks.html:340`、`quality/task_detail.html:13`） |
+| V-7 | P2 缺 f 前缀 | grep `第{index+2}行导入失败` | `app/main/routes.py:4945`、`:5036` 两处**同字面量、无 `f`** ⇒ 落库为字面量 `第{index+2}行…` |
+| V-8 | 通知触发器调用点 | grep `def notify_` / `notify_* (` | 定义 5 个（`notification_service.py:430/457/484/506/528`）；**全仓调用点仅 1 处**：`routes.py:3601 notify_raw_substitution(` ⇒ B7-01/02/03 三条触发器**零调用点** |
+| V-9 | B5-01 读取点与计算点 | grep `piecework_amount` / `rework_counts_piecework` | 读取 `mes_service.py:1815`（唯一）；4 个计算点 `routes.py:1822`、`models.py:154`、`routes.py:400`、`routes.py:409` |
+| V-10 | 计划点名的两个门禁脚本 | `scripts/` 清单 + 全仓 grep | `scripts/` 仅 15 个 `.py` + `deploy.bat`；**无** `check_notification_triggers.py`、**无** `check_is_archived_policy.py`（全仓命中仅文档/探针产物） |
+| V-11 | B3-02 死文件 | `(Get-Item app\main\sales_routes.py).Length` | **1** 字节，且 `git ls-files app/main` 仍含它（仍被跟踪） |
+| V-12 | B8-10/B8-11 载体 | grep | `download_product_template` @`routes.py:7647`、`temp_path = None` @`:7650`；`save_temp_file` @`:5083`、`tempfile.mkdtemp()` @`:5085`；`cleanup_temp_files` @`:2180`（只删文件）、`@bp.before_request` @`:2203` |
+| V-13 | B8-01/02/03 谓词 | grep `is_archived` | 未统一：`routes.py:4797`(`is_(False)`)、`:4808`、`:6125`、`:12065`、`:12093`、`:12122`（后五处 `filter_by(is_archived=False)`）；已统一：`routes.py:6247`/`:6254`、`quality.py:744`、`mes_service.py:1562` |
+| V-14 | B4-07 两段提交缝 | grep + read | `quality.py:978 db.session.commit()` → `:981 mes_service.apply_inspection_result(record)` → `:990 db.session.commit()` |
+| V-15 | P7 类型校验 | grep | `quality.py:838 if template.type != task.target_type:`（严格相等，仍 400） |
+| V-16 | C-6 门禁漏传 | grep | `mes_service.py:351 allowed, reason = qc_gate_allows_output(batch_item=item, workpieces=workpieces)`（**无 `production_record` 实参**） |
+| V-17 | P3/P9/P10 载体 | grep | `routes.py:4232`/`:4255` `for key, value in log.old_data.items():`；`routes.py:2733 notes=data['notes']` ↔ `excel_generator.py:336-341` 字典 **无 `notes` 键**；取价三处 `routes.py:2718`（带 `effective_date`）/`:3902`/`:4020`（`filter_by(process_code).first()`） |
+| V-18 | B6-01/02/04 载体 | `read` 全文 | `nonconformities.html` **33 行**：`:12 {{ nc.type }}`、`:13 {{ nc.status }}`、`:14` 只认 `nc.workpiece_id`、`:15 {{ nc.handling_result }}`、`:17 {% if nc.status in ('open','pending_approval') %}`、`:18-23` 表单仅 csrf + 3 个 `action` 按钮 |
+| V-19 | B5-03 消费方 | grep `piecework_breakdown` | 定义 `mes_service.py:1812`，**唯一调用** `:1833`（`piecework_amount` 内部）⇒ 工资明细侧无消费方 |
+| V-20 | 静态门禁 6 项 | 见 §5.3 与 captain 2026-10-08 基线 | 6 项全 `exit 0`，逐字读数与 `00-共享事实底盘.md` §2 一致（本次未复跑请求型脚本） |
+
+### 0.5 ⚠ 取代声明（captain 追加裁定 `A-7` / `A-8`；**原值保留不删，append-only 补正**）
+
+> **本节由任务 `t15` 追加**（2026-10-08），目的：消除本文件 §1 与 `test-reports-2026-10/81-后续开发与测试规划.md` §1.1 之间的「同一事实两套起点数字」。
+> **本文件其余章节（§1.1「各档计入明细」、§2 的 82 行条目表、§3 阶段C、§4 P1–P12、§5 D1–D24/AGENTS.md/数字对账表、§6、§7 自检、§8）一字未改**；本节只提供**取代后的读法**。
+
+| 项 | 原值（本文件 §1.1 印刷值） | **被取代后的值（唯一有效口径）** | 依据 |
+| --- | --- | --- | --- |
+| **起点分布** | 已实现 **12** / 部分实现 **7** / 未实现 **54** / 计划内不做·不改·销项·不可本机做 **6** / 无法核实 **3** | **已实现 11 / 部分实现 5 / 未实现 57 / 计划内不做等 6 / 无法核实 3**（**合计仍 82**） | `recon-arbitration.md` 的 **`A-7`（批次8 档位）+ `A-8`（`B7-06` 档位）** |
+
+**被改判的条目（逐条给依据与理由）**
+
+| 条目 | 原档位（本文件 §1.1） | **改判后档位** | 依据与理由 |
+| --- | --- | --- | --- |
+| **`B8-07`** | 已实现（静态面） | **部分实现** | `A-7`：代码面已在位（`routes.py:304-305` 的分页白名单），但**缺验收载体**（「锁死」所需的常量/断言未加）⇒ 批次8 的正确档位为 **0 已实现 / 1 部分（`B8-07`）/ 1 不改（`B8-08`）/ 10 未实现 = 12**，**不得只写「0/12」** |
+| **`B7-06`** | 部分实现（形式成立、约束未落地） | **未实现** | `A-8`：「净增 = 0」是**现状描述**（因**未接线**故未新增），**不是完成证据**；`create_notification` 内部仍自带隐式 `commit`（`notification_service.py:121`） |
+| **`B8-05`** | 部分实现 | **未实现** | `A-7` 的批次8 口径：批次8 只有 `B8-07` 计入「部分实现」⇒ `B8-05`（可映射未映射 + 15 处无豁免注释）归**未实现** |
+| **`B8-12`** | 部分实现（代码在位、文档未改） | **未实现** | 同上（`A-7` 口径：批次8 无第二条「部分实现」） |
+
+**计数自洽校验**：`12 − 1 = 11`（`B8-07` 出「已实现」）｜`7 − 3 + 1 = 5`（`B7-06`/`B8-05`/`B8-12` 出「部分实现」，`B8-07` 入「部分实现」）｜`54 + 4 = 57`（上述四条入「未实现」）⇒ **`11 + 5 + 57 + 6 + 3 = 82`** ✓
+
+**配套影响（本文件其它章节不改，仅在此声明改判后的读法）**
+
+- §1.1「各档计入明细」表：**已实现（12）→ 11**（去掉 `B8-07`）；**部分实现（7）→ 5**（去掉 `B7-06`/`B8-05`/`B8-12`）；**未实现（54）→ 57**（加上这四条）；计划内不做等 **6** 与无法核实 **3** 不变。
+- §1.1「逐批分解」表：**批次7** 行「部分 1 / 未实现 6」→ **部分 0 / 未实现 7**；**批次8** 行「已实现 1 / 部分 2 / 未实现 8」→ **已实现 0 / 部分 1 / 未实现 10**（该行的「不改 1」＝`B8-08` 不变）；其余批次行不变。
+- §1.2 及其后任何引用五值分布之处，**一律以本声明为准**。
+- 与 `test-reports-2026-10/81-后续开发与测试规划.md` §1.1（`11 / 5 / 57 / 6 / 3 = 82`）**逐值一致**；读者单看本文件或单看 `81-` 均不会再得到冲突口径。
+- 若后续再有 captain 追加裁定 ⇒ **以其为准并追加同类声明**（**不得回改本文件的原值**）。
+- 关联：本文件 §6.3 的 `N-A1…N-A7` 已由 `A-6…A-13` 全部裁毕；本次改动只落 `A-7`/`A-8` 对**起点分布**的影响，其它口径（`A-6` 模块数 7/265、`A-9` `BytesIO` 13/16/17、`A-10` `P11` 部分关闭、`A-11` 10/11 条双口径、`A-12` 差集 31）已在 `81-` §6.3 落地，**本文件不改**。<br>⚠ **本文件其余「待裁定」口径亦已裁毕 ⇒ 见 `§9.3`（append-only 订正声明）**。
+
+---
+
+## 1. 一页结论
+
+### 1.1 整体完成度分布（**两个口径，不得互替**）
+
+**口径 A：按 82 条 B 编号的实现侧五值**（本表 §2 逐条判定）
+
+| 状态 | 条数 | 占比 |
+| --- | --- | --- |
+| **已实现** | **12**（原值）⚠ 已被 `A-7`/`A-8` 取代 → **11**，见 §0.5 取代声明 | 14.6% |
+| **部分实现** | **7**（原值）⚠ 已被 `A-7`/`A-8` 取代 → **5**，见 §0.5 取代声明 | 8.5% |
+| **未实现** | **54**（原值）⚠ 已被 `A-7`/`A-8` 取代 → **57**，见 §0.5 取代声明 | 65.9% |
+| **计划内不做／不改／销项／不可本机做** | **6**（不受 `A-7`/`A-8` 影响） | 7.3% |
+| **无法核实** | **3**（不受 `A-7`/`A-8` 影响） | 3.7% |
+| **合计** | **82** | 100% |
+
+> ⚠ **取代提示（captain `A-7` / `A-8`）**：上表**原值一律保留不删**（append-only 留痕）；经 captain 追加裁定后，**起点分布的唯一有效口径为 已实现 11 / 部分实现 5 / 未实现 57 / 计划内不做等 6 / 无法核实 3 = 82**。逐条改判与被改判的四个条目（`B8-07`、`B7-06`、`B8-05`、`B8-12`）见 **§0.5 取代声明**；与 `81-后续开发与测试规划.md` §1.1 逐值一致。
+
+**逐批分解**
+
+| 批次 | 条数 | 已实现 | 部分实现 | 未实现 | 计划内不做等 | 无法核实 |
+| --- | --- | --- | --- | --- | --- | --- |
+| 批次3 测试资产与工程纪律 | 6 | 1 | 0 | 5 | 0 | 0 |
+| 批次4 质检闭合 | 8 | 3 | 2 | 2 | 1 | 0 |
+| 批次5 返工计件与料账 | 6 | 5 | 0 | 1 | 0 | 0 |
+| 批次6 不合格处置可用性 | 7 | 0 | 0 | 7 | 0 | 0 |
+| 批次7 通知与审计回滚 | 7 | 0 | 1 | 6 | 0 | 0 |
+| 批次8 口径收口与残余 | 12 | 1 | 2 | 8 | 1 | 0 |
+| 批次9 文档纠偏 | 16 | 0 | 1 | 12 | 0 | 3 |
+| 批次10 治理与外部环境 | 14 | 2 | 0 | 8 | 4 | 0 |
+| 批次11 最终收口 | 6 | 0 | 1 | 5 | 0 | 0 |
+| **合计** | **82** | **12** | **7** | **54** | **6** | **3** |
+
+> ⚠ **受影响的逐批行（原值保留不删）**：**批次7** 行「部分 1 / 未实现 6」→ 按 `A-8` 应为 **部分 0 / 未实现 7**；**批次8** 行「已实现 1 / 部分 2 / 未实现 8」→ 按 `A-7` 应为 **已实现 0 / 部分 1（`B8-07`）/ 未实现 10**（该行「不改 1」＝`B8-08` 不变）。其余批次行不变；详见 §0.5 取代声明。
+
+**各档计入明细（供独立复核件逐条对账，避免「同一事实两个数」）**
+
+| 档 | 明确计入的编号（合计） |
+| --- | --- |
+| **已实现（12）** | `B3-01`｜`B4-01`、`B4-02`、`B4-03`｜`B5-01`、`B5-02`、`B5-04`、`B5-05`、`B5-06`｜`B8-07`｜`B10-01a`、`B10-01-边界`（后者的状态词为「符合边界要求（已满足）」） |
+| **部分实现（7）** | `B4-04`、`B4-05`｜`B7-06`｜`B8-05`、`B8-12`｜`B9-13`｜`B11-04` |
+| **未实现（54）** | `B3-02…B3-06`（5）｜`B4-07`、`B4-08`（2）｜`B5-03`（1）｜`B6-01…B6-07`（7；`B6-07` 计划标注「可选」）｜`B7-01…B7-05`、`B7-07`（6）｜`B8-01`、`B8-02`、`B8-03`、`B8-04`、`B8-06`、`B8-09`、`B8-10`、`B8-11`（8）｜`B9-01…B9-03`、`B9-06…B9-16`（12）｜`B10-01b`、`B10-02`、`B10-03`、`B10-07`、`B10-08`、`B10-09`、`B10-10`、`B10-11`（8；后两条计划即标「须先拍板」）｜`B11-01…B11-03`、`B11-05`、`B11-06`（5） |
+| **计划内不做/不改/销项/不可本机做（6）** | `B4-06`（计划内不做）｜`B8-08`（计划明确「默认不改」）｜`B10-01c`（计划内不做）｜`B10-04`（**销项**：计划前提已被源码证伪）｜`B10-05`（不可在本机做）｜`B10-06`（不立项） |
+| **无法核实（3）** | `B9-04`（需逐句语义判读）｜`B9-05`（需 git 历史）｜`B9-08`（未取得可判坐标 + 沙箱侧需非沙箱环境） |
+
+> 说明：批次4 的表格行序为 **`B4-01 → B4-03 → B4-02`**（遵循计划抬头 t6 F2 强制的批内执行顺序），非编号顺序，属有意为之。
+> 自证：按本表 §2 的 82 行状态列机械统计得「已实现 11 + 符合边界要求 1 = 12 / 部分 7 / 未实现 54 / 计划内不做等 3 + 销项 1 + 不可本机做 1 + 不立项 1 = 6 / 无法核实 3」＝ 82，与上表逐格一致。
+
+**口径 B：按「文档漂移」量纲**（与口径 A 不是同一量纲，**不得与上表相加**）
+
+| 漂移面 | 条数 | 状态说明 |
+| --- | --- | --- |
+| 批次9 的 16 条（`B9-01…B9-16`） | **16** | **0/16 已改**：13 条原文与旧数字逐字仍在位、1 条部分改（`B9-13`）、3 条静态不可核（`B9-04/05/08`） |
+| `D1–D24` | **24** | 15 条仍漂移；6 条部分修正（D2/D3/D4/D9/D13/D19）；1 条**订正方向本身错误**（D8）；1 条值两代过时（D10）；**无一条可判「无需处理」** |
+| `AGENTS.md` | **13** | 门禁表 **1 处硬错**（`:87` 的「退出码 3=入口缺失」与 `ci_gates.py:1138` 只有 0/1/2 不符）+ **12 处**与源码冲突/口径需收紧<br>⚠ **本行已被 `§9.1` 订正（append-only，原值保留）**：应为「**0 处硬错 + 1 处表述需补注**」，即 **1 处表述需补注 + 12 处**与源码冲突/口径需收紧 |
+| 需求状态列（`03`/`04`） | **32+1** | 32 条 REQ 中 15 条应订正（`F-01/F-03/F-02/F-05/F-06/F-07/C-02/L-01/M-01/K-06/E-07/E-08` 等）；`04` §8.1 自述（✅43/⚠15/❌19/—1）与 §3 状态列机械解析（✅37/⚠14/❌26/—1）**不自洽 6 条** ⇒ 本战役**第 6 次计数漂移** |
+
+> **一句话**：**批次4/5 的主体已落地且可行为级复核；批次3、6、7、8、9、10、11 与阶段C 绝大多数未开工**；文档层（批次9 + D1–D24 + AGENTS.md）与源码的差距仍是「规划 ≠ 现实」的根因。
+
+### 1.2 最关键的 5 个事实（各带证据）
+
+| # | 事实 | 证据（`file:line` / 读数） |
+| --- | --- | --- |
+| **F-1** | **批次4/5 不是「只接线」，有行为级证据**：`fail` ⇒ 建 NC + 回写 `quality_status='fail'` ⇒ 门禁拒；处置 `rework` 至 `done` ⇒ 复位放行（阳性对照成立） | `mes_service.py:736 def apply_inspection_result` → `:753-761` 分派在 `:763 if workpiece is None` **之前**；NC 构造 `:624-636`；回写 `:553-598`、写字段 `:596-597`；门禁 `:196-207`。行为读数：`nc_rows_delta=+1`、`quality_status: NULL→'fail'`、`allowed=false`；处置后 `allowed=true / quality_status='pass'` |
+| **F-2** | **返工计件开关是行为级生效的**（不是「有读取点」）：唯一读取点 `mes_service.py:1815`，四个工资计算点同口径 | `mes_service.py:1761-1766 def rework_counts_piecework()`；`excluded = set() if rework_counts_piecework() else rework_production_record_ids(records)` @`:1815`；S1 `routes.py:1822` / S2 `models.py:154` / S3 `routes.py:400` / S4 `routes.py:409`。行为读数：`false ⇒ 60.0`、`true ⇒ 160.0`（**Δ=100.0**），非返工记录两态均 `60.0`。**识别口径 = `R1 rework_task_id → R2 global_sn`**（`07b` DEC-2 §2.2），**不是**计划原文的 `notes` 前缀（该前缀无数据源） |
+| **F-3** | **报工链的门禁是结构性 fail-open**：`inbound_production_output` 调门禁时**漏传 `production_record`** ⇒ `record_ids` 恒空 ⇒ 门禁「序3 有在办单据 / 序4 未闭环 NC」两条拒绝路径**在报工路径永不生效**，真正生效的只有 `quality_status` 一根柱子 | 调用 `mes_service.py:351 qc_gate_allows_output(batch_item=item, workpieces=workpieces)`（**无 `production_record`**）`[本表实测]`；调用方 `routes.py:3712-3717` 亦不传；行为对照 `gate_without_production_record=true`（放行）vs `gate_with=true`（拒「产出存在未完成的质检任务」）。**这是 `REQ-E-07` 与 `recon-backend.md` 的正面冲突点**（§6 A-3） |
+| **F-4** | **批次6/7 基本零开工，且计划点名的门禁脚本根本不存在**：模板 33 行原样；4/5 通知触发器零调用点；审计回滚无级联、无守恒 | `nonconformities.html` 33 行（`:12/:13` 英文枚举、`:14` 只认工件、`:17-23` 全按钮）`[本表实测]`；`notify_task_assignment`/`notify_inventory_warning`/`notify_process_change`/`notify_spec_change` 定义 `notification_service.py:506/484/430/457`，**调用点 0**（全仓仅 `routes.py:3601 notify_raw_substitution(`）`[本表实测]`；回滚 `delete` 分支 `routes.py:4252-4273` 只 `add(new_record)`，无级联；`scripts/check_notification_triggers.py`、`scripts/check_is_archived_policy.py` **全仓不存在** `[本表实测]` |
+| **F-5** | **构建层与 C-07 仍 `blocked`，不得折算 pass；而「迁移链已收敛」与「真库已 stamp」是两件事** | `Jenkinsfile` 生效 `error()` = **0** 行（`:112`/`:122` 仍注释态）；`.github/workflows/docker-deploy.yml:19` 仍 `continue-on-error: true`、`:57` 无 `needs: gate`；`ci_gates.py:117-132` `state='blocked'`、`not_counted_as_passed=True`；`harness/r2_c07_probe.py` 自陈 `blocked_no_guard`；真库 `alembic_version` 只读读出 `f179636cecf0`（**未** stamp 到 `p1nonctarget`） |
+
+### 1.3 最严重的 5 个风险（按「业务破坏力 × 已发生程度」排序）
+
+| # | 风险 | 为什么严重 | 证据与剩余动作 |
+| --- | --- | --- | --- |
+| **R-1** | **资金：取价口径三处不一致 + 生产记录导入 0 条入库** | 同一 `process_code` 在不同链路取到**不同版本**的工价 ⇒ **计件工资算错**；且导入功能**完全不可用**（每次 0 条） | 取价：`routes.py:2718`（`process_code == … AND effective_date <= … ORDER BY effective_date DESC`）vs `:3902`/`:4020`（`filter_by(process_code).first()`）`[本表实测]`；实测两处取到 `3487` vs `3488`。导入：`routes.py:2733 notes=data['notes']` ↔ `excel_generator.py:336-341` 字典**无 `notes` 键** ⇒ `KeyError: 'notes'` ⇒ 0 条 `[本表实测]`。**P10，业务侧 P0 / 技术侧 P2 → 冲突 X-1 类** |
+| **R-2** | **库存账实不符：报工路径报废不产生 `scrap` 台账行** | 报废「状态已置 `scrapped`、台账无行」⇒ 报废件数无法统计、报废库与实物不一致（**P9**）；且「不做报废成本台账」（N-12）的措辞会把这个库存台账需求挡回去 | `mes_service.py:1121-1143`：`:1125 if wp:` 是唯一写台账入口 ⇒ `workpiece_id IS NULL` 的报工路径 NC **不写行**；行为读数 `scrap_rows_delta=0`（`bi.status='scrapped'`、门禁仍拒）。**须先把 N-12 收窄为「不做金额台账」**（§6 拍板项 2） |
+| **R-3** | **可追溯性存在「假可回滚」面**：审计行 `target_id=NULL` 而 `can_rollback=true` | 审计表标记可回滚但目标不可寻址 ⇒ 回滚**点了就 404**；`old_data IS NULL` 时抛 `AttributeError` ⇒ **HTTP 500**（计划要求 400 + 原因）；无级联、无守恒 | 真库旁证 `audit_log` **73 行 / `target_id IS NULL` 40 行 / 其中 `can_rollback=1` 10 行**（`id=7,8,12,15,24,29,40,44,68,73`）；无 flush：`routes.py:5149→:5152-5159`、`quality.py:625→:628-635`（对照三处**有** flush：`routes.py:564/1734/4420`）；`routes.py:4232`/`:4255` `log.old_data.items()`；**守恒前置判定结论：`old_data` 不含扣料/子行（真库命中 0）⇒ 守恒在既有数据上不可实现** |
+| **R-4** | **质量闭环「落了库、办不完」+ 来料检 UI 死锁 + 离线部署风险** | 批次6 六条 UI 判据全红 ⇒ 业务人员看不到中文、看不出目标、被静默指派、来料检点返工必 400；P7 三方口径互斥 ⇒ **来料检在 UI 上无法完成**；Bootstrap 核心 CSS/JS 走 **jsdelivr CDN**（`BOOTSTRAP_SERVE_LOCAL` 全仓未设）⇒ 内网/离线页面丢样式与交互 | `nonconformities.html:12/13/14/15/17/18-23` `[本表实测]`；`stock.py:123`（`limit(200)`、不读 `request.args`）；`quality.py` 全文 `nonconform` 命中仅 `:7` import、详情 `record_data` 无 `nonconformity` 键 ⇒ `records.html:404-430` 恒走 else；P7 三处：`04` 文档 A4、`quality.py:838`、界面 3 处枚举缺席；CDN 见 §6 A-1（**内网风险须登记**） |
+| **R-5** | **原子性/静默失败面**：质检结论两段提交缝、报工 7 处内层 `try/except` 吞失败、导入整单拒绝与上传残留 | 可出现「结论已提交、NC/门禁未落地」「扣了料但没计件」这类**静默的账实不符**；导入侧直接违反 `AGENTS.md` 的「行级容错」明文纪律 | `quality.py:978 commit → :981 调用 → :990 commit` `[本表实测]`（B4-07，**未做故障注入⇒中高置信**）；`routes.py:3474-3476/3527-3528/3555-3556/3607-3608/3659-3661/3684-3685/3750-3751` 七处（P6）；`routes.py:2061-2066` 整单拒绝（实测 3 好+2 坏 ⇒ `employee Δ=0`）；`routes.py:4000-4006`/`:2171-2176` 两场景残留（实测 `residue_exists=true`） |
+
+---
+
+## 2. 批次3–11 全部 82 条 B 编号逐条对账总表
+
+### 2.0 编号完整性与「一条不漏」自证
+
+| 批次 | 编号区间 | 条数 |
+| --- | --- | --- |
+| 批次3 | `B3-01…B3-06` | 6 |
+| 批次4 | `B4-01…B4-08` | 8 |
+| 批次5 | `B5-01…B5-06` | 6 |
+| 批次6 | `B6-01…B6-07` | 7 |
+| 批次7 | `B7-01…B7-07` | 7 |
+| 批次8 | `B8-01…B8-12` | 12 |
+| 批次9 | `B9-01…B9-16` | 16 |
+| 批次10 | `B10-01a`/`B10-01b`/`B10-01c` + `B10-01-边界` + `B10-02…B10-11` | 14 |
+| 批次11 | `B11-01…B11-06` | 6 |
+| **合计** | | **82** |
+
+自证：正则扫规划文档全文得 84 个唯一 B 串 = **82 条实条目 + 2 个祖先标签**（`B3-07`：出现在 B3-01 的「原 B3-03…B3-07 → 现 B3-02…B3-06」说明；`B10-01`：出现在 v1.1 的「原 B10-01 拆为 a/b/c」说明）`[本表实测 V-4]`。本节表格 **82 行**，与上表逐条对应。
+
+### 2.1 批次3 —— 测试资产与工程纪律加固（`B3-01…B3-06`；承接：后端 + 验证）
+
+| 编号 | 计划要求（摘要 + 计划给的原 file:line） | 实测状态 | 证据（实测 file:line / 命令读数） | 剩余工作 | 承接角色 |
+| --- | --- | --- | --- | --- | --- |
+| **B3-01** | 三条请求型脚本统一加 `--no-dump`/cwd 重定位：不写仓库根 JSON 时 exit code 必须反映断言结果（原：`smoke_test.py:186`、`permission_matrix.py:129`） | **已实现** | `smoke_test.py:90-91 default_out()` ⇒ `.tmp/<RUN_ID>/`（绝对路径、与 cwd 无关）+ `:264-266` `--out`/`--no-dump`；`permission_matrix.py:82-84` 同形态 + `:402-411` 四参数 + `:117-127` 写盘失败只 `[WARN] 落盘失败（不影响退出码）` + `:376` 退出码只由 `anon_open`/`face_failures` 决定；**`functional_test.py` 本就不落盘**（`json.dump` 仅在 `:342` 行内数据 + `:489` stdout） | 无（本项收口）。可选项：把三条脚本的 `--no-dump` 写进 CI 命令模板 | 后端 + 验证 |
+| **B3-02** | `git rm` 掉 `app/main/sales_routes.py`（1 字节、0 路由、0 引用） | **未实现** | `(Get-Item app\main\sales_routes.py).Length` = **1**；`git ls-files app/main` ⇒ 10 个文件仍含它 `[本表实测 V-11]`；AST 路由 0 | 删除该文件；连带解锁 `B9-03`/`B9-16`/`B11-03` 的「已删除」表述 | 后端（+ 运维/文档） |
+| **B3-03** | 给 `flask db *` 加前置校验：`DATABASE_URL` 未指向副本/未显式允许时拒跑 | **未实现**（且无替代落点） | 全仓无 `scripts/check_db_url_guard.py`；`@app.cli.command` 只有 `app/__init__.py:238 init-db`（`:242-255` 无 URI 断言）；启动链 `:156-224` 无闸（`_ensure_schema` 定义 `:103`、`db.create_all()` `:107`、调用点 `:224`）；唯一「参考实现」在探针内注入（`harness/r2_c07_probe.py:153/183-184/192`，不改生产代码） | **与阶段C §10.2 C-07 是同一件事，建议合并为一项**；落点 `app/__init__.py:156-224`；前置：生产面冻结解除 | 后端 + 运维 |
+| **B3-04** | 把 `docs/交付说明-P0P1.md §6.2 第 9 项` 的老库升级命令做成一次性脚本 | **未实现** | 全仓 `*upgrade*`（排除 `migrations/versions`）仅命中仓库根 `merge_and_upgrade.py`（2024 老物）；`scripts/` 下无老库升级脚本；已有 `scripts/migrate_sqlite_to_postgres.py` 是 **SQLite→PG**（`:1-9` docstring），**不是**「启动自愈 + `flask db stamp p1nonctarget`」路径 | 新建脚本，或显式登记「不做」并给出人工命令块 | 运维/文档 + 后端 |
+| **B3-05** | 在 `permission_matrix.py` 增「内联 role 计数 ≤ 白名单（15+2 带行号）」断言 | **未实现**（有探测、无断言） | `permission_matrix.py:156-157` 只做分类标记 `kinds.append('inline_role_check')`；`:376` 退出码只由 `anon_open` + C-06 `face_failures` 决定；`:377-384` 两个 `[FAIL]` 分支均不含 inline role 计数。**白名单可直接引用**：`routes.py:337/340/350/654/5983` + `quality.py:46/82/104/120/529/822/911/1217/1277/1347` = 15；`quality/tasks.html:340`、`quality/task_detail.html:13` = 2 `[本表实测 V-6]` | 新增白名单常量（含行号）+ 越界即失败；**判据须双向**（白名单外新增 1 处 ⇒ 非 0；删白名单内 1 处 ⇒ 仍 0） | 后端 + 验证 |
+| **B3-06** | 把「31 张 create_all 表」与「13 文件无条件 create_table」作为脚本化对拍 | **未实现** | `scripts/`+`harness/` 内唯一涉 `create_all` 判据的是 `r2_c07_probe.py`（判 C-07 抛错点，与 31 表无关）；`check_migration_heads.py` 只数 head（`:31-34`）。手工复算：迁移文件 **35**；含 `create_table` **字面表名口径 13 文件/13 修订、AST 调用口径 14 文件**；调用总数 54；有 `has_table` 守卫仅 **3** 个（⇒ **无条件者 11 文件**）；`c02604883c72` **24 处**；模型类 **74** | 新增对拍脚本（表集合差集 + 无条件 create_table 分类）并进门禁表 | 后端 + 验证 |
+
+### 2.2 批次4 —— 无工件报工的质检结论落地（`B4-01…B4-08`；批内顺序 **B4-01→B4-03→B4-02**；承接：质检域 + 后端 + 验证）
+
+| 编号 | 计划要求（摘要 + 计划原 file:line） | 实测状态 | 证据（实测 file:line / 行为读数） | 剩余工作 | 承接角色 |
+| --- | --- | --- | --- | --- | --- |
+| **B4-01** | `apply_inspection_result` 对 `production_record` 目标**不再早退**：`fail` ⇒ 建 `NonconformityRecord`（按 `target_type` 区分）；`pass` ⇒ 不建。原：早退 `mes_service.py:421-422`、NC 创建仅 `:454`/`:557` | **已实现** | `mes_service.py:736 def apply_inspection_result`；`:753-761` 分派 `elif task.target_type == 'production_record': apply_production_record_result(record, task); return`（**在 `:763 if workpiece is None:` 之前**）；`:763-764` 早退**仅对工件路径**；NC 构造 `:624-636`（含 `target_type='production_record'`/`target_id`/`workpiece_id=None`）；工件路径 `:796-808`。**行号偏移**：`:421-422` → 该早退对 production_record **已不存在**；`:454/:557` → `:624/:796`（+170/+239）。行为：`nc_rows_delta=+1`、`target_type='production_record'`、`target_id=rec.id`；`pass` 分支不建单 | 无（结构闭合）。建议把「fail 必须建 NC」加入常驻门禁（当前载体 `negative_matrix.py` **不在链**） | 质检域 + 验证 |
+| **B4-03** | 质检结论**自动回写** `ProductionBatchItem.quality_status`（**B4-02 的前置**）。原：唯一写入点 `routes.py:8898-8899`（人工 PUT） | **已实现** | 自动写点 `mes_service.py:553 def recompute_production_quality_status`；写字段 `:596-597`；调用点 `:640`（结论落地）/`:667`（处置闭环复位）；日志 `:641-642`（「质检结论落地：生产记录 … → 实例 … quality_status=」）与 `:668-669`。人工通道仍在：`routes.py:8926-8927`（**计划 `:8898-8899` → 实测 +28**）。行为：`NULL → 'fail'`；处置 `done` 后 → `'pass'` | 人工 PUT 与自动写点并存 ⇒ 需在文档/界面明确「人工只作纠正」（`07b` DEC-1 §1.5-4 已写口径，**代码无提示**） | 质检域 + 后端 |
+| **B4-02** | `fail` 后**门禁生效**：后续产出被拒入正品库并给出可读原因。原：门禁 `mes_service.py:169-172` | **已实现（拒绝路径可达，但报工链只有一条柱子）** | 门禁 `mes_service.py:157 def qc_gate_allows_output`；batch_item 分支 `:196-207`（`:199-200 quality_status in ('fail','failed','rejected') ⇒ 拒`；`:201-202 status=='scrapped' ⇒ 拒`；`:203-207 pending 且有在办单据 ⇒ 拒`；`:209-212 有在办质检任务/未闭环 NC ⇒ 拒`）；报工链调用 `routes.py:3711-3717` → `mes_service.py:351`。**偏移**：`:169-172` → `:196-207`（+27）。行为：fail ⇒ 拒（可读原因）；处置 done ⇒ 放行；报废 ⇒ 仍拒。**结构缺口**：报工路径不传 `production_record` ⇒ `record_ids=[]` ⇒ 序3/序4 不命中（结构见 §1.2 F-3） | ① 验收必须按「fail 回写后再报工」构造（**不得**靠「已建质检任务」）；② 若要「报工产出存在未完成质检任务也拦」，须先拍板补传 `production_record`（**属口径变更，与 `REQ-E-07` 冲突**，§6 拍板项 1） | 质检域 + 后端 + 验证 |
+| **B4-04** | `/quality/nonconformities` 能查到报工路径的不合格，且能看出对应哪张生产记录。原：`stock.py:113-118`（`:117` 全量取前 200） | **部分实现** | 列表路由 `stock.py:119-124`：`:123 items = NonconformityRecord.query.order_by(id.desc()).limit(200).all()`（无筛选 ⇒ `target_type='production_record'` 的行**能查到**）；模板 `nonconformities.html:14` 只认 `nc.workpiece_id` ⇒ production_record 路径（`workpiece_id IS NULL`）**只显示 `-`**，看不出对应哪张生产记录 `[本表实测 V-18]`。**偏移**：`:113-118`/`:117` → `:119-124`/`:123`（+6） | 列表页按 `target_type` 渲染目标列（`production_record` ⇒ 显示 `global_sn` 并给链接）；**与 B6-02 是同一处改动** | 前端 + 后端 |
+| **B4-05** | 处置动作对报工路径可用（返工 ⇒ 新建任务；报废 ⇒ 入报废库台账）。原：`mes_service.dispose_nonconformity`（返工 `:704-719`、报废 `:722-734`） | **部分实现**（返工 ✅；**报废台账仅对有工件路径成立**） | 入口 `mes_service.py:1029-1030`；返工分支 `:1069-1119`（`:1088 task_notes=f'返工 不合格单#{nc.id}'`、`:1091-1101` 建 `TaskAssignment`、`:1105 nc.rework_task_id`、`:1117 nc.status='done'`）；报废分支 `:1121-1143`（`:1125 if wp:` → `inbound_workpiece(..., stock_kind='scrap', quantity=pieces)`、`:1133-1134` 扣料、`:1138 item.status='scrapped'`）；端点 `stock.py:95-104`。**偏移**：`:704-719`/`:722-734` → `:1069-1119`/`:1121-1143`（+365/+399）。行为：返工件数正确；报废扣料正确但 `scrap_rows_delta=0` | ① 报工路径报废补 `scrap` 台账（**与 P9 同一条**）；② 返工工序/员工缺省仍静默落 `Employee.query.first()`（`:1073-1084`）⇒ 与 B6-03 配套修 | 后端 + 质检域 |
+| **B4-06** | **本轮不做**「产出行按次拆分」前置项（除非 Q-1 选 B） | **计划内不做（符合）** | 全仓无按次拆分实现；现存形态即 Q-1 默认 A（阻断 + 登记）：门禁拒 + NC 登记（`mes_service.py:196-212`、`:624-636`） | 无；建议在 81- 里把「Q-1 选 A」**显式登记为已决**，防下一轮误判为遗漏 | 质检域（登记） |
+| **B4-07** | **事务/原子性**：`fail` 处置（建 NC + 回写 `quality_status` + 库存动作）必须同事务或显式声明分步补偿，禁止「NC 已建但门禁未生效」中间态。原：`routes.py:3679-3737`（`begin_nested()` 模式可复用） | **未实现（存在两段提交缝）** | `quality.py:978 db.session.commit()` → `:981 mes_service.apply_inspection_result(record)`（**NC 创建 + 回写在此调用内**）→ `:990 db.session.commit()`；异常出口 `:997-1002`（`rollback()` + 500）`[本表实测 V-14]`。对照：报工链**有**嵌套事务 `routes.py:3711 with db.session.begin_nested():`。**偏移**：`:3679-3737` → `:3711-3717`（+32） | 把结论落地纳入同一事务（`:981` 前移或 `:978` 只 `flush()`），并**显式声明**边界（文档 + 注释）；**本轮未做故障注入 ⇒ 「中间态可否被外部触发」为中高置信** | 后端 + 验证 |
+| **B4-08** | 两条生产链产出计数一致性对拍：报工路径（`quantity=task.quantity` 一行批量）与工件路径（单件 1 行）入库后**件数合计必须相等**（对拍脚本纳入本批验收）。原：`routes.py:3700-3704` vs `mes_service.py:210-243` | **未实现** | 报工路径 `routes.py:3712-3717`（`quantity=task.quantity`）；工件路径 `mes_service.py:225 def inbound_workpiece(..., quantity=1)`（默认 1 件）；**对拍脚本不存在**：`scripts/` 15 个 `.py` 与 `harness/` 内无任何件数守恒/双链对拍脚本；`w2w3_probe` 仅单链格（N3/N4/A1/A2）。**偏移**：`routes.py:3700-3704` → `:3712-3717`；`mes_service.py:210-243` → `:225-270`<br>⚠ **本格已被 `§9.4-F4` 收窄（append-only，原值保留）**：`harness/` 内**有**命名为「件数守恒」的既有判据（`harness/uat_chains.py:403` `P0-1.9`、`:913` `P0-4.5`）⇒ 原措辞「**无任何**件数守恒/双链对拍脚本」**过宽** | 新增对拍脚本（建议进门禁链）：判据 = 同一订单/实例两条链 `fg` **件数合计**相等（**禁止用行数**，见 `业务流程现状与缺口.md` §6.1） | 后端 + 验证 |
+
+### 2.3 批次5 —— 假开关接线与工资/料账正确性（`B5-01…B5-06`；承接：后端 + 财务口径 + 验证）
+
+> **口径迭代提示**：计划正文写的 F1 修法是 `join(TaskAssignment, global_sn==)` + `TaskAssignment.notes.like('返工 不合格单#%')`；**实测实现采用更晚的 `07b` DEC-1/DEC-2 裁定 = R1 `NonconformityRecord.rework_task_id` → R2 `global_sn`**（`notes` 前缀降为提示）。二者目标一致、实测判据更强，**不记为未实现**，但**规划文本须回填**。
+
+| 编号 | 计划要求（摘要 + 计划原 file:line） | 实测状态 | 证据（实测 file:line / 行为读数） | 剩余工作 | 承接角色 |
+| --- | --- | --- | --- | --- | --- |
+| **B5-01** | 接线 `quality.rework_counts_piecework`：默认 `false` 不计件、`true` 计件。原：**零读取点**（`models.py:2603` 唯一命中；求和 `routes.py:1815`） | **已实现（行为级）** | 唯一读取点 `mes_service.py:1761-1766 def rework_counts_piecework()`（`:1763 SystemConfig.get('quality.rework_counts_piecework', False)`，字符串兜底 `'1/true/yes/on'`）；开关种子 `models.py:2606-2612`（`value='false'`）；**4 个工资计算点全部改为调用共享函数**：S1 `routes.py:1822`、S2 `models.py:154`、S3 `routes.py:400`、S4 `routes.py:409` `[本表实测 V-9]`；模板侧 grep `rework_counts_piecework` = 0。**偏移**：`routes.py:1815` → `:1822`（+7）；`models.py:2603` → `:2606`（+3）。行为：`false ⇒ 60.0`、`true ⇒ 160.0`（**Δ=100.0**） | 无（代码侧）。建议把「双向差分 + 阴性对照」做成常驻门禁脚本（计划 §3.3 T-B 的脚本**不存在**） | 后端 + 财务口径 |
+| **B5-02** | 返工记录识别链路（F1 修正后形态）；**不新增列** | **已实现**（判据升级 R1→R2） | `mes_service.py:1758 REWORK_NOTE_PREFIX`；`:1769-1775 rework_task_ids()`（**R1**：`NonconformityRecord.rework_task_id` 非空集合）；`:1778-1785 rework_task_global_sns()`（**R1→R2**）；`:1788-1794 rework_production_record_ids(records)`；判定 `:1812-1824 piecework_breakdown`，关键行 `:1815 excluded = set() if rework_counts_piecework() else rework_production_record_ids(records)`；R3 提示 `:1804-1809`；返工任务 `global_sn` 由 `models.py:374-377` 生成、报工建记录带 `global_sn=task.global_sn`（`routes.py:3399-3405`，计划记 `:3392-3398`，+7）。**未新增列**（`check_properties` 期望值未变） | ① **R3（notes 前缀）不参与判定**：若 NC 未写 `rework_task_id`（如工序/员工推不出而不建返工任务，`mes_service.py:1112-1116`），工资侧不会剔除 ⇒ 需 A/B 断言覆盖该支路；② **规划文本须按实测口径回填**（含 `notes.like` 段落） | 后端 + 验证 |
+| **B5-03** | 工资明细**可区分**返工产量（哪些是返工、哪些正常） | **未实现** | `mes_service.py:1812 def piecework_breakdown`，**唯一调用** `:1833`（`piecework_amount` 内部）`[本表实测 V-19]` ⇒ 无消费方；`routes.py` 仅取标量（`:400/:409/:1822`）；模板 `salary_calculation.html:59-72/88-120` 只渲染汇总列；全仓模板 grep `返工` 或 `rework` 仅命中 `nonconformities.html:20` 按钮与 `admin_dashboard.html:601` 图表标签 | 后端已就绪（返回 `(counted, dropped, excluded)`）：把 `dropped/excluded` 透传到明细接口 + 模板加一列。**业务侧要求提到 P1（直接涉及发钱）** | 后端 + 前端 + 财务口径 |
+| **B5-04** | 报废扣料**按实际消耗**（替代 `mat.quantity - 1`）；按 F3 五条取数规则。原：`mes_service.py:729-732 max(0, mat.quantity - 1)` | **已实现** | **硬编码已不存在**（全仓 grep `quantity - 1`/`mat.quantity` 仅命中 `:1202-1205` 的 BOM 装配扣料）。取值链 `mes_service.py:673-700 def scrap_material_plan`：① `:683-690` 逐行 `ProductionRecordMaterial` 按 `raw_material_id` 合并求和；② `:691-692` 兜底 `raw_material_quantity`；③ `:693-699` 两者皆无 ⇒ **空清单 + warning（不扣料）**；扣减 `:703-733 def deduct_scrap_materials`（`:721-722` 单件量×件数、`:724-729` 夹紧 0 + warning、`:730` 写回）；调用点 `:1133-1134`。行为：`3.0×2 → −6.0`、`4.0×2 → −8.0`、**对照料 Δ=0** | 无（代码侧）。`w2w3_probe` 的 AC-29-b/-d 载体**未回写断言账本** ⇒ 归阶段C 台账动作 | 后端 + 验证 |
+| **B5-05** | 返工任务**件数不再固定 1**（或明确「由处置时填写」）。原：`mes_service.py:708`（`quantity=1`） | **已实现** | `mes_service.py:1007-1026 def rework_quantity_for(nc, workpiece, explicit=None, production_record=None)`：`:1012-1019` 显式入参（≤0/非整数 ⇒ `ValueError` ⇒ 端点 400）；`:1022-1025` 来源生产记录 `quantity`（返回留痕说明）；`:1026 return 1, '件数取默认值1（未找到来源生产记录）'`（**兜底留痕，非静默**）；入参透传 `stock.py:93/101`；调用 `:1085-1090`。**偏移**：`:708` → `:1026`（+318）。行为：显式 7 ⇒ `quantity=7`；缺省 ⇒ `quantity=5`（来源记录） | 无（代码侧）。`rework_quantity` 目前是端点可选入参、**UI 无输入框** ⇒ 与 B6-03 一并补 | 后端 + 前端 |
+| **B5-06** | 报废成本口径**登记**（`nc.scrap_cost` 单字段、无台账；本批只登记不做台账）。原：`mes_service.py:723` | **已实现（按计划仅登记）** | `mes_service.py:1123 nc.scrap_cost = scrap_cost or 0`（生产路径）与 `:976`（来料检路径）；模型 `models.py:944 scrap_cost = db.Column(db.Float, default=0)`；启动自愈登记 `app/__init__.py:77 ('scrap_cost','FLOAT')`；全仓无成本台账/汇总表（grep `scrap_cost` 11 处全为入参/写入/日志）。**偏移**：`:723` → `:1123`（+400）。行为：`nc_scrap_cost=12.5` 可写入 | 无（本批口径即「只登记」）。**注意**：若后续做成本台账属新口径（**与 P9 的库存台账行不是一回事**，见 §4-P9） | 后端 + 财务口径 |
+
+### 2.4 批次6 —— 不合格处置的「能看懂、能办完」（`B6-01…B6-07`；承接：前端 + 后端 + 验证）
+
+> **本批后端侧几乎零开工**（`recon-backend.md` §3 与 `recon-frontend.md` §2 独立复核一致）：模板仍 **33 行**最小页；列表路由无筛选；详情接口无 `nonconformity` 键。以下行号**全部未漂移**（与计划一致）。
+
+| 编号 | 计划要求（摘要 + 计划原 file:line） | 实测状态 | 证据（实测 file:line） | 剩余工作 | 承接角色 |
+| --- | --- | --- | --- | --- | --- |
+| **B6-01** | 「类型/状态」显示**中文**（AC4.1）。原：`nonconformities.html:12`/`:13` | **未实现** | `:12 <td>{{ nc.type }}</td>`、`:13 <td>{{ nc.status }}</td>`（直接渲染英文枚举）；**另有 `:15 <td>{{ nc.handling_result }}</td>` 同样未中文化**（AC4.1 未点名，属同一口径面）`[本表实测 V-18]`。后端已有可复用口径：`NonconformityRecord.target_label`（`models.py:954-961`）与 `mes_service.INCOMING_NC_LABELS`（`:816`） | 加枚举→中文映射（后端字典或 Jinja 过滤器）；AC4.1 判据：DOM 可见文案不再出现 `open`/`pending_approval`/`rework`/`scrap`/`accept`（可留在 `value`/`data-*`） | 前端 + 后端 |
+| **B6-02** | 来料检不合格行可**跳转到到货单/采购单**（AC4.2）。原：`nonconformities.html:14` | **未实现** | `:14` 只 `{% if nc.workpiece_id %}` 给工件链接，`{% else %}-{% endif %}`；来料检 NC 的 `workpiece_id` 为 NULL（`models.py:926` 注释、`mes_service.nonconformity_target` `:819-835`）⇒ 该列恒显示 `-` `[本表实测 V-18]` | 按 `target_type` 分支渲染：`goods_receipt` ⇒ 到货单/采购单链接；`production_record` ⇒ 生产记录链接（**与 B4-04 同一处改动**） | 前端 + 后端 |
+| **B6-03** | 返工必须能**选工序与员工**；未选给可读提示（AC4.3）。原：`nonconformities.html:18-23` 不带参数 ⇒ 落到 `mes_service.py:697-703` | **未实现** | `:18-23` 表单只含 `csrf_token` + 三个 `name="action"` 按钮（**无 `rework_process_id`/`employee_id`/`rework_quantity`/`scrap_quantity` 任何输入**）`[本表实测 V-18]`；服务端缺省链 `mes_service.py:1073-1084`（员工：来源记录 → `Employee.query.filter_by(user_id=current_user.id).first() or Employee.query.first()`）⇒ **仍会静默指派第一个员工**。端点侧已就绪：`stock.py:89-102` 支持四入参透传 | 表单补 2 个必填下拉（工序/员工；数据源 `/api/quality/processes` `quality.py:696`、`/api/quality/inspectors` `quality.py:669` 对 inspector 均开放）+ 未选返回 400 可读提示；**只缺前端与必填校验** | 前端 + 后端 |
+| **B6-04** | 不适用动作**不提供按钮**或明确说明（AC4.4）。原：`nonconformities.html:17`；来料检点返工走 `mes_service.py:604-605` 抛错 | **未实现** | `:17 {% if nc.status in ('open','pending_approval') %}` ⇒ 未闭环单**都**显示三按钮（含来料检）`[本表实测 V-18]`；服务端 `mes_service.py:1041-1043`（`target_type=='goods_receipt'` → `dispose_incoming_nonconformity`）→ `:946-947 if action not in INCOMING_NC_ACTIONS: raise ValueError('来料检不合格仅支持退货/让步接收/报废处置')` → 端点 `stock.py:110-112` ⇒ **HTTP 400**。**偏移**：`:604-605` → `:946-947`（+342） | 模板按 `target_type` **条件渲染动作集**（来料检只给退货/让步接收/报废）；后端文案继续兜底 | 前端 + 后端 |
+| **B6-05** | 让步审批人可按「待审批」**筛选**（AC3.2）。原：`stock.py:117` 全量前 200、无筛选 | **未实现** | `stock.py:122-124`：`:123 items = NonconformityRecord.query.order_by(id.desc()).limit(200).all()` → `:124 render_template(...)`（**路由完全不读 `request.args`**）；模板无筛选控件；审批机制 `mes_service.py:1055-1067`（`accept`：角色不在 `quality.concession_approver_roles` ⇒ `pending_approval`，否则 `approved`）与来料检 `:959-970` ⇒ **「同按钮点第二次」仍是唯一入口**。**偏移**：`:117` → `:123`（+6） | 路由加 `status`（白名单）筛选 + 模板筛选控件；按计划**不改**二次点击机制本身 | 前端 + 后端 |
+| **B6-06** | 质检记录详情弹窗显示处置信息（消除死分支，AC7.1）。原：`quality.py` 中 `nonconformity` **零命中**（仅 `:7` import）→ `records.html:406-429` 恒隐藏 | **未实现（死分支）** | `quality.py` 全文 grep `nonconform` = **1 处，仅 `:7` import**；详情接口 `:1271-1329 def get_inspection_record_detail`，`record_data`（`:1313-1324`）键为 `id/record_code/type/inspection_target/inspector_name/inspection_time/result/notes/items/base_items` —— **无 `nonconformity` 键**（`jsonify` `:1326-1329`）；模板 `records.html:143`（容器初值 `display:none`）、`:404-430`（`:406 if (record.nonconformity) { … } else { display='none' }`）⇒ **恒走 else** | 详情接口补键，**字段名须对齐模板已用**：`handling_method/handler_name/handling_time/handling_notes`。**强对照（可直接照抄）**：同仓 `quality/print_record.html:167-196` 已正确实现，且注释点明关系名是 `nonconformity_records` 且 `lazy='dynamic'`（**必须 `.first()`，不得直接真值判断**） | 后端 + 前端 |
+| **B6-07** | 让步审批通知（**可选**，与批次7 通知接线合并做最省）。原：通知触发器仅 1 个有调用点 | **未实现（计划标注为可选）** | `dispose_nonconformity` 的 `accept` 分支（`mes_service.py:1055-1067`）与 `dispose_incoming_nonconformity`（`:959-970`）**均无通知调用**；`notify_*` 全仓调用点仍只有 1 个（`routes.py:3601 notify_raw_substitution`）`[本表实测 V-8]` | 若做：在 `nc.status='pending_approval'` 落点调 `create_notification(trigger_type=…, related_model='NonconformityRecord', related_id=nc.id)`；**须先解决 B7-06（去 commit）与 B7-07（幂等）** | 后端 + 验证 |
+
+### 2.5 批次7 —— 可追踪性：通知触发器接线 + 审计回滚级联（`B7-01…B7-07`；承接：后端 + 验证）
+
+| 编号 | 计划要求（摘要 + 计划原 file:line） | 实测状态 | 证据（实测 file:line） | 剩余工作 | 承接角色 |
+| --- | --- | --- | --- | --- | --- |
+| **B7-01** | 派工后发通知（`notify_task_assignment`）。原：定义 `notification_service.py:506`；**唯一**调用点 `routes.py:3594` | **未实现** | 定义实测 `notification_service.py:506 def notify_task_assignment(...)`（**行号未漂移**）；**调用点 0**（全仓仅 1 命中 = 定义处）`[本表实测 V-8]`；唯一在用的通知函数 = `routes.py:3601 notify_raw_substitution(`（在 `update_task_status` 替用分支内；计划记 `:3594`，+7） | 在派工写入路径（`routes.py:4384 add_task` / `:3111 manage_tasks` / 生产中心派工）接入；**并满足 B7-06/07** | 后端 + 验证 |
+| **B7-02** | 库存预警通知（`notify_inventory_warning`）。原：`notification_service.py:484`（零调用点） | **未实现** | 定义实测 `:484 def notify_inventory_warning(material_name, current_stock, min_stock)`；**零调用点**；库存写入点（如 `routes.py:3490 raw_material.quantity -= …`）附近**无**安全库存比较 | 在库存递减/入库路径加「低于 `min_stock`」判定并调通知；**需先明确 `min_stock` 数据源**（当前无该列/无配置项 ⇒ **需拍板，可能涉及新增配置**） | 后端 + 产品 |
+| **B7-03** | 工序变更 / 规格变更通知。原：`notification_service.py:430` / `:457`（零调用点） | **未实现** | 定义实测 `:430 def notify_process_change(...)`、`:457 def notify_spec_change(...)`；**两者零调用点** `[本表实测 V-8]` | 在工序/规格变更落点接入（`routes.py` 的 `ProductProcess`/`ProductBOM`/订单规格更新段）；建议与 B7-01 同批 | 后端 + 验证 |
+| **B7-04** | 审计回滚**级联**：`delete` 分支恢复父行时按关系恢复子行。原：`routes.py:4183`；`delete` 分支 `:4240-4261` 只 `add(new_record)`，无级联 | **未实现** | 端点实测 `routes.py:4192-4195`（`/audit_logs/rollback/<int:log_id>` + `@require_capability('audit.rollback')`）；`delete` 分支实测 `:4252-4273`：`:4254 new_record = model_class()` → `:4255-4259` 逐字段 `setattr` → **`:4261 db.session.add(new_record)`** → `:4264-4271` 回滚审计行 → `:4272 commit`（**无任何子行恢复**）；反射入口 `:4182-4189 def _resolve_audit_model`（计划记 `:4170`，+12）。**偏移**：`:4183` → `:4192`（+9）；`:4240-4261` → `:4252-4273`（+12）。行为：叶节点（`ProcessPrice`）回滚 200 成功 ⇒ 缺的正是「带子行的父行」 | 级联恢复（按 `models.py` 关系反向恢复）**或显式拒绝**（带子行时 400 + 原因，避免 `IntegrityError`）；判据：带子行父记录回滚后子行数前后一致 | 后端 + 验证 |
+| **B7-05** | 回滚**守恒**：回滚已扣料生产记录后库存与 `MaterialAllocation.consumed_quantity` 回到扣料前；否则 400 + 原因。**前置判定（t6 §3④）**：先判定 `AuditLog.old_data` 是否真含扣料/子行信息 | **未实现**（且**前置判定已给结论：守恒在既有数据上不可实现**） | 只读真库：`audit_log` 73 行 / `old_data IS NULL` **61**；`old_data` 文本含 `materials`/`raw_material`/`consumed` = **0**；`rollback_type='edit'` 且 `old_data IS NULL` = **2 行**（`id=42`/`id=70`）；`target_model='ProductionRecord'` 的 edit 行 = **0**。端点两者都没做：`:4228-4251` 的 edit 分支 `:4232 for key, value in log.old_data.items():` 在 NULL 时抛 `AttributeError` → `:4278-4282` 兜底 ⇒ **HTTP 500**（实测 `id=70`）；delete 分支 `:4255` 同形 `[本表实测 V-17]`。**偏移**：计划 `:4170` 反射入口 → 实测 `:4182` | ① **按 t6 结论降级登记为「明确 400 + 原因」**（**不得承诺守恒**）；② 修 `old_data is None` 分支（`if not log.old_data: 400 + 原因`）；③ 若要真守恒，须先改**写入面**让 `old_data` 含扣料明细（属口径/迁移变更，单独排期） | 后端 + 验证 |
+| **B7-06** | 新增接线**不得各写一次隐式 `commit`**。原：既有 `notify_raw_substitution` 内部自提交（`routes.py:3594` 调用点） | **部分实现**（形式成立、约束未落地） | `notification_service.py:107-121`：`db.session.add(notification)` → `:108 flush()` → `:115 _create_receivers_by_rules(...)` → **`:121 db.session.commit()`** ⇒ `create_notification` **内部自带 commit** `[本表实测]`；异常 `:126-129 rollback + raise`；唯一调用点 `routes.py:3601`（包在 `:3575-3608 try/except` 内，吞异常仅记日志）。因**未新增任何接线**，故「净增 = 0」**形式上成立**；但约束本身**未落地** | 接线时**必须先用 `commit=False`（或调用方 `begin_nested`）再接线**，否则每接一个触发器就多一次隐式提交 | 后端 |
+| **B7-07** | 通知接线的**幂等/重复通知判据**：同一业务事件重复触发不得产生重复通知（按 `trigger_type + related_model + related_id` 去重，或按批次+接收人唯一） | **未实现** | `create_notification` 实测 `:52-129`（`:52 def` 起）：`Notification` 构造 `:96-105` → `add/flush` `:107-108` → 接收者 `:111-115` → **无任何查重查询**；模型侧字段可用 `models.py:1908 trigger_type` / `:1919 related_model` / `:1920 related_id`（`:1922-1927` **只有普通索引、无唯一约束**） | 在 `create_notification` 内按 `trigger_type+related_model+related_id`（或批次+接收人）去重；**若加唯一约束属 schema 变更 ⇒ 必须手写迁移 + `_ENSURED_COLUMNS` 登记**（AGENTS.md 禁令） | 后端 + 验证 |
+| **（附）计划门禁脚本** | 批次7「验证命令」：`scripts/check_notification_triggers.py`（§3.3 T-A：AST 抓 `def notify_*` ⇒ 每个触发器 ≥1 调用点，未接线 = exit 1） | **未实现（门禁缺口）** | `scripts/` 下 15 个 `.py`（`check_db_bootstrap`/`check_doc_claims`/`check_migration_heads`/`check_model_refs`/`check_properties`/`check_templates`/`functional_test`/`migrate_sqlite_to_postgres`/`permission_matrix`/`route_inventory`/`smoke_test`/`windows_service`/`_probe_seed`/`_sandbox_compat`/`_test_bootstrap`）**无该文件**；全仓命中仅文档/探针产物 `[本表实测 V-10]`。同批 §3.3 T-C 的 `scripts/check_is_archived_policy.py` **亦不存在** | 新增脚本并纳入门禁链（`ci_gates`）；否则「触发器是否接线」永远无自动判据 | 后端 + 验证 |
+
+### 2.6 批次8 —— 口径收口与残余清理（`B8-01…B8-12`；承接：后端 + 验证）
+
+| 编号 | 计划要求（摘要 + 计划原 file:line） | 实测状态 | 证据（实测 file:line） | 剩余工作 | 承接角色 |
+| --- | --- | --- | --- | --- | --- |
+| **B8-01** | 库存列表页两处谓词统一为「NULL = 未存档」。原：`routes.py:4781`（`is_(False)`）/`:4792` | **未实现** | 实测**漂移**到 `:4797` / `:4808`：`:4797 query = query.filter(RawMaterial.is_archived.is_(False))`、`:4808 query = query.filter_by(is_archived=False)`（**两处仍排除 NULL**）`[本表实测 V-13]` | 两处改 `or_(is_(False), is_(None))`；**判据需造 `is_archived IS NULL` 行**（真实库该列 NULL 行数为 0 ⇒ 不造数就是「没测到」） | 后端 + 验证 |
+| **B8-02** | 物料搜索 API 三处谓词统一。原：`routes.py:12037`/`:12065`/`:12094` | **未实现** | 实测 `:12065 RawMaterial.query.filter_by(is_archived=False)`、`:12093 Consumable.query.filter_by(is_archived=False)`、`:12122 FinishedProduct.query.filter_by(is_archived=False)` ⇒ **三处全排除 NULL** `[本表实测 V-13]` | 三处统一（与 B8-01 同批） | 后端 |
+| **B8-03** | `Consumable` 列表第 4 处统一（并进文档口径表）。原：`routes.py:6109` | **未实现** | 实测漂移到 `routes.py:6125`：`get_available_consumables()` 内 `query = Consumable.query.filter_by(is_archived=False)`（`:6121` 是 `def`）`[本表实测 V-13]` | 统一 + 进文档口径表（`交付说明-P0P1.md:250-252` 漏列该处） | 后端 + 文档 |
+| **B8-04** | **例外登记脚本**：把「刻意保留 `== False`」写进白名单常量，越界即失败。原证据：例外 `mes_service.py:1032/1038/1044` | **未实现** | `scripts/check_is_archived_policy.py` **不存在**；`AGENTS.md` 门禁表**无**该脚本条目（grep = 0）`[本表实测 V-10]` | 新建脚本 + 进门禁表；白名单须含**盘点快照例外**（`mes_service.py:1441/1447/1453`） | 后端 + 验证 |
+| **B8-05** | 内联 `current_user.role` **15 处**逐处复核：可映射的映射、对象级归属加注释固化。原：可映射 `routes.py:647`/`:5967`；landing `:330/333/343` | **部分实现** | 清单与实测一致：**Python 15 处**（`routes.py:337/340/350/654/5983` + `quality.py:46/82/104/120/529/822/911/1217/1277/1347`）`[本表实测 V-6]`；但计划所列「可映射」两处**未映射**（实测漂移到 `routes.py:654`、`:5983`），且 15 处**均无契约豁免注释** | 两处改 `can()`；其余按「契约豁免 + 行号」逐处注释（**与 B3-05 白名单同源**） | 后端 |
+| **B8-06** | 模板剩余 **2 处**固化为契约豁免**并加注释**。原：`quality/tasks.html:340`、`quality/task_detail.html:13` | **未实现**（行号对、注释无） | 两处仍是内联 role（`tasks.html:340`、`task_detail.html:13`）`[本表实测 V-6]`，上文 8 行内**无任何豁免注释** | 加注释；可选：`:340` 改 `can('quality.inspect')`（与后端同源），`:13` 属对象归属复合条件、按 `REQ-N-03` 豁免可不动 | 前端 + 后端 |
+| **B8-07** | 分页白名单残余盘点 + 锁死（`per_page ∈ {20,50,100}`）。原：`routes.py:286-308` | **已实现（静态面）** | `routes.py:293 def handle_pagination_args(f)`；`:304-305 if per_page not in [20, 50, 100]: per_page = 20` | 「锁死」若取严格口径（提常量/加断言）则尚未做；**与 `recon-arch.md` §0「批次8 0/12 已实现」的汇总口径不同**（见 §6 待裁定 N-A2） | 后端 |
+| **B8-08** | 搜索「条/件」文案：**默认不改**；仅当拍板要改时动文案（不动 `len()`）。原：`global_search.html:47/282`、`advanced_search.html:155/210` | **计划内不改（=正确状态）** | `global_search.html:47` 仍「共 N 条结果」；`advanced_search.html:155` 仍「N 条结果」、`:210` 仍「N 条{{ category }}记录」（计划记的 `:282` 未命中，`:47`/`:155`/`:210` 命中） | 无（计划明确「默认不改」） | 前端（登记） |
+| **B8-09** | `advanced_search.html` 分类名未汉化的既有文案缺口。原：`advanced_search.html:162-170` | **未实现** | `advanced_search.html:162-170` 仍只给 4 个中文标签（`employees`/`process_prices`/`products`/`customers`）；`:208-212` 仍是 `{% else %}` 兜底「找到 N 条{{ category }}记录」 | 补分类名映射（`inventory` 等） | 前端 |
+| **B8-10** | `download_product_template` 的**死清理块**（`temp_path=None` 后仍清理）。原：`routes.py:7619 def`、`:7622 temp_path = None`、`:7640-7651` 清理块 | **未实现** | 实测漂移：`def download_product_template()` @`routes.py:7647`；`:7650 temp_path = None`；`:7667-7674` `except` 块内 `if temp_path and os.path.exists(temp_path): os.remove(...)`；`:7675-7681` `finally` 块同样判断 ⇒ **`temp_path` 全函数从未被赋非 None 值**（模板走 `io.BytesIO()` `:7654-7656`）⇒ 两块恒为死代码 `[本表实测 V-12]` | 删除两块；判据：`temp_path = None` 后仍存在清理块的端点 = 0（**静态可验**） | 后端 |
+| **B8-11** | `save_temp_file()` 的**目录泄漏**（`mkdtemp()` 建目录、`cleanup_temp_files()` 只删文件不删目录；唯一调用点 `import_products`）。原：`routes.py:5067`、`:2173-2194`、`:7670` | **未实现**（计划的两条轨**都未做**） | 实测漂移：`routes.py:5083 def save_temp_file(...)`；`:5085 temp_dir = tempfile.mkdtemp()`；`cleanup_temp_files()` @`:2180`，`:2187-2199` 只 `os.listdir` + `os.path.isfile` + `os.remove(file)` —— **无 `os.rmdir`/`shutil.rmtree`**；`@bp.before_request` @`:2203`；唯一调用点 `:7698`（`import_products`）`[本表实测 V-12]` | 选一轨实施并在提交信息里写明：**轨一（推荐、本环境可验）**改钩子/统一目录回收；**轨二（本环境不可验）**非沙箱计数式手工判据（**须标「需非沙箱环境」，不得写成已通过**） | 后端 + 验证 |
+| **B8-12** | `/api/quality/tasks/import` **不落盘**（直接 `pd.read_excel(file)`）⇒ 文档表述需收窄为「7 个落盘 + 1 个内存流」。原：`quality.py:1559 def`、`:1581 pd.read_excel(file)` | **部分实现（代码已实现 / 文档未改）** | 代码：`quality.py:1615 def import_inspection_tasks()`；`:1634 df = pd.read_excel(file)`（**传 file 对象、非路径**）。文档：`AGENTS.md:49` 仍写「仅上传解析必须落盘」（无例外说明）、`:293` recipe 标题仍「Excel 导入（**必须落盘** + 行级容错）」。**口径应为**：全仓导入端点 **9 个**；`routes.py` **8 个落盘**（5 个 `TEMP_FOLDER` + 2 个 `tempfile.gettempdir()` + 1 个 `mkdtemp`）；1 个内存流 | 改 `AGENTS.md:49` 与 `:293`（**注意 `:79-81` 不是 import 块**，真实锚点是 `:49` 与 `:293`；t5/t6 曾把 `:282` 当 recipe 标题，实测 recipe 5 标题在 `:293`） | 文档 + 后端 |
+
+### 2.7 批次9 —— 文档纠偏（`B9-01…B9-16`；**只判「计划要求改的那份文档改了没有」**；承接：运维/文档）
+
+> 实测工具：`reconcile-2026-10-08/probe_arch_docs.py`（只读，stdout JSON）。**净结论：0/16 已改。**
+
+| 编号 | 计划要求（摘要 + 计划原目标文件:行） | 实测状态 | 证据（实测文档原文片段） | 剩余工作 | 承接角色 |
+| --- | --- | --- | --- | --- | --- |
+| **B9-01** | D1/D2/D3：`继续开发准备报告.md:14/24/57/67/96/97/272` 订正「261 视图 / 102 inline role / 194 路由 / 2 head」 | **未实现** | `:14` `261 个 main 视图 = 150 装饰器 + 102 inline role + 9 仅 login_required`；`:24` `194 路由`；`:21`/`:57`/`:67` `2 个 head`；`:38`/`:97`/`:105` 亦含 `102 inline`。**旧数字全部原样在位** | 按 `recon-docs.md` §4.A 逐行照抄订正（真实值：265 视图 = 257 `@require_capability` + 8 仅 `@login_required`；内联 role 15+2；路由 271/0；单 head） | 运维/文档 |
+| **B9-02** | D4/D13：「31 模板 77 处硬编码 role」订正为「模板 2 处 + Python 15 处」，并修正 `tasks.html:337` → `:340` | **未实现** | `:20` `31 模板 77 处硬编码 role`；`:50` 仍写 `quality/tasks.html:337`；`:273` 表格行写「**仅 2 处**」但**未给行号**；全文件 `quality/tasks.html:340` **0 命中** | 逐行订正（行号订正只完成了一半） | 运维/文档 |
+| **B9-03** | D7：`app/main` 模块清单补 `sales_routes.py`（并在批次3 删除后写成「已删除」） | **未实现**（前提未成立） | `sales_routes` 在 4 份背景文档**全部 0 命中** ⇒ 既没「登记」也没「已删除」；因 `B3-02` 未做，「已删除」也不可能写 | 依赖 `B3-02`；删除后同步本表与 `AGENTS.md` | 运维/文档 + 后端 |
+| **B9-04** | D8：删除「3 个后缀型残留其实被 git 跟踪，原记录有误」这处**错误的自订正** | **无法核实** | 反证已实测：`git ls-files` 对 `*.bak`/`*.new`/`*.backup` 命中 **0**；`.gitignore:36-38` 为这三条（内容一致、顺序与计划不同）。但「文档里那句错误的订正删没删」**需逐句语义判读，文本 grep 无法给出唯一答案** | 人工判读后订正；**同时撤回规划附录 E 的 D8 订正动作**（该订正方向本身错误，见 §5.1） | 运维/文档 |
+| **B9-05** | D9：「删除 4 个遗留备份文件」订正为**同一提交删了 7 个** | **无法核实** | 该条判据是 `git show --stat <删除提交>` 的历史事实；本次 HEAD = `534ce70b…`，**不是**那条删除提交 ⇒ 静态树上不可复核。仅可证「今日 `app/main` 无这 7 个文件」 | 用 `git show --name-status f60a54d` 取历史事实后订正（`recon-docs.md` 已给出读数：7 个 `D`，合计 2543015 B） | 运维/文档 |
+| **B9-06** | D15：把 `继续开发准备报告.md` §二/§四 的 4 个已拍板 ❓ 标为「已决（见 §六）」，并把 T3 Q1/Q2/Q8 提到待拍板清单顶部 | **未实现** | `:30` 仍是图例 `❓需业务确认`；`:35`/`:45`/`:46`/`:47`/`:52` 仍带 ❓；`:102-104` 仍以 ❓ 作待拍板项；**全文件「已决」0 命中**。（另：实测 §二 = 5 处 ❓、§四 = 3 处 ❓ ⇒ **合计 8 处**，计划的「4 个」本身不准） | 逐处加标记；未决项（移动端入口等）保留 ❓ 并在顶部加时效警示 | 运维/文档 |
+| **B9-07** | D10：交接指针 `148d8a5` → 现 HEAD `f60a54d`；D5：`_ENSURED_COLUMNS` → 10 表 43 列 | **未实现**（且情况更糟） | `开发进度与交接.md:305`/`:315`、`继续开发准备报告.md:233`/`:243` 均写 `148d8a5`；两文件 `f60a54d` **0 命中**；本次实测 HEAD = `534ce70b…` ⇒ **三个指针全不相同**（文档 `148d8a5`／计划要求写 `f60a54d`／真实 `534ce70b`） | 统一为真实 HEAD 并注明时点；`_ENSURED_COLUMNS` 改 **10 表 43 列** | 运维/文档 |
+| **B9-08** | D20：更新 `交付说明-P0P1.md §7` 与 `开发进度与交接.md §8.2` 的**复现命令**（受限环境须写清 shim / cwd 重定位 / `--no-dump`），并补 t6 F12 的独立复核通道 | **无法核实** | 两份文档中「`_sandbox_compat`」上下文未逐节读全，**未取得可直接判「已改/未改」的坐标**；另本会话为 `danger-full-access`，**无法复现**受限沙箱下的 PermissionError ⇒ 沙箱侧只能登记口径 | 明确落点后订正；沙箱侧判据标「需非沙箱环境」 | 运维/文档 + 验证 |
+| **B9-09** | D21：「导入端点必须落盘」收窄；⚠ t6 F7 要求点名同步 `AGENTS.md:79-81`；t5 勘误称真实落点是 `:48-50` 与 `:282` | **未实现**（且**两处锚点行号都错**） | `AGENTS.md:49` 仍「仅上传解析必须落盘」；`:293` recipe 标题仍「必须落盘」。**行号勘定（本次实测，纠正 t5 与计划双方）**：`:79-81` **不是 import 代码块**，而是**门禁表三行**（`:79 check_migration_heads` / `:80 check_properties` / `:81 route_inventory`）；`:282` **不是 recipe 标题**，而是 API recipe 代码块内的 `data = [{`；**recipe 5 标题实测在 `:293`** | 改 `:49` 与 `:293`（两处）；`:79` 处**不需要**保留检索锚点（它从未承担政策锚点） | 运维/文档 |
+| **B9-10** | D24：统一「无校验」口径为 75=历史基线 / 5=当前无校验视图 / 15=当前内联 role 行数 | **未实现** | `测试报告-2026-08-11.md:220` `为 75 条`、`:301` `无校验路由 75 → 15`、`:433` 同、`:568` `降到 6 条`；**未见「三量纲不得互替」的统一表述** | 按 §5.3 的三量纲表述统一（今日实测：无校验视图 **5**、匿名可访问 **0**、内联 role **15+2**） | 运维/文档 |
+| **B9-11** | D23：「5 个 head 已收敛」改为「（历史）曾多 head，现单一 head」 | **未实现** | `开发进度与交接.md:108` `**当前状态（2026-09-18 实测）**：5 个 head 已收敛为**单一 head p1nonctarget**`（**仍是「已收敛」句式**）；`:260` `~~收敛 5 个 head~~ —— **已完成**` | 改措辞 + 更新实测时点 | 运维/文档 |
+| **B9-12** | D5：`_ENSURED_COLUMNS` 数字统一为 **10 表 43 列** | **未实现** | `开发进度与交接.md` 的 `_ENSURED_COLUMNS` 命中（`:115`/`:118`/`:125`/`:249`/`:357`/`:391`/`:499`）**无一处给出「10 表 43 列」**；`继续开发准备报告.md:59` 仍是「盲区」旧口径；`交付说明-P0P1.md:47` 仍写「28 行」。**「10 表 43 列」在两份主文档 0 命中** | 统一为 10 表 43 列（逐表 6/9/6/6/1/2/3/8/1/1） | 运维/文档 |
+| **B9-13** | D22：`routes.py` 行数口径统一（12126 换行 / 12127 行） | **部分实现** | `继续开发准备报告.md:271` `**12126** 行`；`开发进度与交接.md:341` `**12126 行**`——两处**都只写一种值、均未写口径**，且**两个旧值都已过时**（真实 = `splitlines()=12155`、`\n`=12155、末行有换行、511969 B） | 统一为 **12155 行**并写明口径 | 运维/文档 |
+| **B9-14** | 其余订正 D6/D11/D12/D14/D16/D17/D18/D19（含 `.gitignore`、`is_archived` 表、`globals()`、门禁 exit code、落盘/目录清理、死清理块、**13 文件无条件 create_table**） | **未实现**（部分项不可核） | ① `AGENTS.md` 仍无 `check_is_archived_policy`/`check_notification_triggers` 条目；② **D19 数字对拍**：实测「含 `create_table` 的迁移文件 = **14**」（计划写 13 文件/12 修订）、`c02604883c72` = **24 处** ✅；③ `.gitignore` 实测 **42 行**（D6 要求订正「3 行」旧说法——文件本身已改，文档是否同步未逐处读全） | 逐条按 `recon-docs.md` §4 照抄订正；**12 修订的写法应改为「字面口径 13 文件 = 13 修订 / AST 口径 14 文件 / 无守卫 11 文件」** | 运维/文档 |
+| **B9-15** | **「质检能力已实现」整体降级**：`业务流程现状与缺口.md` §一 与 `开发进度与交接.md` 把「质检门禁与不合格处置」由【完整】改为「**部分实现**」 | **未实现** | `业务流程现状与缺口.md:51` `\| 不合格品处置 NonconformityRecord \| **完整** \| 返工=新建任务、报废入报废库并扣料…`（**仍【完整】**）；全文件「部分实现」0 命中；`开发进度与交接.md:20` 仍 `质检入库 \| 质检门禁、不合格处置… \| **已完成**`，且该文件「部分实现」0 命中 | 改为「部分实现（报工路径报废无台账、批次6 页面不可用）」；并把「返工计件配置读取点已接」写清（T4 §4-6 冲突 2 的旧说法已过时） | 运维/文档 |
+| **B9-16** | `AGENTS.md` 表述订正：补「`app/main` 有 **8 个**含 `@bp.route` 的模块」；门禁表补新脚本；修正「导入必须落盘」 | **未实现**（且**该订正句式本身有误**） | ① `AGENTS.md` 中「8 个含 `@bp.route`」**0 命中**；② 门禁表**未补** `check_is_archived_policy`/`check_notification_triggers`；③ `:49`/`:293` 未收窄。**⚠ 计划给出的订正值「app/main 8 个模块」与实测不符**：本次独立 AST 实测 `app/main` 含 `@bp.route` 的模块 = **7 个 / 265 条**（`routes.py` 192、`quality.py` 27、`equipment.py` 15、`purchase.py` 13、`production_center.py` 7、`shipping.py` 6、`stock.py` 5）`[本表实测 V-5]`；「8 个模块 / 269 条」是**全仓**口径（+`app/auth/routes.py` 4 条） | 按 **7 个模块 / 265 条（app/main）+ 全仓 8 模块 / 269 条** 订正；登记该计划值需更正（§6 待裁定 N-A1） | 运维/文档 |
+
+### 2.8 批次10 —— 治理与外部环境（`B10-01a/b/c`+`B10-01-边界`+`B10-02…B10-11`；承接：运维/后端 + 验证）
+
+| 编号 | 计划要求（摘要） | 实测状态 | 证据（实测 file:line / 读数） | 剩余工作 | 承接角色 |
+| --- | --- | --- | --- | --- | --- |
+| **B10-01a** | 匿名 UNIQUE 具名化（仅「新库/新建表」路径生效） | **已实现（源码面在位，且明显早于本战役）** | `app/models.py` 具名约束逐处命中：`:84 uq_process_price_global_sn`、`:110 uq_process_price_group_global_sn`、`:111 uq_subtotal_process`、`:145 uq_employee_global_sn`、`:242 uq_bonus_penalty_global_sn`、`:314 uq_task_assignment_global_sn`、`:394 uq_salary_history_global_sn`、`:424 uq_coefficient_history_global_sn`、`:466 uq_finished_product_serial_number`、`:467 uq_finished_product_global_sn`。⚠ **对既有库无效**（`create_all()` 不重建已存在表）——计划已自陈 | 与计划的关系需澄清（是「已完成」还是「立项时已存在被误列为待做」）；对既有库限制按 B10-01c 登记 | 后端/运维 |
+| **B10-01b** | 补 **31 张表**为正式、幂等迁移（沿用「表缺失才建表」模式，清单见规划附录 A） | **未实现**（且缺对拍脚本） | 迁移文件 35 个 / `revisions=35` / 单 head ✅；但**无任何脚本**做「总表 75 / 迁移建 49 / 差 31」对拍（同 B3-06）；`p0p2messtables_add_create_all_tables.py:27` docstring 仍是登记说明、**非 31 表完整补齐**；`p0p2messtables_*.py:815-817` 的 `_ensure_table()` 循环是**幂等模式样板** | 新建幂等迁移 + 对拍脚本；**不承诺「全链重放」**（B10-01-边界） | 后端 + 验证 |
+| **B10-01c** | 既有库匿名约束处置（可选/需排期）：**默认路径本轮不做**，仅登记限制 | **计划内不做（符合）** | 计划明文「默认不做」；C-1 章程相关表述仍在 `开发进度与交接.md:108` 一带 | 无（保持登记）；把「既有库仍为匿名约束」写进 C-1 章程 | 运维/文档 |
+| **B10-01-边界** | 明确**不承诺「全链重放」**；真实库仍靠「启动自愈 + `flask db stamp p1nonctarget`」（不撤除） | **符合边界要求（已满足）** | `app/__init__.py:103 _ensure_schema` 定义、`:107 db.create_all()`、`:224` 调用点、`:21-… _ENSURED_COLUMNS` 均在位；`check_migration_heads.py` exit 0。⚠ 真实库 `alembic_version` 只读读出 **`f179636cecf0`**（**未** stamp 到 `p1nonctarget`）——「迁移链已收敛」与「库已 stamp」是**两件事** | 无；引用时须写明上面这句「两件事」 | 运维/文档 |
+| **B10-02** | 迁移碎片清理：`delivery_schedules` / `sales_order_delivery_batches`（create→alter→drop，无模型无表） | **未实现（碎片仍在）** | `migrations/versions/011e395c1aa4_add_sales_order_management_tables.py`：`:21 create_table('delivery_schedules'`、`:38 drop_table('sales_order_delivery_batches')`、`:146 create_table('sales_order_delivery_batches'`、`:164 drop_table('delivery_schedules')`（同一文件内 create+drop 对）；`a3f28e475446_*.py:71`/`:107` 又来一轮；`83bfde43921e_*.py:21`/`:43` 对 `sales_order_delivery_batches` 做 `batch_alter_table` | 清理或显式登记「保留」 | 后端 |
+| **B10-03** | 部署配置复核：`.env` 硬写 sqlite + 弱 `SECRET_KEY`。原：`deploy.bat:178-179`、`Jenkinsfile:252-253`、`deploy.config.yml:34-35` | **未实现** | 实测（行号有漂移，问题仍在）：`scripts/deploy.bat:178 echo SECRET_KEY=your-secret-key-here >> .env`、`:179 echo DATABASE_URL=sqlite:///app.db >> .env`；`Jenkinsfile:295`/`:296` 同两句（计划记 `:252-253`）；`deploy.config.yml:35 DATABASE_URL: "sqlite:///app.db"`（计划记 `:34-35`） | 改为必填校验/生成随机密钥（部署安全面） | 运维 + 验证 |
+| **B10-04** | `my_tasks.use` 已登记但**无路由使用** ⇒ 补装饰器或从 `CAPABILITIES` 删除 | **销项（计划前提已被源码证伪）** | `app/permissions.py:96` 登记 `my_tasks.use`；**已有使用点**：`routes.py:3287 @require_capability('task.manage', 'my_tasks.use')`（`update_task_status`）、`:356 can_any('my_tasks.use', 'production_order.view', 'quality.view')`（`user_dashboard` 分流）；`require_capability` 是 **OR 语义**（`permissions.py:151-152`/`:161`）；`check_templates` 报 `44 used on routes` ⇒ **无 `declared - used` 非空** | **撤销该条目**或改写为「已在使用（`routes.py:3287`/`:356`）」+ 文档订正 | 文档（+ 后端确认） |
+| **B10-05** | C-2 PG 主从 failover 演练 + `pg_dump` 例行备份 | **不可在本机做（与计划一致）** | 计划自陈 `docker`/`pg_dump`/`psql` 均不在 PATH、无可连 Postgres 服务；本次未复测 PATH（无必要，不作判据） | 登记「需外部环境」；不得写成已做 | 运维（登记） |
+| **B10-06** | C-3 断网多主 | **不立项（与计划一致）** | 计划明文「本期明确不做」；全仓无相关代码 | 无 | 产品/运维（登记） |
+| **B10-07** | `delivery_batches` 与发货**无关联**（计划依据：`shipping.py`/`mes_service.py` 中 `delivery_batches` 无命中） | **未实现（未修亦未登记）** | 本次未复测该 grep（属业务后端范围）；仅确认 `delivery_schedules`/`sales_order_delivery_batches` 迁移碎片在（B10-02）。**计划记为「待 T3 Q6-A 拍板」** | 待拍板；若采纳「只做对照视图」则可做 | 后端 + 产品 |
+| **B10-08** | 客户删除未校验关联订单（默认：禁止删除有订单客户） | **未实现** | 计划标注 t5 未逐读该路由；本次未复核（属业务后端范围）。**`recon-product.md` §2-G-E 独立取证**：`routes.py:9258-9296 delete_customer`，`:9267-9268` 明写 `# 检查是否有关联的订单或其他业务数据` / `# TODO: 添加订单关联检查`，随后**直接** `db.session.delete(customer)`（`:9293`） | 按默认实施「禁止删除有订单客户（400 + 提示），只允许停用」；**注意其默认路径描述本身需修**（`recon-product.md` §5-D-2） | 后端 + 产品 |
+| **B10-09** | 编码规则/流水号日志查询页 | **未实现** | 计划依据「有生成日志无查询页」；`recon-product.md` §2-G-D 取证：`CodeGenerationLog`（`models.py:732`）有写入（`models.py:1031`、`routes.py:5518`），`grep CodeGenerationLog.query` = **0 命中**（无读取/列表页） | 需产品确认字段；只读列表 + 按 `rule_id/时间/用户` 筛选 | 后端 + 产品 |
+| **B10-10** | 计件工资是否与质检结果挂钩（**与批次5 的返工计件是两件事**） | **未实现（须先拍板）** | 计划「✅ 可做，须先拍板」；`recon-product.md` §2-G-C 取证：`piecework_breakdown`（`mes_service.py:1812-1824`）只按「是否返工」过滤、**不看任何质检字段** | 待拍板；建议**登记为「质量成本」需求**（不得与 Q-2 混为一谈） | 产品 + 后端 |
+| **B10-11** | `/production_center` 实例完工不入库（与报工路径不一致，须先拍板） | **未实现（须先拍板）** | 计划「✅ 可做，须先拍板」；`recon-product.md` §1.3 取证：`production_center.py` 全文 `inbound`/`finished_product`/`stock_kind` **0 命中**、`qualit`/`inspection`/`qc_gate` **0 命中** ⇒ 该路径**既不扣料也不入库、完全绕过质检闭环**<br>⚠ **本格已被 `§9.4-F5` 订正（append-only，原值保留）**：`qualit` **不是 0 命中**——实测 `app/main/production_center.py:294 'quality_status': item.quality_status`（**仅读出**，无门禁判定与写入） | 待拍板；若维持「本批不含」，**必须在界面显式标注**「此入口完工不生成正品库记录」 | 产品 + 后端 |
+
+### 2.9 批次11 —— 最终收口（`B11-01…B11-06`；承接：运维/文档 + 验证）
+
+| 编号 | 计划要求（摘要） | 实测状态 | 证据 | 剩余工作 | 承接角色 |
+| --- | --- | --- | --- | --- | --- |
+| **B11-01** | 四份文档同步：`开发进度与交接.md`（总体进度、§七、§八提交表、`_ENSURED_COLUMNS` → 10 表 43 列、HEAD 指针、C-1 章程状态） | **未实现** | ① 「10 表 43 列」**0 命中**（同 B9-12）；② HEAD 指针仍 `148d8a5`（`:305`/`:315`），真实 `534ce70b`（同 B9-07） | 同 B9-07/B9-12；建议由 `scripts/check_doc_claims.py`（20 条钉常量）机器校验 | 运维/文档 |
+| **B11-02** | `交付说明-P0P1.md` + `业务流程现状与缺口.md` 同步：已闭合项标「已闭合」；§6.7 `is_archived` 表补 `routes.py:6109`；「质检门禁与不合格处置」改**部分实现** | **未实现** | ① `业务流程现状与缺口.md:51` 仍【完整】（同 B9-15）；② `:432` 的 `is_archived` 口径表未补易耗品那处（且实测该谓词在 `routes.py:6125` 而非 6109）；③ 全文件「部分实现」0 命中 | 逐处订正（`docs/` 不可覆写 ⇒ 只能新建订正件，`70-` §10.4/§10.6） | 运维/文档 |
+| **B11-03** | `AGENTS.md` 数字与表述更新：门禁表补 `check_notification_triggers.py`/`check_is_archived_policy.py`；`app/main` 模块表述订正；落盘表述收窄 | **未实现** | ① 两脚本在 `AGENTS.md` **0 命中**；② 「8 个含 `@bp.route`」**0 命中**（且该值本身应为 **7**，见 B9-16）；③ `:49`/`:293` 未收窄。**门禁期望值本身正确**（`:78-82` 四项 + `:83` + `ci_gates` `:84`，本次逐项实跑全部逐字相符） | 按 B9-09/B9-16 一并改（**门禁表期望值不动**） | 运维/文档 |
+| **B11-04** | 仓库卫生 + 推送核对：`git ls-files uploads` = 0、`git ls-files '*.pyc'` = 0、`git status --short` **干净（无未跟踪残留）**、`github/main...HEAD` = `0 0` | **部分实现** | ✅ `git ls-files uploads` = 0；✅ `git ls-files '*.pyc'` = 0；✅ `git rev-list --left-right --count github/main...HEAD` = `0 0`；❌ `git status --short` **不干净**：4 条未跟踪（`_probe_tmp/`、`docs/交接提示词-批次3开工-2026-10-06.md`、`docs/开发与测试规划-2026-10-06.md`、`reconcile-2026-10-08/`）`[本表实测 V-3]`；另**新增排雷**：仓库根三个 **0/1 字节但被 git 跟踪**的垃圾文件（`c02604883c72` 0 B、`python` 0 B、`test_batch_process_demo.html` 1 B） | 清理/提交未跟踪残留；处理三个已入库垃圾文件；**同时登记** `_permission_matrix.json`/`_smoke_results.json`（已 gitignore、mtime 早于 B3-01 收口 ⇒ 不构成回归） | 运维/后端 |
+| **B11-05** | 各批次验收记录归档：`docs/验收记录-批次N-YYYY-MM-DD.md`（含未在沙箱执行项的显式标注） | **未实现** | `Get-ChildItem docs -Filter '验收记录*'` ⇒ **0 个文件** | 新建归档件（每条写明「取证方」「环境限制」） | 验证 + 运维/文档 |
+| **B11-06** | 本规划文件自身定稿：去草稿标记，回填各批次实际结果与 T6 findings 销项状态 | **未实现** | `docs/开发与测试规划-2026-10-06.md` 内**仍为计划态**（批次条目全部以「待做」句型书写，无「实际结果」回填栏） | 待 81- 规划出来后回填；本文件（80-）即其必需的实测输入 | 运维/文档（+ 本文件消费） |
+
+---
+
+## 3. 阶段C 移交清单逐项状态（`70-第2轮收口与阶段C移交.md` §10.1…§10.10）
+
+| 节 | 项 | 状态 | 实测证据 | 剩余工作／解除条件 |
+| --- | --- | --- | --- | --- |
+| **§10.1** | ⛔ **构建层晋升（A-63 第二步，captain 独占，最高优先级）** | **未做（`blocked`，不得折算 pass）** | ① `Jenkinsfile` 生效 `error()` = **0 行**（`:112`/`:122` 仍为 `//` 注释；`:111`/`:121` 是其上文注释行）；② `.github/workflows/docker-deploy.yml:19` 仍 `continue-on-error: true`、`:57-58` 下**无生效 `needs: gate`**；③ blocking echo 清单（`Jenkinsfile:97`）**未含** `check_model_refs`/`check_http_contract`/`evidence_hash`（三者在该文件 0 命中）；`ci_gates.py:117-132` `BUILD_LAYER_BLOCKED.state='blocked'`、`not_counted_as_passed=True` | **动作**：① `Jenkinsfile:111/112/121/122` 解除 `error()` 注释；② GH `:19` 去 `continue-on-error`、`:57` 加 `needs: gate`；③ blocking echo 清单补三个脚本。**判据** `AC-63-1…AC-63-7`（`60-` §7.2.3，7 条一字不改） |
+| **§10.1 前置** | 前置条件 `P-1 / P-2 / P-3` | **P-1 ✅ / P-2 ✅ / P-3 ❌** | `P-3 = 真实 CI 全绿 ≥1 轮`：**0 轮**（无 CI 运行日志入口，**不可核**）⇒ **这是 §10.1 的唯一未满足前置** | 取得 ≥1 轮真实 CI 全绿观测（外部环境） |
+| **§10.2** | **C-07 实现（应用级真实库硬闸）** | **未实现（`blocked(生产面冻结)`）** | 落点 `app/__init__.py:156-224` 实测**无任何闸**（`_ensure_schema` 定义 `:103`、`db.create_all()` `:107`、调用点 `:224`）；探针 `harness/r2_c07_probe.py:758` `cur_state = 'blocked_no_guard'`、`:1267` docstring 自陈「闸由探针注入」、`:1288` 期望表含 `('absent-repo','absent','inject','blocked_no_guard',0,False)`；`ci_gates.py:127-128 condition_to_unblock` 与 §10.1 同一条件 | **判据**：`--guard-source present` ⇒ `create_all_calls` 由 **1 → 0**，且 `--strict-current-guard` 通过。**本轮未执行**（需注入，属生产面 Modification，超出只读范围）。**与 B3-03 是同一件事，建议合并** |
+| **§10.3** | **产品面 10 条（P1–P10）** | **10/10 未处置**（P11/P12 另有口径） | 判据 = 每条 GAP 的**变红条件转绿**且原探针仍 `exit 0`：①`P1` 两处 `flush()`（`routes.py:5152`/`quality.py:628` 之前）；②`P2` 两处 f-string（`:4945`/`:5036`）；③`P3` `/employees/import` 改行级；④`P4` 两处 `finally`；⑤`P5` 两处补「第 N 行」；⑥`P6` 内层 `try/except` 改 savepoint/上抛；⑦`P7` 口径二选一 + 界面补 `goods_receipt`；⑧`P8` 修正 `04` §2.2 B2 口径；⑨`P9` 报工路径报废补 `scrap` 台账行；⑩`P10` 补 `notes` 键 + 统一三处取价口径。以上 10 条载体**今日全部仍在位**（§4 逐条给行号） | 见 §4 的「建议归属」；**P9/P10 存在业务 P0 与技术 P2 的排序冲突**（§6 X 类） |
+| **§10.4** | `04-业务验收标准与端到端判据.md` 状态列回填 | **未做** | `docs/` 树**不可覆写** ⇒ 只能新建订正件；本轮实测 `04` §8.1 自述（`✅43/⚠15/❌19/—1`）与 §3 状态列机械解析（`✅37/⚠14/❌26/—1`，78 行）**不自洽 6 条**；需求侧推演订正后应为 `✅51/⚠12/❌14/—1` | 新建订正件；正式回填须由原作者在**同一机械口径**下重跑（命令见 `recon-requirements.md` §6-①） |
+| **§10.5** | `fixtures.py:179` 固定编号（T-04）+ `evidence_hash × regression_preflight` 交互缺陷 | **未做** | 判据：`--freeze` 不再必然报 33 条陈旧违规（`40` §8-C-1/§8-C-2；本轮未复跑） | 取 `fixtures.py:179` 的固定编号 + 修 `evidence_hash --freeze` 的陈旧违规判据 |
+| **§10.6** | `REQ-*` 状态列回填 | **未做** | 含 `F-01/F-03/E-07/E-08`（**已在位、状态列仍 `G`**）：源码坐标 `mes_service.py:757-761`/`:624-636`、`:553-598`/`:596-597`、`routes.py:3705-3717`+`mes_service.py:351`、`:1245-1276` | 新建订正件（同 §10.4 的处置方式） |
+| **§10.7** | 未收口任务接续（下一轮实测） | **未收口（多项 `blocked` 保持）** | `V-13`（TL-05/06/07）：**时点已变**——三件今日均已落盘且自检通过（`check_properties.py` 27366 B / `--selftest` **22/22** exit 0；`check_doc_claims.py` 33390 B / `RESULT: OK（violations=0）` / `--selftest` **16/16** exit 0；`requirements.lock` 2002 B）⇒ 可改为「**验收 + 进链**」；`V-15`（两脚本改钉显式提交号）**在途**；`C-07/C-02(并发)/C-03(浏览器)/C-08(轨二)/C-09` **保持 `blocked`**；`C-06` 写端点 deny **未断言**（`permission_matrix` 按设计只扫 GET）；`V-03/V-05/V-06/V-07` 探针**未复跑** | 逐项按 `70-` §10.7 表格执行；`C-06` 须在**同一工具内**加方法参数化 face（不得新起并行工具） |
+| **§10.8** | 工具与口径卫生 8 条 | **1 条已实现 / 1 条部分 / 6 条未改** | ① `reconcile_r2.py:555` **仍未加** `--coverage`（无参调用 + 断言 `exit 0`，而真实无参 = `exit 2` ⇒ 该检查项**必然报红**）；② `r2_v14_ledgerbook.py:257-262` `command` 无 `--coverage` 而 `exit_code: 0` ⇒ 记录与真实矛盾；③ **已实现**：`40` §4.5 工作区版已入库（`git status` 无 `M`，56294 B / mtime 2026-10-07 23:02:53）；④ `final_recount.py:313-314`/`:378` 仍 `101/141`（`LOCKED` 已为 `108/116/0`）；⑤ `api_matrix.py:808-809` 24 条 CSRF 文案判据**未删/未重指**（文件 804 行、mtime 2026-10-06 22:44:30，本战役期间未改）；⑥ `ci_gates` **无运行锁**（全文无 lock/flock/msvcrt/O_EXCL）；⑦ `regression_preflight` 无「有意复跑白名单」（`whitelist`/`intentional` 0 命中）；⑧ 冻结锚点 `evidence/harness/coverage.json` **未获** `superseded_by`（命中皆为台账脚本自建字段） | 逐条按 `70-` §10.8 判据修；① 是 P12 的根因 |
+| **§10.9** | 计划文本的两处时点修正（`35`） | **未做** | ① 附录 A 命令 ③ 应把 `scripts` 从「期望空」移到「门禁脚本面（授权可变）」；② §9.5 停止条件应补「收口/移交波的重跑须 `preflight`」 | 改文档（文档层，零生产风险） |
+| **§10.10** | 归档与卫生 | **未做（且出现第 6 次同族复发）** | `N-14`（同 run 51 个修订版探针产物无 `superseded_by`）、t9 两份互斥台账、`P11` 仓库根污染、`evidence_hash --freeze` 33 条陈旧违规——逐条按 `40` §4.1/§5.2 处置；V-17 自曝「台账多版 + 两处 `guard_write` 同内容重复件」，建议给 `_env.save_evidence` 加「同内容即复用」幂等分支 | 按 `40` 四步处置并治本（幂等分支） |
+
+**两个 `blocked` 的前置条件（必须原样呈现，不得折算 pass）**
+
+| blocked 项 | 前置条件 | 现状 |
+| --- | --- | --- |
+| **A-63 第二步（构建层晋升）** | `P-1`（已满足）→ `P-2`（已满足）→ **`P-3` = 真实 CI 全绿 ≥1 轮** | **P-3 = 0 轮（不可核）** ⇒ 不得解除 |
+| **C-07 实现（应用级真实库硬闸）** | **生产面冻结解除**（`blocked(生产面冻结)`）+ 显式授权通道 | 规格与判据已就绪（`r2_c07_probe.py` 9/9），**闸未实装** |
+
+---
+
+## 4. 阶段C 产品问题 P1–P12 状态表（今天是否仍存在 + 证据 + 建议归属）
+
+> **计数口径（必须带）**：**仍存在 11 条**（P1–P10 + P12）；**已消失 1 条**（P11 的原载体 `.tmp_v15_*`，实测 0 个），但**同族新残留 `_probe_tmp/` 仍在**（见下）。若按 `70-` §10.3 的「**产品面 10 条**」口径（P1–P10），则 **10 条全部仍需处置**；**P8 属文档口径、P12 属测试资产口径**，二者**不是产品代码缺陷**。
+
+| # | 今天是否仍存在 | 实测 `file:line` + 行内容 | 判定 | 建议归属（业务 / 技术） |
+| --- | --- | --- | --- | --- |
+| **P1** | **仍存在（行为级复现）** | `routes.py:5149 db.session.add(product)` → `:5152 log = AuditLog(` … `:5159 target_id=product.id`（**其间无 `flush()`**）；`quality.py:625 db.session.add(task)` → `:628 log = AuditLog(` … `:635 target_id=task.id`（同形）。**对照三处有 flush**：`routes.py:564`/`:1734`/`:4420`（计划给的这三个行号**今日逐位准确、0 漂移**） | **确认存在**。下游后果实测：新建成品 ⇒ 审计行 `target_id=null / can_rollback=true`，对其回滚 ⇒ **404「目标记录不存在」**。真库旁证：`audit_log` **73 行 / NULL 40 行 / `can_rollback=1 且 NULL` 10 行**（`id=7,8,12,15,24,29,40,44,68,73`） | **业务 P0 / 技术 P0**；归属：后端（2 行 `flush()`）+ **存量 10 行处置须拍板**（置 `can_rollback=False` 诚实标记 / 不回填 `target_id`） |
+| **P2** | **仍存在** | `routes.py:4945` 与 `:5036`：`error_messages.append('第{index+2}行导入失败，请稍后重试或联系管理员')`（**缺 f 前缀，两处同字面量**）；对照 `:4028`（有 f）`[本表实测 V-7]` | **确认存在**（探针 `literal_brace_bug` 仍红）；行号**未漂移**；修法 = 2 个 `f` | **业务 P1 / 技术「阶段C 产品面」P2**；归属：后端 |
+| **P3** | **仍存在（行为级复现）** | `routes.py:2061-2066`：`:2061 if error_messages:` → `:2062 return jsonify({'success': False, 'message': f'数据验证失败，共发现{len(error_messages)}个错误：…'})`（**早于任何 commit**）；其后的行级容错 + 最终 commit 在 `:2102-2140` | **确认存在**（违反 `AGENTS.md`「导入必须行级容错」）。行为：3 好 + 2 坏 ⇒ `success=false`、`employee` 增量 **0**；行号**未漂移** | **业务 P1 / 技术 P2**；归属：后端（**建议与 P2/P4/P5 打包成「导入体验」一张工单**） |
+| **P4** | **仍存在（两场景都红）** | 场景 S4：`routes.py:4000 try:` → `:4003 file.save(temp_path)` → `:4005 ExcelGenerator.parse_task_data(temp_path)` → **`:4006 os.remove(temp_path)`（在 try 内）**；异常出口 `:4066-4067`（**无 `finally`、无删除**）。场景 S5：`:2171-2176` 清理**只在 `except` 分支**，而早退 `:2062` 与成功返回 `:2166` 都不经 `except`；`@bp.before_request` 阈值 `:2194 if current_time - file_time > 300:`（**救不了当次文件**） | **确认存在**。行为：残留 `t3_*_good_bad.xlsx` / `t3_*_broken.xlsx`（`residue_exists=true`）；**本次实测未污染仓库 `uploads/temp`**（`TEMP_FOLDER` 已改指副本目录） | **业务 P1 / 技术 P2**；归属：后端（两处 `finally`） |
+| **P5** | **仍存在** | `routes.py:4016 error_messages.append(f"员工工号 {data['employee_id']} 不存在")`（**无「第 N 行」**）、`:4022`（同；其下一行 `:4022` 与 `:4016` 均为同类）；对照 `:4028 f'第 {index + 2} 行：{date_error}'`（**有**）、`:2058 f'第{i+1}行数据错误：…'`（**有**） | **确认存在**（`row_number_all_ok=false`）；四行行号**全部未漂移** | **业务 P1 / 技术 P2**；归属：后端（与 P2 同工单） |
+| **P6** | **仍存在** | 载体 `routes.py:3285-3288`（`/tasks/<int:id>/update_status`）；函数体内**7 处**「记日志后继续」的内层 `try/except`：`:3474-3476`（自动创建质检任务）、`:3527-3528`（报工扣料回写）、`:3555-3556`（替用分析）、`:3607-3608`（替用通知）、`:3659-3661`（批次状态同步）、`:3684-3685`（生产中心状态同步）、`:3750-3751`（末道入库）；外层出口 `:3755-3759` | **确认存在**（≥4 处 ⇒ 可形成「部分应用」；响应码不反映原子性）。**计划只给探针名，本次给出逐处行号**；**注入复现本轮未做** ⇒ 取行级确定 + 中高置信 | **业务 P1 / 技术 P2**；归属：后端 + 验证（须做故障注入验收） |
+| **P7** | **仍存在** | 实现侧：`quality.py:837-839`（`:838 if template.type != task.target_type:` → `:839 return jsonify({'success': False, 'message': '质检模板类型与任务类型不匹配'}), 400`）；兜底绑定：`mes_service.py:90-94`（`:93 if template is None and target_type in ('workpiece','heat_lot','goods_receipt'):` → `:94 template = pick_template('production_record') or …`）；界面侧：`templates/main/quality/templates.html:103-107` 模板类型下拉**无 `goods_receipt`**、`tasks.html:121-125` 任务类型下拉**无**、`tasks.html:24-29` 类型筛选**无**；3 张 JS 名映射表（`tasks.html:363-371`、`records.html:255-262`、`quality.py:1502-1506`）与 `_VALID_TASK_TYPES`（`quality.py:1507`）**全部缺席**；文档侧：`docs/test-reports/2026-10/04-…md:75`（A4）要求「启用的 `type='material'` 质检模板」 | **确认存在（三角死锁）**：文档口径 ↔ 实现口径 ↔ 界面可选项**三方互斥** ⇒ **来料检在 UI 上无法完成** | **业务 P1 / 技术 P3**；归属：**须用户拍板择一**（§6 拍板项 4）+ 后端 + 前端（**无论选哪条路，3 处 UI 枚举都必须补**） |
+| **P8** | **仍存在（文档口径问题，非代码缺陷）** | `04-…md:88`（B2 行）字面：「`production_batches` +1、`production_batch_items` +n、`task_assignment` +「**工序数×n**」」；`70-` §4-P8 登记 V-12 实测 `V12-B2.3：task_delta=3 / process_count=3 / batch_item_delta=2`（字面期望 6） | **确认存在**（口径过时；实现为「每工序一张」） | **业务 P2 / 技术 P3**；归属：文档（`docs/` 不可覆写 ⇒ 新建订正件） |
+| **P9** | **仍存在（行为级复现）** | `mes_service.py:1121-1131`：`:1125 if wp:` → `:1127 inbound_workpiece(wp, stock_kind='scrap', …)`；`:1138 item.status = 'scrapped'`（**状态已置，台账行只在 `wp` 非空时写**）；报工路径 NC 的 `workpiece_id` 为 NULL（`mes_service.py:632 workpiece_id=None`） | **确认存在**。行为：报废前后 `finished_product(stock_kind='scrap')` 行数 **Δ=0**（复现 `70-` 的 `scrap_rows_delta=0`），同时 `item.status='scrapped'`、门禁 `allowed=false` ⇒ **「状态对了、台账没写」** | **业务 P0（与技术 P2 冲突，§6 X-1）/ 技术 P2**；归属：后端（1 个函数内的分支扩展）；**前置：先把 N-12 措辞收窄为「不做金额台账」**（§6 拍板项 2） |
+| **P10** | **仍存在（两子项均确认）** | ① `routes.py:2733 notes=data['notes']` ↔ `app/utils/excel_generator.py:336-341`：字典键仅 `date`/`employee_id`/`process_code`/`quantity`（**无 `notes`**）⇒ 每行 `KeyError: 'notes'` → `:2738-2739` 记「处理记录时出错」⇒ **0 条入库** `[本表实测 V-17]`。② 取价三处：`routes.py:2717-2720`（`process_code == … AND effective_date <= … ORDER BY effective_date DESC → first()`）↔ `:3902`、`:4020`（`ProcessPrice.query.filter_by(process_code=…).first()`，**不看 `effective_date`**）`[本表实测 V-17]` | **确认存在**（① `notes` KeyError；② 三处取价口径不一致 ⇒ 实测取到 `3487` vs `3488`）；**全部行号未漂移** | **业务 P0（与技术 P2 冲突）/ 技术 P2**；归属：后端（解析器补 `notes` 键或改 `data.get('notes')`；抽 `pick_process_price(code, date)` 单点统一） |
+| **P11** | **原载体已消失；同族新残留存在** | ① 仓库根 `.tmp_v15_*`：**0 个**（原 6 个 `.{out,err}` 已清）`[本表实测 V-3]`）。② **新观察**：仓库根 `_probe_tmp/`（含 `gate-baseline.txt` **24704 B**）今日仍为 `?? _probe_tmp/`（未跟踪）；另有 `scripts/_probe_seed.py` 同在 `scripts/` 内（非门禁表列名） | **P11 原条已消除**；`_probe_tmp/` 属**同族新残留**（建议归 `40` §2 运行时目录纪律） | **业务 P2**；归属：运维/验证（**只登记，未处置**——可能是其他成员在途产物，须 captain 决定） |
+| **P12** | **仍存在（两处下游资产仍按无参调用记录）** | ① `harness/reconcile_r2.py:555`：`chk_subprocess([PY, '-B', 'test-reports-2026-10/harness/coverage_drift.py'], '漂移判据 exit 0')`（**无 `--coverage`**），而 `chk_subprocess` 在 `:262 def` / `:274 ok = … (code == expect_exit)`；② `harness/r2_v14_ledgerbook.py:257-262`：`'command'` 拼串无 `--coverage`，`:262 'exit_code': 0` | **确认存在**（两处都会因 N-1 的修而变红/变陈旧）。本次实跑复核：`coverage_drift.py` **无参 ⇒ exit 2**（stdout 明写「用法错误，不是回归」） | **业务 P1–P2 / 技术 P3**；归属：验证（两处重指 `--coverage <run 产物>`） |
+
+---
+
+## 5. 文档漂移订正表（可直接作为阶段C §10.4/§10.6 的输入）
+
+### 5.1 `D1–D24` 现状（口径：**该订正是否已落到当前仓库的文档文本里**，不判其结论值对不对）
+
+| # | 漂移内容（附录 E 原文摘要） | 今天是否仍漂移 | 关键实测证据 | 订正去向（建议值） |
+| --- | --- | --- | --- | --- |
+| **D1** | 「261 视图 / 102 inline role」 | **是**（源文档未改） | `继续开发准备报告.md:14/38/97/105` 旧数字原样；实测 main 视图 **265** = `@require_capability` **257** + 仅 `@login_required` **8** + 无守卫 **0**；内联 role **15+2** | 见 `recon-docs.md` §4.A `:14` |
+| **D2** | 「194 路由 / `routes.py` 11557 行」 | **部分修正**（271 已确认；**12127 已过时**） | `route_inventory` 271/0；`routes.py` = 511969 B / `splitlines()`=**12155** / `\n`=12155 / 末行有换行 / 无 BOM | 12155 行（写明口径） |
+| **D3** | 「2 个 head 待收敛」 | **部分修正**（`:274` 已改「1 个」，`:21`/`:57`/`:67` 仍写 2 个） | `check_migration_heads.py` ⇒ `HEADS=['p1nonctarget']` / `head_count=1` / `revisions=35` | 「单一 head（历史曾多 head）」 |
+| **D4** | 「31 模板 77 处 role」 | **部分修正**（`:273` 已改；`:20`/`:50`/`:97`/`:105` 仍写 31 模板 77 处 / 102 inline） | 模板 **2 处**（`tasks.html:340`、`task_detail.html:13`）`[本表实测 V-6]`；Python **15** | 模板 2 + Python 15 |
+| **D5** | 「`_ENSURED_COLUMNS` 8 表 23 列」 | **是** | AST：**tables=10 / cols=43**（逐表 6/9/6/6/1/2/3/8/1/1） | 10 表 43 列 |
+| **D6** | 「57 个 `.pyc` 跟踪 + `.gitignore` 3 行」 | **部分修正**（`:68`/`:275` 仍写 57；`:68` 仍写「仅 3 行」） | `git ls-files '*.pyc'` = **0**；`.gitignore` = **42 行**（`/uploads/temp/` 在 `:32`；`*.bak/*.new/*.backup` 在 `:36-38`） | 0（原 57）/ 42 行 |
+| **D7** | 「`app/main` 只有 `routes.py`」 | **是**（`AGENTS.md:91` + 交接文档仍未改） | 实测 `app/main` **7 个**含 `@bp.route` 的模块 / **265 条** `[本表实测 V-5]`；`app/main` 跟踪文件 **10 个**（含 1 字节 `sales_routes.py`） | 7 个模块（全仓 8 模块 / 269 条） |
+| **D8** | 「3 个后缀型残留其实被跟踪，原记录有误」→ 订正目标是「该订正本身错误」 | **订正目标本身不成立**（1） | `git ls-tree -l f60a54d^` ⇒ 三个文件**确被跟踪**；`git show --name-status f60a54d` ⇒ 三者以 `D` 删除；`git show f60a54d^:.gitignore` ⇒ **无** `*.bak/*.new/*.backup`（三条是**同一提交**才加入） | **撤回 D8 的订正动作**，保留 `AGENTS.md:91` 原句 |
+| **D9** | 「删 4 个备份文件」 | **部分修正**（`:220` 仍写「删除 4 个」） | `git show --name-status f60a54d` ⇒ **7 个 `D`**；7 blob 合计 **2543015 B**（4 名字型 = 1989144 B = 1.99 MB） | 7 个（并写明 1.99 MB 只对应 4 名字型） |
+| **D10** | 「HEAD == `148d8a5`」 | **两值都过时** | `git rev-parse HEAD` = **`534ce70b204c767feee551e8fd04e538374b1de8`**；`f60a54d`/`148d8a5` 均为其祖先；`交接提示词:8` 仍写 `f60a54d` | `534ce70b…`（并注明时点） |
+| **D11** | 「新增 4 端点」 | **是** | `quality.py:1368 /api/quality/records/export`、`:1533`、`:1579`、`:1612`；`production_center.py:400` ⇒ **5 个** | 5 个（补 `/api/quality/records/export`） |
+| **D12** | 「审计回滚用 `globals()` 反射」 | **是**（`:281` 仍把 `globals()` 列为「仍未做」） | `routes.py:4182 def _resolve_audit_model`、`:4186 getattr(models_module, …)`；`globals()` 在 `routes.py` **仅** `:4183` docstring | 「已改为 `getattr(app.models, name)`；**级联仍未处理**」 |
+| **D13** | 「模板 role 在 `tasks.html:337`」 | **部分修正**（`:50` 仍写 `:337`） | `tasks.html:340` 命中 `current_user.role` `[本表实测 V-6]` | `:340` |
+| **D14** | 「门禁全部 exit 0 可复跑」（受限环境 exit 1） | **`AGENTS.md` 已修正（`:92-94`）；docs 侧仍漂移** | 本环境：`smoke_test --no-dump` ⇒ 148/8/0 问题 exit 0；`permission_matrix --no-dump` ⇒ 匿名 0 / 无校验 5 / C-06 全绿 exit 0；源码 `smoke_test.py:246/266`、`permission_matrix.py:365/404` 证实落盘改到 `.tmp/<RUN_ID>/` | 按 E-03 后口径改写（**并作废「纯垫片」旧说法**） |
+| **D15** | `继续开发准备报告` §二/§四 的 **4 个** ❓ 已拍板而未勘误 | **是**；且「4 个」本身与实测不符 | 实测 §二 **5 处** ❓、§四 **3 处** = **合计 8 处** | 8 处逐条标注（已决/未决） |
+| **D16** | `is_archived` 口径表漏 `routes.py:6109` | **是**（清单缺易耗品一处，且行号整体漂移） | 未统一点：`routes.py:4797`/`:4808`/**:6125**/`:12065`/`:12093`/`:12122`；已统一点：`:6247`/`:6254`、`quality.py:744`、`mes_service.py:1562`；例外：`mes_service.py:1441/1447/1453` `[本表实测 V-13]` | 补 `:6125` 并订正全部行号 |
+| **D17** | 「导入落盘由 `cleanup_temp_files()` + `finally` 清理」 | **是** | `routes.py` 导入端点 **8 个**：5 个 `TEMP_FOLDER`（`temp_path` 在 `:1951/2300/2696/3876/4002`）、2 个 `tempfile.gettempdir()`（`:4892/4979`）、1 个走 `save_temp_file()`（`:5083`→`:5085 mkdtemp`，调用点 `:7698`）；`cleanup_temp_files()` `:2180` **只删文件不删目录** | 按三类分别写明（见 `recon-docs.md` §4.E `:446`） |
+| **D18** | 「临时文件与清理钩子整体移除」 | **是** | `routes.py:7647 def download_product_template`、`:7650 temp_path = None`（此后从未赋值）、`:7668-7681` 两处死分支；同函数 `:7654-7656` 已是 `BytesIO` `[本表实测 V-12]` | 补「仍留死清理块」并删除 |
+| **D19** | 「15 个修订无条件 `create_table` / `c02604883c72` 建 23 张表」 | **部分成立**（24 处 ✅；**「12 修订」不可复现**；漏计 `p0p2messtables`） | AST：含 `create_table` 的修订文件 **14**；字面表名口径 **13 文件 = 13 修订**；有守卫 **3** ⇒ 无条件 **11**；`c02604883c72` **24 处 / 0 守卫** | 「13 文件（字面）= 13 修订 / 14 文件（含 p0p2messtables）/ 无条件 11 / 该修订 24 处」 |
+| **D20** | 「文档复现命令可直接跑」 | **`AGENTS.md` 已修正（`:92-99`）；docs 侧仍漂移**；沙箱侧本环境**无法复证** | 本环境（danger-full-access）：`check_db_bootstrap` 原生 exit 0、`route_inventory` 原生 exit 0、两条请求型脚本 `--no-dump` exit 0 | 写明「受限沙箱需垫片；danger-full-access 可原生直跑」 |
+| **D21** | 「导入端点必须落盘」 | **是** | `quality.py:1615 def import_inspection_tasks`、`:1634 df = pd.read_excel(file)`（内存流）；对照 `routes.py` 8 个落盘端点；全仓导入端点 **9 个** | 收窄为「需真实路径时落盘」；**点名 `AGENTS.md:49` 与 `:293`**（`:79-81` 不是 import 块） |
+| **D22** | `routes.py` 行数两值并存 | **是**（两值都已过时） | HEAD 版：bytes=511969 / `splitlines()`=**12155** / `\n`=12155 / 末行有换行；对照 `f60a54d` 版 = 12127/12126 且末行无换行 | 12155（写明口径） |
+| **D23** | 「5 个 head 已收敛」 | **是** | `开发进度与交接.md:108`、`:260` 原文仍在；实测 `head_count=1` | 「（历史）曾多 head，现单一 head」 |
+| **D24** | 「无校验 15 个」**量纲混用** | **是** | `测试报告-2026-08-11.md:301` 仍 `75 → 15`、`:568` `降到 6 条`；今日实测：无校验视图 **5**、匿名可访问 **0**、内联 role **15+2**、历史基线 **75** | 三量纲并列且注明「不得互替」（§5.3） |
+
+**汇总**：仍漂移 **15** 条（D1/D5/D7/D11/D12/D15/D16/D17/D18/D22/D23/D24 + D6/D14/D20 的 docs 侧）+ 部分修正 **6** 条（D2/D3/D4/D9/D13/D19）+ **D8 订正方向本身不成立** + D10 值两代过时 ⇒ **24 条无一条可判「无需处理」**。
+
+### 5.2 `AGENTS.md` 关键冲突（门禁表 + 表述）
+
+| # | 位置 | 原文（节选） | 实测 | 处置 |
+| --- | --- | --- | --- | --- |
+| **硬错-1** | `AGENTS.md:87` | 退出码语义 `… / 3=入口缺失` | `ci_gates.py:1138` = `code = 1 if (blocking_fail or not root_ok or ineffective) else (2 if report_fail else 0)`；全文**无 `return 3`/`sys.exit(3)`**，全仓「入口缺失」**0 命中** | **订正文档或实装出口（二选一，须留证）**<br>⚠ **本行整行已被 `§9.2` 订正（append-only，原值保留）**：定性由「硬错」撤回为「口径不完备 / 表述需补注」，佐证「全仓『入口缺失』0 命中」作废 |
+| **A1** | `:91` | 「结论：`app/main` 下现只有 `routes.py` 一个路由模块」 | 实测 `app/main` **7 个**模块 / **265 条**；另有 1 字节死文件 `sales_routes.py` `[本表实测 V-5]` | **必改**（P0） |
+| **A2** | `:25` | 「蓝图路由：`routes.py` … 与 `quality.py`」 | 同上 7 个模块，各承载一个域 | 必改 |
+| **A3** | `:30` | 「质量相关在 `quality.py`；任务/生产/库存/销售/产品等在 `routes.py`」 | `routes.py` 单文件 12155 行 / 192 条路由，域已外移 5 个模块 | 必改 |
+| **A4** | `:87` | 同「硬错-1」 | 同 | 必改/补实装<br>⚠ **已由 `§9.2` 订正（append-only）**：不是「必改/补实装」，而是「**补注 `3` 的来源（CI 封装层）+ 明确脚本自身只发 0/1/2**」 |
+| **A5** | `:49` | 「导入端点才写 `TEMP_FOLDER` … 8 个导入端点属于这种形态」 | 8 个落盘端点中**只有 5 个**写 `TEMP_FOLDER`（`:1951/2300/2696/3876/4002`）；2 个写 `tempfile.gettempdir()`（`:4892/4979`）；1 个走 `mkdtemp()`（`:5083/:5085`，调用点 `:7698`） | 必改 |
+| **A6** | `:49`、`:328` | 「`save_temp_file()`（`app/main/routes.py:5067`）」 | 实测 **`:5083`**（`mkdtemp()` `:5085`）`[本表实测 V-12]` | 必改（行号漂移） |
+| **A7** | `:35`、`:184` | 「仓库现有 **13 处**已是内存生成模式」 | `routes.py` `BytesIO()` = **13** ✅；`quality.py` 另有 **3**（`:1465/1561/1596`）、`excel_generator.py:612` 1 ⇒ 全仓 **17**（**与 `recon-product.md` 的「15 处」口径冲突，见 §6 待裁定 N-A7**） | 必改（限定到 `routes.py` 或改 16/17）；**先裁定 15 vs 17**<br>⚠ 已裁毕 ⇒ 见 `§9.3`（`A-9`：`routes.py` 13 / `app/main` 16 / `app/` 17；「15 处」作废） |
+| **A8** | `:95` | 「`cleanup_temp_files()` 作为 `@bp.before_request` 钩子（`routes.py:2196-2200`）」 | 行为 ✅（`:2194` 阈值判定）；行号漂移：`def cleanup_temp_files` @**`:2180`**、`@bp.before_request` @**`:2203`**、`os.remove` @`:2196` `[本表实测 V-12]` | 必改行号 |
+| **A9** | `:91` | 「`SKIP_SUFFIXES`（`.bak` / `.new` / `.backup`）」 | `check_properties.py:81 = ('.bak', '.new', '.backup', '.pyc')`（**漏 `.pyc`**） | 补 `.pyc` |
+| **A10** | `:91` | 「（约 **1.99 MB**，全仓引用 0 处）」 | 4 名字型 = 1989144 B = 1.99 MB；7 文件合计 2543015 B = 2.54 MB | 补口径 |
+| **A11** | `:99` | 「优先跑不发请求的 **5 个**脚本」 | 门禁表（`:78-83`）已列 6 条命令；`check_model_refs`/`w4_http_contract` 不在该 5 个里；`scripts/check_doc_claims.py`（2026-10-07 新增，`RESULT: OK` exit 0）**未进 14 步链、`AGENTS.md` 全文未提** | 补列 |
+| **A12** | `:91` | 「**其实被 git 跟踪**，原记录有误」 | ✅ **原文正确**（`f60a54d^` 三文件确被跟踪） | **保留原文**；撤回 D8 订正动作 |
+
+**门禁表期望值（本次逐项实跑，全部逐字相符，**不需要改**）**：`:78 check_templates` = `87 templates / 44 declared / 40 used in templates / 44 used on routes / landing 5` → `RESULT: OK`；`:79 check_migration_heads` = `HEADS=['p1nonctarget']` / `head_count=1` / `revisions=35`；`:80 check_properties` = `已扫描 23 个文件，模型类 74 个`；`:81 route_inventory` = `total rules=271` / `duplicate=0`（**报告型，退出码不进判据链**）；`:82 check_model_refs` = `scanned 23 files` / `violations 0`；`:83 w4_http_contract --expect 10` = 10 站点；`:84 ci_gates` = **14 步**（blocking 10 + report-only 4，**引用须连 SHA256 `2EDB60DAE31C5D649E3A3177D5502AD2EB3438E85D5898DC7EC48C83EED75D09` + 时点**）。
+
+### 5.3 数字对账表（文档值 vs 实测值 vs 建议值；**每个数字都必须带口径**）
+
+| 指标 | 文档值（代表位置） | 实测值（工具 + 口径） | 结论 | 建议值 |
+| --- | --- | --- | --- | --- |
+| 模板数 | 87（`AGENTS.md:78` 等） | **87**（`check_templates` `parsed 87 files`；`app/templates` 下非 html 文件 0 ⇒ 全文件数亦 87） | ✅ 一致 | 87 |
+| 声明能力数 | 44 | **44**（AST `permissions.py:27` Dict len=44；`check_templates` `44 declared`） | ✅ 一致 | 44（另有「43 used」/「40 used in templates」口径，**勿混**） |
+| 角色数 | 7 | **7**（AST Tuple len=7） | ✅ 一致 | 7 |
+| 模型类数 | 74 | **74**（`check_properties`；`db.metadata.tables` 同） | ✅ 一致 | 74 |
+| 路由数 | 271（`AGENTS.md:81`）；旧值 194/261 | **271**（url_map）；AST `@bp.route` = **269**；蓝图层 `main` = **265** / `auth` 4 / `static` 1 / `bootstrap` 1 `[本表实测 V-5]` | ⚠ 旧值需订正 | **271（url_map）/ 269（装饰器）/ 265（main）**；引用必带口径 |
+| 无能力装饰器的 main 视图 | 旧文「150 装饰器 + 102 inline role + 9 仅 login_required」 | **8**（AST：265 = `require_capability` 257 + 仅 `login_required` 8 + 无守卫 0） | ⚠ 需订正 | 8 |
+| `_ENSURED_COLUMNS` | 8 表 23 列 / 48 列 | **10 表 / 43 列**（AST `app/__init__.py:21`） | ⚠ 需订正 | 10 表 43 列 |
+| 迁移 head | 2 / 5 | **1**（`HEADS=['p1nonctarget']`） | ⚠ 需订正（措辞 + 值） | 单一 head（历史曾多 head） |
+| 迁移修订数 / 文件数 | 35 / 32 | **35 / 35** | ⚠ 文件数需订正 | 35 / 35 |
+| 迁移建表 / 差集 | 迁移建 49 / 差 31 | **迁移字面表名 = 49**；真库 **75** 表（含 `alembic_version`）⇒ 业务表 74；**差集 31**（若把 `alembic_version` 计入未在迁移的集合则为 **32**） | ✅ 基本一致（**口径须写明**） | 75 表 / 74 业务表 / 迁移建 49 / 差集 **31（业务表口径）**；**32 = 含 `alembic_version` 口径** |
+| 无条件 `create_table` | 15 个修订 / `c02604883c72` 建 23 张表 | **14 文件含调用**；字面 **13 文件 = 13 修订**；**无守卫 11 文件**；`c02604883c72` **24 处** | ⚠ 需订正 | 14/13/11 + 24 处 |
+| 内联 `current_user.role`（Python） | 102 / 「约 70」/「16」 | **15**（AST/逐行；另 `permissions.py:7` 是 docstring ⇒ 文本命中 **16 行**）`[本表实测 V-6]` | ⚠ 需订正 | **15（代码）+ 2（模板）**；「16」= 含 1 行 docstring 的文本口径 |
+| 内联 role（模板） | 31 模板 77 处 | **2**（`tasks.html:340`、`task_detail.html:13`）`[本表实测 V-6]` | ⚠ 需订正 | 2（契约豁免） |
+| 导出/模板 `BytesIO` | 13（`AGENTS.md:35/184` 等） | `routes.py` = **13** ✅；**全仓 = 17**（+`quality.py` 3 + `excel_generator.py` 1） | ⚠ 口径需订正；**另有「15 处」的口径冲突待裁定**<br>⚠ 已裁毕 ⇒ 见 `§9.3`（`A-9`：15 作废，用 13/16/17） | 「`routes.py` 13；全仓导出/模板端点 ≥16；`BytesIO()` 全仓 17」 |
+| 落盘导入端点数 | 8（`AGENTS.md:49`）/ 9 | **全仓 9 个**：`routes.py` **8 个落盘**（5 `TEMP_FOLDER` + 2 OS temp + 1 `mkdtemp`）+ `quality.py` **1 个不落盘** | ⚠ 需写明口径 | 「9 个导入端点；8 个落盘（全在 `routes.py`）；1 个内存流」 |
+| 无校验视图（运行时） | 5 / 75（历史）/ 15（量纲混用） | **5**（`permission_matrix --no-dump`：`api_notification_stats`/`api_recent_notifications`/`manage_notifications`/`my_tasks`/`user_dashboard`）；**匿名可访问 0** | ✅ 5 一致；⚠「15」需订正 | **5（运行时）/ 8（AST「仅登录未登记能力」）/ 75（2026-08-11 历史基线）——三者不得互替** |
+| `routes.py` 行数 | 11557 / 12214 / 12126 / 12127 | **12155**（`splitlines()`=12155、`\n`=12155、末行有换行、无 BOM/CRLF、511969 B） | ⚠ 全部旧值过时 | 12155 |
+| `models.py` 行数 | 约 2770–3092 | **2983** | ✅ 落在区间内 | 2983 |
+| 已跟踪 `.pyc` | 57 | **0** | ⚠ 需订正（新旧口径并存） | 0（原 57） |
+| `.gitignore` | 「仅 3 行」/「14 条规则」 | **42 行**（`:32 /uploads/temp/`；`:36-38 *.bak/*.new/*.backup`；`:41` test-reports `.tmp/`） | ⚠ 需订正 | 42 行 |
+| smoke 目标数 | 148 | **148**（`--no-dump`：`8 身份 × 148`、0 问题、exit 0） | ✅ 一致 | 148（+9 跳过） |
+| functional_test | 109 通过 / 0 失败 | **本轮未重跑**；`check_doc_claims` 钉常量 `functional_passed=109` 与源值相等 ⇒ 自洽 | ✅（口径来源 = `run_gates.EXPECTED`） | 109 / 0 |
+| HEAD | `148d8a5` → `f60a54d` | **`534ce70b204c767feee551e8fd04e538374b1de8`** | ⚠ 需订正 | 534ce70… |
+| 真库不变量 | `F5DA2306…0E0F065` | **2531328 B / `F5DA2306BC31CBAB098AAD3774016D320A9B9AA3546F93418196AE9900E0F065` / mtime 2026-09-18 12:50:55**；`alembic_version=f179636cecf0` | ✅ 一致 | 不变（**注意 `alembic_version` 未 stamp**） |
+| `ci_gates` 步骤数 | 11 → 14 | **14**（blocking 10 + report-only 4）；文件 69125 B / `2EDB60DA…` / mtime 2026-10-07 22:22:17 | ✅ 一致（**引用须连 SHA256 + 时点**） | 14（连 SHA256） |
+| `check_doc_claims` 口径键 | 未被任何背景文档登记 | `--list-constants` ⇒ **20 条全部 OK**（含 `rules_total=271`、`templates_files=87`、`model_classes=74`、`migration_revisions=35`、`capabilities_declared=44`、`smoke_targets=148`、`functional_passed=109`） | ⚠ 未登记 | 建议作为「文档数字的机读权威源」并登记进 `AGENTS.md` 门禁表 |
+
+---
+
+## 6. 分歧仲裁记录（以 `recon-arbitration.md` 为准；新冲突登记为待 captain 追加裁定）
+
+### 6.1 采信仲裁件（`recon-arbitration.md` A-1…A-5，**本文件一律照此引用**）
+
+| # | 裁定 | 本文件的落地 |
+| --- | --- | --- |
+| **A-1** | **Bootstrap 5 走 CDN**（`flask_bootstrap/__init__.py:76 setdefault('BOOTSTRAP_SERVE_LOCAL', False)`、`:108`/`:114-119`/`:173`）；`recon-frontend.md` §K-4「无 CDN」**在此点上不成立** | 本文件 **禁止**使用「无 CDN」表述；`base.html:9 {{ bootstrap.load_css() }}` / `:544 {{ bootstrap.load_js() }}` ⇒ **内网/离线部署风险必须登记**（页面会丢 Bootstrap 核心样式与 JS）；真正走 `url_for` 的是 bootstrap-icons、select2 主题、jQuery、Toastr/Select2/SweetAlert2、jsQR |
+| **A-2** | 模板能力调用数 = **`can('cap')` 101 处 / 32 文件 + `can_any(` 7 处 / 2 文件**；「110 / 28」为 `openQrScan(`/`stopQrScan(` 等假阳性 | 本文件按 101/32 + 7 引用，**「110/28」不出现在本文件**；与门禁口径 `44 declared / 40 used in templates / 44 used on routes` **分开表述**（不是同一量纲） |
+| **A-3** | **报工路径是否补传 `production_record`：不裁定，属用户决策项** | 本文件列为**须拍板项 1**（§6.2），并给默认路径「维持现状口径（`REQ-E-07`）+ 靠 `quality_status` 回写」（该链已实测成立） |
+| **A-4** | `recon-frontend.md` 的 `3521328` 为笔误，真库 = **2531328** | 本文件统一使用 `2531328 / F5DA2306…0E0F065 / 2026-09-18 12:50:55` |
+| **A-5** | 引用纪律四条（数字带口径 / `file_exists` 不判已实现 / `blocked` 不折算 pass / 冲突以仲裁件为准） | 本文件 §0.1/§0.2 已内化为强制纪律 |
+
+### 6.2 须用户拍板项（**不由 agent 裁定**；含默认路径）
+
+| # | 拍板项 | 冲突/依据 | 默认路径（不拍板时） |
+| --- | --- | --- | --- |
+| **1** | **报工路径是否补传 `production_record`**（让「报工产出存在未完成质检任务也拦」） | `recon-backend.md` 与 `recon-product.md` 都建议补（现状 fail-open：`mes_service.py:351` 漏传 + 报工不写 notes ⇒ `record_ids` 恒空）；`recon-requirements.md` 指出这**直接违反 `REQ-E-07`**「本次报工自建的质检任务不作本次入库门禁依据」 | **维持现状口径**（靠 `quality_status` 回写；该链已实测成立）；若要改，须**同批**改 `REQ-E-07` 口径文本 + 加阳性/阴性两格（`recon-product.md` §1.1 的 A-2 格为「当前必红」的证据） |
+| **2** | **P9 vs 「不做清单」N-12** | `recon-product.md`：N-12「不做报废成本台账」会把 P9（报工路径报废无 `scrap` 台账行）**挡回去** | **把 N-12 收窄为「不做金额台账（库存台账行必须写）」**；**不得**据此把 P9 静默降级或删掉 |
+| **3** | **Q-2 识别口径** | `07b DEC-2 §2.2` 的 `R1 rework_task_id → R2 global_sn`；**原文 `notes` 前缀无数据源**（报工不写 notes） | **以 `07b` 为准**；`docs/交接提示词…§五` 的 Q-2 行须加「识别口径已由 `07b` DEC-2 §2.2 更正」；照抄原文会规划出一个**永不生效**的开关 |
+| **4** | **04 文档 §2.1 A4 vs `quality.py:838`（P7 三角死锁）与 `goods_receipt` 口径** | 三方互斥：文档写 `type='material'`、实现要求 `template.type == task.target_type`、界面 3 处枚举无 `goods_receipt` | **择一**：路径 A 改文档为 `goods_receipt` + 补 3 处 UI 枚举 + 3 张 JS 名映射表 + `_VALID_TASK_TYPES`；路径 B 放宽 `:838` 接受 `material`。**无论选哪条，3 处 UI 枚举与 3 张映射表都必须补**（否则问题被隐藏） |
+
+### 6.3 输入稿之间的**新冲突**（`recon-arbitration.md` 未覆盖）⇒ 登记为**待 captain 追加裁定**（本文件仅给出源码侧取证，不构成裁定）
+
+> ⚠ **本节 7 条（`N-A1…N-A7`）已全部由 captain `A-6…A-13` 裁毕（`A-13` 明示「待裁定池已清空」）** ⇒ **本节标题与各行原值一律保留不删（append-only）**，但读法改为「**已裁定，不得再按「待裁定」引用**」。逐条裁定结果见 **`§9.3`**。
+
+| # | 冲突 | 各方说法 | 源码侧取证（供裁定） |
+| --- | --- | --- | --- |
+| **N-A1** | `app/main` 含 `@bp.route` 的模块数 | `recon-arch.md` §1.2 写「实测 **8 个**含 `@bp.route` 的模块」；`recon-docs.md` §2.2-A1 写「**7 个**模块 / 265 条（全仓 8 模块 / 269 条）」；计划 `B9-16` 的订正句式也写「app/main 有 **8 个**」 | **本次独立 AST 实测 = `app/main` 7 个模块 / 265 条**（`routes.py` 192、`quality.py` 27、`equipment.py` 15、`purchase.py` 13、`production_center.py` 7、`shipping.py` 6、`stock.py` 5）`[本表实测 V-5]`。「8 模块 / 269 条」是**全仓**口径（含 `app/auth/routes.py` 4 条）。⇒ **建议追加裁定：`app/main` = 7 个；计划 B9-16 的订正值需更正**<br>⚠ 已裁毕 ⇒ 见 `§9.3`（`A-6`：**7 个模块 / 265 条**；「8 个」是**全仓**口径 = `app/main` 7 + `app/auth` 4 = 8 模块 / 269 条） |
+| **N-A2** | 批次8 完成度口径 | `recon-arch.md` §0 汇总写「批次8 **0/12 已实现**」，但其 §2 的 `B8-07` 行写「**已实现（静态面）**」、`B8-08` 行写「按计划不改（=正确状态）」 | 本文件按**行级判定**计入（`B8-07` = 已实现；`B8-08` = 计划内不改）。⇒ 同一稿内「汇总 vs 行级」不一致，**建议追加裁定以哪一层为计数口径**<br>⚠ 已裁毕 ⇒ 见 `§9.3`（`A-7`：批次8 = **0 已实现 / 1 部分（`B8-07`）/ 1 不改（`B8-08`）/ 10 未实现 = 12**；不得只写「0/12」） |
+| **N-A3** | `B7-06` 的状态 | `recon-backend.md` 汇总表计「批次7 已实现 1（`B7-06`，仅『未新增』）」；`recon-requirements.md` 计「批次7 未开始（仅 `B7-06` 形式成立）」 | 本文件计 **部分实现**（形式成立、约束未落地；`create_notification` 内部自带 `commit` @`notification_service.py:121`）。⇒ **建议追加裁定口径**<br>⚠ 已裁毕 ⇒ 见 `§9.3`（`A-8`：`B7-06` = **未实现**；「净增 0」是现状描述、不是完成证据） |
+| **N-A4** | 导出内存生成的处数 | `AGENTS.md` 写 **13**；`recon-docs.md` §3 给「`routes.py` 13 / 导出端点 ≥16 / 全仓 `BytesIO()` 17」；`recon-product.md` §6/§7.1 给「`BytesIO` 构造点实测 **15 处**」 | 两稿的**逐行枚举**不同（17 = 13+3+1；15 未给出完整行号清单）。⇒ **建议追加裁定：以「枚举行号 + 文件」为准**，本文件 §5.3 暂按 `recon-docs.md` 的 13/16/17 呈现并标注「15 未获独立证据」<br>⚠ 已裁毕 ⇒ 见 `§9.3`（`A-9`：`routes.py` 13 / `app/main` 16 / `app/` 17；「15 处」作废） |
+| **N-A5** | `P11` 的状态表述 | `recon-arch.md` §6.4 记「仓库根 `.tmp_v15_*` = **0 个**（G-22 已消失）」；`recon-backend.md` §5-P11 / `recon-product.md` §3.11 记「原载体已清，**同族新残留 `_probe_tmp/`**」 | **不冲突，属同一件事的两半**：本次 `git status` 复核 `_probe_tmp/` **仍在**（`?? _probe_tmp/`，含 `gate-baseline.txt` 24704 B）`[本表实测 V-3]`。⇒ 建议合并为一条登记（原条消除、同族残留未处置）<br>⚠ 已裁毕 ⇒ 见 `§9.3`（`A-10`：`P11` = **部分关闭**；`_probe_tmp/gate-baseline.txt` 系 captain 自跑残留并已删除；`scripts/_probe_seed.py` 先于本轮、不并入） |
+| **N-A6** | 「仍存在 11 条」的计数口径 | `recon-backend.md` / `recon-product.md` 均给「仍存在 **11** 条（P1–P10+P12）」；`70-` §10.3 的**产品面**口径只有 **10** 条（P1–P10） | 本文件两个口径**并列呈现**（§4 抬头）；不得单独引用「11」而不说口径 |
+| **N-A7** | `create_all` 差集 31 vs 32 | `recon-docs.md` §3 = **31**；`recon-product.md` §2-G-N = 「差集 **32**，去掉 `alembic_version` = **31**」 | 属**口径差异**（是否把 `alembic_version` 计入「未在迁移的表集合」）：本文件 §5.3 同时给出 31（业务表）与 32（含 `alembic_version`）。⇒ 建议追加裁定统一写法<br>⚠ 已裁毕 ⇒ 见 `§9.3`（`A-12`：权威 **31**，32 为含 `alembic_version` 的另一口径） |
+
+---
+
+## 7. 自检表（对照三条自查纪律）
+
+| # | 纪律 | 自查结果 | 具体 |
+| --- | --- | --- | --- |
+| **S-1** | **「文件存在 ≠ 已实现」** | ✅ 通过 | 本表 12 条「已实现」中 **8 条有行为级证据**（B4-01/02/03、B5-01/02/04/05/06）、**4 条为源码/读数级**（B3-01 命令读数、B8-07 静态判据、B10-01a 源码面在位、B10-01-边界 符合边界要求），**无一条只凭「文件存在」**。反例已按「未实现」处理：`B7-01/02/03`（有定义、**零调用点**）、`B6-01…06`（模板存在但判据全红）、`B9-*`（文档存在但原文未改）、计划点名的两个门禁脚本（**不存在**） |
+| **S-2** | **每条判定带「工具 + 口径 + 值」** | ✅ 通过 | 82 条每条证据格均含 `file:line` 或命令读数；本轮作者另做 **20 项**独立复核（§0.3，标 `[本表实测]`）；三条「无法核实」逐条写明原因（B9-04 需语义判读、B9-05 需 git 历史、B9-08 需明确落点 + 非沙箱环境） |
+| **S-3** | **未验证项不混入完成数** | ✅ 通过 | **未混入**项清单：① `B9-04/05/08`（无法核实，**不计完成**）；② A-63 第二步与 C-07（`blocked`，**不计 pass**）；③ `P6` 的**注入复现未做**（标「取行级确定 + 中高置信」）；④ `B4-07` 的**故障注入未做**（同上）；⑤ `P12` 的「`--coverage` ⇒ exit 0」为**转述未复跑**；⑥ `REQ-M-02/M-03`（零行表 / `is_archived IS NULL` 行数）**本轮未读库复核**；⑦ `_probe_tmp/`、`scripts/_probe_seed.py` **归属未定**（只登记）；⑧ 浏览器类结论（真实 DOM、Select2 下拉实际过滤、移动端断点、CSS 死类）**一律未判**；⑨ 请求型门禁脚本（`smoke_test`/`permission_matrix`/`functional_test`/`w2w3_probe`）**本轮未复跑**，只用 captain 2026-10-08 基线与历史产物 |
+
+---
+
+## 8. 输入稿覆盖情况、缺口登记与复跑入口
+
+### 8.1 输入稿覆盖（8/8 存在，**无领域未覆盖**）与各稿自陈边界
+
+| 稿 | 覆盖范围 | 自陈「未做/未覆盖」（不得当已做） |
+| --- | --- | --- |
+| `00-共享事实底盘.md`（W0/t1） | 真库不变量、6 项静态门禁读数、`ci_gates` 14 步、数字基线 | 不判实现状态（观测记录） |
+| `recon-arch.md`（W1/t2） | 批次3/8/9/10/11 + 阶段C 构建层/工具卫生/归档 | **未覆盖批次4/5/6/7**；`B9-04/05/08` 判「不可核」；未跑请求型脚本 |
+| `recon-backend.md`（W2/t11） | 批次4/5/6/7 逐条 + P1–P12 现场复核（含行为级探针） | `B4-07`/`P6` **未做故障注入**；`coverage_drift --coverage ⇒ exit 0` 未复跑；`_probe_tmp/` 归属未判 |
+| `recon-frontend.md`（W3/t4） | 模板规模/权限渲染/批次6 UI 判据/P7/前端资产 | **无浏览器**（DOM/Select2 实际过滤/移动端行为/CSS 死类一律 `无法核实（需浏览器）`）；未发 HTTP 请求；未复核后端其它条目 |
+| `recon-requirements.md`（W4/t5） | REQ 状态订正、`04` 计数漂移、断链清单、P0/P1/P2 重排、X-1…X-6 | `REQ-M-02/M-03` **未读库复核**；行为级读数**转述** `recon-backend.md`；`AC-62` 只读 `--list` 声明、未真跑注入 |
+| `recon-product.md`（W5/t6） | Q-1…Q-4 落地、C-6 口径缺口、附录B 15 组、P1–P12 分级、X-1…X-4 | `coverage_drift --coverage ⇒ exit 0` 未复跑；`P6` 未注入；P7/P8 的 V-12 探针读数只做取行确认 |
+| `recon-docs.md`（W6/t7） | D1–D24 逐条、`AGENTS.md` 门禁表 + 12 处冲突、数字总表、订正执行清单 | 沙箱侧（D14/D20）**本环境无法复证**（danger-full-access）；未跑请求型脚本 |
+| `recon-arbitration.md`（captain） | 跨稿冲突裁定 A-1…A-5 | 明示「不得作为新增事实来源」；未覆盖的新冲突由 captain 追加 A-6…（本文件 §6.3 已登记 7 条待裁定）<br>⚠ 已闭合 ⇒ 见 `§9.3`（7 条已由 `A-6…A-13` 裁毕） |
+
+### 8.2 缺口登记（本文件的缺口，不是别稿的）
+
+1. **本文件未新增任何行为级探针**：所有行为读数（`nc_rows_delta`、`Δ=100.0`、`scrap_rows_delta=0`、`audit_log 73/40/10`、`residue_exists=true`、`employee Δ=0`）均为 `recon-backend.md` / `recon-product.md` 的探针产物，本文件**标注为引用**并在 §0.3 给出作者亲自复核的 20 项静态/取行证据。
+2. **本轮未读库复核** `REQ-M-02`（45 张零行表）与 `REQ-M-03`（`is_archived IS NULL` 行数）——须副本库，命令见 `recon-requirements.md` §6-⑤。
+3. **未复跑任何请求型门禁脚本**（`smoke_test` / `permission_matrix` / `functional_test` / `w2w3_probe`）：本文件的门禁读数来自 captain 2026-10-08 基线与 W0 底盘。
+4. **7 条跨稿新冲突**（§6.3 N-A1…N-A7）**待 captain 追加裁定**——本文件未单方面裁定，只给源码侧取证。<br>⚠ **本项已闭合（append-only 订正）**：`A-13` 明示「待裁定池已清空」，`N-A1…N-A7` 已由 `A-6…A-13` 全部裁毕 ⇒ 逐条结果见 **`§9.3`**；本行原值保留不删。
+5. **本文件产出后 `git status` 会多一条未跟踪项**（`test-reports-2026-10/80-…md`），属预期。
+
+### 8.3 复跑入口（仓库根目录；**全部只读**）
+
+```powershell
+$env:PYTHONIOENCODING='utf-8'
+$py = 'F:\Miniconda\envs\wage\python.exe'
+Set-Location 'D:\workspace\wage_management_system - bak'
+
+# ⓪ 不变量（开工/收尾各一次；期望 2531328 / F5DA2306…0E0F065 / 2026-09-18 12:50:55）
+(Get-Item app.db).Length; (Get-FileHash app.db -Algorithm SHA256).Hash
+(Get-Item app.db).LastWriteTime.ToString('yyyy-MM-dd HH:mm:ss')
+git rev-parse HEAD
+git status --porcelain
+git status --porcelain --untracked-files=no      # 期望 0 行
+
+# ① 82 条 B 编号完整性（期望 84 唯一串 = 82 条 + B3-07/B10-01 两个祖先标签）
+#    （正则 B\d{1,2}-\d{2}[a-c]?(-边界)? 扫 docs/开发与测试规划-2026-10-06.md 去重）
+
+# ② 本文件 §0.3 的核心复核（可逐条肉眼比对）
+python -B -c "import ast,os;per={};tot=0
+for fn in sorted(os.listdir('app/main')):
+    if not fn.endswith('.py'): continue
+    t=ast.parse(open(os.path.join('app/main',fn),encoding='utf-8',errors='replace').read())
+    c=sum(1 for n in ast.walk(t) if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef)) for d in n.decorator_list if 'route' in (ast.unparse(d) if hasattr(ast,'unparse') else ''))
+    per[fn]=c; tot+=c
+print('APP_MAIN_BP_ROUTE_TOTAL',tot); print(per)"     # 期望 265 / 7 个非零模块
+
+# ③ 计划点名的两个门禁脚本（期望：不存在）
+Get-ChildItem scripts -File | Select-Object -ExpandProperty Name
+Test-Path scripts/check_notification_triggers.py     # 期望 False
+Test-Path scripts/check_is_archived_policy.py        # 期望 False
+Test-Path app/main/sales_routes.py                   # 期望 True（1 字节，未删）
+
+# ④ 阶段C 两项 blocked 的载体（期望：仍 blocked）
+Select-String -Path Jenkinsfile -Pattern '^\s*error\('           # 期望 0 行生效
+& $py -B test-reports-2026-10/harness/ci_gates.py --list         # 期望 steps=14
+(Get-FileHash test-reports-2026-10/harness/ci_gates.py -Algorithm SHA256).Hash  # 2EDB60DA…
+
+# ⑤ P12 的行为（期望 exit 2 = 用法错误，不是回归）
+& $py -B test-reports-2026-10/harness/coverage_drift.py ; Write-Output "exit=$LASTEXITCODE"
+
+# ⑥ 收尾复核真库（必须与 ⓪ 逐字相同）
+(Get-FileHash app.db -Algorithm SHA256).Hash
+```
+
+---
+
+*本文件全部判定给 `file:line` 或「工具 + 口径 + 读数」；凡属引用（`recon-backend.md`/`recon-product.md` 的行为级读数）已逐处标注来源；凡「无法核实 / 未复核 / 待裁定」项**均未计入完成数**，并已在 §6.3/§7/§8.2 显式登记。*
+

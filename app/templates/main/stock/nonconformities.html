@@ -1,33 +1,159 @@
 {% extends "base.html" %}
 {% block title %}不合格处置{% endblock %}
 {% block content %}
+{# B14-01：枚举值中文化。英文枚举仅作为映射键存在于模板源码中，不进入 DOM 可见文案。 #}
+{% set NC_TYPE_LABELS = {'rework': '返工', 'scrap': '报废', 'accept': '让步接收', 'return': '退货'} %}
+{% set NC_STATUS_LABELS = {'open': '待处置', 'pending_approval': '待审批', 'approved': '已批准', 'rejected': '已拒绝', 'done': '已完成'} %}
+{% set NC_RESULT_LABELS = {'rework': '返工', 'scrap': '报废', 'accept': '让步接收', 'return': '退货'} %}
 <div class="container mt-4">
     <h2>不合格处置</h2>
+
+    {# B14-05：待审批筛选入口。仅提供链接并携带 status 查询参数（与后端约定的参数名为 status），
+       筛选逻辑与参数解析由 app/main/stock.py 的路由实现，本模板不新增任何 URL 规则。 #}
+    <div class="mb-3" id="ncStatusFilter">
+        <span class="text-muted me-2">按状态筛选：</span>
+        <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('main.manage_nonconformities') }}">全部</a>
+        <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('main.manage_nonconformities', status='open') }}">待处置</a>
+        <a class="btn btn-sm btn-outline-warning" href="{{ url_for('main.manage_nonconformities', status='pending_approval') }}">待审批</a>
+    </div>
+
     <table class="table table-hover">
-        <thead><tr><th>ID</th><th>类型</th><th>状态</th><th>工件</th><th>结果</th><th>操作</th></tr></thead>
-        <tbody>
-        {% for nc in items %}
+        <thead>
             <tr>
+                <th>ID</th>
+                <th>类型</th>
+                <th>状态</th>
+                <th>目标</th>
+                <th>结果</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for nc in items %}
+            {% set task = nc.record.task if nc.record else None %}
+            {% set ttype = nc.target_type if nc.target_type else (task.target_type if task else None) %}
+            <tr data-nc-id="{{ nc.id }}" data-nc-type="{{ nc.type }}" data-nc-status="{{ nc.status }}" data-target-type="{{ ttype }}">
                 <td>{{ nc.id }}</td>
-                <td>{{ nc.type }}</td>
-                <td>{{ nc.status }}</td>
-                <td>{% if nc.workpiece_id %}<a href="{{ url_for('main.workpiece_detail', id=nc.workpiece_id) }}">{{ nc.workpiece_id }}</a>{% else %}-{% endif %}</td>
-                <td>{{ nc.handling_result }}</td>
+                <td>{{ NC_TYPE_LABELS.get(nc.type, nc.type) }}</td>
+                <td>{{ NC_STATUS_LABELS.get(nc.status, nc.status) }}</td>
+                {# B14-02：目标列 —— 来料检走该到货单的检验记录页，生产检走对应生产记录的质检任务页
+                   （同时解决 B4-04「看不出对应哪张生产记录」）；历史工件事据保留工件链接。 #}
                 <td>
-                    {% if nc.status in ('open', 'pending_approval') %}
+                    {% if ttype == 'goods_receipt' %}
+                    <a href="{{ url_for('main.quality_inspection', record_id=nc.record_id) }}"
+                       data-target-type="goods_receipt" data-target-id="{{ nc.target_id }}"
+                       title="查看该到货单的来料检验记录">到货单 #{{ nc.target_id }}</a>
+                    {% elif ttype == 'production_record' and task %}
+                    {% set prec = task.target_record %}
+                    <a href="{{ url_for('main.quality_task_detail', task_id=task.id) }}"
+                       data-target-type="production_record" data-target-id="{{ task.target_id }}"
+                       title="查看该生产记录的质检任务详情">生产记录 {{ prec.global_sn if prec else ('#' ~ task.target_id) }}</a>
+                    {% elif nc.workpiece_id %}
+                    <a href="{{ url_for('main.workpiece_detail', id=nc.workpiece_id) }}">工件 #{{ nc.workpiece_id }}</a>
+                    {% else %}-{% endif %}
+                </td>
+                <td>{{ NC_RESULT_LABELS.get(nc.handling_result, nc.handling_result) or '—' }}</td>
+                <td>
+                    {% if can('quality.inspect') and nc.status in ('open', 'pending_approval') %}
+                    {% if ttype == 'goods_receipt' %}
+                    {# B14-04：来料检只允许 退货 / 让步接收 / 报废，不提供返工。 #}
                     <form class="d-inline" method="post" action="{{ url_for('main.dispose_nonconformity_api', id=nc.id) }}">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <button class="btn btn-sm btn-outline-primary" name="action" value="rework">返工</button>
-                        <button class="btn btn-sm btn-outline-danger" name="action" value="scrap">报废</button>
-                        <button class="btn btn-sm btn-outline-success" name="action" value="accept">让步</button>
+                        <button type="submit" name="action" value="return" class="btn btn-sm btn-outline-secondary">退货</button>
+                        <button type="submit" name="action" value="accept" class="btn btn-sm btn-outline-success">让步接收</button>
+                        <button type="submit" name="action" value="scrap" class="btn btn-sm btn-outline-danger">报废</button>
                     </form>
+                    {% else %}
+                    {# B14-03：返工必须显式选择工序与员工（两个 required 下拉，数据源 /api/quality/processes、/api/quality/inspectors）。 #}
+                    <form class="d-inline-flex flex-wrap align-items-center gap-1 mb-1" method="post"
+                          action="{{ url_for('main.dispose_nonconformity_api', id=nc.id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <select class="form-select form-select-sm w-auto nc-rework-process" name="rework_process_id"
+                                required aria-label="返工工序">
+                            <option value="">请选择工序</option>
+                        </select>
+                        <select class="form-select form-select-sm w-auto nc-rework-employee" name="employee_id"
+                                required aria-label="返工员工">
+                            <option value="">请选择员工</option>
+                        </select>
+                        <button type="submit" name="action" value="rework" class="btn btn-sm btn-outline-primary">返工</button>
+                    </form>
+                    <form class="d-inline" method="post" action="{{ url_for('main.dispose_nonconformity_api', id=nc.id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" name="action" value="scrap" class="btn btn-sm btn-outline-danger">报废</button>
+                        <button type="submit" name="action" value="accept" class="btn btn-sm btn-outline-success">让步接收</button>
+                    </form>
+                    {% endif %}
                     {% endif %}
                 </td>
             </tr>
-        {% else %}
+            {% else %}
             <tr><td colspan="6" class="text-muted">暂无不合格记录</td></tr>
-        {% endfor %}
+            {% endfor %}
         </tbody>
     </table>
 </div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+(function () {
+    var PROCESS_API = "{{ url_for('main.get_processes') }}";
+    var INSPECTOR_API = "{{ url_for('main.get_inspectors') }}";
+
+    function notify(message) {
+        if (window.toastr) {
+            toastr.error(message);
+        }
+    }
+
+    function fillSelects(selector, items, valueOf, labelOf) {
+        document.querySelectorAll(selector).forEach(function (select) {
+            items.forEach(function (item) {
+                var option = document.createElement('option');
+                option.value = valueOf(item);
+                option.textContent = labelOf(item);
+                select.appendChild(option);
+            });
+        });
+    }
+
+    fetch(PROCESS_API, { credentials: 'same-origin' })
+        .then(function (response) { return response.json(); })
+        .then(function (payload) {
+            if (!payload || !payload.success) {
+                throw new Error((payload && payload.message) || '工序数据加载失败');
+            }
+            fillSelects('.nc-rework-process', payload.data || [], function (item) {
+                return item.id;
+            }, function (item) {
+                var name = item.process_name || '';
+                return item.process_code ? (item.process_code + ' - ' + name) : name;
+            });
+        })
+        .catch(function (error) {
+            notify('返工工序加载失败，请刷新后重试');
+            console.error(error);
+        });
+
+    fetch(INSPECTOR_API, { credentials: 'same-origin' })
+        .then(function (response) { return response.json(); })
+        .then(function (payload) {
+            if (!payload || !payload.success) {
+                throw new Error((payload && payload.message) || '员工数据加载失败');
+            }
+            fillSelects('.nc-rework-employee', payload.inspectors || [], function (item) {
+                return item.id;
+            }, function (item) {
+                var name = item.name || '';
+                return item.employee_id ? (name + '（' + item.employee_id + '）') : name;
+            });
+        })
+        .catch(function (error) {
+            notify('返工员工加载失败，请刷新后重试');
+            console.error(error);
+        });
+})();
+</script>
 {% endblock %}

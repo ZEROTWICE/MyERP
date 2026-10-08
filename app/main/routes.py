@@ -16,7 +16,7 @@ from app.main.forms import (
     ProductionOrderForm, NotificationRuleForm, NotificationTemplateForm,
     GlobalSearchForm, AdvancedSearchForm, ExportProductForm, ProductImportForm
 )
-from sqlalchemy import desc, or_
+from sqlalchemy import desc, or_, func
 from app.utils.excel_generator import ExcelGenerator
 import io
 import os
@@ -44,9 +44,54 @@ from .production_center import *
 from . import equipment, purchase, shipping, stock
 
 from app.services.search_service import SearchService
+# 合金钢辙叉两份原始数据源的导入（工价标准 73 页 / 48页表格 BOM）：
+# 解析器在 app/utils，落库与行级容错在 app/services/alloy_steel_import_service.py
+from app.utils.alloy_steel_price_converter import AlloySteelPriceConverter
+from app.utils.alloy_steel_bom_converter import AlloySteelBomConverter
+from app.services.alloy_steel_import_service import import_price_result, import_bom_result
 # DEC-2 §2.5：计件金额的**唯一**口径函数（S1/S3/S4 与 models.Employee.total_salary 同源；
 # 返工是否计入由 SystemConfig('quality.rework_counts_piecework') 在该函数内唯一决定）
-from app.services.mes_service import piecework_amount
+# B12-04：`piecework_breakdown` 是同一口径的明细视图（counted/dropped/excluded），
+# 金额仍只由 `piecework_amount` 决定，这里只把**已经算好**的剔除量暴露给界面核对。
+# 注意：开关的读取点仍**唯一**在 mes_service.rework_counts_piecework() 内（RC-18/AC-04-e），
+# 本文件需要回显开关状态时也只调用该访问器，不自己直读 SystemConfig。
+from app.services.mes_service import piecework_amount, piecework_breakdown, rework_counts_piecework
+
+
+def _piecework_detail(records):
+    """B12-04：把 `piecework_breakdown` 已算好的 `counted/dropped/excluded` 摊平成界面可用结构。
+
+    只调用、不重算：`counted` 与 `piecework_amount` 同源，因此新增明细列
+    不会改变计件工资总额与既有计算口径。返回的 `records` 是同一批记录对象（顺序不变），
+    每条的 `_piecework_excluded` 由 `excluded` 集合标注，供模板区分「正常 / 返工」。
+    """
+    records = list(records)
+    counted, dropped, excluded = piecework_breakdown(records)
+    entries = []
+    normal_quantity = 0.0
+    rework_quantity = 0.0
+    for record in records:
+        is_rework = getattr(record, 'id', None) in excluded
+        setattr(record, '_piecework_excluded', is_rework)
+        if is_rework:
+            rework_quantity += record.quantity
+        else:
+            normal_quantity += record.quantity
+        entries.append({
+            'record': record,
+            'is_rework': is_rework,
+            'amount': record.quantity * record.process.price,
+        })
+    return {
+        'counted': counted,
+        'dropped': dropped,
+        'full_amount': counted + dropped,
+        'normal_quantity': normal_quantity,
+        'rework_quantity': rework_quantity,
+        'rework_counts_piecework': rework_counts_piecework(),
+        'excluded_ids': sorted(i for i in excluded if i is not None),
+        'records': entries,
+    }
 
 
 def _reraise_http(exc):
@@ -105,6 +150,49 @@ def _coerce_excel_date(value, label='日期'):
     if parsed is None or pd.isna(parsed):
         return None, f'{label}格式错误（{value}）'
     return parsed.to_pydatetime(), None
+
+
+def pick_process_price(process_code, business_date):
+    """取价单点（B12-01 唯一口径）：返回 business_date 当日结束前生效的最新版工价。
+
+    等价语义 = 原 app/main/routes.py:2717-2720（生产记录导入链的正确口径）：
+        ProcessPrice.query.filter(
+            ProcessPrice.process_code == process_code,
+            ProcessPrice.effective_date <= end_of_day + timedelta(days=1)
+        ).order_by(ProcessPrice.effective_date.desc()).first()
+    其中 end_of_day = 业务日期 23:59:59.999999。
+
+    之所以保留 `+ timedelta(days=1)`：它是仓库既有约定（routes.py:765/800/1169/3126、
+    quality.py:706 同样写法），用于吸收「工价录入时 effective_date 被写成 datetime 且
+    落在业务日之后」的边界；去掉会把这类版本漏掉，故此处逐字保留基准语义。
+
+    与 `filter_by(process_code=...).first()` 的旧写法相比，本函数额外做两件事：
+      1. 排除 effective_date 晚于业务日 +1 天的行 —— 不得把未生效的未来价当当前价；
+      2. 按 effective_date 降序取第一条 —— 同一 process_code 多版本时取最新版。
+    无生效版本时返回 None（调用方保持各自的原有容错，不得改为抛异常）。
+
+    business_date 为 None 时返回 None（调用方按「无生效版本」处理）。
+    business_date 接受 date/datetime，以及 Excel 文本日期单元格的 str（复用
+    `_coerce_excel_date` 的解析口径，避免文本日期与基准行产生不可比的类型）。
+    """
+    if business_date is None:
+        return None
+    if isinstance(business_date, datetime):
+        day = business_date.date()
+    elif isinstance(business_date, date):
+        day = business_date
+    elif isinstance(business_date, str):
+        coerced, err = _coerce_excel_date(business_date, '业务日期')
+        if err or coerced is None:
+            return None
+        day = coerced.date() if isinstance(coerced, datetime) else coerced
+    else:
+        return None
+    end_of_day = datetime.combine(day, datetime.max.time())
+    return ProcessPrice.query.filter(
+        ProcessPrice.process_code == process_code,
+        ProcessPrice.effective_date <= end_of_day + timedelta(days=1)
+    ).order_by(ProcessPrice.effective_date.desc()).first()
 
 
 def _resolve_raw_material_category(name, created_by=None):
@@ -923,6 +1011,20 @@ def add_process_price():
                          title='新增工序价格',
                          finished_rules_json=finished_rules_json,
                          raw_rules_json=raw_rules_json)
+
+
+def _norm_change_value(value):
+    """B13-06：变更判定用的值归一（只服务通知触发判定，不改审计快照本身）。
+
+    edit_process_price 的 old_data 在赋值前采集（DB 里是 datetime ⇒ isoformat 带 'T00:00:00'），
+    new_data 在赋值后采集（表单给的是 date ⇒ isoformat 只有日期）；同一天的不同写法不是变更，
+    不归一会让「原样提交」也判成变更、无意义地触发通知路径。
+    """
+    if isinstance(value, str) and len(value) == 19 and value.endswith('T00:00:00'):
+        return value[:10]
+    return value
+
+
 @bp.route('/process_prices/<int:id>/edit', methods=['GET', 'POST'])
 @login_required
 @require_capability('process.manage')
@@ -1009,7 +1111,24 @@ def edit_process_price(id):
                     )
                     db.session.add(group)
             
-            # 记录可回滚的审计日志
+            # 记录可回滚的审计日志（new_data 提为局部变量，供 B13-06 变更判定复用）
+            new_data = {
+                'process_code': process_price.process_code,
+                'process_name': process_price.process_name,
+                'component': process_price.component,
+                'drawing_no': process_price.drawing_no,
+                'model_no': process_price.model_no,
+                'price': process_price.price,
+                'effective_date': process_price.effective_date.isoformat() if process_price.effective_date else None,
+                'notes': process_price.notes,
+                'version': process_price.version,
+                'is_current': process_price.is_current,
+                'price_type': process_price.price_type,
+                'has_output': process_price.has_output,
+                'output_type': process_price.output_type,
+                'code_rule_id': process_price.code_rule_id,
+                'needs_inspection': process_price.needs_inspection
+            }
             log = AuditLog(
                 user_id=current_user.id,
                 action='修改工序价格',
@@ -1019,24 +1138,25 @@ def edit_process_price(id):
                 target_model='ProcessPrice',
                 target_id=process_price.id,
                 old_data=old_data,
-                new_data={
-                    'process_code': process_price.process_code,
-                    'process_name': process_price.process_name,
-                    'component': process_price.component,
-                    'drawing_no': process_price.drawing_no,
-                    'model_no': process_price.model_no,
-                    'price': process_price.price,
-                    'effective_date': process_price.effective_date.isoformat() if process_price.effective_date else None,
-                    'notes': process_price.notes,
-                    'version': process_price.version,
-                    'is_current': process_price.is_current,
-                    'price_type': process_price.price_type,
-                    'has_output': process_price.has_output,
-                    'output_type': process_price.output_type,
-                    'code_rule_id': process_price.code_rule_id,
-                    'needs_inspection': process_price.needs_inspection
-                }
+                new_data=new_data
             )
+
+            # B13-06：工序变更通知接线。仅当工序信息真的发生变化时才通知
+            #（old_data 与 new_data 逐键比较，未变更 ⇒ +0，见 B13-06 阴性对照）；
+            # 日期类字段先经 _norm_change_value 归一（DB datetime 与表单 date 的 isoformat 写法不同，
+            # 同一天不算变更）；本落点不新增 commit —— 通知只 add/flush，随下方既有的
+            # db.session.commit() 与审计行同一事务落库（B13-05 事务口径）。
+            if any(_norm_change_value(old_data.get(k)) != _norm_change_value(new_data.get(k))
+                   for k in old_data):
+                from app.services.notification_service import notify_process_change
+                notify_process_change(
+                    process_name=process_price.process_name,
+                    old_data=old_data,
+                    new_data=new_data,
+                    related_id=process_price.id,
+                    receivers=['all_admins'],
+                )
+
             db.session.add(log)
             db.session.commit()
             
@@ -1111,6 +1231,9 @@ def delete_process_price(id):
             'code_rule_id': process.code_rule_id,
             'needs_inspection': process.needs_inspection
         }
+        # B13-04：process_price_group 的子行会被 ORM 级联静默删除（两个外键都是 NOT NULL），
+        # 回滚时必须能按新主键重建，先在快照里留档（键名以 `__` 开头，回滚时不当业务字段处理）
+        old_data[_AUDIT_CHILD_KEY] = _collect_audit_delete_children(ProcessPrice, process.id)
         
         # 记录可回滚的审计日志
         log = AuditLog(
@@ -1817,15 +1940,19 @@ def salary_calculation():
                 BonusPenalty.date.between(start_date, end_date)
             ).all()
             
-            # 计算工资
+            # 计算工资（B12-04：金额口径不变，明细把已算好的「返工剔除量」一并带上）
             base_salary = employee.base_salary
-            piecework = piecework_amount(production_records)
-            piecework = piecework * employee.coefficient
+            piecework_detail = _piecework_detail(production_records)
+            # 口径未改：金额仍由 piecework_amount 给出（与 breakdown 同源）；
+            # 显式校验两者一致，避免将来只改一边导致「明细与工资对不上」时**静默**发错工资。
+            if abs(piecework_amount(production_records) - piecework_detail['counted']) > 1e-9:
+                raise RuntimeError('piecework_amount 与 piecework_breakdown 口径不一致')
+            piecework = piecework_detail['counted'] * employee.coefficient
             bonus = sum(bp.amount for bp in bonus_penalty_records if bp.type == 'bonus')
             penalty = sum(bp.amount for bp in bonus_penalty_records if bp.type == 'penalty')
             total_salary = base_salary + piecework + bonus - penalty
             
-            # 更新总计
+            # 更新总计（只累加 counted，与「金额口径唯一」一致）
             total_stats['base_salary'] += base_salary
             total_stats['piecework'] += piecework
             total_stats['bonus'] += bonus
@@ -1836,6 +1963,10 @@ def salary_calculation():
                 'employee': employee,
                 'base_salary': base_salary,
                 'piecework': piecework,
+                'piecework_counted': piecework_detail['counted'],
+                'piecework_dropped': piecework_detail['dropped'],
+                'piecework_detail': piecework_detail,
+                'piecework_records': piecework_detail['records'],
                 'bonus': bonus,
                 'penalty': penalty,
                 'total_salary': total_salary,
@@ -1843,6 +1974,42 @@ def salary_calculation():
                 'bonus_penalty_records': bonus_penalty_records
             })
         
+        # B12-04：同一份 salary_data 的机器可读视图（`?format=json`）。
+        # 复用既有 `/salary_calculation` 规则 ⇒ 不新增 url_map 规则（A-70 锁定的
+        # 路由/冒烟基线 271/148 不动），也未新增开关读取点：
+        # `rework_counts_piecework` 直接沿用 salary_data 里已经放好的值。
+        if (request.args.get('format') or '').strip().lower() == 'json':
+            return jsonify({
+                'success': True,
+                'start_date': start_date.strftime('%Y-%m-%d') if start_date else None,
+                'end_date': end_date.strftime('%Y-%m-%d') if end_date else None,
+                'rework_counts_piecework': bool(salary_data[0]['piecework_detail']['rework_counts_piecework'])
+                if salary_data else False,
+                'data': [{
+                    'employee_id': item['employee'].id,
+                    'employee_no': item['employee'].employee_id,
+                    'employee_name': item['employee'].name,
+                    'department': item['employee'].department,
+                    'coefficient': item['employee'].coefficient,
+                    'normal_quantity': item['piecework_detail']['normal_quantity'],
+                    'rework_quantity': item['piecework_detail']['rework_quantity'],
+                    'counted': item['piecework_counted'],
+                    'dropped': item['piecework_dropped'],
+                    'piecework': item['piecework'],
+                    'excluded_record_ids': item['piecework_detail']['excluded_ids'],
+                    'records': [{
+                        'record_id': rec['record'].id,
+                        'date': rec['record'].date.strftime('%Y-%m-%d') if rec['record'].date else None,
+                        'process_name': rec['record'].process.process_name if rec['record'].process else None,
+                        'quantity': rec['record'].quantity,
+                        'price': rec['record'].process.price if rec['record'].process else None,
+                        'amount': rec['amount'],
+                        'is_rework': rec['is_rework'],
+                        'counted': not rec['is_rework'],
+                    } for rec in item['piecework_records']],
+                } for item in salary_data],
+            })
+
         return render_template('main/salary_calculation.html', 
                              form=form, 
                              salary_data=salary_data,
@@ -1851,6 +2018,7 @@ def salary_calculation():
                              end_date=end_date)
     
     return render_template('main/salary_calculation.html', form=form)
+
 
 @bp.route('/audit_logs', methods=['GET', 'POST'])
 @login_required
@@ -2598,6 +2766,103 @@ def import_process_prices():
             except OSError:
                 pass
 
+@bp.route('/process_prices/import_alloy', methods=['POST'])
+@login_required
+@require_capability('process.manage')
+def import_alloy_process_prices():
+    """导入「合金钢辙叉计件工价标准.xlsx」原始版式（73 页，每页一个型号）。
+
+    与 /process_prices/import 的分工：那条吃的是 10 列标准模板（人工整理过），
+    本端点直接吃原始工价标准表——每页有独立表头、页内小计/合计块、型号与图号列
+    可能写错，解析交给 AlloySteelPriceConverter，落库交给
+    alloy_steel_import_service（每行一个 SAVEPOINT，坏行只记「第N页 行M：原因」）。
+
+    表单参数 dry_run=1 时只解析校验并回滚，返回同一份报告供人工确认。
+    """
+    if 'file' not in request.files:
+        return jsonify({'success': False, 'message': '没有上传文件'})
+
+    file = request.files['file']
+    if not file or not file.filename:
+        return jsonify({'success': False, 'message': '没有选择文件'})
+    if not file.filename.lower().endswith(('.xlsx', '.xlsm')):
+        return jsonify({'success': False, 'message': '请上传 Excel 文件（.xlsx）'})
+
+    dry_run = request.form.get('dry_run') in ('1', 'true', 'True', 'on')
+    temp_dir = None
+    try:
+        temp_dir, paths = save_upload_files([file])
+        result = AlloySteelPriceConverter.convert_alloy_steel_file(paths[0])
+        if not result.get('data'):
+            return jsonify({
+                'success': False,
+                'message': result.get('message') or '没有解析到工价数据，请确认文件版式',
+                'data': result,
+            })
+        report = import_price_result(result, source_name=file.filename,
+                                     dry_run=dry_run, user_id=current_user.id)
+        return jsonify({
+            'success': bool(report.get('success')),
+            'message': report.get('message') or '导入完成',
+            'data': report,
+        })
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error('导入合金钢辙叉计件工价标准失败：%s', e, exc_info=True)
+        return jsonify({'success': False, 'message': '导入失败：{0}，请检查文件后重试'.format(e)})
+    finally:
+        if temp_dir:
+            shutil.rmtree(temp_dir, ignore_errors=True)
+
+@bp.route('/products/import_bom_alloy', methods=['POST'])
+@login_required
+@require_capability('product.import')
+def import_alloy_bom():
+    """导入「48页表格」——每份一个总图号的 BOM 明细表，一次可传多份。
+
+    子件按 图号 → 代码 → 名称 复用或新建 Product，父子层级写成
+    ProductBOM(material_type='product', product_id=父件, material_id=子件)。
+    表单 replace_existing=0 时只追加；默认先删这批父件已有的 product 明细，保证重复
+    导入幂等（操作员手工挂的 raw/finished 明细不受影响）。
+
+    表单参数 dry_run=1 时只解析校验并回滚，返回同一份报告。
+    """
+    files = [f for f in request.files.getlist('files') if f and f.filename]
+    if not files:
+        return jsonify({'success': False, 'message': '没有选择文件'})
+
+    bad = [f.filename for f in files if not f.filename.lower().endswith(('.xlsx', '.xlsm'))]
+    if bad:
+        return jsonify({'success': False,
+                        'message': '只支持 Excel 文件（.xlsx）：' + '、'.join(bad[:3])})
+
+    dry_run = request.form.get('dry_run') in ('1', 'true', 'True', 'on')
+    replace_existing = request.form.get('replace_existing', '1') not in ('0', 'false', 'False', 'off')
+    temp_dir = None
+    try:
+        temp_dir, paths = save_upload_files(files)
+        result = AlloySteelBomConverter.convert_bom_files(paths)
+        if not result.get('data'):
+            return jsonify({
+                'success': False,
+                'message': result.get('message') or '没有解析到 BOM 明细，请确认文件版式',
+                'data': result,
+            })
+        report = import_bom_result(result, source_name='48页表格', dry_run=dry_run,
+                                   replace_existing=replace_existing, user_id=current_user.id)
+        return jsonify({
+            'success': bool(report.get('success')),
+            'message': report.get('message') or '导入完成',
+            'data': report,
+        })
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error('导入48页表格 BOM 失败：%s', e, exc_info=True)
+        return jsonify({'success': False, 'message': '导入失败：{0}，请检查文件后重试'.format(e)})
+    finally:
+        if temp_dir:
+            shutil.rmtree(temp_dir, ignore_errors=True)
+
 @bp.route('/process_prices/export', methods=['GET', 'POST'])
 @login_required
 @require_capability('process.view')
@@ -2702,7 +2967,7 @@ def import_production_records():
         success_count = 0
         error_messages = []
         
-        for data in record_data:
+        for index, data in enumerate(record_data):
             try:
                 # 查找员工
                 employee = Employee.query.filter_by(employee_id=data['employee_id']).first()
@@ -2710,14 +2975,17 @@ def import_production_records():
                     error_messages.append(f"员工工号 {data['employee_id']} 不存在")
                     continue
                 
-                # 查找工序价格，使用改进的日期处理逻辑
-                target_date = data['date']
-                end_of_day = datetime.combine(target_date, datetime.max.time())
+                # B13-10：日期兜底 —— xlsx 文本日期单元格（str）会被 SQLite 方言拒绝
+                # （StatementError: SQLite Date type only accepts Python date objects as input），
+                # 统一走仓库既有 _coerce_excel_date（口径同奖惩导入 routes.py:4019-4023）。
+                # 文本日期是业务上应当能导入的好行，只有确实无法解析的日期串才按坏行跳过。
+                business_date, date_error = _coerce_excel_date(data.get('date'), '日期')
+                if date_error or business_date is None:
+                    error_messages.append(f"{date_error}（原值：{data.get('date')}）")
+                    continue
                 
-                process_price = ProcessPrice.query.filter(
-                    ProcessPrice.process_code == data['process_code'],
-                    ProcessPrice.effective_date <= end_of_day + timedelta(days=1)
-                ).order_by(ProcessPrice.effective_date.desc()).first()
+                # 查找工序价格（B12-01 取价单点：唯一口径见模块级 pick_process_price）
+                process_price = pick_process_price(data['process_code'], business_date)
                 
                 if not process_price:
                     error_messages.append(f"未找到工序 {data['process_code']} 在 {data['date']} 的价格")
@@ -2729,25 +2997,36 @@ def import_production_records():
                     employee_id=employee.id,
                     process_id=process_price.id,
                     quantity=data['quantity'],
-                    date=data['date'],
+                    date=business_date,
                     notes=data['notes']
                 )
                 db.session.add(record)
+                # B13-10：逐行提交（行级落盘）—— 坏行只回滚自己，好行照常入库。
+                # 原实现不提交到循环结束，一行类型错误会让后续行全部报 PendingRollbackError，
+                # 最后整批 commit 抛异常被外层静默吞成「HTTP 200 + success=false + 0 行」。
+                db.session.commit()
                 success_count += 1
                 
             except Exception as e:
+                db.session.rollback()
+                current_app.logger.error(f'生产记录导入：第 {index + 2} 行处理失败：{str(e)}')
                 error_messages.append(f"处理记录时出错: {str(e)}")
         
         if success_count > 0:
-            db.session.commit()
-            # 记录审计日志
-            log = AuditLog(
-                user_id=current_user.id,
-                action='批量导入生产记录',
-                details=f'成功导入 {success_count} 条生产记录'
-            )
-            db.session.add(log)
-            db.session.commit()
+            # 记录审计日志（B13-10：生产记录已在循环内逐行提交，此处只提交审计行；
+            # 审计行写失败只记 ERROR，不把已经落盘的行对外谎报成 success=false ——
+            # 原实现两个 commit 分离，第二个 commit 失败会落到外层 except 谎报整批失败）
+            try:
+                log = AuditLog(
+                    user_id=current_user.id,
+                    action='批量导入生产记录',
+                    details=f'成功导入 {success_count} 条生产记录'
+                )
+                db.session.add(log)
+                db.session.commit()
+            except Exception as e:
+                db.session.rollback()
+                current_app.logger.error(f'批量导入生产记录：审计日志写入失败：{str(e)}')
         
         message = f'成功导入 {success_count} 条记录'
         if error_messages:
@@ -2759,6 +3038,11 @@ def import_production_records():
         })
         
     except Exception as e:
+        # B13-10：致命错误（临时文件/解析阶段，行循环之前）也要回滚 + 留日志，不再静默吞异常。
+        # 走到这里时行级提交尚未发生（循环内每行异常、审计行异常都已各自兜住），
+        # 因此 success=false 与「0 行入库」一致，不存在「行已提交却报失败」的部分提交。
+        db.session.rollback()
+        current_app.logger.error(f'生产记录导入失败：{str(e)}')
         return jsonify({'success': False, 'message': '导入失败，请稍后重试或联系管理员'})
 
 @bp.route('/production_records/export', methods=['GET', 'POST'])
@@ -3252,6 +3536,17 @@ def manage_tasks():
                 }
             )
             db.session.add(log)
+
+            # B13-06：派工通知接线。本落点不新增 commit —— 通知只 add/flush，
+            # 随下方既有的 db.session.commit() 与任务/审计行同一事务落库（B13-05 口径）。
+            from app.services.notification_service import notify_task_assignment
+            notify_task_assignment(
+                employee_name=employee.name,
+                task_count=1,
+                related_id=task.id,
+                receivers=[employee.user_id] if employee.user_id else None,
+            )
+
             db.session.commit()
             
             flash('任务分配成功', 'success')
@@ -3435,6 +3730,7 @@ def update_task_status(id):
                             status='pending'
                         )
                         db.session.add(inspection_task)
+                        db.session.flush()  # B13-01b：先取主键，供下面审计行 target_id（否则恒 NULL ⇒ 回滚 404）
                         
                         # 记录质检任务创建的审计日志
                         inspection_log = AuditLog(
@@ -3453,6 +3749,7 @@ def update_task_status(id):
                                 'auto_created': True
                             }
                         )
+                        _assert_add_audit_target(inspection_log, '自动创建质检任务', inspection_task.id)
                         db.session.add(inspection_log)
                         
                         current_app.logger.info(f'自动创建质检任务：{inspection_task.global_sn}，对应生产记录：{production_record.global_sn}')
@@ -3896,10 +4193,11 @@ def import_bonus_penalties():
                     error_messages.append(f'第 {index + 2} 行：{date_error}')
                     continue
                 
-                # 查找工序（如果有）
+                # 查找工序（如果有）（B12-01 取价单点：按奖惩日期取当日结束前生效的最新版，
+                # 原为 filter_by(process_code).first() —— 无日期约束、无版本排序）
                 process_id = None
                 if data['process_code']:
-                    process = ProcessPrice.query.filter_by(process_code=data['process_code']).first()
+                    process = pick_process_price(data['process_code'], bonus_date)
                     if process:
                         process_id = process.id
                 
@@ -4016,16 +4314,17 @@ def import_tasks():
                     error_messages.append(f"员工工号 {data['employee_id']} 不存在")
                     continue
                 
-                # 查找工序
-                process = ProcessPrice.query.filter_by(process_code=data['process_code']).first()
-                if not process:
-                    error_messages.append(f"工序编号 {data['process_code']} 不存在")
-                    continue
-                
                 # 目标日期兜底：文本日期单元格（str）会被 SQLite 方言拒绝，统一解析
                 target_date, date_error = _coerce_excel_date(data.get('target_date'), '目标完成日期')
                 if date_error:
                     error_messages.append(f'第 {index + 2} 行：{date_error}')
+                    continue
+                
+                # 查找工序（B12-01 取价单点：按目标完成日期取当日结束前生效的最新版，
+                # 原为 filter_by(process_code).first() —— 无日期约束、无版本排序）
+                process = pick_process_price(data['process_code'], target_date)
+                if not process:
+                    error_messages.append(f"工序编号 {data['process_code']} 不存在")
                     continue
                 
                 # 创建任务记录
@@ -4179,6 +4478,29 @@ def export_tasks():
     flash('表单验证失败', 'danger')
     return redirect(url_for('main.manage_tasks'))
 
+_ADD_AUDIT_TARGET_MISSING = (
+    '审计不变量被破坏：rollback_type=add 的审计行没有 target_id（回滚端点按 target_id '
+    '找不到目标，会返回 404「目标记录不存在」）。成因：新建业务行后未先 db.session.flush() '
+    '取主键就给 AuditLog(target_id=<新行>.id) 赋值（B13-01；正确写法见 add_employee 的 flush）。'
+)
+
+
+def _assert_add_audit_target(log, action, new_row_id):
+    """B13-01 不变量断言：`rollback_type='add'` ⇒ `target_id IS NOT NULL`。
+
+    必须在新行业务行 `flush()` 之后、`commit()` 之前调用。违反时**抛 AssertionError 并带
+    可读原因**（不静默）：写路径由各端点的 `except Exception` 出口成 500（业务行随事务回滚，
+    不会留下「假可回滚」行）；读路径见 `rollback_audit_log` 的同名不变量登记。
+    """
+    if new_row_id is None or log.target_id is None:
+        detail = (f'{_ADD_AUDIT_TARGET_MISSING} [action={action} '
+                  f'target_model={log.target_model} '
+                  f'new_row_id={new_row_id!r} audit_target_id={log.target_id!r}]')
+        current_app.logger.error('B13-01 审计不变量违反：%s', detail)
+        raise AssertionError(detail)
+    return log
+
+
 def _resolve_audit_model(model_name):
     """按类名从 app.models 取模型。审计日志里存的是字符串，用 globals() 取不到未在本模块 import 的模型。"""
     import app.models as models_module
@@ -4187,6 +4509,158 @@ def _resolve_audit_model(model_name):
     if isinstance(model_class, type) and issubclass(model_class, db.Model):
         return model_class
     return None
+
+
+def _coerce_audit_snapshot_value(model_class, key, value):
+    """B13-01b：把审计快照里的字符串还原成 Date/DateTime 列能接受的对象。
+
+    `old_data` 落进 JSON 列后所有值都只剩 JSON 原生类型，DateTime 列在快照里就是字符串
+    （例如 `RawMaterialCategory.to_dict()` 的 `created_at`: `2026-10-08 12:00:00`）。
+    B13-04 的删除重建循环原本只处理 `*_date` 结尾的键，于是 `created_at` 这类键会把字符串
+    绑到 DateTime 列上，SQLite 方言抛
+    `TypeError: SQLite DateTime type only accepts Python datetime and date objects as input`
+    ⇒ 回滚退化成 500（既不是 400 也不是 404），且运维看不出原因。
+    这里按**列类型**解析：DateTime 列 ⇒ `datetime`、Date 列 ⇒ `date`。
+    解析失败**保持原值**（不静默归零、不吞异常），让下游照常显式报错。
+    """
+    if not isinstance(value, str) or not value:
+        return value
+    column = getattr(getattr(model_class, '__table__', None), 'columns', {}).get(key)
+    col_type = getattr(column, 'type', None)
+    if isinstance(col_type, db.DateTime):
+        kind = 'datetime'
+    elif isinstance(col_type, db.Date):
+        kind = 'date'
+    else:
+        return value
+    try:
+        parsed = pd.to_datetime(value, errors='raise')
+    except Exception:
+        return value
+    return parsed.to_pydatetime() if kind == 'datetime' else parsed.date()
+
+
+# ---------------------------------------------------------------------------
+# B13-03 / B13-04：回滚端点的「能不能回滚」判定
+# ---------------------------------------------------------------------------
+_AUDIT_OLD_DATA_MISSING = (
+    '无法回滚：该审计行没有保存字段级快照（old_data IS NULL），回滚端点无法确定要恢复的字段值。'
+    '为免留下半回滚数据，本次不做任何写入；此处不承诺回滚守恒（依据 recon-backend §7-4 的降级结论）。'
+    '处置建议：按该行 details 指向的业务对象手工核对后补录。'
+    '该行 can_rollback=1 只表示登记时标记为可回滚，不代表现在能自动回滚。'
+)
+
+# B13-04：`old_data` 里的子行留档键。以 `__` 开头，回滚时不当业务字段处理。
+_AUDIT_CHILD_KEY = '__children__'
+
+# 需要「删除前留档子行」的模型 → (子表名, 子模型类名, 指向本表的非空外键列)。
+# 目前只有 ProcessPrice：父子关系表 process_price_group 的两个外键都是 NOT NULL，且挂了
+# `cascade='all, delete-orphan'`，删除父工序时 ORM 会把关联行静默删掉（SQLite 默认不开外键，
+# DB 层 ondelete='CASCADE' 不生效，见 app/models.py:114-116 的注释）。审计快照只含父行自身字段
+# ⇒ 必须自带子行清单，否则回滚只能恢复父行（半恢复）。其余模型的「带子行父行」走下面的
+# 显式拒绝路径（`81-` §7.1 N-13：不给全部模型补 cascade）。
+_AUDIT_CHILD_MODELS = {
+    'ProcessPrice': ('process_price_group', 'ProcessPriceGroup', ('subtotal_id', 'process_id')),
+}
+
+
+def _audit_child_spec(model_class):
+    return _AUDIT_CHILD_MODELS.get(getattr(model_class, '__name__', ''))
+
+
+def _collect_audit_delete_children(model_class, target_id):
+    """删除前采集「会被 ORM 级联静默删除」的子行，供 delete 端点在 `old_data` 中留档。
+
+    返回 `{子表名: [{外键列: 值}, ...]}`；无留档需求的模型返回 None。
+    """
+    spec = _audit_child_spec(model_class)
+    if not spec or target_id is None:
+        return None
+    table_name, child_cls_name, fk_cols = spec
+    import app.models as models_module
+
+    child_cls = getattr(models_module, child_cls_name, None)
+    if child_cls is None:
+        return None
+    rows = child_cls.query.filter(
+        or_(*[getattr(child_cls, col) == target_id for col in fk_cols])).all()
+    return {table_name: [{col: getattr(row, col) for col in fk_cols} for row in rows]}
+
+
+def _validate_audit_delete_children(model_class, target_id, inventory):
+    """回滚前校验子行留档能否重建；返回问题清单（空清单 = 可以安全重建）。"""
+    spec = _audit_child_spec(model_class)
+    if not spec or not inventory:
+        return []
+    table_name, _child_cls_name, fk_cols = spec
+    rows = (inventory or {}).get(table_name) or []
+    problems = []
+    for cols in rows:
+        for col in fk_cols:
+            value = cols.get(col)
+            if value is None or value == target_id:
+                continue
+            # 对侧（同一条子行的另一个外键）必须仍然存在，否则重建出来的是孤儿行
+            if db.session.get(model_class, value) is None:
+                problems.append(f'{table_name}.{col}={value} 指向的记录已不存在（无法重建该子行）')
+    return problems
+
+
+def _apply_audit_delete_children(model_class, target_id, new_record_id, inventory):
+    """按新父行主键重建留档子行；返回 (已重建, 已存在跳过)。"""
+    spec = _audit_child_spec(model_class)
+    if not spec or not inventory:
+        return 0, 0
+    table_name, child_cls_name, fk_cols = spec
+    rows = (inventory or {}).get(table_name) or []
+    if not rows:
+        return 0, 0
+    import app.models as models_module
+
+    child_cls = getattr(models_module, child_cls_name, None)
+    if child_cls is None:
+        return 0, len(rows)
+    restored = skipped = 0
+    for cols in rows:
+        values = {col: (new_record_id if cols.get(col) == target_id else cols.get(col))
+                  for col in fk_cols}
+        exists = child_cls.query.filter(
+            *[getattr(child_cls, col) == values[col] for col in fk_cols]).first()
+        if exists is not None:
+            skipped += 1
+            continue
+        db.session.add(child_cls(**values))
+        restored += 1
+    return restored, skipped
+
+
+def _audit_blocking_children(model_class, target_id):
+    """B13-04：列出「父行已不在、但这些非空外键子行仍指向它」的 (子表, 外键列, 行数)。
+
+    数据来源：`db.metadata` 全表外键内省 + 逐列实时计数。不能用 ORM relationship 代替——
+    relationship 并不覆盖全部外键（例如 `process_price_group.process_id` 在 ProcessPrice 侧
+    没有直接关系），会漏掉真实子行。只统计 **NOT NULL** 外键列：只有这类子行在父行缺失时
+    必然处于不完整状态（既不能置空，也无法随父行一起恢复）。
+    """
+    blocking = []
+    try:
+        table_name = model_class.__tablename__
+        for tname, table in db.metadata.tables.items():
+            for col in table.columns:
+                for fk in col.foreign_keys:
+                    if fk.column.table.name != table_name or col.nullable:
+                        continue
+                    try:
+                        cnt = db.session.query(func.count()).select_from(table).filter(
+                            col == target_id).scalar() or 0
+                    except Exception:
+                        continue
+                    if cnt:
+                        blocking.append((tname, col.name, int(cnt)))
+    except Exception as exc:
+        # 内省失败不能把回滚变成 500，但绝不能静默
+        current_app.logger.error('B13-04 子行内省失败：%s', exc)
+    return blocking
 
 
 @bp.route('/audit_logs/rollback/<int:log_id>', methods=['POST'])
@@ -4203,6 +4677,33 @@ def rollback_audit_log(log_id):
         model_class = _resolve_audit_model(log.target_model)
         if model_class is None:
             return jsonify({'success': False, 'message': f'未知的目标模型：{log.target_model}'}), 400
+
+        # B13-01 读路径不变量登记：`rollback_type='add'` ⇒ `target_id IS NOT NULL`。
+        # 违反时**不能静默**——历史存量行会落进下面的 `query.get(None)` 而退化成「目标记录不存在」，
+        # 掩盖真实原因，故先落一条带原因的 ERROR 再走同一出口（HTTP 语义与文案保持不变）。
+        if log.rollback_type == 'add' and log.target_id is None:
+            current_app.logger.error(
+                'B13-01 审计不变量违反：%s [log_id=%s action=%s target_model=%s]',
+                _ADD_AUDIT_TARGET_MISSING, log.id, log.action, log.target_model)
+
+        # B13-03：`old_data IS NULL` 的 edit/delete 行**明确 400 + 可读原因**。
+        # 修前是 `for key, value in log.old_data.items()` 抛 AttributeError，落进下面的
+        # `except Exception` 变成 500「回滚失败，请稍后重试或联系管理员」——运维看不出为什么。
+        # 只拒绝、不做任何写入：快照缺失时无法重建字段值，且不承诺回滚守恒。
+        if log.rollback_type in ('edit', 'delete') and not log.old_data:
+            detail = (f'[log_id={log.id} action={log.action} rollback_type={log.rollback_type} '
+                      f'target_model={log.target_model} target_id={log.target_id}]')
+            current_app.logger.error('B13-03 回滚拒绝（快照缺失）：%s %s',
+                                     _AUDIT_OLD_DATA_MISSING, detail)
+            return jsonify({
+                'success': False,
+                'message': _AUDIT_OLD_DATA_MISSING,
+                'reason': 'old_data_missing',
+                'log_id': log.id,
+                'rollback_type': log.rollback_type,
+                'target_model': log.target_model,
+                'target_id': log.target_id,
+            }), 400
 
         # 根据不同的回滚类型执行不同的操作
         if log.rollback_type == 'add':
@@ -4250,16 +4751,79 @@ def rollback_audit_log(log_id):
                 return jsonify({'success': False, 'message': '目标记录不存在'}), 404
                 
         elif log.rollback_type == 'delete':
+            # B13-04：先区分「删除已生效」与「删除未生效（目标行仍在）」。
+            # 目标行仍在 ⇒ 不存在子行丢失问题，保持修前行为（恢复一条同内容记录，200），不误伤正常路径。
+            existing_target = (db.session.get(model_class, log.target_id)
+                               if log.target_id is not None else None)
+
+            if existing_target is None:
+                blocking = _audit_blocking_children(model_class, log.target_id)
+                if blocking:
+                    listing = '、'.join(f'{t}.{c}×{n}' for t, c, n in blocking)
+                    message = (
+                        f'无法回滚：目标 {log.target_model}(id={log.target_id}) 的删除已生效，'
+                        f'但仍有非空外键子行指向它（{listing}）。审计快照只保存该记录自身的字段、'
+                        f'不含子行，自动回滚只能恢复父行、无法恢复这些子行，会留下半恢复数据，'
+                        f'因此本次不做任何写入，也不承诺回滚守恒。'
+                        f'处置建议：按上面的清单先确认子行归属与业务影响，再决定是否手工补录父行。'
+                    )
+                    current_app.logger.error(
+                        'B13-04 回滚拒绝（存在非空外键子行）：%s '
+                        '[log_id=%s action=%s target_model=%s target_id=%s children=%s]',
+                        message, log.id, log.action, log.target_model, log.target_id, listing)
+                    return jsonify({
+                        'success': False,
+                        'message': message,
+                        'reason': 'blocking_children',
+                        'children': [{'table': t, 'column': c, 'rows': n}
+                                     for t, c, n in blocking],
+                        'children_source': 'db.metadata 外键内省（仅 NOT NULL 外键列）+ 实时行数',
+                    }), 400
+
+                # 子行留档（新快照才带）若无法完整重建，也拒绝——否则同样是半恢复
+                problems = _validate_audit_delete_children(
+                    model_class, log.target_id, (log.old_data or {}).get(_AUDIT_CHILD_KEY))
+                if problems:
+                    message = (
+                        '无法回滚：子行留档无法完整重建（' + '；'.join(problems) + '）。'
+                        '本次不做任何写入，以免留下半恢复数据；请先确认对侧记录是否已被删除。'
+                    )
+                    current_app.logger.error(
+                        'B13-04 回滚拒绝（子行留档不可重建）：%s [log_id=%s action=%s problems=%s]',
+                        message, log.id, log.action, problems)
+                    return jsonify({
+                        'success': False,
+                        'message': message,
+                        'reason': 'child_snapshot_unrestorable',
+                        'problems': problems,
+                    }), 400
+
             # 恢复被删除的记录
             new_record = model_class()
-            for key, value in log.old_data.items():
+            for key, value in (log.old_data or {}).items():
+                if key.startswith('__'):
+                    continue  # B13-04：子行留档等元数据不是业务字段
                 if hasattr(new_record, key):
                     if key.endswith('_date') and value:
                         value = datetime.fromisoformat(value).date()
+                    else:
+                        # B13-01b：created_at/updated_at 等 DateTime 列在快照里是字符串，
+                        # 直接 setattr 会在 flush 时被 SQLite 方言拒（TypeError）⇒ 按列类型解析
+                        value = _coerce_audit_snapshot_value(model_class, key, value)
                     setattr(new_record, key, value)
-            
+
             db.session.add(new_record)
-            
+            # B13-04：先 flush 取新主键，子行要按新父行主键重建（同 B13-01 的成因）
+            db.session.flush()
+
+            restored, skipped = _apply_audit_delete_children(
+                model_class, log.target_id, new_record.id,
+                (log.old_data or {}).get(_AUDIT_CHILD_KEY))
+            if restored or skipped:
+                current_app.logger.warning(
+                    'B13-04 回滚重建子行：action=%s log_id=%s target_model=%s 新主键=%s 重建=%s 已存在=%s',
+                    log.action, log.id, log.target_model, new_record.id, restored, skipped)
+
             # 记录回滚操作
             rollback_log = AuditLog(
                 user_id=current_user.id,
@@ -4438,6 +5002,17 @@ def add_task():
             }
         )
         db.session.add(log)
+
+        # B13-06：派工通知接线（与 manage_tasks 同一口径）。本落点不新增 commit ——
+        # 通知只 add/flush，随下方既有的 db.session.commit() 同一事务落库。
+        from app.services.notification_service import notify_task_assignment
+        notify_task_assignment(
+            employee_name=employee.name,
+            task_count=1,
+            related_id=task.id,
+            receivers=[employee.user_id] if employee.user_id else None,
+        )
+
         db.session.commit()
         
         return jsonify({
@@ -4920,6 +5495,7 @@ def import_finished_products():
                     notes=str(row.get('备注', ''))
                 )
                 db.session.add(product)
+                db.session.flush()  # B13-01b：先取主键，供下面审计行 target_id（否则恒 NULL ⇒ 回滚 404）
                 
                 # 记录审计日志
                 log = AuditLog(
@@ -4938,6 +5514,7 @@ def import_finished_products():
                         'status': product.status
                     }
                 )
+                _assert_add_audit_target(log, '导入成品', product.id)
                 db.session.add(log)
                 
                 success_count += 1
@@ -5011,6 +5588,7 @@ def import_raw_materials():
                     notes=str(row.get('备注', ''))
                 )
                 db.session.add(material)
+                db.session.flush()  # B13-01b：先取主键，供下面审计行 target_id（否则恒 NULL ⇒ 回滚 404）
                 
                 # 记录审计日志
                 log = AuditLog(
@@ -5029,6 +5607,7 @@ def import_raw_materials():
                         'quantity': material.quantity
                     }
                 )
+                _assert_add_audit_target(log, '导入原材料', material.id)
                 db.session.add(log)
                 
                 success_count += 1
@@ -5086,6 +5665,31 @@ def save_temp_file(file: FileStorage) -> str:
     temp_path = os.path.join(temp_dir, secure_filename(file.filename))
     file.save(temp_path)
     return temp_path
+
+
+def save_upload_files(files) -> 'tuple':
+    """把一批上传文件存进同一个临时目录，**保留原始文件名**。
+
+    与 save_temp_file 的差别：这里不能用 secure_filename——BOM 转换器拿文件名当父件型号，
+    secure_filename('（11）YHHC CZ577-I-03.xlsx') 会压成 '11YHHC_CZ577-I-03.xlsx'，
+    型号就读错了。目录整个交给调用方在 finally 里 shutil.rmtree 删掉。
+
+    :return: (临时目录, [文件路径...])
+    """
+    temp_dir = tempfile.mkdtemp()
+    saved = []
+    for index, file in enumerate(files, 1):
+        # 客户端的 filename 可能带完整路径，只取最后一段，顺带挡掉 '..'
+        name = os.path.basename((file.filename or '').replace('\\', '/')).strip()
+        if not name:
+            name = 'upload-{0}.xlsx'.format(index)
+        path = os.path.join(temp_dir, name)
+        if os.path.exists(path):  # 同批次重名：加序号，避免后一个覆盖前一个
+            stem, ext = os.path.splitext(name)
+            path = os.path.join(temp_dir, '{0}-{1}{2}'.format(stem, index, ext))
+        file.save(path)
+        saved.append(path)
+    return temp_dir, saved
 
 
 @bp.route('/inventory/finished/add', methods=['POST'])
@@ -5147,6 +5751,7 @@ def add_finished_product():
         
         # 添加到数据库
         db.session.add(product)
+        db.session.flush()  # B13-01b：先取主键，供下面审计行 target_id（否则恒 NULL ⇒ 回滚 404）
         
         # 记录审计日志
         log = AuditLog(
@@ -5165,6 +5770,7 @@ def add_finished_product():
                 'status': product.status
             }
         )
+        _assert_add_audit_target(log, '添加成品', product.id)
         db.session.add(log)
         
         db.session.commit()
@@ -5248,6 +5854,7 @@ def add_raw_material():
         
         # 添加到数据库
         db.session.add(material)
+        db.session.flush()  # B13-01b：先取主键，供下面审计行 target_id（否则恒 NULL ⇒ 回滚 404）
         
         # 记录审计日志
         log = AuditLog(
@@ -5269,6 +5876,7 @@ def add_raw_material():
                 'status': material.status
             }
         )
+        _assert_add_audit_target(log, '添加原材料', material.id)
         db.session.add(log)
         
         db.session.commit()
@@ -5382,6 +5990,7 @@ def add_code_rule():
             
             db.session.add(rule)
             
+            db.session.flush()  # B13-01b：先取主键，供下面审计行 target_id（否则恒 NULL ⇒ 回滚 404）
             # 添加审计日志
             log = AuditLog(
                 user_id=current_user.id,
@@ -5397,6 +6006,7 @@ def add_code_rule():
                     'format_pattern': rule.format_pattern
                 }
             )
+            _assert_add_audit_target(log, '添加编码规则', rule.id)
             db.session.add(log)
             
             db.session.commit()
@@ -6921,7 +7531,12 @@ def delete_raw_material_category(category_id):
             action='删除原材料品类',
             details=f'删除原材料品类：{category.name} ({category.code})',
             can_rollback=True,
-            rollback_type='add',
+            # B13-01b：这里执行的是**删除**，原标 'add' 属语义相反——回滚走 add 分支时
+            # `query.get(target_id)` 必然找不到行（刚被删掉）⇒ 恒定 404「目标记录不存在」，
+            # 与「删除已生效」的真实状态不符（B13-03/B13-04 的 delete 分支就是为它准备的）。
+            # 改为 'delete' 后：行不存在 + 无阻塞子行（上面已拒绝仍有原材料的品类）
+            # ⇒ 用 old_data 恢复该品类；若真有子行，则由 B13-04 明确 400 而不是 404。
+            rollback_type='delete',
             target_model='RawMaterialCategory',
             target_id=category.id,
             old_data=category_data
@@ -7062,7 +7677,10 @@ def add_product():
         
         # 添加到数据库
         db.session.add(product)
-        
+        # B13-01：必须先 flush 取主键，否则下面 target_id=product.id 恒为 None ⇒ 审计行
+        # can_rollback=1 但指不到对象，回滚端点只能返回 404「目标记录不存在」
+        db.session.flush()  # 获取product.id
+
         # 记录审计日志
         log = AuditLog(
             user_id=current_user.id,
@@ -7084,6 +7702,8 @@ def add_product():
                 'notes': product.notes
             }
         )
+        # B13-01 不变量断言：rollback_type='add' ⇒ target_id IS NOT NULL（违反即带原因抛错）
+        _assert_add_audit_target(log, '添加产品', product.id)
         db.session.add(log)
         
         db.session.commit()
@@ -7794,8 +8414,10 @@ def import_products():
                             can_rollback=True,
                             rollback_type='add',
                             target_model='Product',
+                            target_id=new_product.id,
                             new_data=product_data
                         )
+                        _assert_add_audit_target(log, '批量添加产品', new_product.id)
                         db.session.add(log)
                         imported_count += 1
                         
@@ -8304,7 +8926,26 @@ def edit_production_order(order_id):
                 new_data=new_data
             )
             db.session.add(log)
-            
+
+            # B13-06：规格变更通知接线。仅当规格型号字段真的变化时才通知
+            #（old_data 与 new_data 在 spec_*/direction 上逐键比较，未变更 ⇒ +0，
+            # 见 B13-06 阴性对照）；纯数量/日期/备注变更按判据不属于「规格变更」，不通知。
+            # 本落点不新增 commit —— 通知只 add/flush，随下方既有的
+            # db.session.commit() 与审计行同一事务落库（B13-05 事务口径）。
+            _SPEC_CHANGE_FIELDS = (
+                'spec_extended', 'spec_gasket', 'spec_joint', 'spec_drilling',
+                'spec_other', 'spec_other_desc', 'direction',
+            )
+            if any(old_data.get(k) != new_data.get(k) for k in _SPEC_CHANGE_FIELDS):
+                from app.services.notification_service import notify_spec_change
+                notify_spec_change(
+                    order_number=order.order_number,
+                    batch_count=len(batches),
+                    task_count=len(tasks),
+                    related_id=order.id,
+                    receivers=['all_admins'],
+                )
+
             db.session.commit()
             flash(f'生产订单修改成功，同时更新了 {len(batches)} 个批次和 {len(tasks)} 个任务的规格型号信息', 'success')
             return redirect(url_for('main.production_order_detail', order_id=order_id))
@@ -8849,7 +9490,7 @@ def create_tasks_for_production_batch(batch):
                 can_rollback=True,
                 rollback_type='add',
                 target_model='TaskAssignment',
-                target_id=None,  # 将在flush后更新
+                target_id=task.id,  # B13-01b：flush() 已在上面取到主键（原为 None + 事后回填，回填映射是反的）
                 new_data={
                     'employee_id': employee.id,
                     'process_id': process_item.process_id,
@@ -8859,22 +9500,14 @@ def create_tasks_for_production_batch(batch):
                     'task_type': 'auto'
                 }
             )
+            _assert_add_audit_target(log, '自动创建生产任务', task.id)
             db.session.add(log)
         
-        # 提交以获取任务ID
+        # B13-01b：target_id 已在上面构造审计行时取到（flush() 就在其上），
+        # 原来这里有一个「事后按 id desc 回填 target_id」的循环，已删除——
+        # 它的 i ↔ logs 映射是反的（首个 task 会拿到最新那条日志），
+        # 且会命中历史 target_id IS NULL 的行、把别人的审计行改掉。
         db.session.flush()
-        
-        # 更新审计日志中的target_id
-        for i, task in enumerate(created_tasks):
-            logs = AuditLog.query.filter_by(
-                user_id=current_user.id,
-                action='自动创建生产任务',
-                target_model='TaskAssignment',
-                target_id=None
-            ).order_by(AuditLog.id.desc()).limit(len(created_tasks)).all()
-            
-            if i < len(logs):
-                logs[i].target_id = task.id
         
         current_app.logger.info(f'为生产批次 {batch.batch_number} 成功创建了 {len(created_tasks)} 个生产任务')
         return True
@@ -10738,6 +11371,7 @@ def consumable_inbound():
             )
             
             db.session.add(consumable)
+            db.session.flush()  # B13-01b：先取主键，供下面审计行 target_id（否则恒 NULL ⇒ 回滚 404）
             
             # 记录审计日志
             audit_log = AuditLog(
@@ -10758,6 +11392,7 @@ def consumable_inbound():
                     'unit_price': consumable.unit_price
                 }
             )
+            _assert_add_audit_target(audit_log, '添加易耗品', consumable.id)
             db.session.add(audit_log)
             
             db.session.commit()
@@ -11071,6 +11706,7 @@ def add_consumable_category():
             )
             
             db.session.add(category)
+            db.session.flush()  # B13-01b：先取主键，供下面审计行 target_id（否则恒 NULL ⇒ 回滚 404）
             
             # 记录审计日志
             audit_log = AuditLog(
@@ -11089,6 +11725,7 @@ def add_consumable_category():
                     'requires_approval': category.requires_approval
                 }
             )
+            _assert_add_audit_target(audit_log, '添加易耗品品类', category.id)
             db.session.add(audit_log)
             
             db.session.commit()

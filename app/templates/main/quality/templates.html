@@ -26,6 +26,7 @@
                         <option value="production_record">生产记录质检</option>
                         <option value="product">成品质检</option>
                         <option value="material">原材料质检</option>
+                        <option value="goods_receipt">来料质检</option>
                     </select>
                 </div>
                 <div class="col-md-2">
@@ -104,6 +105,7 @@
                                 <option value="production_record">生产记录质检</option>
                                 <option value="product">成品质检</option>
                                 <option value="material">原材料质检</option>
+                                <option value="goods_receipt">来料质检</option>
                             </select>
                         </div>
                     </div>
@@ -296,7 +298,8 @@ function getTemplateTypeName(type) {
     const types = {
         'production_record': '生产记录质检',
         'product': '成品质检',
-        'material': '原材料质检'
+        'material': '原材料质检',
+        'goods_receipt': '来料质检'
     };
     return types[type] || type;
 }

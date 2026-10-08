@@ -132,8 +132,59 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
+                    {% if can('salary.view') %}
+                    <!-- 计件拆分（B12-04）：正常 / 返工产量与金额可逐条核对 -->
+                    {% set pw = data.piecework_detail %}
+                    <!-- 机器可读读数（供核对脚本/评审解析；数值与下表同源，不参与任何金额计算） -->
+                    <div class="salary-piecework-split" data-b12-04-split
+                         data-employee-id="{{ data.employee.id }}"
+                         data-normal-quantity="{{ '%g'|format(pw.normal_quantity) }}"
+                         data-rework-quantity="{{ '%g'|format(pw.rework_quantity) }}"
+                         data-counted="{{ '%.2f'|format(pw.counted) }}"
+                         data-dropped="{{ '%.2f'|format(pw.dropped) }}"
+                         data-full-amount="{{ '%.2f'|format(pw.full_amount) }}"
+                         data-piecework="{{ '%.2f'|format(data.piecework) }}"
+                         data-excluded-record-ids="{{ pw.excluded_ids|join(',') }}"></div>
+                    <h6>计件拆分（正常 / 返工）</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered">
+                            <thead>
+                                <tr>
+                                    <th>类别</th>
+                                    <th>件数</th>
+                                    <th>计件金额（未乘系数）</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>正常产量</td>
+                                    <td>{{ '%g'|format(pw.normal_quantity) }}</td>
+                                    <td>{{ "%.2f"|format(pw.counted) }}</td>
+                                </tr>
+                                <tr class="{{ 'text-danger' if pw.dropped > 0 else 'text-muted' }}">
+                                    <td>返工产量</td>
+                                    <td>{{ '%g'|format(pw.rework_quantity) }}</td>
+                                    <td>{{ "%.2f"|format(pw.dropped) }}</td>
+                                </tr>
+                                <tr class="fw-bold">
+                                    <td>合计</td>
+                                    <td>{{ '%g'|format(pw.normal_quantity + pw.rework_quantity) }}</td>
+                                    <td>{{ "%.2f"|format(pw.full_amount) }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <!-- 口径说明（静态文案，不随开关分支、不引用开关键）：正常产量恒计入；
+                             返工产量是否计入由质量参数里的「返工计件」开关唯一决定。 -->
+                        <p class="mb-2 small text-muted">
+                            计入工资的计件金额：{{ "%.2f"|format(data.piecework) }}。
+                            正常产量恒计入；返工产量是否计入由质量参数中的返工计件开关决定，
+                            上表「计件金额」列为未乘系数的原始计件额，供两态核对。
+                        </p>
+                    </div>
+                    {% endif %}
+
                     <!-- 生产记录 -->
-                    <h6>生产记录</h6>
+                    <h6 class="mt-3">生产记录</h6>
                     <div class="table-responsive">
                         <table class="table table-sm">
                             <thead>
@@ -143,16 +194,27 @@
                                     <th>数量</th>
                                     <th>单价</th>
                                     <th>小计</th>
+                                    <th>类别</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for record in data.production_records %}
-                                <tr>
+                                <tr class="{{ 'text-danger' if record._piecework_excluded else '' }}"
+                                    data-record-id="{{ record.id }}"
+                                    data-is-rework="{{ 'true' if record._piecework_excluded else 'false' }}"
+                                    data-counted="{{ 'false' if record._piecework_excluded else 'true' }}">
                                     <td>{{ record.date.strftime('%Y-%m-%d') }}</td>
                                     <td>{{ record.process.process_name }}</td>
                                     <td>{{ record.quantity }}</td>
                                     <td>{{ "%.2f"|format(record.process.price) }}</td>
                                     <td>{{ "%.2f"|format(record.quantity * record.process.price * data.employee.coefficient) }}</td>
+                                    <td>
+                                        {% if record._piecework_excluded %}
+                                        <span class="badge bg-danger">返工（未计入）</span>
+                                        {% else %}
+                                        <span class="badge bg-success">正常</span>
+                                        {% endif %}
+                                    </td>
                                 </tr>
                                 {% endfor %}
                             </tbody>

@@ -26,6 +26,7 @@
                         <option value="production_record">生产记录质检</option>
                         <option value="product">成品质检</option>
                         <option value="material">原材料质检</option>
+                        <option value="goods_receipt">来料质检</option>
                     </select>
                 </div>
                 <div class="col-md-2">
@@ -122,6 +123,7 @@
                                 <option value="production_record">生产记录质检</option>
                                 <option value="product">成品质检</option>
                                 <option value="material">原材料质检</option>
+                                <option value="goods_receipt">来料质检</option>
                             </select>
                         </div>
                         <div class="col-md-4">
@@ -365,7 +367,8 @@ function getTaskTypeName(type) {
     const types = {
         'production_record': '生产记录质检',
         'product': '成品质检',
-        'material': '原材料质检'
+        'material': '原材料质检',
+        'goods_receipt': '来料质检'
     };
     return types[type] || type;
 }
@@ -525,6 +528,12 @@ function loadInspectionTargets() {
         case 'material':
             url = "{{ url_for('main.get_available_raw_materials') }}";  // 原材料列表API（已存在）
             break;
+        case 'goods_receipt':
+            // B14-07（方案 A）：来料检任务的检验对象是到货单，到货单流程自有发起入口，
+            // 本页面没有对应的列表 API。必须在这里就退出 fetch：url 留空会让
+            // fetch('') 去请求当前页面（HTML），解析出的选项全是错的。
+            container.innerHTML = '<div class="alert alert-info mb-0">来料检任务的检验对象是到货单，请在到货单页面发起检验。</div>';
+            return;
     }
     
     fetch(url)
@@ -554,6 +563,10 @@ function loadInspectionTargets() {
                                 `<option value="${material.id}">${material.internal_number} - ${material.material_name || ''}</option>`
                             ).join('');
                         }
+                        break;
+                    case 'goods_receipt':
+                        // B14-07（方案 A）：无到货单列表 API，上面已提前 return；保留显式
+                        // 分支以免将来上游改动时静默渲染出空/错选项。
                         break;
                 }
                 
@@ -768,6 +781,11 @@ function loadInspectionTargetsForEdit(type, selectedTargetId) {
         case 'material':
             url = "{{ url_for('main.get_available_raw_materials') }}";
             break;
+        case 'goods_receipt':
+            // B14-07（方案 A）：同 loadInspectionTargets —— 到货单没有列表 API，
+            // 既不要落到 default（会显示"未知的检验对象类型"），也不要 fetch 空 URL。
+            container.innerHTML = '<div class="alert alert-info mb-0">来料检任务的检验对象是到货单，请在到货单页面发起检验。</div>';
+            return;
         default:
             container.innerHTML = '<div class="alert alert-warning">未知的检验对象类型</div>';
             return;
@@ -805,6 +823,9 @@ function loadInspectionTargetsForEdit(type, selectedTargetId) {
                                 `<option value="${material.id}" ${material.id == selectedTargetId ? 'selected' : ''}>${material.internal_number} - ${material.material_name || ''}</option>`
                             ).join('');
                         }
+                        break;
+                    case 'goods_receipt':
+                        // B14-07（方案 A）：无到货单列表 API，上面已提前 return；保留显式分支。
                         break;
                 }
                 

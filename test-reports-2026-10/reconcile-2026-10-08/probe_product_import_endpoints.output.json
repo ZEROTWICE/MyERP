@@ -1,0 +1,119 @@
+{
+ "app/main/routes.py": [
+  {
+   "endpoint": "import_employees",
+   "route": "/employees/import",
+   "def_line": 2066,
+   "disk_writes": [
+    {
+     "line": 2083,
+     "text": "file.save(temp_path)"
+    }
+   ],
+   "memory_reads": []
+  },
+  {
+   "endpoint": "import_process_prices",
+   "route": "/process_prices/import",
+   "def_line": 2415,
+   "disk_writes": [
+    {
+     "line": 2432,
+     "text": "file.save(temp_path)"
+    }
+   ],
+   "memory_reads": []
+  },
+  {
+   "endpoint": "import_production_records",
+   "route": "/production_records/import",
+   "def_line": 2812,
+   "disk_writes": [
+    {
+     "line": 2828,
+     "text": "file.save(temp_path)"
+    }
+   ],
+   "memory_reads": []
+  },
+  {
+   "endpoint": "import_bonus_penalties",
+   "route": "/bonus_penalties/import",
+   "def_line": 4011,
+   "disk_writes": [
+    {
+     "line": 4027,
+     "text": "file.save(temp_path)"
+    }
+   ],
+   "memory_reads": []
+  },
+  {
+   "endpoint": "import_tasks",
+   "route": "/tasks/import",
+   "def_line": 4138,
+   "disk_writes": [
+    {
+     "line": 4154,
+     "text": "file.save(temp_path)"
+    }
+   ],
+   "memory_reads": []
+  },
+  {
+   "endpoint": "import_finished_products",
+   "route": "/inventory/finished/import",
+   "def_line": 5264,
+   "disk_writes": [
+    {
+     "line": 5277,
+     "text": "file.save(temp_path)"
+    }
+   ],
+   "memory_reads": []
+  },
+  {
+   "endpoint": "import_raw_materials",
+   "route": "/inventory/raw/import",
+   "def_line": 5351,
+   "disk_writes": [
+    {
+     "line": 5364,
+     "text": "file.save(temp_path)"
+    }
+   ],
+   "memory_reads": []
+  },
+  {
+   "endpoint": "import_products",
+   "route": "/products/import",
+   "def_line": 8074,
+   "disk_writes": [
+    {
+     "line": 8087,
+     "text": "temp_path = save_temp_file(file)"
+    }
+   ],
+   "memory_reads": []
+  }
+ ],
+ "app/main/quality.py": [
+  {
+   "endpoint": "import_inspection_tasks",
+   "route": "/api/quality/tasks/import",
+   "def_line": 1639,
+   "disk_writes": [],
+   "memory_reads": [
+    {
+     "line": 1658,
+     "text": "df = pd.read_excel(file)"
+    }
+   ]
+  }
+ ],
+ "app/main/stock.py": [],
+ "app/main/purchase.py": [],
+ "app/main/equipment.py": [],
+ "app/main/production_center.py": [],
+ "app/main/shipping.py": []
+}

@@ -45,6 +45,25 @@ EVIDENCE_DIR_LEGACY = EVIDENCE_ROOT
 EVIDENCE_JOURNAL_NAME = 'evidence_journal.jsonl'
 
 REAL_DB = os.path.join(REPO_ROOT, 'app.db')
+#: ── A-70「有意更新三步」历史 + **B14-R1 回退**（ALLOY-IMPORT-02 / 2026-10-09）────────────────
+#: 【历史留痕 · 生效期望已回退】ALLOY-IMPORT-02（「合金钢辙叉计件工价标准 + 48页表格 BOM」正式
+#:   写入真实库：工价 +3534 / 小计关系 +3507 / 旧工价 −3486 / 旧小计关系 −2906 / 产品 +1080 /
+#:   BOM 明细 +1728 / 审计 +3）曾按 A-70 三步把本行由「导入前锚点」`F5DA2306…0F065`（2531328 B）
+#:   改写为导入后锚点 `4EB632A48F1C7E8A13BCE8F6263D587A1958D01CC84E37A0D4359E1506DDFA43`
+#:   （3035136 B）。**该重基线已被 B14-R1（2026-10-09，用户裁定「回退真库锚点重基线、保留合金钢
+#:   功能代码」）回退**：真实库由 captain 还原为 2531328 B / `F5DA2306…0F065` /
+#:   mtime `2026-09-18 12:50:55`；导入态字节另存 `app.db.evidence-ALLOY-IMPORT-02-20261009_004539`
+#:   （3035136 B / `4EB632A4…FA43`）；上述导入后锚点自此**只作注释里的历史记录**，不作生效期望。
+#: 同批一并回退的三处（同一触发项，四者必须同改，否则 `t6_ledger_check.py:183` 的交叉断言或门禁必红）：
+#:   `run_gates.py` 的 `EXPECTED['bootstrap_copied_rows']`、`ci_gates.py` 的 `check_db_bootstrap`
+#:   期望串、`t6_ledger_check.py` 的 `PINNED_DB_SHA`。逐处前值/新值/依据/命令见 append-only 登记件
+#:   `test-reports-2026-10/B14-R1-锚点回退登记.md`。
+#: 判据（阴性对照）：把本行写成导入后锚点 `4EB632A4…`（干净库现状）⇒ `assert_real_db_untouched()`
+#:   现场必抛 `RuntimeError: 真实库 app.db 已偏离钉死哈希`（B14-R1 已实测，见登记件 §阴性对照）。
+#: 冻结历史件（`harness/final_recount.py`、`harness/analysis_ledger.py`、`harness/reconcile_r2.py`、
+#:   `reconcile-2026-10-08/*`、带日期 markdown 报告、`r2_v14_ledgerbook.py` 等）一律**不动** ——
+#:   它们本就钉在导入前的干净口径上，无需随本次回退改动。
+#: ────────────────────────────────────────────────────────────────────────────────────────
 REAL_DB_SHA256_EXPECTED = 'F5DA2306BC31CBAB098AAD3774016D320A9B9AA3546F93418196AE9900E0F065'
 
 _encode_fix = "import sys;sys.stdout.reconfigure(encoding='utf-8',errors='replace');sys.stderr.reconfigure(encoding='utf-8',errors='replace')\n"

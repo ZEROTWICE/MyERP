@@ -32,6 +32,7 @@ class NotificationService:
         'USER_LOGIN': 'user_login',                  # 用户登录
         'DATA_BACKUP': 'data_backup',                # 数据备份
         'RAW_SUBSTITUTION': 'raw_substitution',      # 原材料替用
+        'CONCESSION_APPROVAL': 'concession_approval',  # 让步审批（B13-08 补键）
     }
     
     # 预定义的接收者类型
@@ -60,7 +61,8 @@ class NotificationService:
         trigger_data: Dict = None,
         receivers: List[Union[int, str]] = None,
         template_code: str = None,
-        template_variables: Dict = None
+        template_variables: Dict = None,
+        _dedup_enabled: bool = True
     ) -> Notification:
         """
         创建通知
@@ -80,8 +82,48 @@ class NotificationService:
         
         Returns:
             Notification: 创建的通知对象
+
+        幂等（B13-07）：插入前按 (trigger_type, related_model, related_id) 做一次
+        **查询级**存在性检查，同一业务事件重复触发（双击 / 重放 / 多路径触发）不会
+        产生第二条通知行，此时返回既有通知行（不再新建 receiver，避免与
+        uq_notification_receiver 冲突）。语义边界：
+
+        * 去重键 = `trigger_type + related_model + related_id` 三者同时相等。
+        * `related_id is None` 时**不去重**（直接新建）：无关联对象的通知无法在
+          「同一事件的重复触发」与「两个不同事件」之间区分，去重会误合并真实事件；
+          此处显式定义为「一律不去重」，而非意外行为。
+        * 三键之外的信息（title/content/notification_type/receivers）**不**改变
+          去重结果：同一事件重放时携带的载体数据差异不影响「同一事件」的判定。
+        * 去重只做存在性查询，**不新增唯一约束 / 索引 / 列**（零 schema 变更）。
+
+        事务边界（B13-05）：本方法只 add/flush，**不再自带 commit**。
+        flush 仅用于取得 notification.id 以建立 receiver 关联，不是提交；
+        提交责任在调用方（谁开事务谁提交），避免「每接一个触发器多一次隐式提交」。
+        异常路径保留 rollback（沿用既有行为）：调用方须自持事务边界，
+        失败时由其决定回滚或消化本次通知写入。
         """
         try:
+            # 幂等检查（B13-07）：同一业务事件重复触发不重复建行。
+            # 负例对照用的开关 _dedup_enabled=False 仅供证据探针使用（默认 True）。
+            existing = NotificationService._find_existing_notification(
+                trigger_type=trigger_type,
+                related_model=related_model,
+                related_id=related_id,
+                dedup_enabled=_dedup_enabled,
+            )
+            if existing is not None:
+                # 重放：返回既有行，不新建 Notification / NotificationReceiver。
+                # 与首次创建保持同一终态（首次创建末尾即 status='sent'）。
+                if existing.status != 'sent':
+                    existing.status = 'sent'
+                    existing.sent_at = existing.sent_at or datetime.utcnow()
+                current_app.logger.info(
+                    f'通知幂等命中，跳过重复创建: trigger_type={trigger_type} '
+                    f'related_model={related_model} related_id={related_id} '
+                    f'(既有 ID: {existing.id})'
+                )
+                return existing
+
             # 如果使用模板，渲染标题和内容
             if template_code and template_variables:
                 template = NotificationTemplate.query.filter_by(
@@ -118,8 +160,6 @@ class NotificationService:
             notification.status = 'sent'
             notification.sent_at = datetime.utcnow()
             
-            db.session.commit()
-            
             current_app.logger.info(f'通知创建成功: {notification.title} (ID: {notification.id})')
             return notification
             
@@ -127,6 +167,48 @@ class NotificationService:
             db.session.rollback()
             current_app.logger.error(f'创建通知失败: {str(e)}')
             raise e
+
+    @staticmethod
+    def _find_existing_notification(
+        trigger_type: str,
+        related_model: str = None,
+        related_id: int = None,
+        dedup_enabled: bool = True
+    ) -> Optional[Notification]:
+        """B13-07 幂等去重：按 (trigger_type, related_model, related_id) 查既有通知行。
+
+        返回命中到的既有通知（已存在或本会话内已 add 未提交的），未命中返回 None。
+
+        为什么两段查：
+        1. 先查本会话 `db.session.new`——同一事务内连续两次触发时，第一次 add 的行
+           还未落库，用 `no_autoflush` 的查询看不到它，会误建第二条。
+        2. 再查库（`related_id is not None` 才查，见 create_notification 的语义边界）。
+           用 `no_autoflush` 避免这次只读查询顺带 flush 调用方的其它待写对象
+           （读操作不应有写副作用），也避免命中已被 `delete()` 标记删除的行。
+
+        不改 schema：只用既有列做等值查询；`related_id` 为空时显式不去重。
+        """
+        if not dedup_enabled or related_id is None:
+            return None
+
+        # 1) 本会话内已 add 但尚未提交的通知（同事务重复触发）
+        for obj in db.session.new:
+            if not isinstance(obj, Notification):
+                continue
+            if (
+                obj.trigger_type == trigger_type
+                and obj.related_model == related_model
+                and obj.related_id == related_id
+            ):
+                return obj
+
+        # 2) 库内既有通知（跨请求 / 跨事务重复触发）
+        with db.session.no_autoflush:
+            return Notification.query.filter(
+                Notification.trigger_type == trigger_type,
+                Notification.related_model == related_model,
+                Notification.related_id == related_id,
+            ).order_by(Notification.id.asc()).first()
 
     @staticmethod
     def _create_receivers(notification: Notification, receivers: List[Union[int, str]]):
@@ -407,7 +489,13 @@ class NotificationService:
 
     @staticmethod
     def delete_notification(notification_id: int, user_id: int) -> bool:
-        """删除用户的通知接收记录"""
+        """删除用户的通知接收记录
+
+        事务边界：本方法沿用既有形态，仍自行提交/回滚（与 `mark_as_read`/
+        `archive_notification` 的「调用方提交」形态不一致，但属 B13-05 的
+        「除既有 1 处」存留项——B13-05 只移除 `create_notification` 的隐式提交，
+        不扩大改动面）。当前全仓零调用点。
+        """
         try:
             receiver = NotificationReceiver.query.filter_by(
                 notification_id=notification_id,
@@ -427,17 +515,28 @@ class NotificationService:
 
 
 # 便捷的触发器函数
-def notify_process_change(process_name: str, old_data: Dict, new_data: Dict, user_id: int = None):
-    """工艺变更通知"""
+def notify_process_change(process_name: str, old_data: Dict, new_data: Dict, user_id: int = None,
+                          related_id: int = None, receivers: List[Union[int, str]] = None):
+    """工艺变更通知
+
+    B13-06 接线：调用方传 `related_id`（被变更的 `ProcessPrice.id`），本通知才具备
+    B13-07 的查询级幂等键（`trigger_type='process_change'` + `related_model='ProcessPrice'`
+    + `related_id`）；不传则按 B13-07 语义「一律不去重」（related_id 为空时不去重）。
+    `receivers` 同样由调用方显式给出：规则表（NotificationRule）当前 0 行，
+    只靠 `_create_receivers_by_rules` 会静默地一个接收人都不建。
+    """
     user_id = user_id or (current_user.id if current_user.is_authenticated else None)
     
-    NotificationService.create_notification(
+    # 事务边界：本 helper 不自提交，提交责任在调用方的事务边界内（B13-05）。
+    notification = NotificationService.create_notification(
         trigger_type=NotificationService.TRIGGER_TYPES['PROCESS_CHANGE'],
         title=f'工艺变更通知 - {process_name}',
         content=f'工艺 {process_name} 已发生变更，请及时关注。',
         notification_type='warning',
         priority='high',
         related_model='ProcessPrice',
+        related_id=related_id,
+        receivers=receivers,
         trigger_data={
             'process_name': process_name,
             'old_data': old_data,
@@ -452,19 +551,31 @@ def notify_process_change(process_name: str, old_data: Dict, new_data: Dict, use
             'new_data': new_data
         }
     )
+    return notification
 
 
-def notify_spec_change(order_number: str, batch_count: int, task_count: int, user_id: int = None):
-    """规格变更通知"""
+def notify_spec_change(order_number: str, batch_count: int, task_count: int, user_id: int = None,
+                       related_id: int = None, receivers: List[Union[int, str]] = None):
+    """规格变更通知
+
+    B13-06 接线：调用方传 `related_id`（被变更的 `ProductionOrder.id`），本通知才具备
+    B13-07 的查询级幂等键（`trigger_type='spec_change'` + `related_model='ProductionOrder'`
+    + `related_id`）；不传则按 B13-07 语义「一律不去重」（重复事件会重复建行）。
+    `receivers` 同样由调用方显式给出：规则表（NotificationRule）当前 0 行，
+    只靠 `_create_receivers_by_rules` 会静默地一个接收人都不建。
+    """
     user_id = user_id or (current_user.id if current_user.is_authenticated else None)
     
-    NotificationService.create_notification(
+    # 事务边界：本 helper 不自提交，提交责任在调用方的事务边界内（B13-05）。
+    notification = NotificationService.create_notification(
         trigger_type=NotificationService.TRIGGER_TYPES['SPEC_CHANGE'],
         title=f'规格变更通知 - {order_number}',
         content=f'生产订单 {order_number} 的规格信息已更新，影响 {batch_count} 个批次和 {task_count} 个任务。',
         notification_type='info',
         priority='normal',
         related_model='ProductionOrder',
+        related_id=related_id,
+        receivers=receivers,
         trigger_data={
             'order_number': order_number,
             'batch_count': batch_count,
@@ -479,11 +590,29 @@ def notify_spec_change(order_number: str, batch_count: int, task_count: int, use
             'user_name': current_user.username if current_user.is_authenticated else '系统'
         }
     )
+    return notification
 
 
+# ---------------------------------------------------------------------------
+# B13-06 / 拍板项 6：`notify_inventory_warning` **只登记、不接线**的仓库内可见登记。
+#   * 缺失数据源：触发库存预警所需的「安全库存阈值」统一配置项尚无业务取值，
+#     故本触发器在本批次按 81- §7.2 拍板项 6 的默认路径**继续保持零调用点（只登记）**。
+#   * 待加配置项：`SystemConfig(key='inventory.min_stock_level')`（零 schema 变更——
+#     `SystemConfig` 是既有 key/value 表）；其默认登记表 `SystemConfig.DEFAULTS` 位于
+#     `app/models.py`，**不在 B13-06 的 inScope 内** ⇒ 本任务只登记、不改该文件。
+#   * 未给值 ⇒ 不接线；给值后由后续条目把本函数接到库存校验落点。
+#   * 门禁锚点：B13-09 的 allowlist 通道按 `test-reports-2026-10/81-后续开发与测试规划.md`
+#     内「notify_inventory_warning … 只登记」同一行共现定位；本行同时含
+#     notify_inventory_warning 与其豁免语义，便于仓库内检索该登记。
+# ---------------------------------------------------------------------------
 def notify_inventory_warning(material_name: str, current_stock: float, min_stock: float):
-    """库存预警通知"""
-    NotificationService.create_notification(
+    """库存预警通知
+
+    B13-06：**保持零调用点（只登记）**——安全库存阈值配置项 `inventory.min_stock_level`
+    尚无业务取值，见上方登记块与 81- §7.2 拍板项 6。
+    """
+    # 事务边界：本 helper 不自提交，提交责任在调用方的事务边界内（B13-05）。
+    notification = NotificationService.create_notification(
         trigger_type=NotificationService.TRIGGER_TYPES['INVENTORY_WARNING'],
         title=f'库存预警 - {material_name}',
         content=f'物料 {material_name} 库存不足，当前库存：{current_stock}，最低库存：{min_stock}。',
@@ -501,16 +630,29 @@ def notify_inventory_warning(material_name: str, current_stock: float, min_stock
             'min_stock': min_stock
         }
     )
+    return notification
 
 
-def notify_task_assignment(employee_name: str, task_count: int, batch_number: str = None):
-    """任务分配通知"""
-    NotificationService.create_notification(
+def notify_task_assignment(employee_name: str, task_count: int, batch_number: str = None,
+                           related_id: int = None, receivers: List[Union[int, str]] = None):
+    """任务分配（派工）通知
+
+    B13-06 接线：调用方传 `related_id`（新建 `TaskAssignment.id`）与 `receivers`
+    （被派工员工的 user id 列表），本通知才同时具备「`/notifications` 可见」与
+    B13-07 的查询级幂等键（`trigger_type='task_assignment'` +
+    `related_model='TaskAssignment'` + `related_id`）。
+    不传 `related_id` 则按 B13-07 语义「一律不去重」（重复派工事件会重复建行）。
+    """
+    # 事务边界：本 helper 不自提交，提交责任在调用方的事务边界内（B13-05）。
+    notification = NotificationService.create_notification(
         trigger_type=NotificationService.TRIGGER_TYPES['TASK_ASSIGNMENT'],
         title=f'任务分配通知 - {employee_name}',
         content=f'已为 {employee_name} 分配 {task_count} 个新任务' + (f'（批次：{batch_number}）' if batch_number else '') + '。',
         notification_type='info',
         priority='normal',
+        related_model='TaskAssignment',
+        related_id=related_id,
+        receivers=receivers,
         trigger_data={
             'employee_name': employee_name,
             'task_count': task_count,
@@ -522,7 +664,8 @@ def notify_task_assignment(employee_name: str, task_count: int, batch_number: st
             'task_count': task_count,
             'batch_number': batch_number or '无'
         }
-    ) 
+    )
+    return notification
 
 
 def notify_raw_substitution(task_id: int, order_number: str, substitutions: List[Dict], operator_name: str = None):
@@ -540,7 +683,8 @@ def notify_raw_substitution(task_id: int, order_number: str, substitutions: List
     except Exception:
         items_text = '无'
 
-    NotificationService.create_notification(
+    # 事务边界：本 helper 不自提交，提交责任在调用方的事务边界内（B13-05）。
+    notification = NotificationService.create_notification(
         trigger_type=NotificationService.TRIGGER_TYPES['RAW_SUBSTITUTION'],
         title=f'原材料替用 - 任务{task_id}',
         content=f'生产订单 {order_number} 的任务 {task_id} 发生原材料替用：{items_text}。',
@@ -563,3 +707,4 @@ def notify_raw_substitution(task_id: int, order_number: str, substitutions: List
             'items': substitutions
         }
     )
+    return notification

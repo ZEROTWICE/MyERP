@@ -28,6 +28,7 @@
                         <option value="production_record">生产记录质检</option>
                         <option value="product">成品质检</option>
                         <option value="material">原材料质检</option>
+                        <option value="goods_receipt">来料质检</option>
                     </select>
                 </div>
                 <div class="col-md-2">
@@ -256,7 +257,8 @@ function getRecordTypeName(type) {
     const types = {
         'production_record': '生产记录质检',
         'product': '成品质检',
-        'material': '原材料质检'
+        'material': '原材料质检',
+        'goods_receipt': '来料质检'
     };
     return types[type] || type;
 }
@@ -401,32 +403,43 @@ function renderRecordDetail(record) {
     });
     
     // 渲染不合格处理记录
+    // B14-06：本分支此前是死分支 —— 接口 record_data 里没有 nonconformity 键，
+    // 判断恒为假。键名与 /api/quality/records/<id> 的 nonconformity 对象、
+    // print_record.html:167-196 同一口径（type / handler_name / handling_date /
+    // handling_result / notes）。
     const nonconformityContainer = document.getElementById('nonconformityContainer');
     const nonconformityInfo = document.getElementById('nonconformityInfo');
     if (record.nonconformity) {
+        const nc = record.nonconformity;
         nonconformityContainer.style.display = 'block';
         nonconformityInfo.innerHTML = `
             <div class="row">
                 <div class="col-md-4">
                     <p class="mb-1"><strong>处理方式</strong></p>
-                    <p>${record.nonconformity.handling_method}</p>
+                    <p>${nc.type || '无'}</p>
                 </div>
                 <div class="col-md-4">
                     <p class="mb-1"><strong>处理人</strong></p>
-                    <p>${record.nonconformity.handler_name}</p>
+                    <p>${nc.handler_name || '未知'}</p>
                 </div>
                 <div class="col-md-4">
-                    <p class="mb-1"><strong>处理时间</strong></p>
-                    <p>${record.nonconformity.handling_time}</p>
+                    <p class="mb-1"><strong>处理日期</strong></p>
+                    <p>${nc.handling_date || '无'}</p>
+                </div>
+                <div class="col-md-4">
+                    <p class="mb-1"><strong>处理结果</strong></p>
+                    <p>${nc.handling_result || '无'}</p>
                 </div>
                 <div class="col-12">
                     <p class="mb-1"><strong>处理说明</strong></p>
-                    <p>${record.nonconformity.handling_notes || '无'}</p>
+                    <p>${nc.notes || '无'}</p>
                 </div>
             </div>
         `;
     } else {
+        // 无处置单：容器保持隐藏，且清空残留内容（不得显示空块）
         nonconformityContainer.style.display = 'none';
+        nonconformityInfo.innerHTML = '';
     }
 }
 

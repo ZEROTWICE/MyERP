@@ -49,10 +49,14 @@
         <button type="button" class="btn btn-success" onclick="document.getElementById('importFile').click()">
             <i class="fas fa-file-import"></i> 导入工序价格
         </button>
+        <button type="button" class="btn btn-outline-success" onclick="document.getElementById('importAlloyFile').click()">
+            <i class="fas fa-file-excel"></i> 导入合金钢辙叉工价标准
+        </button>
         <a href="{{ url_for('main.export_process_prices') }}" class="btn btn-warning">
             <i class="fas fa-file-export"></i> 导出工序价格
         </a>
         <input type="file" id="importFile" style="display: none" accept=".xlsx" onchange="importProcessPrices(this)">
+        <input type="file" id="importAlloyFile" style="display: none" accept=".xlsx" onchange="importAlloyPrices(this)">
     </div>
     {% endif %}
 
@@ -240,6 +244,7 @@
 
 {% block scripts %}
 <script src="{{ url_for('static', filename='vendor/jquery/jquery-3.6.0.min.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/alloy-steel-import.js') }}"></script>
 <script>
 let processToDelete = null;
 
@@ -516,5 +521,51 @@ function showDetailedAlert(type, title, message) {
 function showAlert(type, message) {
     showDetailedAlert(type, type === 'success' ? '成功' : '错误', message);
 }
+
+// ---- 合金钢辙叉计件工价标准（原始版式，73 页型号）导入 --------------------
+// 与上面的 10 列模板导入区分：这条吃原始工价标准表，先试运行出报告，确认后再正式写入。
+function importAlloyPrices(input) {
+    if (!input.files || !input.files[0]) return;
+    const file = input.files[0];
+    input.value = '';  // 立刻清空，同一个文件再选一次也能触发 change
+    Swal.fire({
+        title: '导入合金钢辙叉工价标准',
+        html: `文件：<b>${file.name}</b><br><span style="font-size:.9em;color:#666">表格按型号分页，页内含小计/合计块；源表笔误只提示不改正</span>`,
+        icon: 'question',
+        showDenyButton: true,
+        showCancelButton: true,
+        confirmButtonText: '正式导入',
+        denyButtonText: '先试运行（只出报告）',
+        cancelButtonText: '取消'
+    }).then(r => {
+        if (r.isConfirmed) uploadAlloyPrices(file, false);
+        else if (r.isDenied) uploadAlloyPrices(file, true);
+    });
+}
+
+function uploadAlloyPrices(file, dryRun) {
+    showImportProgress(dryRun ? '正在解析并试运行…' : '正在导入，请勿关闭页面…');
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('dry_run', dryRun ? '1' : '0');
+    fetch('{{ url_for("main.import_alloy_process_prices") }}', {
+        method: 'POST',
+        body: formData,
+        headers: {'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content}
+    })
+    .then(response => response.json())
+    .then(data => {
+        hideImportProgress();
+        if (!data.data) { showDetailedAlert('danger', '导入失败', data.message || '服务器未返回报告'); return; }
+        showAlloyImportReport(data, dryRun, '工价标准');
+    })
+    .catch(error => {
+        hideImportProgress();
+        showDetailedAlert('danger', '导入失败', '网络错误或服务器异常，请重试');
+        console.error('Alloy price import error:', error);
+    });
+}
+
+// 工价与 BOM 两份报告字段不同，按 kind 渲染；渲染逻辑在 static/js/alloy-steel-import.js
 </script>
 {% endblock %}

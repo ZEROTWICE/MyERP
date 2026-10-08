@@ -1,0 +1,480 @@
+﻿{
+ "B9-01_B9-02_file_exists": true,
+ "B9-01_261_view": [
+  [
+   220,
+   "本节记录 P0/P1 主体交付之后的**收尾一轮**：4 件修复 + 2 件仓库卫生；**第 7 批**（`uploads/temp` 遗留模板取消跟踪）与**第 8 批**（删除 4 个遗留备份文件 + 统一 `is_archived` "
+  ]
+ ],
+ "B9-01_102_inline": [
+  [
+   14,
+   "| 权限 | capability 体系已建但四风格并存未收口 | 44 能力/7 角色；261 个 main 视图 = 150 装饰器 + 102 inline role + 9 仅 login_required；0 无登录守卫 |"
+  ],
+  [
+   38,
+   "4. ⚠️ 102 个 inline `current_user.role` 端点迁移到 `@require_capability`（routes.py 88 + quality.py 14）。"
+  ],
+  [
+   97,
+   "| P0-3 | 权限收口（102 inline 端点 + 3 组模板按钮错位 + 不合格处置导航） | 无（check_templates.py 已 OK 可作基线） | 误收口断掉 material.lookup 等跨模块能力 |"
+  ]
+ ],
+ "B9-01_194_route": [
+  [
+   24,
+   "**规模实测**（与文档有出入）：`routes.py` 约 1.1–1.2 万行 / 194 路由（两个成员分别实测 12214 与 11557 行，差异为统计口径）；`models.py` 约 2770–3092 行 / 74 模型类（"
+  ],
+  [
+   220,
+   "本节记录 P0/P1 主体交付之后的**收尾一轮**：4 件修复 + 2 件仓库卫生；**第 7 批**（`uploads/temp` 遗留模板取消跟踪）与**第 8 批**（删除 4 个遗留备份文件 + 统一 `is_archived` "
+  ]
+ ],
+ "B9-01_2_head": [
+  [
+   21,
+   "| 数据/迁移 | 迁移链分叉但非文档所述 5 head | 32 迁移文件、**2 个 head**（c2mespg001 / f179636cecf0），app.db 停 f179636cecf0；31 表靠 create_all 不在"
+  ],
+  [
+   57,
+   "17. ⚠️ 收敛 2 个 head（c2mespg001 / f179636cecf0）为单 head。"
+  ],
+  [
+   67,
+   "25. ⚠️ 文档漂移：37→44 capability、5→2 head、停在 0e97d0ec34b4→f179636cecf0、routes.py 11557 行。"
+  ],
+  [
+   68,
+   "26. ⚠️ 约 57 个 `.pyc` 已跟踪 + `.gitignore` 仅 3 行；部署脚本 `.env` 硬写 sqlite + 弱 SECRET_KEY；`scripts/merge_and_upgrade` 不存在；`depl"
+  ],
+  [
+   96,
+   "| P0-2 | 收敛 2 head + 补 31 表迁移/固化 create_all 策略 | 确认生产库 alembic 版本 | 误纳 create_all 表生成冲突脚本，需手写幂等迁移 + `_ENSURED_COLUMNS` 登"
+  ],
+  [
+   220,
+   "本节记录 P0/P1 主体交付之后的**收尾一轮**：4 件修复 + 2 件仓库卫生；**第 7 批**（`uploads/temp` 遗留模板取消跟踪）与**第 8 批**（删除 4 个遗留备份文件 + 统一 `is_archived` "
+  ]
+ ],
+ "B9-01_31_template_77_role": [
+  [
+   20,
+   "| 前端 | base.html 已 100% can() | 31 模板 77 处硬编码 role、3 组 role 与能力表不一致、6 孤儿模板、8 处 JS 硬编码 URL；url_for 断链 0 处 |"
+  ],
+  [
+   50,
+   "12. ⚠️ 31 模板 77 处硬编码 `current_user.role` 迁移 `can()`（多数可 1:1 映射；`task_detail.html:13`、`quality/tasks.html:337` 的角色+对象归属复合"
+  ],
+  [
+   105,
+   "| P1-4 | 前端一致性批量收口（77 处 role、8 处 JS、成品 Select2 字段、mobile 对齐、分页白名单、清 6 孤儿模板） | 前置=P0-3 | 每轮跑 check_templates.py |"
+  ],
+  [
+   220,
+   "本节记录 P0/P1 主体交付之后的**收尾一轮**：4 件修复 + 2 件仓库卫生；**第 7 批**（`uploads/temp` 遗留模板取消跟踪）与**第 8 批**（删除 4 个遗留备份文件 + 统一 `is_archived` "
+  ],
+  [
+   273,
+   "| 模板中硬编码 `current_user.role` | 31 模板 / 77 处 | **仅 2 处**（`quality/task_detail.html`、`quality/tasks.html`，均为角色+对象归属复合条件）；P"
+  ]
+ ],
+ "B9-02_tasks_337_remains": [
+  [
+   50,
+   "12. ⚠️ 31 模板 77 处硬编码 `current_user.role` 迁移 `can()`（多数可 1:1 映射；`task_detail.html:13`、`quality/tasks.html:337` 的角色+对象归属复合"
+  ]
+ ],
+ "B9-02_tasks_340_present": [],
+ "B9-06_question_mark_lines": [
+  [
+   30,
+   "标记：✅已拍板/结论明确　❓需业务确认　⚠️需排期实施"
+  ],
+  [
+   35,
+   "3. ⚠️ **物料账误归属**：`consume_bom_for_assembly`（mes_service.py:324）写 consumed 不按 `production_order_id` 过滤，记到别的订单头上。❓实扣归集口径待定。"
+  ],
+  [
+   45,
+   "9. ✅ 三入口并存为已拍板决策；但**报工路径不入库 vs MES 入库不一致**。❓报工路径是否也应末道入库。"
+  ],
+  [
+   46,
+   "10. ⚠️ 请购→采购单断链：`PurchaseOrder.requisition_id` 从不赋值。❓未启用还是缺陷。"
+  ],
+  [
+   47,
+   "11. ⚠️ 来料检 fail 无处置（pass 入库 / fail 停 pending_inspection），且有 `putaway_goods_receipt` 强入库后门绕过质检。❓处置方式。"
+  ],
+  [
+   52,
+   "14. ⚠️ `mobile-optimization.js` 用 DOM 猜角色+硬编码 URL 重建侧边栏，与 base.html can() 菜单脱节。❓移动端是否补产销一体入口。"
+  ],
+  [
+   102,
+   "| P1-1 | 三入口职责边界 + 报工路径末道入库对齐 | 两套都保留/末道入库/未通过库 | ❓报工路径是否入库 |"
+  ],
+  [
+   103,
+   "| P1-2 | 物料账误归属修正 | 计划层+实扣回写 | ❓归集口径 |"
+  ],
+  [
+   104,
+   "| P1-3 | 采购断链 + 来料检 fail 处置 | 完整流程+开关控制+来料检 | ❓断链性质与处置方式（复用 NC 需区分 target） |"
+  ]
+ ],
+ "B9-06_yijue_present": [],
+ "B9-03_sales_routes@docs/开发进度与交接.md": [],
+ "B9-03_sales_routes@docs/交付说明-P0P1.md": [],
+ "B9-03_sales_routes@docs/业务流程现状与缺口.md": [],
+ "B9-03_sales_routes@docs/继续开发准备报告.md": [],
+ "B9-07_148d8a5@docs/开发进度与交接.md": [
+  [
+   305,
+   "### 8.1 本轮提交（第 1–7 批已提交并推送，远端 `github/main` == 本地 HEAD == `148d8a5`；第 8 批与本文档本次更新为同一笔提交）"
+  ],
+  [
+   315,
+   "| 7 | `148d8a5` | docs: 更新全部开发文档并修复 uploads/temp 目录耦合 | `git rm -r --cached uploads/temp`（`git ls-files uploads` = **0**）+ 磁盘删除该目录"
+  ]
+ ],
+ "B9-07_f60a54d@docs/开发进度与交接.md": [],
+ "B9-07_148d8a5@docs/继续开发准备报告.md": [
+  [
+   233,
+   "### 9.2 八笔提交（第 1–7 批已提交并推送，远端 `github/main` == 本地 HEAD == `148d8a5`；第 8 批与本文档本次更新为同一笔提交）"
+  ],
+  [
+   243,
+   "| 7 | `148d8a5` | docs: 更新全部开发文档并修复 uploads/temp 目录耦合（含迁移 docstring 措辞修正） |"
+  ]
+ ],
+ "B9-07_f60a54d@docs/继续开发准备报告.md": [],
+ "B9-12_ensured@docs/开发进度与交接.md": [
+  [
+   115,
+   "**schema 的事实来源不是迁移链，而是 `db.create_all()`**：31 张表由 `create_all()` 建出、**不在迁移历史里**，启动时再由 `app/__init__.py` 的 `_ensure_schema()` / `_ENSURED_COL"
+  ],
+  [
+   118,
+   "- 新增表或列：**手写迁移**（`upgrade()` 内做存在性判断保证幂等）**+ 在 `_ENSURED_COLUMNS` / `_ensure_schema()` 中登记**，让老库启动时自愈。自愈才是本项目实际生效的路径。"
+  ],
+  [
+   125,
+   "> ⚠ **必留的坑**：`flask db *` 会先执行 `create_app()`，而它会跑启动自愈（`create_all` + `_ENSURED_COLUMNS`）。"
+  ],
+  [
+   249,
+   "手写列：`raw_material_categories.requires_approval`、`consumable_categories.requires_approval`（`_ENSURED_COLUMNS` + `c2mespg001`）。扣账细节在 `app/serv"
+  ],
+  [
+   357,
+   "2. 任何 schema 改动**手写迁移 + `_ENSURED_COLUMNS` 登记**，**不跑 `flask db migrate`**；跑 `flask db *` 前先把 `DATABASE_URL` 指向目标库。"
+  ],
+  [
+   391,
+   "- 不改 `db.create_all()` + `_ENSURED_COLUMNS` 启动自愈（**它是线上实际生效的路径，不得撤除**）；"
+  ],
+  [
+   499,
+   "`_ENSURED_COLUMNS` 登记」纪律一起排期）；"
+  ]
+ ],
+ "B9-12_ensured@docs/继续开发准备报告.md": [
+  [
+   21,
+   "| 数据/迁移 | 迁移链分叉但非文档所述 5 head | 32 迁移文件、**2 个 head**（c2mespg001 / f179636cecf0），app.db 停 f179636cecf0；31 表靠 create_all 不在迁移史；`_ENSURED_COLUMN"
+  ],
+  [
+   59,
+   "19. ⚠️ `_ENSURED_COLUMNS` 盲区：6 个规格列在 task_assignment/production_orders/production_batches 上未登记，仅靠未合并 head eb1234567890 补列。"
+  ],
+  [
+   86,
+   "- 手写补列：`app/__init__.py:20-60`(_ENSURED_COLUMNS)、`:74-110`(_ensure_schema)、`migrations/versions/c2mespg001_add_mes_columns.py:15`"
+  ],
+  [
+   96,
+   "| P0-2 | 收敛 2 head + 补 31 表迁移/固化 create_all 策略 | 确认生产库 alembic 版本 | 误纳 create_all 表生成冲突脚本，需手写幂等迁移 + `_ENSURED_COLUMNS` 登记 |"
+  ],
+  [
+   127,
+   "- 不跑 `flask db migrate`，手写迁移 + `_ENSURED_COLUMNS` 登记。"
+  ],
+  [
+   159,
+   "| P0-2 迁移收敛（t2） | 收敛为**单一 head `p0p2messtables`**；31 张 `create_all` 表补手写幂等迁移；`_ENSURED_COLUMNS` 补 6 规格列×3 表；加固 `eb1234567890`（原无条件 `add_colu"
+  ]
+ ],
+ "B9-12_ensured@docs/交付说明-P0P1.md": [
+  [
+   47,
+   "| `app/__init__.py` | 28 行 | t2/t10 | `_ENSURED_COLUMNS` 补 6 规格列×3 表、`nonconformity_records` 两列 |"
+  ],
+  [
+   206,
+   "# 3) 启动应用，由 _ensure_schema()/_ENSURED_COLUMNS 自愈补齐表与列"
+  ],
+  [
+   211,
+   "⚠ **警告**：`flask db *` 会先执行 `create_app()`，而它会跑启动自愈（`create_all` + `_ENSURED_COLUMNS`）。"
+  ]
+ ],
+ "B9-11_five_head@docs/开发进度与交接.md": [
+  [
+   108,
+   "**当前状态（2026-09-18 实测）**：5 个 head 已收敛为**单一 head `p1nonctarget`（35 个修订）**。"
+  ],
+  [
+   260,
+   "- ~~补齐历史缺失的 Alembic 迁移、收敛 5 个 head~~ —— **已完成**：单一 head `p1nonctarget`（35 修订）。"
+  ]
+ ],
+ "B9-11_five_head@docs/继续开发准备报告.md": [
+  [
+   21,
+   "| 数据/迁移 | 迁移链分叉但非文档所述 5 head | 32 迁移文件、**2 个 head**（c2mespg001 / f179636cecf0），app.db 停 f179636cecf0；31 表靠 create_all 不在迁移史；`_ENSURED_COLUMN"
+  ],
+  [
+   77,
+   "4. 本地文档内部也已漂移（37 capability、5 head、停在 0e97d0ec34b4 均过时）。"
+  ]
+ ],
+ "B9-15_partial@docs/业务流程现状与缺口.md": [],
+ "B9-15_full_qc@docs/业务流程现状与缺口.md": [],
+ "B9-15_partial@docs/开发进度与交接.md": [],
+ "B9-15_full_qc@docs/开发进度与交接.md": [],
+ "B9-10_dims@docs/测试报告-2026-08-11.md": [
+  [
+   208,
+   "| `/bonus_penalties/export` | 奖惩数据导出（POST 无校验） | `bonus.manage` = admin/hr |"
+  ],
+  [
+   220,
+   "> 全量清点（含 POST/PUT/DELETE、非 `/api/` 前缀）为 **75 条**无任何角色校验，"
+  ],
+  [
+   269,
+   "会被误判为无校验，实测其权限正确（仅 admin/manager）。以实测矩阵为准。"
+  ],
+  [
+   301,
+   "| `permission_matrix.py` | 3 个薪酬端点全角色 200 | 薪酬端点已收紧 | 无校验路由 75 → 15 | **75 → 6**（均为已知误报或有意开放） |"
+  ],
+  [
+   389,
+   "角色判断」重新全量清点（含 POST/PUT/DELETE、非 `/api/` 前缀），实际 **75 条**。"
+  ],
+  [
+   433,
+   "无角色校验的路由 **75 → 15**。剩余 15 条均为有意开放：通知与「我的任务」按"
+  ],
+  [
+   568,
+   "`permission_matrix.py` 报告的无校验路由降到 6 条，全部已知无害："
+  ]
+ ],
+ "B9-13_route_lines@docs/继续开发准备报告.md": [
+  [
+   271,
+   "| `app/main/routes.py` 行数 | 约 1.1–1.2 万行 | **12126** 行 |"
+  ]
+ ],
+ "B9-13_route_lines@docs/开发进度与交接.md": [
+  [
+   341,
+   "- `app/main/routes.py`：**12126 行**；`after_this_request` **0** 处、`tempfile.mkstemp` **0** 处、`buf = io.BytesIO()` **13** 处。"
+  ]
+ ],
+ "AGENTS_templates_expect": [
+  [
+   78,
+   "| `python -B scripts/check_templates.py` | `87 templates / 44 declared / 40 used in templates / 44 used on routes / landing 5` → `RESULT: OK` |"
+  ]
+ ],
+ "AGENTS_properties_expect": [
+  [
+   80,
+   "| `python -B scripts/check_properties.py` | `已扫描 23 个文件，模型类 74 个` → `RESULT: OK`（**新增闸门**，专治第 5 次复发的「`@property`/不存在列当列用」） |"
+  ]
+ ],
+ "AGENTS_modelrefs_expect": [
+  [
+   82,
+   "| `python -B scripts/check_model_refs.py` | `scanned 23 files` / `name_query_refs`（计数勿钉，已漂移过 574/575/602）/ `violations 0` → `RESULT: OK`（**新增闸门**，专治 P"
+  ]
+ ],
+ "AGENTS_route_expect": [
+  [
+   81,
+   "| `python -B scripts/route_inventory.py` | `total rules=271`，`duplicate (method,path) registrations=0` |"
+  ]
+ ],
+ "AGENTS_heads_expect": [
+  [
+   79,
+   "| `python -B scripts/check_migration_heads.py` | `HEADS=['p1nonctarget']`，`head_count=1`，`revisions=35` → exit 0 |"
+  ]
+ ],
+ "AGENTS_one_route_module_claim": [
+  [
+   91,
+   "> `check_properties.py` 的跳过表有**两类**：① `SKIP_FILENAMES` 里的 4 个名字（`routes_backup.py` / `routes_original.py` / `routes_full.py` / `routes_with_duplicates"
+  ]
+ ],
+ "AGENTS_eight_modules_claim": [],
+ "AGENTS_import_must_persist_48": [
+  [
+   49,
+   "- **仅上传解析必须落盘**：`ExcelGenerator.parse_*` / `pd.read_excel` 需要真实路径，因此导入端点才写 `current_app.config['TEMP_FOLDER']`（`file.save(temp_path)`），由 `cleanup_temp"
+  ]
+ ],
+ "AGENTS_import_must_persist_282": [
+  [
+   293,
+   "5) Excel 导入（**必须落盘** + 行级容错）"
+  ]
+ ],
+ "AGENTS_check_is_archived_policy": [],
+ "AGENTS_check_notification_triggers": [],
+ "AGENTS_check_model_refs_gate": [
+  [
+   82,
+   "| `python -B scripts/check_model_refs.py` | `scanned 23 files` / `name_query_refs`（计数勿钉，已漂移过 574/575/602）/ `violations 0` → `RESULT: OK`（**新增闸门**，专治 P"
+  ]
+ ],
+ "AGENTS_check_http_contract_gate": [],
+ "AGENTS_w4_http_contract": [
+  [
+   83,
+   "| `python -B test-reports-2026-10/harness/w4_http_contract.py --roots app --scope app --expect 10` | 10 个 P-12 站点（`get_json()` 维，具名登记见脚本 docstring）→ e"
+  ]
+ ],
+ "AGENTS_fourteen_steps": [
+  [
+   87,
+   "**单一入口（推荐）**：以上各项已由 `python -B test-reports-2026-10/harness/ci_gates.py --phase first` 统一编排（当前 **14 步**：blocking 10 / report-only 4），退出码语义 `0=全部 block"
+  ],
+  [
+   88,
+   "> ⚠ 引用 `ci_gates` 的步骤数时必须带**「步骤数 + SHA256 + 时点」**：该文件在本战役期间从 11 步增至 14 步，「11 步」只能当阶段A 基线引用。"
+  ]
+ ],
+ "AGENTS_79_81": [
+  [
+   79,
+   "| `python -B scripts/check_migration_heads.py` | `HEADS=['p1nonctarget']`，`head_count=1`，`revisions=35` → exit 0 |"
+  ],
+  [
+   80,
+   "| `python -B scripts/check_properties.py` | `已扫描 23 个文件，模型类 74 个` → `RESULT: OK`（**新增闸门**，专治第 5 次复发的「`@property`/不存在列当列用"
+  ],
+  [
+   81,
+   "| `python -B scripts/route_inventory.py` | `total rules=271`，`duplicate (method,path) registrations=0` |"
+  ]
+ ],
+ "AGENTS_48_50": [
+  [
+   48,
+   "- **导出/模板下载：用 `io.BytesIO` 内存生成**，不落盘（见上「路由/端点规范」）。"
+  ],
+  [
+   49,
+   "- **仅上传解析必须落盘**：`ExcelGenerator.parse_*` / `pd.read_excel` 需要真实路径，因此导入端点才写 `current_app.config['TEMP_FOLDER']`（`file.sav"
+  ],
+  [
+   50,
+   "- 导入必须**行级容错**：坏行只记「第 N 行：…」并跳过，绝不整体 500；文本日期用 `pd.to_datetime` 兜底（参考 `import_tasks`、`import_inspection_tasks`）。"
+  ]
+ ],
+ "AGENTS_282": [
+  [
+   282,
+   "data = [{"
+  ]
+ ],
+ "AGENTS_total_lines": 339,
+ "JENKINS_error_active": [],
+ "JENKINS_error_commented": [
+  [
+   112,
+   "// error('[E-04] 门禁入口缺失：请先把 test-reports-2026-10/harness/** 纳入版本控制')"
+  ],
+  [
+   122,
+   "// error(\"[E-04] blocking 门禁失败: 4 项真闸门 / functional_test / permission_matrix / coverage_drift\")"
+  ]
+ ],
+ "JENKINS_echo_blocking_list": [
+  [
+   97,
+   "echo '[E-04] blocking: check_templates/check_migration_heads/check_properties/check_db_bootstrap/functional_test/permission_matrix/coverage_drift/run_gates(非环境依赖部分)'"
+  ]
+ ],
+ "JENKINS_mentions_new_gates": {
+  "check_model_refs": [],
+  "check_http_contract": [],
+  "evidence_hash": []
+ },
+ "GH_continue_on_error": [
+  [
+   15,
+   "# 第一阶段（当前）：report-only —— continue-on-error: true，且 build-and-push **不** needs 本 job（不阻塞发布）"
+  ],
+  [
+   16,
+   "# 第二阶段（A-63 第二步，观测 1 轮全绿后）：① 删掉 continue-on-error；② 在 build-and-push 下加 `needs: gate`"
+  ],
+  [
+   19,
+   "continue-on-error: true"
+  ]
+ ],
+ "GH_needs_gate": [
+  [
+   16,
+   "# 第二阶段（A-63 第二步，观测 1 轮全绿后）：① 删掉 continue-on-error；② 在 build-and-push 下加 `needs: gate`"
+  ],
+  [
+   58,
+   "# 第二阶段：在此加 `needs: gate`（当前不加 ⇒ gate 不阻塞发布）"
+  ]
+ ],
+ "exists::scripts/check_db_url_guard.py": false,
+ "exists::scripts/check_notification_triggers.py": false,
+ "exists::scripts/check_is_archived_policy.py": false,
+ "exists::requirements.lock": true,
+ "exists::test-reports-2026-10/harness/ci_lint.py": true,
+ "exists::test-reports-2026-10/harness/r2_c07_probe.py": true,
+ "hygiene_evidence": {
+  "exists": true,
+  "files": 13266,
+  "bytes": 327580714
+ },
+ "hygiene_tmp": {
+  "exists": true,
+  "files": 18555,
+  "bytes": 2015360185
+ },
+ "hygiene_repo_root_tmp_v15": [],
+ "gitignore_uploads_temp": [
+  [
+   32,
+   "/uploads/temp/"
+  ]
+ ],
+ "gitignore_dot_tmp": [
+  [
+   41,
+   "/test-reports-2026-10/.tmp/"
+  ]
+ ],
+ "gitignore_evidence": [
+  [
+   42,
+   "/test-reports-2026-10/evidence/"
+  ]
+ ],
+ "gitignore_lines": 42
+}

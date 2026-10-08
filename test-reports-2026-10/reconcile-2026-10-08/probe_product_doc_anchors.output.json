@@ -1,0 +1,209 @@
+{
+ "route_modules": {
+  "rule": "AST：ast.walk 找 FunctionDef 的装饰器里 Call(func.attr==\"route\")，每条算 1 条规则",
+  "per_file": {
+   "app/auth/routes.py": 3,
+   "app/main/equipment.py": 15,
+   "app/main/production_center.py": 7,
+   "app/main/purchase.py": 13,
+   "app/main/quality.py": 27,
+   "app/main/routes.py": 192,
+   "app/main/shipping.py": 6,
+   "app/main/stock.py": 5
+  },
+  "total_rules": 268,
+  "module_count_with_routes": 8,
+  "parse_errors": {}
+ },
+ "inline_role": {
+  "rule": "文本行 grep：`current_user.role` 出现行数（一行算一处）",
+  "python_count": 16,
+  "python_lines": [
+   "app\\main\\quality.py:46: if current_user.role == 'inspector':",
+   "app\\main\\quality.py:82: if current_user.role == 'inspector':",
+   "app\\main\\quality.py:104: if current_user.role == 'inspector' and task.inspector_id != current_user.id:",
+   "app\\main\\quality.py:120: if current_user.role == 'inspector' and record.inspector_id != current_user.id:",
+   "app\\main\\quality.py:529: if current_user.role == 'inspector':",
+   "app\\main\\quality.py:822: if current_user.role == 'inspector' and task.inspector_id != current_user.id:",
+   "app\\main\\quality.py:911: if current_user.role == 'inspector' and record.inspector_id != current_user.id:",
+   "app\\main\\quality.py:1217: if current_user.role == 'inspector':",
+   "app\\main\\quality.py:1277: if current_user.role == 'inspector' and record.inspector_id != current_user.id:",
+   "app\\main\\quality.py:1347: if current_user.role == 'inspector' and record.inspector_id != current_user.id:",
+   "app\\main\\routes.py:337: if current_user.role in ('admin', 'manager'):",
+   "app\\main\\routes.py:340: endpoint = ROLE_LANDING_ENDPOINTS.get(current_user.role)",
+   "app\\main\\routes.py:350: f'user_dashboard accessed by user {current_user.id} ({current_user.username}) role={current_user.role}'",
+   "app\\main\\routes.py:654: if current_user.role == 'admin':",
+   "app\\main\\routes.py:5983: if current_user.role not in ['admin', 'hr']:",
+   "app\\permissions.py:7: 映射初始值逐条抄自 routes.py / quality.py 中已有的 current_user.role 判断；"
+  ],
+  "template_count": 2,
+  "template_lines": [
+   "app\\templates\\main\\quality\\task_detail.html:13: {% if task.status == 'pending' and (current_user.role in ['admin', 'manager'] or (current_user.role == 'inspec",
+   "app\\templates\\main\\quality\\tasks.html:340: {% if current_user.role in ['admin', 'manager', 'inspector'] %}"
+  ]
+ },
+ "ensured_columns": {
+  "rule": "AST：`_ENSURED_COLUMNS` 赋值的 ast.literal_eval（不是正则、不是转述）",
+  "tables": 10,
+  "columns_per_table": {
+   "sales_order_items": 6,
+   "task_assignment": 9,
+   "production_orders": 6,
+   "production_batches": 6,
+   "products": 1,
+   "product_processes": 2,
+   "finished_product": 3,
+   "nonconformity_records": 8,
+   "raw_material_categories": 1,
+   "consumable_categories": 1
+  },
+  "columns_total": 43
+ },
+ "bytesio": {
+  "rule": "文本行 grep：含 `BytesIO` 的行（import 行也计入，故与「13 处导出」口径不同）",
+  "line_count": 22,
+  "lines": [
+   "app\\main\\quality.py:1431: from io import BytesIO",
+   "app\\main\\quality.py:1465: output = BytesIO()",
+   "app\\main\\quality.py:1540: from io import BytesIO",
+   "app\\main\\quality.py:1561: output = BytesIO()",
+   "app\\main\\quality.py:1586: from io import BytesIO",
+   "app\\main\\quality.py:1596: output = BytesIO()",
+   "app\\main\\routes.py:38: from io import BytesIO",
+   "app\\main\\routes.py:1903: buf = io.BytesIO()",
+   "app\\main\\routes.py:2226: buf = io.BytesIO()",
+   "app\\main\\routes.py:2253: buf = io.BytesIO()",
+   "app\\main\\routes.py:2622: buf = io.BytesIO()",
+   "app\\main\\routes.py:2649: buf = io.BytesIO()",
+   "app\\main\\routes.py:2786: buf = io.BytesIO()",
+   "app\\main\\routes.py:2838: buf = io.BytesIO()",
+   "app\\main\\routes.py:3829: buf = io.BytesIO()",
+   "app\\main\\routes.py:3955: buf = io.BytesIO()",
+   "app\\main\\routes.py:4115: buf = io.BytesIO()",
+   "app\\main\\routes.py:4164: buf = io.BytesIO()",
+   "app\\main\\routes.py:7654: buf = io.BytesIO()",
+   "app\\main\\routes.py:7950: buf = io.BytesIO()",
+   "app\\utils\\excel_generator.py:608: from io import BytesIO",
+   "app\\utils\\excel_generator.py:612: excel_file = BytesIO()"
+  ]
+ },
+ "temp_folder": {
+  "rule": "文本 grep：`TEMP_FOLDER` 出现次数（routes.py）",
+  "routes_py_occurrences": 6,
+  "app_all_occurrences": 7,
+  "save_temp_file_def_line": 5083
+ },
+ "tables": {
+  "rule": "真实库 sqlite_master（**只读 URI，未写库**） vs 正则 `create_table('...')` 扫 migrations/versions/*.py",
+  "real_db_table_count": 75,
+  "migration_create_table_count": 49,
+  "migration_files_with_create_table": 13,
+  "diff_count": 32,
+  "diff_tables": [
+   "alembic_version",
+   "consumable_categories",
+   "consumables",
+   "equipment",
+   "equipment_capabilities",
+   "equipment_downtime",
+   "furnace_layout_cells",
+   "furnace_layouts",
+   "goods_receipt_items",
+   "goods_receipts",
+   "heat_lot_slots",
+   "heat_lots",
+   "inventory_count_items",
+   "inventory_counts",
+   "material_requisition_items",
+   "material_requisitions",
+   "material_return_items",
+   "material_returns",
+   "purchase_order_items",
+   "purchase_orders",
+   "purchase_requisition_items",
+   "purchase_requisitions",
+   "purchase_settlements",
+   "shipment_items",
+   "shipment_receipts",
+   "shipments",
+   "suppliers",
+   "task_workpieces",
+   "work_center_equipment",
+   "work_centers",
+   "workpiece_events",
+   "workpieces"
+  ],
+  "per_file": [
+   {
+    "file": "011e395c1aa4_add_sales_order_management_tables.py",
+    "count": 2
+   },
+   {
+    "file": "166a7ce7b905_add_customer_management_tables.py",
+    "count": 2
+   },
+   {
+    "file": "29e80e4970ac_add_product_mbom_tables.py",
+    "count": 3
+   },
+   {
+    "file": "322346bd1261_add_production_order_and_batch_.py",
+    "count": 5
+   },
+   {
+    "file": "33c7d77643c1_remove_material_name_column_from_raw_.py",
+    "count": 3
+   },
+   {
+    "file": "9f02bbbbd492_update_raw_material_model_remove_.py",
+    "count": 2
+   },
+   {
+    "file": "a3f28e475446_add_sales_order_management_tables.py",
+    "count": 3
+   },
+   {
+    "file": "b1a01_add_system_config_and_task_completed_at.py",
+    "count": 1
+   },
+   {
+    "file": "c02604883c72_add_quality_management_tables.py",
+    "count": 24
+   },
+   {
+    "file": "c117632ece3d_remove_material_name_from_raw_material_.py",
+    "count": 1
+   },
+   {
+    "file": "c4863dae8be6_add_notification_system.py",
+    "count": 5
+   },
+   {
+    "file": "c4b4caaebd94_add_raw_material_categories_table.py",
+    "count": 1
+   },
+   {
+    "file": "da_add_process_assignment_tables.py",
+    "count": 2
+   }
+  ]
+ },
+ "anchors": {
+  "rule": "文件/文本直读",
+  "sales_routes_py_bytes": 1,
+  "app_main_py_files": [
+   "__init__.py",
+   "equipment.py",
+   "forms.py",
+   "production_center.py",
+   "purchase.py",
+   "quality.py",
+   "routes.py",
+   "sales_routes.py",
+   "shipping.py",
+   "stock.py"
+  ],
+  "capabilities_count": 37,
+  "roles_count": null
+ }
+}

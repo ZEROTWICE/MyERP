@@ -40,3 +40,14 @@ tmp_p01/
 # ---- 测试战役产出（E-04：CI 需要 harness 与规格文档，故跟踪；大数据与运行时产物不跟踪）----
 /test-reports-2026-10/.tmp/
 /test-reports-2026-10/evidence/
+
+# ---- 合金钢辙叉导入的原始数据源（业务侧会更新的大体积表格，不入库）----
+# 解析与导入代码在 app/utils/alloy_steel_price_converter.py、
+# app/utils/alloy_steel_bom_converter.py、app/services/alloy_steel_import_service.py，
+# 数据本身通过「导入合金钢辙叉工价标准」/「导入合金钢辙叉 BOM」两个入口上传即可。
+/工具/合金钢辙叉计件工价标准.xlsx
+/工具/48页表格/
+
+# Excel/WPS 打开表格时产生的锁文件
+~$*
+
