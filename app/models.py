@@ -950,7 +950,7 @@ class InspectionTask(db.Model):
     global_sn = db.Column(db.String(50), unique=True, nullable=False, comment='全局流水号', index=True)
     template_id = db.Column(db.Integer, db.ForeignKey('inspection_templates.id'), nullable=True, index=True)
     inspector_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
-    target_type = db.Column(db.String(20), nullable=False, comment='检验对象类型(product/production_record/material)', index=True)
+    target_type = db.Column(db.String(20), nullable=False, comment='检验对象类型(product/production_record/material/goods_receipt；自动创建为 workpiece/heat_lot)', index=True)
     target_id = db.Column(db.Integer, nullable=False, comment='检验对象ID', index=True)
     status = db.Column(db.String(20), nullable=False, default='pending', comment='任务状态(pending/in_progress/completed/cancelled)', index=True)
     priority = db.Column(db.Integer, default=0, comment='优先级', index=True)

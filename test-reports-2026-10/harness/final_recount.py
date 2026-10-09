@@ -38,7 +38,9 @@ OUTDIR = os.path.join(REPORTS, "evidence", "final")
 PY_EXE = r"F:\Miniconda\envs\wage\python.exe"
 
 REAL_DB = os.path.join(ROOT, "app.db")
-REAL_DB_PINNED = "F5DA2306BC31CBAB098AAD3774016D320A9B9AA3546F93418196AE9900E0F065"
+#: RF-1（2026-10-09，批次15 I1，用户拍板）：真库锚点重基线。本处与 `analysis_ledger.py` 的
+#: `real_db_recount.json` 以及现场真库三处对拍（见 :332 / :457 / :491），两处钉值必须同源同值。
+REAL_DB_PINNED = "B4FB980C5D1B25B3C3A0EADC12ECF01C75B36EBD213B109E5DD190C617EEAABE"
 
 # ---- 交付物清单（相对仓库根；POSIX 风格 key） -------------------------------
 STAGE2 = [
@@ -323,8 +325,14 @@ def machine_claims(artifacts=None):
             str(cv.get("csrf_positive_control"))[:40], "coverage_verdict.json.csrf_positive_control", kind="note")
     rd = load("real_db_recount")
     if rd:
+        #: RF-1（2026-10-09，批次15 I1）真库锚点重基线：真库完成一次正常首启播种
+        #: （`inspection_templates` +2 / `inspection_items` +7）⇒ 行数口径随之前移
+        #: rows_total 6713→6722、rows_business 6712→6721、zero_row_tables 49→47
+        #: （`test-reports-2026-10/.tmp/run-b15/rf1_seed.py` 逐表复算；本块仅在
+        #: `evidence/analysis/real_db_recount.json` 存在时生效，该件当前不存在 ⇒ 本条为
+        #: 与 :43 REAL_DB_PINNED 同批前移的一致性期望，未参与本轮门禁。
         for key, exp in (("unchanged", True), ("tables_total", 75), ("tables_without_alembic", 74),
-                         ("rows_total", 6713), ("rows_business", 6712), ("zero_row_tables", 49),
+                         ("rows_total", 6722), ("rows_business", 6721), ("zero_row_tables", 47),
                          ("batch_items_total", 23), ("batch_items_null_quality", 23),
                          ("batch_items_pending_quality", 0), ("finished_product_rows", 2),
                          ("finished_product_null_stock_kind", 2), ("rows_material_allocations", 0)):

@@ -38,7 +38,9 @@ REPORTS = os.path.join(ROOT, 'test-reports-2026-10')
 EVIDENCE = os.path.join(REPORTS, 'evidence')
 OUTDIR = os.path.join(EVIDENCE, 'analysis')
 REAL_DB = os.path.join(ROOT, 'app.db')
-REAL_DB_PINNED = 'F5DA2306BC31CBAB098AAD3774016D320A9B9AA3546F93418196AE9900E0F065'
+#: RF-1（2026-10-09，批次15 I1，用户拍板）：真库锚点重基线。本处 `unchanged = sha256_file(REAL_DB)
+#: == REAL_DB_PINNED` 读**现场**真库（见 :281 / :777），旧值不随前移即报 unchanged=False。
+REAL_DB_PINNED = 'B4FB980C5D1B25B3C3A0EADC12ECF01C75B36EBD213B109E5DD190C617EEAABE'
 APP = os.path.join(ROOT, 'app')
 
 lines_out = []

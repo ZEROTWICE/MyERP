@@ -351,6 +351,10 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
+                    <div class="alert alert-info py-2 small mb-3">
+                        <div>部分报工（完成数量小于任务数量）时，任务会回到「进行中」并保留已报数量，可再次打开本弹窗补报剩余数量完成更正。</div>
+                        <div class="mt-1">未挂生产批次的报工只扣减实际库存，不会回写该生产订单的物料已消耗数量。</div>
+                    </div>
                     <div class="mb-3">
                         <label class="form-label">完成数量</label>
                     <input type="number" class="form-control" id="completedQuantity" min="0">

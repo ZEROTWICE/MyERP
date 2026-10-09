@@ -34,7 +34,10 @@ REPO_ROOT = os.path.dirname(REPORTS_ROOT)
 #: 真实库钉死哈希（与 _env.REAL_DB_SHA256_EXPECTED 同源；下方 _selftest 前会交叉断言）
 #: B14-R1（2026-10-09）：随 `_env` 一并回退 —— ALLOY-IMPORT-02 导入后曾同步为 3035136 B /
 #: `4EB632A4…FA43`（历史记录，非生效值）；真实库已还原为 2531328 B / `F5DA2306…0F065`。
-PINNED_DB_SHA = 'F5DA2306BC31CBAB098AAD3774016D320A9B9AA3546F93418196AE9900E0F065'
+#: RF-1（2026-10-09，批次15 开工前项 I1，用户拍板）：随 `_env` 一并无条件前移到 `B4FB980C…EAABE`
+#: （**同为 2531328 B**）—— 真实库完成 A-70 首启播种（inspection_templates +2 / inspection_items +7）。
+#: 旧值 `F5DA2306…0F065` 自此**只作本注释里的历史记录**，不作生效期望。
+PINNED_DB_SHA = 'B4FB980C5D1B25B3C3A0EADC12ECF01C75B36EBD213B109E5DD190C617EEAABE'
 
 WEAK_KINDS = ('file_exists', 'content_mention')
 COVERAGE_CLASS_IDS = re.compile(r'^C-(0[1-9]|1[01])$')

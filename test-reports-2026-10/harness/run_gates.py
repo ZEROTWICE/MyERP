@@ -54,7 +54,12 @@ EXPECTED = {
     'routes_static': 1,
     'routes_dup_method_path': 0,
     'bootstrap_accounts': 64,
-    'bootstrap_copied_rows': 6712,   # B14-R1（2026-10-09）回退 ALLOY-IMPORT-02 导入期值 10172；干净库实测 6712
+    # RF-1（2026-10-09，批次15 I1，用户拍板）真库锚点重基线：真库完成一次正常首启播种
+    # （`inspection_templates` +2 / `inspection_items` +7，共 +9 行）⇒ 直接拷贝行数随之前移
+    # 6712 → 6721。与 `ci_gates.py` 的 `check_db_bootstrap` 期望串、`t6_ledger_check.py` 的
+    # `PINNED_DB_SHA`、`_env.py` 的 `REAL_DB_SHA256_EXPECTED` 属同一触发项（A-70「必须同改」，
+    # 见 `_env.py` 顶部说明）。前值 6712 系 B14-R1（2026-10-09）回退 ALLOY-IMPORT-02 导入期值 10172。
+    'bootstrap_copied_rows': 6721,
     'bootstrap_skipped_tables': 0,
     'functional_passed': 127,
     'functional_failed': 0,

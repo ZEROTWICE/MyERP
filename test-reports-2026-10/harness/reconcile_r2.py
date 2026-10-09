@@ -91,7 +91,9 @@ def ensure_tl05_probe():
     return PROBE_DIR_REL
 
 REAL_DB = os.path.join(REPO, 'app.db')
-REAL_DB_SHA = 'F5DA2306BC31CBAB098AAD3774016D320A9B9AA3546F93418196AE9900E0F065'
+#: RF-1（2026-10-09，批次15 I1，用户拍板）：真库锚点重基线。本处读**现场**真库（`real_db_fp()`
+#: 的 `equals_frozen`，见 :814 / :1014），旧值不随前移即报 equals_frozen=False。
+REAL_DB_SHA = 'B4FB980C5D1B25B3C3A0EADC12ECF01C75B36EBD213B109E5DD190C617EEAABE'
 PHASE_A_FIRST_COMMIT = '590b688'          # 26-阶段A收口报告 §3.2：590b688 起为阶段A 提交序列
 
 #: 自动引擎口径不足时的显式修正（stricter-or-equal，且必须可复算）

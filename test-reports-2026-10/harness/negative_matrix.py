@@ -150,7 +150,8 @@ def case1_real_db_guard(before_hash):
                        f'# evidence_level: {res["evidence_level"]}\n--- stdout ---\n{res["stdout"]}\n'
                        f'--- stderr ---\n{res["stderr"]}')
     record('NV-1.1', '真实库 SHA256 跑前 == 跑后 == 钉死值',
-           'sha256(app.db) 三次一致且等于 F5DA2306…0E0F065',
+           ('sha256(app.db) 三次一致且等于 %s…%s'
+            % (REAL_DB_SHA256_EXPECTED[:8], REAL_DB_SHA256_EXPECTED[-5:])),
            {'before': before_hash, 'pinned': REAL_DB_SHA256_EXPECTED},
            {'now': sha256_file(REAL_DB)},
            'passed' if (sha256_file(REAL_DB) == before_hash == REAL_DB_SHA256_EXPECTED)
@@ -197,20 +198,34 @@ def case1_real_db_guard(before_hash):
     unattributed = sorted(t for t in deltas if t not in allowed_seed_tables)
     post_deviates = bool(post_sha) and post_sha != REAL_DB_SHA256_EXPECTED
     deviation_explained = post_deviates == bool(deltas)   # 指纹变 ⇔ 有实测写入（不许无解释漂移）
-    record('NV-1.5', '口径校准：引导前副本指纹 == 真实库钉死值；引导后偏离须由实测写入解释（B14-R3 复标）',
+    # RF-1 复标（2026-10-09，批次15 开工前项 I1，用户拍板「真库锚点重基线」）：真实库经 A-70 首启
+    # 播种后**已自带**默认质检模板（inspection_templates=2 / inspection_items=7，见
+    # test-reports-2026-10/RF1-真库锚点重基线登记.md），引导副本的 seed_defaults() 因此按 type 命中
+    # 既有行、**零净增** ⇒ 引导后副本指纹 == 真实库钉死值、seeding_deltas 为空集。
+    # B14-R3 版判据里的硬条件「引导后必然偏离」（`and post_deviates`）与「净增全为正」（`all(v>0)`）
+    # 在此形态下双双失效（前者恒 False，后者对空集恒 True 而失去约束力）。故复标为**双向等价**判据：
+    # 「副本指纹偏离 ⇔ 有实测写入」＋「写入只允许落在 inspection_templates / inspection_items」。
+    # 零净增（RF-1 后）与纯播种（RF-1 前）两种形态都合格；无解释漂移、越表写入一律不合格。
+    record('NV-1.5', '口径校准：引导前副本指纹 == 真实库钉死值；引导后偏离须由实测写入解释'
+                     '（B14-R3 复标 / RF-1 复标）',
            '两时点分开：①引导前字节副本 SHA256 == 钉死值 ⇒ 指纹不能当拒绝判据；'
-           '②引导后允许且必然偏离，且偏离只能由默认质检模板下发解释',
+           '②引导后指纹若偏离，偏离必须与实测逐表净增**严格等价**（偏离 ⇔ 有写入），'
+           '且写入只能落在默认质检模板的两张表',
            {'pre_bootstrap_sha256': REAL_DB_SHA256_EXPECTED,
             'copy_is_real_file': False,
-            'post_bootstrap_sha256': '!= 钉死值（引导写入所致）',
-            'net_add_source': {'inspection_templates': '+2（SYS-QC-PROD-REC / SYS-QC-GOODS-REC）',
-                               'inspection_items': '+7'}},
+            'post_bootstrap_sha256': '== 钉死值（RF-1 后真库已含默认模板，引导零净增）；'
+                                     '若偏离则必须与 seeding_deltas 严格等价',
+            'net_add_source': {'inspection_templates': 'RF-1 前 +2 / RF-1 后 +0'
+                                                      '（SYS-QC-PROD-REC / SYS-QC-GOODS-REC）',
+                               'inspection_items': 'RF-1 前 +7 / RF-1 后 +0'}},
            {'pre_bootstrap': pre,
             'post_bootstrap_sha256': post_sha,
             'post_bootstrap_bytes': parsed.get('copy_path_bytes'),
             'samefile_with_real': parsed.get('copy_is_real_file'),
             'seeding_deltas': deltas,
+            'seeding_delta_total': sum(deltas.values()),
             'unattributed_deltas': unattributed,
+            'post_bootstrap_deviates': post_deviates,
             'deviation_explained': deviation_explained,
             'real_db_templates': parsed.get('real_db_templates'),
             'copy_templates': parsed.get('copy_templates'),
@@ -218,14 +233,15 @@ def case1_real_db_guard(before_hash):
             'real_db_sha256_after_probe': parsed.get('real_db_sha256_after_probe')},
            'passed' if (pre_sha == REAL_DB_SHA256_EXPECTED
                         and parsed.get('copy_is_real_file') is False
-                        and post_deviates and not unattributed and deviation_explained
-                        and all(v > 0 for v in deltas.values())) else 'failed',
+                        and not unattributed and deviation_explained) else 'failed',
            evidence=os.path.relpath(ev, REPO_ROOT),
            note='B14-R3 复标：原判据用**引导后**指纹 == 钉死值，B14-08 启动下发默认质检模板'
                 '（app/__init__.py:247 _seed_system_configs -> InspectionTemplate.seed_defaults()，'
                 '副本 inspection_templates +2 / inspection_items +7）后该前提失效。'
-                '新判据把校准钉在**引导前**字节副本（PRE_BOOTSTRAP_COPY），并把引导后偏离与实测净增绑定：'
+                'B14-R3 把校准钉在**引导前**字节副本（PRE_BOOTSTRAP_COPY），并把引导后偏离与实测净增绑定：'
                 '指纹变 ⇔ 有写入，且写入只能落在 inspection_templates / inspection_items。'
+                'RF-1 复标：真库本身完成 A-70 首启播种后，副本不再新增模板 ⇒ 删去「必然偏离」硬条件，'
+                '把「偏离 ⇔ 写入」升格为唯一等价判据（零净增形态合格，越表/无解释漂移仍不合格）。'
                 '**不得据此放宽隔离保证**：copy_is_real_file（samefile）仍是硬判据，NV-1.2/1.3/1.4 未动。')
 
 

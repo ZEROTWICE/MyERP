@@ -103,11 +103,25 @@ def pick_template(target_type):
 
     链上确实一套可用模板都没有时返回 `None`（任务 `template_id` 留空，由检验员手选），
     **不**返回类型不符的模板。
+
+    RF-2（2026-10-09 · 批次15 开工前项 I2）**类型守卫**：上行承诺此前与实现矛盾 ——
+    旧实现 `if template is not None: return template` 会把链尾候选（类型 ≠ 任务类型）直接
+    返回，与 docstring 相反。现于返回前逐字校验 `template.type == target_type`，类型不符的
+    候选一律跳过 ⇒ 本函数**只可能**返回 `type == target_type` 的模板或 `None`，
+    下游 `app/main/quality.py` 的类型严格相等校验不会再被自动绑定触发 400。
+    回退链 `_TEMPLATE_TYPE_CHAIN`（`:89-93`）逐字未改，仍是类型口径的唯一声明来源；
+    只是不再用于「返回错型模板」—— 链尾项的检索顺序保留，命中后由守卫拦下。
     """
     for candidate in _TEMPLATE_TYPE_CHAIN.get(target_type, (target_type,)):
         template = InspectionTemplate.query.filter_by(type=candidate, is_active=True).first()
-        if template is not None:
-            return template
+        if template is None:
+            continue
+        # RF-2 类型守卫：下游按 `template.type != task.target_type` 严格 400
+        # （`app/main/quality.py:863-865` 文案「质检模板类型与任务类型不匹配」），
+        # 自动绑定错型模板即造出「永远确认不了」的死锁任务 ⇒ 此处只放行同型候选。
+        if template.type != target_type:
+            continue
+        return template
     return None
 
 

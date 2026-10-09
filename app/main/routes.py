@@ -2131,6 +2131,8 @@ def import_employees():
         success_count = 0
         error_messages = []
         warning_messages = []
+        # 行级容错：坏行只记「第 N 行：…」并跳过，好行继续入库（与 /tasks/import 同形态）
+        pending_rows = []
         
         # 数据验证
         for i, data in enumerate(employee_data, 1):
@@ -2224,50 +2226,40 @@ def import_employees():
             
             if row_errors:
                 error_messages.append(f'第{i+1}行数据错误：{"; ".join(row_errors)}')
+            else:
+                pending_rows.append((i + 1, data))
         
-        # 如果有验证错误，直接返回
-        if error_messages:
-            return jsonify({
-                'success': False, 
-                'message': f'数据验证失败，共发现{len(error_messages)}个错误：\n' + '\n'.join(error_messages[:10]) + 
-                          (f'\n... 还有{len(error_messages)-10}个错误未显示' if len(error_messages) > 10 else '')
-            })
+        # 检查重复的工号：文件内重复只跳过重复行，其余行继续入库
+        seen_row_by_id = {}
+        deduped_rows = []
+        for row_no, data in pending_rows:
+            emp_id = data['employee_id']
+            if emp_id in seen_row_by_id:
+                error_messages.append(
+                    f'第{row_no}行工号 {emp_id} 在文件中重复（首次出现在第{seen_row_by_id[emp_id]}行）'
+                )
+                continue
+            seen_row_by_id[emp_id] = row_no
+            deduped_rows.append((row_no, data))
         
-        # 检查重复的工号
-        employee_ids = [data['employee_id'] for data in employee_data if data.get('employee_id')]
-        duplicate_ids = [emp_id for emp_id in set(employee_ids) if employee_ids.count(emp_id) > 1]
-        if duplicate_ids:
-            return jsonify({
-                'success': False, 
-                'message': f'Excel文件中存在重复的工号：{", ".join(duplicate_ids)}'
-            })
-        
-        # 检查数据库中已存在的工号
-        existing_employee_ids = []
-        existing_user_ids = []
-        for data in employee_data:
+        # 检查数据库中已存在的工号：同样按行跳过，不整单拒绝
+        prepared_rows = []
+        for row_no, data in deduped_rows:
+            emp_id = data['employee_id']
             # 检查员工工号是否已存在
-            if Employee.query.filter_by(employee_id=data['employee_id']).first():
-                existing_employee_ids.append(data['employee_id'])
+            if Employee.query.filter_by(employee_id=emp_id).first():
+                error_messages.append(f'第{row_no}行工号 {emp_id} 在数据库中已存在')
+                continue
             
             # 检查用户名是否已存在
-            if User.query.filter_by(username=data['employee_id']).first():
-                existing_user_ids.append(data['employee_id'])
-        
-        if existing_employee_ids:
-            return jsonify({
-                'success': False, 
-                'message': f'以下工号在数据库中已存在：{", ".join(existing_employee_ids)}'
-            })
-        
-        if existing_user_ids:
-            return jsonify({
-                'success': False, 
-                'message': f'以下工号对应的用户名已存在：{", ".join(existing_user_ids)}'
-            })
+            if User.query.filter_by(username=emp_id).first():
+                error_messages.append(f'第{row_no}行工号 {emp_id} 对应的用户名已存在')
+                continue
+            
+            prepared_rows.append((row_no, data))
         
         # 处理员工数据
-        for i, data in enumerate(employee_data, 1):
+        for row_no, data in prepared_rows:
             try:
                 # 创建用户账号
                 user = User(username=data['employee_id'], role='user')
@@ -2292,7 +2284,7 @@ def import_employees():
                 success_count += 1
                 
             except Exception as e:
-                error_messages.append(f"第{i+1}行员工 {data.get('employee_id', '未知')} 处理失败: {str(e)}")
+                error_messages.append(f"第{row_no}行员工 {data.get('employee_id', '未知')} 处理失败: {str(e)}")
         
         # 最终提交
         try:
@@ -2337,13 +2329,16 @@ def import_employees():
         })
         
     except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': '导入失败，请稍后重试或联系管理员'})
+    finally:
+        # 上传件清理：解析失败 / 校验早退 / 成功 / 异常四条出口都落在这里
+        # （原先只有 except 里清理 ⇒ 前两条出口把上传件永久留在 TEMP_FOLDER）
         if temp_path and os.path.exists(temp_path):
             try:
                 os.remove(temp_path)
             except OSError:
                 pass
-        db.session.rollback()
-        return jsonify({'success': False, 'message': '导入失败，请稍后重试或联系管理员'})
 
 def cleanup_temp_files():
     """清理超过5分钟的临时文件"""
@@ -3704,7 +3699,12 @@ def update_task_status(id):
             # 检查工序是否需要检验，如果需要则自动创建质检任务
             process = ProcessPrice.query.get(task.process_id)
             if process and process.needs_inspection:
+                sp_inspection = None
                 try:
+                    # B15-05：本块的写入（质检任务 + 审计行 + 工件链）整体包进一个 savepoint。
+                    # 语义不变（仍「不影响主流程」，不阻断本次报工），但块内任一步失败时
+                    # 由 savepoint 回滚本块半成品，避免「质检任务已落库、审计行缺失」的部分应用。
+                    sp_inspection = db.session.begin_nested()
                     # 查找默认的质检员
                     default_inspector = User.query.filter(
                         db.or_(
@@ -3767,8 +3767,10 @@ def update_task_status(id):
                                 )
                     else:
                         current_app.logger.warning(f'未找到可用的质检员，无法为生产记录 {production_record.global_sn} 创建质检任务')
-                        
+                    sp_inspection.commit()  # B15-05：本块成功——释放 savepoint（不提交外层事务）
                 except Exception as e:
+                    if sp_inspection is not None:
+                        sp_inspection.rollback()  # B15-05：块内半成品（如已 flush 的 InspectionTask）整体回滚
                     current_app.logger.error(f'自动创建质检任务失败：{str(e)}')
                     # 不影响主流程，继续执行
             
@@ -3823,6 +3825,10 @@ def update_task_status(id):
                     current_app.logger.warning(f'报工扣料明细被跳过：{consumption["invalid"]}')
             except Exception as e:
                 current_app.logger.error(f'报工扣料回写 MaterialAllocation 失败：{str(e)}')
+                # B15-05：扣料回写失败必须整体失败——此处不再吞异常，上抛由外层统一
+                # db.session.rollback() + 500 success=false，避免「实扣已发生、计划账未回写」
+                # 的部分应用被静默提交（块内已用 savepoint 包住计划账回写）。
+                raise
         else:
             # 如果任务还未完成，但已经开始，更新状态为进行中
             task.status = 'in_progress'
@@ -3851,6 +3857,10 @@ def update_task_status(id):
                     continue
         except Exception as se:
             current_app.logger.warning(f'替用分析失败: {str(se)}')
+            # B15-05：替用分析失败必须整体失败——此处不再吞异常，上抛由外层统一
+            # db.session.rollback() + 500 success=false，避免「替用明细缺失但报工照常提交」
+            # 的审计失真被静默接受（本块纯内存读取，无自身的部分写入）。
+            raise
 
         audit_log = AuditLog(
             user_id=current_user.id,
@@ -4295,13 +4305,13 @@ def import_tasks():
     if not file.filename.endswith('.xlsx'):
         return jsonify({'success': False, 'message': '请上传Excel文件(.xlsx)'})
     
+    temp_path = None
     try:
         filename = secure_filename(file.filename)
         temp_path = os.path.join(current_app.config['TEMP_FOLDER'], filename)
         file.save(temp_path)
         
         task_data = ExcelGenerator.parse_task_data(temp_path)
-        os.remove(temp_path)  # 删除临时文件
         
         success_count = 0
         error_messages = []
@@ -4311,7 +4321,7 @@ def import_tasks():
                 # 查找员工
                 employee = Employee.query.filter_by(employee_id=data['employee_id']).first()
                 if not employee:
-                    error_messages.append(f"员工工号 {data['employee_id']} 不存在")
+                    error_messages.append(f"第 {index + 2} 行：员工工号 {data['employee_id']} 不存在")
                     continue
                 
                 # 目标日期兜底：文本日期单元格（str）会被 SQLite 方言拒绝，统一解析
@@ -4324,7 +4334,7 @@ def import_tasks():
                 # 原为 filter_by(process_code).first() —— 无日期约束、无版本排序）
                 process = pick_process_price(data['process_code'], target_date)
                 if not process:
-                    error_messages.append(f"工序编号 {data['process_code']} 不存在")
+                    error_messages.append(f"第 {index + 2} 行：工序编号 {data['process_code']} 不存在")
                     continue
                 
                 # 创建任务记录
@@ -4340,7 +4350,7 @@ def import_tasks():
                 success_count += 1
                 
             except Exception as e:
-                error_messages.append(f"处理记录时出错: {str(e)}")
+                error_messages.append(f"第 {index + 2} 行：处理记录时出错: {str(e)}")
         
         if success_count > 0:
             db.session.commit()
@@ -4364,6 +4374,14 @@ def import_tasks():
         
     except Exception as e:
         return jsonify({'success': False, 'message': '导入失败，请稍后重试或联系管理员'})
+    finally:
+        # 上传件清理：解析失败 / 校验早退 / 成功 / 异常四条出口都落在这里
+        # （原先 os.remove 只在解析成功那条直线上 ⇒ 解析失败必然残留上传件）
+        if temp_path and os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except OSError:
+                pass
 @bp.route('/export_tasks', methods=['GET', 'POST'])
 @login_required
 @require_capability('task.manage')
@@ -5519,7 +5537,7 @@ def import_finished_products():
                 
                 success_count += 1
             except Exception as e:
-                error_messages.append('第{index+2}行导入失败，请稍后重试或联系管理员')
+                error_messages.append(f'第{index+2}行导入失败，请稍后重试或联系管理员')
         
         db.session.commit()
         
@@ -5612,7 +5630,7 @@ def import_raw_materials():
                 
                 success_count += 1
             except Exception as e:
-                error_messages.append('第{index+2}行导入失败，请稍后重试或联系管理员')
+                error_messages.append(f'第{index+2}行导入失败，请稍后重试或联系管理员')
         
         db.session.commit()
         
@@ -7050,7 +7068,7 @@ def inventory_inbound():
                         success_count += 1
                 
                 except Exception as e:
-                    error_messages.append('第 {row_index + 1} 行处理失败，请稍后重试或联系管理员')
+                    error_messages.append(f'第 {row_index + 1} 行处理失败，请稍后重试或联系管理员')
             
             # 提交数据库事务
             if success_count > 0:
@@ -7197,7 +7215,7 @@ def raw_material_inbound():
                     success_count += 1
                 
                 except Exception as e:
-                    error_messages.append('第 {row_index + 1} 行处理失败，请稍后重试或联系管理员')
+                    error_messages.append(f'第 {row_index + 1} 行处理失败，请稍后重试或联系管理员')
             
             # 提交数据库事务
             if success_count > 0:
@@ -7319,7 +7337,7 @@ def finished_product_inbound():
                     success_count += 1
                 
                 except Exception as e:
-                    error_messages.append('第 {row_index + 1} 行处理失败，请稍后重试或联系管理员')
+                    error_messages.append(f'第 {row_index + 1} 行处理失败，请稍后重试或联系管理员')
             
             # 提交数据库事务
             if success_count > 0:

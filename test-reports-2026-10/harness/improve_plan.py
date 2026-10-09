@@ -37,7 +37,9 @@ EVIDENCE_ROOT = os.path.join(REPORTS_ROOT, 'evidence')
 EVID_DIR = os.path.join(EVIDENCE_ROOT, 'improve')
 
 REAL_DB = os.path.join(REPO_ROOT, 'app.db')
-REAL_DB_SHA256_EXPECTED = 'F5DA2306BC31CBAB098AAD3774016D320A9B9AA3546F93418196AE9900E0F065'
+#: RF-1（2026-10-09，批次15 I1，用户拍板）：真库锚点重基线。本处读**现场**真库读数与钉值比较
+#: （`matches_pinned`，见 :594 / :801），旧值 F5DA2306…0F065 是 A-70 前的干净锚点，不随前移即报假红。
+REAL_DB_SHA256_EXPECTED = 'B4FB980C5D1B25B3C3A0EADC12ECF01C75B36EBD213B109E5DD190C617EEAABE'
 
 REPORT_DOC = os.path.join(REPORTS_ROOT, '07-测试与工程改进报告.md')
 SELF = os.path.abspath(__file__)

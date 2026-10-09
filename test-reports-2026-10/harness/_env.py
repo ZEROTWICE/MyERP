@@ -64,7 +64,34 @@ REAL_DB = os.path.join(REPO_ROOT, 'app.db')
 #:   `reconcile-2026-10-08/*`、带日期 markdown 报告、`r2_v14_ledgerbook.py` 等）一律**不动** ——
 #:   它们本就钉在导入前的干净口径上，无需随本次回退改动。
 #: ────────────────────────────────────────────────────────────────────────────────────────
-REAL_DB_SHA256_EXPECTED = 'F5DA2306BC31CBAB098AAD3774016D320A9B9AA3546F93418196AE9900E0F065'
+#: ── RF-1「真库锚点重基线」（批次15 开工前项 I1 / 2026-10-09，用户拍板）────────────────────
+#: 【生效期望已前移】本行由 `F5DA2306…0F065`（2531328 B，导入前干净锚点）改写为
+#:   `B4FB980C…EAABE`（**同为 2531328 B**，mtime 2026-10-09 03:39:39.418764055 +0000）。
+#: 触发：`app/__init__.py:247 _seed_system_configs()` → `InspectionTemplate.seed_defaults()`
+#:   在**首启路径**上无条件补缺，而真实库 `inspection_templates`/`inspection_items` 原为 **0 行**
+#:   ⇒ RF-1 现场复核判定为活缺陷；经用户拍板后由本任务对真实库执行**一次**正常首启播种。
+#: 净增（`test-reports-2026-10/.tmp/run-b15/rf1_seed.py` 逐表复算，75 表全量对拍）：
+#:   `inspection_templates` +2（id=1 `SYS-QC-PROD-REC` type=production_record /
+#:   id=2 `SYS-QC-GOODS-REC` type=goods_receipt）、`inspection_items` +7（id=1..7）；
+#:   `system_configs` Δ=0（5 个 `DEFAULTS` key 早已齐备且值一致）；其余 72 表 Δ=0。
+#: 同批一并前移的处（同一触发项，必须同改，否则 `t6_ledger_check.py:184` 的交叉断言或门禁必红）：
+#:   `harness/t6_ledger_check.py` 的 `PINNED_DB_SHA`、`harness/improve_plan.py:40`、
+#:   `harness/analysis_ledger.py:41`、`harness/final_recount.py:41`、`harness/reconcile_r2.py:94`
+#:   （后四者为**读现场真库读数**的重算器，钉值不随前移即报假红）、
+#:   `harness/negative_matrix.py` 的 NV-1.1 判据描述串与 **NV-1.5 口径复标**。
+#:   **本轮唯一未改的旧值位**：`scripts/_remediate_b13_02_audit_log.py:66-71` 的 `PRE_ANCHOR`
+#:   （自带逐字「原值，append-only 留档，不得被覆盖」且全文只 `out()` 打印不比较）、
+#:   `harness/r2_v14_ledgerbook.py:351-357` 的历史条目字面量（criterion/expected/observed 自洽）、
+#:   `reconcile-2026-10-08/*` 与 `docs/test-reports/_probe/verify_acceptance_baseline.py`（带日期历史件）、
+#:   以及全部带日期 markdown / manifest 历史档。逐条归类与处置理由见 append-only 登记件
+#:   `test-reports-2026-10/RF1-真库锚点重基线登记.md` §5。
+#: 判据（阴性对照，A-70 第 2 步已实测）：**保留旧值** `F5DA2306…0F065` 而真实库已播种 ⇒
+#:   `assert_real_db_untouched()` 现场必抛 `RuntimeError: 真实库 app.db 已偏离钉死哈希`，
+#:   `negative_matrix.py` 实测 NV-1.1/NV-0 failed + NV-1.2…NV-5.1 blocked，exit 1。
+#: 幂等（A-70 第 1 步内实测）：同路径再跑一次首启 ⇒ 逐表 Δ 全 0，bytes 与 SHA256 **与首次完全相同**
+#:   （连 mtime 都未变）⇒ 本锚点可稳定复现。
+#: ────────────────────────────────────────────────────────────────────────────────────────
+REAL_DB_SHA256_EXPECTED = 'B4FB980C5D1B25B3C3A0EADC12ECF01C75B36EBD213B109E5DD190C617EEAABE'
 
 _encode_fix = "import sys;sys.stdout.reconfigure(encoding='utf-8',errors='replace');sys.stderr.reconfigure(encoding='utf-8',errors='replace')\n"
 

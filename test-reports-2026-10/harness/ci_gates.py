@@ -15,7 +15,7 @@ CI 配置只调用它（配置薄、逻辑可离线验证）。
 
 | 组 | 成员 | 说明 |
 | --- | --- | --- |
-| **blocking** | `check_templates` / `check_migration_heads` / `check_properties` / `check_db_bootstrap`(shim) / `functional_test`(shim) / `permission_matrix --no-dump`(shim) / `coverage_drift.py` / **`run_gates.py` 的非环境依赖部分** / **`check_model_refs`（TL-01）** / **`check_http_contract`（TL-02）** | permx 判据单一确定（匿名可访问 = 0）⇒ 直接 blocking |
+| **blocking** | `check_templates` / `check_migration_heads` / `check_properties` / `check_db_bootstrap`(shim) / `functional_test`(shim) / `permission_matrix --no-dump`(shim) / `coverage_drift.py` / **`run_gates.py` 的非环境依赖部分** / **`check_model_refs`（TL-01）** / **`check_http_contract`（TL-02）** / **`chain_count_consistency`（B15-07，件数守恒对拍）** | permx 判据单一确定（匿名可访问 = 0）⇒ 直接 blocking |
 | **report-only** | `smoke_test --no-dump`(shim)（A-63 第一步先观测 1 轮）/ `route_inventory` 与 `measure_coverage` 的**退出码**（报告型 A-30）/ `route_inventory_native_probe`（**环境依赖探针，A-62 明令不得重基线化**）/ **`evidence_hash`（TL-04：白名单制）** | 二者失败只记录、不阻塞；晋升方式见 `--phase second` |
 
 **A-85 接线（B1：把 W7 三个「预留接入位」由注释变实装）**
@@ -56,7 +56,7 @@ CI 配置只调用它（配置薄、逻辑可离线验证）。
 
 | 机制 | 含义 | 落在哪些步 |
 | --- | --- | --- |
-| `real_input` | 把该步读的**输入树/产物路径**指向受控合成坏树（脚本副本按原脚本的相对深度放置，故其自解析 ROOT = 合成树根） | `check_templates` / `check_migration_heads` / `check_properties` / `coverage_drift` / `check_model_refs` / `check_http_contract` / `evidence_hash` |
+| `real_input` | 把该步读的**输入树/产物路径**指向受控合成坏树（脚本副本按原脚本的相对深度放置，故其自解析 ROOT = 合成树根） | `check_templates` / `check_migration_heads` / `check_properties` / `coverage_drift` / `check_model_refs` / `check_http_contract` / `evidence_hash` / `check_notification_triggers` / `chain_count_consistency`（`--perturb` 合成件数偏差声明） |
 | `judge_artifact` | 把该步**判据层读的机读产物**换成合成的降级产物（本步程序照常真跑） | `run_gates`（`gates.json`） |
 | `script_fixture` | 该步的脚本**无任何输入路径参数**（跑真 app/真库）⇒ 把「要跑的程序」这一输入路径换成合成夹具（故意打印与期望值不符的行 + 非 0 退出） | `check_db_bootstrap` / `functional_test` / `permission_matrix` / `smoke_test` / `route_inventory` / `measure_coverage` |
 
@@ -588,6 +588,21 @@ def _inj_check_notification_triggers(ctx):
                                         % commented}}
 
 
+def _inj_chain_count_consistency(ctx):
+    """合成「判据输入声明」：宣称报工链一侧多 1 件 ⇒ 脚本必须 exit 1 且指名侧别。
+
+    只改**输入路径**（`--perturb` 的 JSON 声明），不碰判据、不写任何库：脚本读到「A 侧 = 报工件数 + 1」
+    就必红（C-B15-07.a 的相等判据），并按归因规则指出偏离侧 = `report`。
+    """
+    payload = {'side': 'report', 'delta': 1,
+               'reason': 'V-01 注入（B15-07）：合成「报工链件数合计 +1」的判据输入声明'}
+    return {'kind': 'real_input', 'append_argv': ['--perturb', json.dumps(payload, ensure_ascii=False)],
+            'fixtures': [],
+            'evidence': {'perturbation': payload,
+                         'degradation': '报工链件数合计按声明 +1 ⇒ C-B15-07.a 必红、exit 1、'
+                                        '指名侧别 report（台账一字未动：只改判据输入）'}}
+
+
 #: 每步 1 次注入（形态 ⑦：只改输入路径，不动判据）——判据 ② 的机读依据
 INJECTIONS = {
     'check_templates': {'kind': 'real_input', 'builder': _inj_check_templates,
@@ -629,6 +644,10 @@ INJECTIONS = {
         'kind': 'real_input', 'builder': _inj_check_notification_triggers,
         'how': '--root 指向合成树（真 notification_service.py + 真 routes.py 副本，'
                '其中全部 notify_* 调用点被注释掉）⇒ wired 0 ≠ expect 4'},
+    'chain_count_consistency': {
+        'kind': 'real_input', 'builder': _inj_chain_count_consistency,
+        'how': '--perturb 合成「报工链件数合计 +1」的判据输入声明（不碰判据/不写库）⇒ '
+               'C-B15-07.a 必红、exit 1、指名侧别 report'},
 }
 
 
@@ -690,10 +709,17 @@ def spec_steps(python_exe, check_templates_script=None,
         # 期望串与 run_gates 的 bootstrap_copied_rows 一起抬到 10172（真库 +1080 产品 / +1728 BOM
         # 明细等）。真实库已还原为导入前锚点（2531328 B / F5DA2306…0F065），故两处一起回退到
         # 干净库现场实测值 6712（run ci-run-20261009-005619 的 ci_check_db_bootstrap.out:4）。
+        # 【B15/RF-1 重基线（2026-10/批次15，append-only 订正上一条）】用户拍板「真库重基线」后，
+        # 真实 app.db 由 t2 完成首启播种：inspection_templates +2（production_record / goods_receipt）
+        # + inspection_items +7 ⇒ bootstrap business 行数 6712 → 6721。旧 needle 在新锚点下报红
+        # （`!! expects 直接拷贝 6712 行，跳过 0 张表`，run cf. evidence rf1-before-red.txt），
+        # 故按 A-70 三步重基线到 6721；数值来源 = 本步子进程自报的 `直接拷贝 6721 行，跳过 0 张表`。
+        # 【严禁】在此基础上再抬数：真库只此一次重基线（RF-1 经用户拍板），此后本 needle 与真库
+        # 字节锚定（real_db_sha256 B4FB980C…EABE / 2531328 B）同源。
         {'id': 'check_db_bootstrap', 'group': 'blocking',
          'argv': [exe, '-B', shim, os.path.join('scripts', 'check_db_bootstrap.py')],
          'expect_exit': 0,
-         'expects': ['种子库账号数（经自举导入到空库）= 64', '直接拷贝 6712 行，跳过 0 张表',
+         'expects': ['种子库账号数（经自举导入到空库）= 64', '直接拷贝 6721 行，跳过 0 张表',
                      'OK: 空库自举、幂等、无种子库跳过、整表无遗漏 均通过']},
         {'id': 'run_gates', 'group': 'blocking', 'mode': 'run_gates',
          'argv': [exe, '-B', os.path.join('test-reports-2026-10', 'harness', 'run_gates.py')],
@@ -789,6 +815,31 @@ def spec_steps(python_exe, check_templates_script=None,
                  '（精确 33 条 + %s 通配 1 条，A-89）+ 通配规则匹配数 > 0 + real_db 钉值未变。'
                  '--no-strict-coverage 的理由见上方注释（allowlist 语义 + 去噪声）。'
                  % ARCHIVE_ROOT_GLOB},
+        # ---- B15-07（I5，blocking）：报工链 / 工件链 fg **件数合计**守恒对拍 ---------------
+        # 判据（口径勿动）：① 脚本在**副本库**里同一批次实例上把两条链各跑一次，读
+        #   件数合计（`SUM(finished_product.quantity)` / `SUM(production_record.quantity)`）
+        #   而不是行数 ⇒ 期望「两侧相等且等于报工件数」；② 自带「A 1 行 N 件 vs B N 行 1 件」
+        #   的构造，证明判据与行数**解耦**（若改读行数 ⇒ 1 != 3 假红）；③ 判据不满足或缺参
+        #   ⇒ 脚本 exit 1/2（exit 0 只表示 6 条判据全过）。脚本自报行见 expects。
+        # 分组理由：件数守恒是**确定性**判据（不依赖环境探针、不写真实库），且注入必须能把它
+        # 打成红（见 INJECTIONS 的 --perturb 注入）⇒ 进 blocking，不用 report-only 蒙过。
+        # 耗时说明：本步真建副本库 + 两链各跑一次（在办质检任务按实测顺序后建），单步约 1~2 分钟。
+        {'id': 'chain_count_consistency', 'group': 'blocking',
+         'argv': [exe, '-B', os.path.join('test-reports-2026-10', 'harness',
+                                          'chain_count_consistency.py')],
+         'extra_argv': [{'tail': ['--out', '{json}'],
+                         'json_name': 'chain_count_consistency.json'}],
+         'expect_exit': 0,
+         'expects': ['[cc] 口径 = SUM(finished_product.quantity) 件数合计（禁止用行数）',
+                     '[OK] C-B15-07.a 两侧件数守恒',
+                     '[OK] C-B15-07.a2 行数与件数不同构',
+                     '[OK] C-B15-07.b 两侧基数均 > 0',
+                     '[cc] 判据：6 条通过 / 0 条失败 / 0 条阻断',
+                     '[cc] RESULT: OK'],
+         'expect_absent': ['[FAIL] C-B15-07'],
+         'note': 'B15-07 / I5：双链 fg 件数守恒（件数合计口径，禁止行数）。判据语义与退出码'
+                 '（0=6 条全过 / 1=判据不满足 / 2=用法或参数错）见脚本 docstring；'
+                 '注入形态 ⑦：`--perturb` 合成「一侧件数 ±1」的输入声明 ⇒ 必红并指名侧别。'},
     ]
 
 

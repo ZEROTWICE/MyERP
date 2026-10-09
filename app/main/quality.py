@@ -1001,7 +1001,13 @@ def submit_inspection_record(record_id):
         )
         db.session.add(log)
         
-        db.session.commit()
+        # B15-06：质检结论落地必须与本记录同一事务。这里原先是一段独立的 commit()，
+        # 于是「质检记录 + 明细 + 任务状态 + 审计」先落地，再调 apply_inspection_result
+        # 落不合格单与 quality_status —— 下游一旦抛错，rollback 只回滚第二段，留下
+        # 「质检记录已提交、NC/门禁未落地」的半成品状态（结果不可重提、门禁又不放行）。
+        # 降级为 flush()：既保留 record.id 等写入结果对下游可见，又把唯一提交点收敛到
+        # 函数末尾的 commit()；mes_service 侧全程只 flush 不 commit，异常时整体回滚。
+        db.session.flush()
         
         from app.services import mes_service
         mes_service.apply_inspection_result(record)
