@@ -46,6 +46,34 @@ jobs:
       - name: 安装依赖
         run: python -m pip install --upgrade pip && python -m pip install -r requirements.txt
 
+      # E-04 门禁的前置条件：门禁入口 `ci_gates.py` 依赖真实业务库 app.db 才能启动（见本步 summary）。
+      # 缺库时**整条入口跳过**并把「未执行」写进日志/summary —— 不伪装成「跑绿」。
+      - name: 预检：真实库 app.db 是否在位（决定 E-04 门禁本次能否执行）
+        id: preflight
+        run: |
+          echo "REPO_ROOT（检出根，$GITHUB_WORKSPACE）= $(pwd)"
+          echo "受跟踪的 app.db 条目数 = $(git ls-files app.db | wc -l)（0 = 被 .gitignore 排除，检出里不会有）"
+          if [ -f app.db ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+            echo "app.db 在位 ⇒ E-04 门禁按 CI 等价入口执行"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::E-04 门禁本次未在 CI 执行（NOT EXECUTED）：真实库 app.db 不在版本控制内，检出里不存在"
+            cat >> "$GITHUB_STEP_SUMMARY" <<'MD'
+          ## E-04 门禁：本次未执行（NOT EXECUTED）—— 不是「执行并通过」
+
+          本 job 的检出里没有 `app.db`，因此 **E-04 门禁（CI 等价入口）本次没有被执行**。
+          配置级 lint（E-04-c / E-04-d，即 `ci_lint.py`）不受影响，仍然照跑并独立判红。
+
+          ### 为什么缺库就跑不了（结构性，不是配置问题）
+          - `test-reports-2026-10/harness/_env.py:47`：`REAL_DB = os.path.join(REPO_ROOT, 'app.db')`；
+          - `_env.py:267`（通用子进程包装 `run_child`）在**每个子步骤**前后无条件 `sha256_file(REAL_DB)`（落点是 `_env.py:177` 的 `open()`）⇒ 缺库即 `FileNotFoundError`；
+          - 该调用点在 `ci_gates.py:1134`，即**任何**一步（含纯静态的 `check_templates`）都会同样崩 ⇒ 无法靠「跳过某一步」规避，只能整条入口跳过；
+          - 同类依赖：`scripts/_test_bootstrap.py:25` 的 `shutil.copy2(ROOT/'app.db', …)`（functional_test / permission_matrix / smoke_test 用）；
+          - `app.db`（2531328 B 真实业务库）被 `.gitignore:21` 的 `/app.db` 排除 ⇒ 干净检出里**必然**不存在。
+          MD
+          fi
+
       - name: 门禁入口存在性检查（测试资产是否已纳入版本控制）
         run: |
           if [ ! -f test-reports-2026-10/harness/ci_gates.py ]; then
@@ -53,7 +81,10 @@ jobs:
             exit 3
           fi
 
+      # 缺库时整条入口跳过（判定见上一步 preflight）：绝不在没有真实库的 runner 上跑 ⇒ 也就不会崩在 FileNotFoundError。
+      # 跳过是「未执行」而非「执行并通过」，日志与 job summary 都如实标注。
       - name: E-04 门禁（CI 等价入口）
+        if: steps.preflight.outputs.present == 'true'
         run: |
           python -B test-reports-2026-10/harness/ci_gates.py \
             --phase first \
