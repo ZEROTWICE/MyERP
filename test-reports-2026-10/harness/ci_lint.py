@@ -17,6 +17,7 @@
     python -B test-reports-2026-10/harness/ci_lint.py [--phase first|second] [--json OUT]
 """
 import argparse
+import importlib.util
 import json
 import os
 import re
@@ -257,7 +258,56 @@ def strip_comments(path):
     return '\n'.join(keep)
 
 
-def lint_paths():
+#: L-P4 的 W7/TL 步骤：在 `ci_gates.spec_steps()` 里必须是**真实步骤**（A-85 已由注释变实装）
+L_P4_STEPS = (('check_model_refs', 'TL-01'), ('check_http_contract', 'TL-02'))
+#: L-P2 的路径解析前缀：`ci_gates.py` 里 `harness/…` 这类相对路径是相对报告根写的
+PATH_PREFIXES = ('', 'test-reports-2026-10')
+
+
+def resolve_repo_rel(rel_path):
+    """解析一个**仓库相对**引用：先按 REPO_ROOT 拼，再尝试 `test-reports-2026-10/` 前缀。
+
+    动机（根因记录）：`ci_gates.py` 里的引用有的带 `test-reports-2026-10/` 前缀，有的只写
+    `harness/…`（因为该文件自己就在报告根下自解析）；只用 REPO_ROOT 拼会把**实际存在**的
+    `harness/t8-evidence-whitelist.json` / `harness/w4_http_contract.py` 判成缺失。
+
+    返回 `(candidate, reason)`：`candidate` = 命中的绝对路径，否则为**按第一个前缀拼出的路径**
+    （报错时打印它，便于直接定位）；`reason` = 说明（`''` 表示已命中，可直接使用）。
+    """
+    tried = []
+    for prefix in PATH_PREFIXES:
+        candidate = os.path.join(REPO_ROOT, prefix, *rel_path.split('/')) if prefix \
+            else os.path.join(REPO_ROOT, *rel_path.split('/'))
+        tried.append(candidate)
+        if os.path.isfile(candidate):
+            return candidate, ''
+    return tried[0], '未命中：(REPO_ROOT)=%s；(test-reports-2026-10 前缀)=%s' % (
+        tried[0], tried[1] if len(tried) > 1 else '(无)')
+
+
+def load_step_ids(gates_path=None):
+    """从 `ci_gates.spec_steps()` **实调用**取回真实步骤 id 集合（L-P4 的判据来源）。
+
+    为什么实调用而不用正则：注释里的 `{'id': …}` 也长得一样 —— 正则分不清「真实步骤」与
+    「注释掉的步骤」，那正是本项要防的回归。实调用失败时返回 `(None, 原因)`，由调用方判红。
+    """
+    path = gates_path or CI_GATES
+    try:
+        spec = importlib.util.spec_from_file_location('_ci_gates_spec_probe', path)
+        if spec is None or spec.loader is None:
+            return None, '无法为 %s 构造 module spec' % path
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        steps = module.spec_steps(sys.executable)
+        ids = [s.get('id') for s in steps]
+        if not ids:
+            return None, 'spec_steps() 返回了空步骤表'
+        return set(ids), '共 %d 步' % len(ids)
+    except Exception as exc:                                  # noqa: BLE001
+        return None, 'spec_steps() 调用失败：%s: %s' % (type(exc).__name__, exc)
+
+
+def lint_paths(gates_path=None):
     checks = []
 
     def add(cid, desc, ok, detail=''):
@@ -270,16 +320,27 @@ def lint_paths():
 
     # 从三处配置里抽出的相对路径也必须存在（**注释行不计**：ci_gates 里的 W7 预留接入位是注释）
     found = set()
-    for path in (WORKFLOW, JENKINSFILE, CI_GATES):
+    for path in (WORKFLOW, JENKINSFILE, gates_path or CI_GATES):
         found |= set(REPO_PATH_RX.findall(strip_comments(path)))
-    bad = sorted(p for p in found if not os.path.isfile(os.path.join(REPO_ROOT, p)))
-    add('L-P2', '三处配置真引用的相对路径都存在（%d 个）' % len(found), not bad,
-        '缺失=%s' % (bad or '无'))
-    src_lines = open(CI_GATES, encoding='utf-8').read().splitlines()
-    reserved = [p for p in ('check_model_refs', 'check_http_contract')
-                if any(('#' in ln and p in ln) for ln in src_lines)]
-    add('L-P4', '预留接入位（W7：check_model_refs/check_http_contract）以注释形式登记在 ci_gates.py',
-        len(reserved) == 2, 'found=%s' % reserved)
+    bad = {}
+    for p in sorted(found):
+        candidate, reason = resolve_repo_rel(p)
+        if reason:
+            bad[p] = reason
+    add('L-P2', '三处配置真引用的相对路径都存在（%d 个；REPO_ROOT 优先，再试 test-reports-2026-10/ 前缀）'
+        % len(found), not bad,
+        '缺失=%s' % ({p: r for p, r in bad.items()} or '无'))
+
+    step_ids, step_detail = load_step_ids(gates_path)
+    if step_ids is None:
+        add('L-P4', 'W7 两项（check_model_refs/check_http_contract）已是 ci_gates.py 的真实步骤',
+            False, step_detail)
+    else:
+        present = [i for i, _ in L_P4_STEPS if i in step_ids]
+        absent = ['%s(%s)' % (i, tag) for i, tag in L_P4_STEPS if i not in step_ids]
+        add('L-P4', 'W7 两项（check_model_refs/check_http_contract）已是 ci_gates.py 的真实步骤',
+            len(present) == len(L_P4_STEPS) and not absent,
+            '真实步骤 found=%s absent=%s；%s' % (present, absent or '无', step_detail))
 
     # --no-dump 必须已由 t4 交付（E-04-d 的下半句）
     nd = {}
