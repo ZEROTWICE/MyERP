@@ -46,7 +46,7 @@
     python -B scripts/check_properties.py                 # 扫 app/
     python -B scripts/check_properties.py --root <dir>    # 扫指定目录（自测/注入破坏用）
     python -B scripts/check_properties.py --verbose       # 打印通过项统计
-    python -B scripts/check_properties.py --selftest      # 受控合成源码的阳性/阴性对照（含 TL-05 面）
+    python -B scripts/check_properties.py --selftest      # 先跑受控合成源码的阳性/阴性对照（含 TL-05 面），**随后继续扫描**
 
 退出码：无违规 0；有违规 1；环境错误（找不到 models.py）2。
 
@@ -67,8 +67,16 @@
 - **既有计数口径不得漂移**（E-04 / run_gates 的冻结值；**B14-00b 口径订正 2026-10-09**：外部
   「合金钢导入」批新增 3 个 `app/**` 模块，扫描面 23 → 26，判据侧 `ci_gates.check_properties`
   的期望串已同批推进为 26 —— 本次只订正本注释，判定逻辑与两行输出一字未改）：
-  `已扫描 26 个文件，模型类 74 个`
+  `已扫描 25 个文件，模型类 74 个`
   与 `RESULT: OK` 是判据钉住的两行；新增实例面**不得**改动它们（TL-05 验收要求）。
+  ⚠ 2026-10-10 批次17（B17-16，A-70 重基线）：26 → **25**。B17-01 删除死文件
+  `app/main/sales_routes.py`（1 字节空文件、无类）后 `app/**/*.py` 少一个文件；
+  四处同改 = 本注释 / `harness/run_gates.py` 的 `EXPECTED['properties_files']` /
+  `harness/ci_gates.py` 第 3 步 needle / `scripts/check_doc_claims.py` 的 PINNED，
+  另 `AGENTS.md` 门禁表同步；登记见 `test-reports-2026-10/B17-登记.md` §B17-16。
+  判定逻辑与两行输出一字未改。
+  ⚠ `--selftest` 是**加性**开关（B17-16）：先跑 22 例自检、失败即非 0，**随后照常扫描**；
+  自检统计行（`自检 N/22 通过`）不进任何判据的**唯一**期望串，仅作追加 needle。
 """
 import argparse
 import ast
@@ -541,7 +549,7 @@ def main():
     parser.add_argument('--root', default='app', help='要扫描的源码目录（默认 app）')
     parser.add_argument('--verbose', action='store_true', help='打印通过项统计')
     parser.add_argument('--selftest', action='store_true',
-                        help='受控合成源码的阳性/阴性对照（含 TL-05 实例面）')
+                        help='先跑受控合成源码的阳性/阴性对照（含 TL-05 实例面），随后继续原有扫描')
     args = parser.parse_args()
 
     for stream in (sys.stdout, sys.stderr):
@@ -550,8 +558,10 @@ def main():
         except Exception:
             pass
 
+    # --selftest 是**加性**开关（B17-16）：先跑自检，随后照常扫描；任一面失败即非 0。
+    selftest_code = 0
     if args.selftest:
-        return selftest()
+        selftest_code = selftest()
 
     root = os.path.abspath(args.root)
     models_path = os.path.join(root, 'models.py') if os.path.isdir(root) else MODELS_REL
@@ -591,6 +601,9 @@ def main():
         return 1
 
     print('已扫描 %d 个文件，模型类 %d 个' % (scanned, len(classes)))
+    if selftest_code:
+        print('RESULT: FAIL（--selftest 自检未通过，exit=%d）' % selftest_code)
+        return 1
     print('RESULT: OK（未发现把 @property / 不存在的列当数据库列用）')
     return 0
 

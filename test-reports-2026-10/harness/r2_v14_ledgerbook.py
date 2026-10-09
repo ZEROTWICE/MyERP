@@ -256,9 +256,10 @@ def main():
                          'permission_matrix 匿名=0 且 C-06 四模块全绿；四项 exit 均为 0',
             'command': ('%s -B test-reports-2026-10/harness/write_suite.py；'
                         '%s -B test-reports-2026-10/harness/negative_matrix.py；'
-                        '%s -B test-reports-2026-10/harness/coverage_drift.py；'
+                        '%s -B test-reports-2026-10/harness/coverage_drift.py'
+                        ' --coverage %s/coverage.json；'
                         '%s -B scripts/_sandbox_compat.py scripts/permission_matrix.py --no-dump'
-                        % (PY, PY, PY, PY)),
+                        % (PY, PY, PY, RUN_DIR_REL, PY)),
             'exit_code': 0,
             'expected': 'write_suite 54 条 PASS 54/FAIL 0；negative_matrix 28/28 passed=28 failed=0；'
                         'coverage_drift D-1…D-8 全 OK；permission_matrix 匿名=0 + 四模块全绿 + 416 行 5xx=0',
@@ -291,7 +292,10 @@ def main():
             'class': 'improved',
             'class_basis': 'write_suite 由 B0 的 51 passed / 3 failed 转为 54 passed / 0 failed'
                            '（阶段A 修复的红转绿）；其余三项与基线同值',
-            'postfix_evidence': '%s/write_suite.console.txt' % TMP, 'notes': '',
+            'postfix_evidence': '%s/write_suite.console.txt' % TMP,
+            'notes': 'B17-11（2026-10-09）：coverage_drift 调用点补显式 `--coverage <run 产物>`'
+                     '（缺参 = exit 2 用法错误，不是回归 —— A-114）。`observed`/`criterion_digest`'
+                     '仍为该 run 的历史读数，本次不重写。',
         },
         {
             'id': 'REG-preflight',

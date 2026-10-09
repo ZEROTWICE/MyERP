@@ -2068,7 +2068,6 @@ def view_audit_logs():
 def download_employee_template():
     """下载员工导入模板"""
     
-    temp_path = None
     try:
         wb = ExcelGenerator.create_employee_template()
         filename = 'employee_template.xlsx'
@@ -2086,20 +2085,8 @@ def download_employee_template():
             mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
     except Exception as e:
-        if temp_path and os.path.exists(temp_path):
-            try:
-                os.remove(temp_path)
-            except OSError:
-                pass
         flash('下载模板失败，请稍后重试或联系管理员', 'danger')
         return redirect(url_for('main.manage_employees'))
-    finally:
-        # 确保在请求结束后删除临时文件
-        if temp_path and os.path.exists(temp_path):
-            try:
-                os.remove(temp_path)
-            except OSError:
-                pass
 
 @bp.route('/employees/import', methods=['POST'])
 @login_required
@@ -2353,6 +2340,15 @@ def cleanup_temp_files():
         # 遍历临时文件夹
         for filename in os.listdir(temp_folder):
             file_path = os.path.join(temp_folder, filename)
+            # save_temp_file() 用 mkdtemp 建的子目录：过期后整个回收（否则空目录会一直堆积）
+            if os.path.isdir(file_path):
+                if current_time - os.path.getmtime(file_path) > 300:
+                    try:
+                        shutil.rmtree(file_path)
+                        current_app.logger.info(f"Cleaned up temp dir: {filename}")
+                    except Exception as e:
+                        current_app.logger.error(f"Error cleaning up temp dir {filename}: {str(e)}")
+                continue
             # 检查文件是否存在且是否为文件（不是文件夹）
             if os.path.isfile(file_path):
                 # 获取文件的最后修改时间
@@ -2413,7 +2409,6 @@ def export_employees():
 def download_process_price_template():
     """下载工序价格导入模板"""
     
-    temp_path = None
     try:
         wb = ExcelGenerator.create_process_price_template()
         filename = 'process_price_template.xlsx'
@@ -2431,20 +2426,8 @@ def download_process_price_template():
             mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
     except Exception as e:
-        if temp_path and os.path.exists(temp_path):
-            try:
-                os.remove(temp_path)
-            except OSError:
-                pass
         flash('下载模板失败，请稍后重试或联系管理员', 'danger')
         return redirect(url_for('main.process_prices'))
-    finally:
-        # 确保在请求结束后删除临时文件
-        if temp_path and os.path.exists(temp_path):
-            try:
-                os.remove(temp_path)
-            except OSError:
-                pass
 @bp.route('/process_prices/import', methods=['POST'])
 @login_required
 @require_capability('process.manage')
@@ -2906,7 +2889,6 @@ def export_process_prices():
 def download_production_record_template():
     """下载生产记录导入模板"""
     
-    temp_path = None
     try:
         wb = ExcelGenerator.create_production_record_template()
         filename = 'production_record_template.xlsx'
@@ -2924,20 +2906,8 @@ def download_production_record_template():
             mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
     except Exception as e:
-        if temp_path and os.path.exists(temp_path):
-            try:
-                os.remove(temp_path)
-            except OSError:
-                pass
         flash('下载模板失败，请稍后重试或联系管理员', 'danger')
         return redirect(url_for('main.manage_production_records'))
-    finally:
-        # 确保在请求结束后删除临时文件
-        if temp_path and os.path.exists(temp_path):
-            try:
-                os.remove(temp_path)
-            except OSError:
-                pass
 
 @bp.route('/production_records/import', methods=['POST'])
 @login_required
@@ -3063,9 +3033,7 @@ def export_production_records():
         records = query.all()
         wb = ExcelGenerator.export_production_records(records)
         
-        temp_path = None
         try:
-            # 创建临时文件
             buf = io.BytesIO()
             wb.save(buf)
             buf.seek(0)
@@ -3077,20 +3045,8 @@ def export_production_records():
                 download_name=f'production_records_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
             )
         except Exception as e:
-            if temp_path and os.path.exists(temp_path):
-                try:
-                    os.remove(temp_path)
-                except OSError:
-                    pass
             flash('导出失败，请稍后重试或联系管理员', 'danger')
             return redirect(url_for('main.manage_production_records'))
-        finally:
-            # 确保在请求结束后删除临时文件
-            if temp_path and os.path.exists(temp_path):
-                try:
-                    os.remove(temp_path)
-                except OSError:
-                    pass
     
     return render_template('main/export_form.html', form=form, title='导出生产记录')
 
@@ -3103,8 +3059,6 @@ def export_bonus_penalties():
         query = BonusPenalty.query
         if form.employee_id.data:
             query = query.join(Employee).filter(Employee.employee_id == form.employee_id.data)
-        if form.process_code.data:
-            query = query.join(ProcessPrice).filter(ProcessPrice.process_code == form.process_code.data)
         if form.type.data:
             query = query.filter(BonusPenalty.type == form.type.data)
         if form.start_date.data:
@@ -3115,9 +3069,7 @@ def export_bonus_penalties():
         records = query.all()
         wb = ExcelGenerator.export_bonus_penalties(records)
         
-        temp_path = None
         try:
-            # 创建临时文件
             buf = io.BytesIO()
             wb.save(buf)
             buf.seek(0)
@@ -3129,20 +3081,8 @@ def export_bonus_penalties():
                 download_name=f'bonus_penalties_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
             )
         except Exception as e:
-            if temp_path and os.path.exists(temp_path):
-                try:
-                    os.remove(temp_path)
-                except OSError:
-                    pass
             flash('导出失败，请稍后重试或联系管理员', 'danger')
             return redirect(url_for('main.manage_bonus_penalties'))
-        finally:
-            # 确保在请求结束后删除临时文件
-            if temp_path and os.path.exists(temp_path):
-                try:
-                    os.remove(temp_path)
-                except OSError:
-                    pass
     
     return render_template('main/export_form.html', form=form, title='导出奖惩记录')
 
@@ -4133,7 +4073,6 @@ def my_tasks():
 def download_bonus_penalty_template():
     """下载奖金/罚款导入模板"""
     
-    temp_path = None
     try:
         wb = ExcelGenerator.create_bonus_penalty_template()
         filename = 'bonus_penalty_template.xlsx'
@@ -4151,20 +4090,8 @@ def download_bonus_penalty_template():
             mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
     except Exception as e:
-        if temp_path and os.path.exists(temp_path):
-            try:
-                os.remove(temp_path)
-            except OSError:
-                pass
         flash('下载模板失败，请稍后重试或联系管理员', 'danger')
         return redirect(url_for('main.manage_bonus_penalties'))
-    finally:
-        # 确保在请求结束后删除临时文件
-        if temp_path and os.path.exists(temp_path):
-            try:
-                os.remove(temp_path)
-            except OSError:
-                pass
 
 @bp.route('/bonus_penalties/import', methods=['POST'])
 @login_required
@@ -4260,7 +4187,6 @@ def import_bonus_penalties():
 def download_task_template():
     """下载任务导入模板"""
     
-    temp_path = None
     try:
         wb = ExcelGenerator.create_task_template()
         filename = 'task_template.xlsx'
@@ -4278,20 +4204,8 @@ def download_task_template():
             mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
     except Exception as e:
-        if temp_path and os.path.exists(temp_path):
-            try:
-                os.remove(temp_path)
-            except OSError:
-                pass
         flash('下载模板失败，请稍后重试或联系管理员', 'danger')
         return redirect(url_for('main.manage_tasks'))
-    finally:
-        # 确保在请求结束后删除临时文件
-        if temp_path and os.path.exists(temp_path):
-            try:
-                os.remove(temp_path)
-            except OSError:
-                pass
 
 @bp.route('/tasks/import', methods=['POST'])
 @login_required
@@ -5391,7 +5305,7 @@ def manage_inventory():
             ))
         if not show_archived:
             # 上面 join 之后 filter_by 会落到 RawMaterialCategory 上，必须写全限定
-            query = query.filter(RawMaterial.is_archived.is_(False))
+            query = query.filter(db.or_(RawMaterial.is_archived.is_(False), RawMaterial.is_archived.is_(None)))
     else:
         query = FinishedProduct.query
         if search:
@@ -5402,7 +5316,7 @@ def manage_inventory():
                 FinishedProduct.inspector.ilike(f'%{search}%')
             ))
         if not show_archived:
-            query = query.filter_by(is_archived=False)
+            query = query.filter(db.or_(FinishedProduct.is_archived.is_(False), FinishedProduct.is_archived.is_(None)))
     
     pagination = query.order_by(desc('id')).paginate(
         page=page, per_page=per_page, error_out=False
@@ -5682,8 +5596,8 @@ def validate_excel_file(file: FileStorage) -> Optional[str]:
     return None
 
 def save_temp_file(file: FileStorage) -> str:
-    """保存上传的文件到临时目录"""
-    temp_dir = tempfile.mkdtemp()
+    """保存上传的文件到临时目录（TEMP_FOLDER 下的 mkdtemp 子目录，由 cleanup_temp_files 回收）"""
+    temp_dir = tempfile.mkdtemp(dir=current_app.config['TEMP_FOLDER'])
     temp_path = os.path.join(temp_dir, secure_filename(file.filename))
     file.save(temp_path)
     return temp_path
@@ -6786,7 +6700,7 @@ def get_available_consumables():
     """
     try:
         from app.models import Consumable
-        query = Consumable.query.filter_by(is_archived=False)
+        query = Consumable.query.filter(db.or_(Consumable.is_archived.is_(False), Consumable.is_archived.is_(None)))
         if request.args.get('only_available', 'false').lower() == 'true':
             query = query.filter(Consumable.quantity > 0, Consumable.status == 'in_stock')
         # 服务端搜索（Select2 发 search）：品名在品类表，specification 为本表列
@@ -8333,7 +8247,6 @@ def get_product_process(product_id, process_item_id):
 def download_product_template():
     """下载产品导入模板"""
     
-    temp_path = None
     try:
         wb = ExcelGenerator.create_product_template()
         filename = 'product_template.xlsx'
@@ -8351,20 +8264,8 @@ def download_product_template():
             mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
     except Exception as e:
-        if temp_path and os.path.exists(temp_path):
-            try:
-                os.remove(temp_path)
-            except OSError:
-                pass
         flash('下载模板失败，请稍后重试或联系管理员', 'danger')
         return redirect(url_for('main.manage_products'))
-    finally:
-        # 确保在请求结束后删除临时文件
-        if temp_path and os.path.exists(temp_path):
-            try:
-                os.remove(temp_path)
-            except OSError:
-                pass
 @bp.route('/products/import', methods=['POST'])
 @login_required
 @require_capability('product.import')
@@ -12765,7 +12666,7 @@ def api_search_materials():
         
         if material_type in ['all', 'raw']:
             from app.models import RawMaterial
-            raw_query = RawMaterial.query.filter_by(is_archived=False)
+            raw_query = RawMaterial.query.filter(db.or_(RawMaterial.is_archived.is_(False), RawMaterial.is_archived.is_(None)))
             
             if only_available:
                 raw_query = raw_query.filter(RawMaterial.quantity > 0, RawMaterial.status == 'in_stock')
@@ -12793,7 +12694,7 @@ def api_search_materials():
         
         if material_type in ['all', 'consumable']:
             from app.models import Consumable
-            consumable_query = Consumable.query.filter_by(is_archived=False)
+            consumable_query = Consumable.query.filter(db.or_(Consumable.is_archived.is_(False), Consumable.is_archived.is_(None)))
             
             if only_available:
                 consumable_query = consumable_query.filter(Consumable.quantity > 0, Consumable.status == 'in_stock')
@@ -12822,7 +12723,7 @@ def api_search_materials():
         
         if material_type in ['all', 'finished']:
             from app.models import FinishedProduct
-            finished_query = FinishedProduct.query.filter_by(is_archived=False)
+            finished_query = FinishedProduct.query.filter(db.or_(FinishedProduct.is_archived.is_(False), FinishedProduct.is_archived.is_(None)))
             
             if only_available:
                 finished_query = finished_query.filter(FinishedProduct.quantity > 0, FinishedProduct.status == 'in_stock')

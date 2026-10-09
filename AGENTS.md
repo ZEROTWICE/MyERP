@@ -46,7 +46,7 @@ Guidelines:
 - Excel 导入/导出
   - 逻辑封装在 `app/utils/excel_generator.py`；路由只负责查询与文件清理。
   - **导出/模板下载：用 `io.BytesIO` 内存生成**，不落盘（见上「路由/端点规范」）。
-  - **仅上传解析必须落盘**：`ExcelGenerator.parse_*` / `pd.read_excel` 需要真实路径，因此导入端点才写 `current_app.config['TEMP_FOLDER']`（`file.save(temp_path)`），由 `cleanup_temp_files()` + `finally` 清理；辅助函数 `save_temp_file()`（`app/main/routes.py:5067`）用 `tempfile.mkdtemp()`。当前 `routes.py` 有 8 个导入端点属于这种形态。
+  - **需真实路径时才落盘**：`ExcelGenerator.parse_*` 需要真实路径，因此导入端点才写 `current_app.config['TEMP_FOLDER']`（`file.save(temp_path)`），由 `cleanup_temp_files()` + `finally` 清理；辅助函数 `save_temp_file()`（`app/main/routes.py:5600`）用 `tempfile.mkdtemp(dir=TEMP_FOLDER)`，空目录由同一清理钩子按过期时间回收。当前 **11 个导入端点 = 10 落盘 + 1 内存流**：10 落盘 = 5 个直接写 `TEMP_FOLDER` + 2 个 `tempfile.gettempdir()` + 1 个 `save_temp_file()` + 2 个 `save_upload_files()`（`app/main/routes.py:2776` `import_alloy_process_prices`、`:2825` `import_alloy_bom`；helper 定义 `app/main/routes.py:5606`，落系统 temp、由调用方 `finally shutil.rmtree` 回收）；1 内存流 = `app/main/quality.py:1707` `import_inspection_tasks` 走 `pd.read_excel(file)` 不落盘。历史件（`B17-00-契约冻结.md:97`、`phase1-snapshot/**`、`reconcile-2026-10-08/**`、`33/80/81`）保留当时读数 9/8/1，不追改。
   - 导入必须**行级容错**：坏行只记「第 N 行：…」并跳过，绝不整体 500；文本日期用 `pd.to_datetime` 兜底（参考 `import_tasks`、`import_inspection_tasks`）。
 
 - 前端交互约定（模板/JS）
@@ -77,15 +77,15 @@ Guidelines:
     | --- | --- |
     | `python -B scripts/check_templates.py` | `87 templates / 44 declared / 40 used in templates / 44 used on routes / landing 5` → `RESULT: OK` |
     | `python -B scripts/check_migration_heads.py` | `HEADS=['p1nonctarget']`，`head_count=1`，`revisions=35` → exit 0 |
-    | `python -B scripts/check_properties.py` | `已扫描 23 个文件，模型类 74 个` → `RESULT: OK`（**新增闸门**，专治第 5 次复发的「`@property`/不存在列当列用」） |
-    | `python -B scripts/route_inventory.py` | `total rules=271`，`duplicate (method,path) registrations=0` |
+    | `python -B scripts/check_properties.py` | `已扫描 25 个文件，模型类 74 个` → `RESULT: OK`（**新增闸门**，专治第 5 次复发的「`@property`/不存在列当列用」）。⚠ 2026-10-09 批次17（B17-16，A-70 重基线）由 23 → **25**：B17-01 删除死文件 `app/main/sales_routes.py` 后 `app/**/*.py` 少一个文件；**模型类 74 不变**；四处同改 = 本行 / `harness/run_gates.py:48` / `harness/ci_gates.py` 第 3 步 needle / `scripts/check_doc_claims.py` 的 PINNED（登记见 `test-reports-2026-10/B17-登记.md` §B17-16） |
+    | `python -B scripts/route_inventory.py` | `total rules=273`，`duplicate (method,path) registrations=0`（2026-10-09 批次17 B17-10 口径重基线 271 → **273**，源 = 现场 `route_inventory.py` 读数 + `harness/run_gates.py` `EXPECTED['routes_total_rules']`） |
     | `python -B scripts/check_model_refs.py` | `scanned 23 files` / `name_query_refs`（计数勿钉，已漂移过 574/575/602）/ `violations 0` → `RESULT: OK`（**新增闸门**，专治 P-01 类「模型名未导入」NameError）；判据只钉 `violations 0` + `RESULT: OK` |
     | `python -B test-reports-2026-10/harness/w4_http_contract.py --roots app --scope app --expect 10` | 10 个 P-12 站点（`get_json()` 维，具名登记见脚本 docstring）→ exit 0 |
 
     模板/权限/迁移/property/模型引用/HTTP 契约六项都要求 exit 0；有违规就必须先修，不要靠改期望值过关。
 
-    **单一入口（推荐）**：以上各项已由 `python -B test-reports-2026-10/harness/ci_gates.py --phase first` 统一编排（当前 **14 步**：blocking 10 / report-only 4），退出码语义 `0=全部 blocking 通过 / 1=有 blocking 失败 / 2=仅 report-only 失败 / 3=入口缺失`。
-    > ⚠ 引用 `ci_gates` 的步骤数时必须带**「步骤数 + SHA256 + 时点」**：该文件在本战役期间从 11 步增至 14 步，「11 步」只能当阶段A 基线引用。
+    **单一入口（推荐）**：以上各项已由 `python -B test-reports-2026-10/harness/ci_gates.py --phase first` 统一编排（当前 **19 步**：blocking 15 / report-only 4；读数 2026-10-09，`ci_gates.py` SHA256 `54D8371B…16C680`，批次17 追加末位 17 `negative_matrix` / 18 `check_is_archived_policy` / 19 `check_doc_claims`），退出码语义 `0=全部 blocking 通过 / 1=有 blocking 失败 / 2=仅 report-only 失败 / 3=入口缺失`。
+    > ⚠ 引用 `ci_gates` 的步骤数时必须带**「步骤数 + SHA256 + 时点」**：该文件在本战役期间从 11 步增至 14 步（**阶段A 基线**）、批次17 收口为 **19 步**；「11 步 / 14 步」都只能当**当时时点**的基线引用，不得当现状。
     > ⚠ `route_inventory.py` 与 `harness/measure_coverage.py` 属**报告型**（stdout 全是度量值，无判据语义）⇒ **其退出码不进闸门链**，判据改由 `harness/coverage_drift.py` 消费其 JSON 产出。
     > ⚠ `harness/run_gates.py` 内的 `route_inventory_native_probe` 属**环境依赖探针**：其退出码随沙箱环境态变化，**不得写入任何 blocking 判据**。
     > `check_properties.py` 的跳过表有**两类**：① `SKIP_FILENAMES` 里的 4 个名字（`routes_backup.py` / `routes_original.py` / `routes_full.py` / `routes_with_duplicates.py`）——这 4 个**遗留备份文件已于 2026-09-18 第 8 批从仓库删除**（约 1.99 MB，全仓引用 0 处），**名字保留作防御**（这类超大副本可能带语法错误，若被误恢复，跳过比让脚本崩在 `ast.parse` 更好）；② `SKIP_SUFFIXES`（`.bak` / `.new` / `.backup`），跳过 `app/main/routes.py.backup`、`routes.py.bak`、`routes.py.new` 这 3 个后缀型残留（**其实被 git 跟踪**，原记录有误；已于第 8 批一并删除）。**结论：`app/main` 下现只有 `routes.py` 一个路由模块；不要再按「包内有语法错误的备份文件」的说法去处理。**
@@ -290,7 +290,7 @@ def example_select2():
         return jsonify({'success': False, 'message': f'加载失败: {str(e)}'}), 500
 ```
 
-5) Excel 导入（**必须落盘** + 行级容错）
+5) Excel 导入（需真实路径时才落盘 + 行级容错）
 
 ```python
 @bp.route('/import_example', methods=['POST'])
@@ -303,7 +303,7 @@ def import_example():
         flash('请选择要导入的 Excel 文件', 'warning')
         return redirect(url_for('main.example_list'))
 
-    # 解析器要真实路径，这里是唯一允许落盘的场景
+    # 解析器要真实路径才落盘；能走内存流的（如 pd.read_excel(file)）不要落盘
     temp_path = os.path.join(current_app.config['TEMP_FOLDER'], secure_filename(file.filename))
     file.save(temp_path)
     try:
@@ -317,7 +317,7 @@ def import_example():
                 errors.append(f'第 {idx} 行：{e}')
         db.session.commit()
     finally:
-        cleanup_temp_files()          # app/main/routes.py:2173
+        cleanup_temp_files()          # app/main/routes.py:2334
     if errors:
         flash('部分行未导入：' + '；'.join(errors[:5]), 'warning')
     else:
@@ -325,8 +325,8 @@ def import_example():
     return redirect(url_for('main.example_list'))
 ```
 
-> 也可以用辅助函数 `save_temp_file(file)`（`app/main/routes.py:5067`，内部 `tempfile.mkdtemp()`），
-> 但**必须**在 `finally` 里清掉，否则空目录会在系统 TEMP 下无限堆积。
+> 也可以用辅助函数 `save_temp_file(file)`（`app/main/routes.py:5600`，内部 `tempfile.mkdtemp(dir=TEMP_FOLDER)`）——
+> 目录开在 `TEMP_FOLDER` 下，由 `cleanup_temp_files()` 按过期时间整个回收；调用方能自己 `finally` 删掉更好。
 
 ---
 

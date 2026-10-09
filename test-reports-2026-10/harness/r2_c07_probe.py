@@ -74,7 +74,7 @@ $env:HARNESS_RUN_ID = 'r2-exec-b2-c07'
 | `_ensure_schema(app)` 调用行 | `app/__init__.py` `splitlines()` | **224**（冻结值） |
 | `db.create_all()` 在 `_ensure_schema` 内的行 | 同上 | **107**（全部命中点 `[20, 107, 246]`） |
 | 闸位窗口 | 同上 | `app.config.from_object(Config)`@156 → `TEMP_FOLDER`@164 → **闸** → `_ensure_schema`@224 |
-| 正例路由数 | `len(app.url_map.iter_rules())` | **271**（与 `route_inventory.py` 口径一致） |
+| 正例路由数 | `len(app.url_map.iter_rules())` | **273**（与 `route_inventory.py` 口径一致；B17-10/B17-11 重基线 271→273） |
 | 真实库 | `_env.sha256_file` | `F5DA2306…0E0F065`（2531328 B），开工/收尾一致 |
 
 本探针**只读生产代码**、**零写真实库**（全程 SHA256 复核）、只写 `evidence/harness/<RUN_ID>/`
@@ -111,7 +111,11 @@ ANCHOR_BEFORE_SCHEMA = '_ensure_schema(app)'
 ANCHOR_DB_CREATE_ALL = 'db.create_all()'
 ANCHOR_NORMALIZE_RETURN = 'return url'
 TARGET_SCHEMA_LINE = 224          # `_ensure_schema(app)` 在 app/__init__.py 的行号（冻结事实）
-ROUTE_RULES_BASELINE = 271        # `scripts/route_inventory.py` 口径：total rules=271
+ROUTE_RULES_BASELINE = 273        # `scripts/route_inventory.py` 口径：total rules=273
+#: B17-10/B17-11（2026-10-09，A-70）：271 → 273（现场 `route_inventory.py` 读数 273）。
+#: 改前 `--expect-rules 271` ⇒ `C-07-b(copy)` expected 271 / actual 273 = **假红**（非回归）；
+#: 改后同一判据转 PASSED。C-07-b 假红与 B17-02 的生产面缺口（`C-07-a(current)`）分开登记，
+#: 见 `test-reports-2026-10/B17-登记.md` §B17-11。
 REPO_ROOT = _env.REPO_ROOT
 DEFAULT_REAL_DB = _env.REAL_DB
 
@@ -944,7 +948,8 @@ def main():
     ap.add_argument('--guard-source', default='auto', choices=['auto', 'inject', 'present'],
                     help='auto=生产已含闸则用之，否则注入参考实现')
     ap.add_argument('--expect-rules', type=int, default=ROUTE_RULES_BASELINE,
-                    help='C-07-b 正例的路由数期望（route_inventory 口径，默认 271）')
+                    help='C-07-b 正例的路由数期望（route_inventory 口径，默认 %d）'
+                         % ROUTE_RULES_BASELINE)
     ap.add_argument('--strict-current-guard', action='store_true',
                     help='要求当前生产代码已含硬闸（实现落地后才加）')
     ap.add_argument('--timeout', type=int, default=600, help='单场景子进程超时秒')

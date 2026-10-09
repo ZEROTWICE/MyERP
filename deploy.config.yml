@@ -28,11 +28,14 @@ deployment:
     description: "工资管理系统Flask应用服务"
     use_windows_service: true  # 是否使用Windows服务方式运行
     
-  # 环境变量
+  # 环境变量（脚本里不落占位值/真实值）
+  # SECRET_KEY: 部署脚本每次现生成后追加进 .env；此处留空即可。
+  # DATABASE_URL: 一律由运行环境提供；留空则不写 .env，应用回落 config.py 默认 sqlite 库。
+  # 回滚：删掉 .env 里的 SECRET_KEY / DATABASE_URL 行，即回到 config.py 的默认值。
   environment:
     FLASK_ENV: "production"
-    SECRET_KEY: "your-production-secret-key-here"
-    DATABASE_URL: "sqlite:///app.db"
+    SECRET_KEY: ""
+    DATABASE_URL: ""
     
   # 健康检查配置
   health_check:

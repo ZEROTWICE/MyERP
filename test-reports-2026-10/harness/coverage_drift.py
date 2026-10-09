@@ -17,6 +17,18 @@
 | D-6 | `len(uncovered_writable)` | `<= 0`（无命中写端点；**V-06/C-05 有意更新**：101 → 0） |
 | D-7 | `smoke_test_plan.static_reproduction_targets` / `_unresolved` | `== 148` / `== 9` |
 | D-8 | `--routes-stdout`：`total rules` / `duplicate (method,path) registrations` | `== 273` / `== 0` |
+| D-9 | 「GET+写」多方法面：`summary.multi_method_with_get_total` / `_uncovered` / `len(uncovered_multi_method_with_get)` | `== 43` / `== 37` / `== 37`（且 `M ≤ N`；**B17-14 新增**） |
+
+**D-9 口径（B17-14：防「多方法 face 只打印不判」）**：`N` = 全量「GET+写」多方法规则（与
+`scripts/route_inventory.py` 同名 face **同源同值**，现场 43）；`M` = 其中**未被任何探针 AST 命中**
+的子集（现场 37），恒有 `M ≤ N`。两个口径**分开判、不得混算**：N 是规则面、M 是未命中子集面
+（`uncovered_writable` 按构造排除「GET+写」⇒ 这 37 条原是漂移门禁盲区，D-6 永远看不见它们）。
+`M` 还必须等于 `len(uncovered_multi_method_with_get)` —— 防 producer 自说自话（键写 37、列表给 0）。
+
+⚠ **结算行的计数口径**：`判据 8/8 通过` 只统计**既有** D-1…D-8 —— `ci_gates.py` 第 11 步（blocking）
+的 `expects` 指纹钉的就是这个子串（纯子串匹配），改计数会连带改 out-of-scope 的门禁指纹。
+B17-14 追加的 D-9 状态以「另 D-9 多方法面判据 OK/FAIL」附在**同一行**；
+**exit 码由全部判据（含 D-9）共同决定**（D-9 失败 ⇒ `failed` 非空 ⇒ `exit 1`）。
 
 用法（仓库根目录）——**CI 里报告型脚本与判据层的正确接法**：
 
@@ -27,7 +39,7 @@
     python -B test-reports-2026-10/harness/coverage_drift.py \
         --coverage <run>/coverage.json --routes-stdout <run>/route_inventory.txt
 
-`--selftest` 对抗自检：用合成文档做 1 阳性 + 8 阴性注入，证明「漂移必被判失败」（不读活体文件 ⇒
+`--selftest` 对抗自检：用合成文档做 1 阳性 + 10 阴性注入，证明「漂移必被判失败」（不读活体文件 ⇒
 不受并发写入影响）。`--json` 额外打印机读 JSON。
 
 退出码：`0` = 全部判据通过；`1` = 任一判据失败（含**显式传入的**产物文件缺失 / 不可解析 / 自检不敏感）；
@@ -170,6 +182,11 @@ SMOKE_TARGETS = 148
 SMOKE_UNRESOLVED = 9
 ROUTE_RULES = 273
 ROUTE_DUP = 0
+#: B17-14：`N` = 全量「GET+写」多方法规则（== `scripts/route_inventory.py` 同名 face 现场读数）；
+#: `M` = 其中未被任何探针 AST 命中的子集（== `len(uncovered_multi_method_with_get)`，恒 M ≤ N）。
+#: 两口径分开判、不得混算；`uncovered_writable` 按构造排除 GET+写 ⇒ D-6 看不见这 37 条。
+MULTI_METHOD_TOTAL = 43
+MULTI_METHOD_UNCOVERED = 37
 
 
 def _cmp(actual, op, expected):
@@ -223,6 +240,22 @@ def evaluate(doc, routes_text=None):
         add('D-8', f'route_inventory: total rules == {ROUTE_RULES} 且 duplicate == {ROUTE_DUP}',
             f'== {ROUTE_RULES} / == {ROUTE_DUP}', f'{rules} / {dup}',
             'passed' if (rules == ROUTE_RULES and dup == ROUTE_DUP) else 'failed')
+
+    # ---- D-9（B17-14）：「GET+写」多方法面 ----
+    # N = 全量「GET+写」多方法规则（与 route_inventory 同名 face 同源）；M = 未命中子集（M ≤ N）。
+    # 判据 = 两个计数键都存在且为 int、等于锁死值、M == len(列表)、M ≤ N —— 任一不符即失败。
+    mm_total = summary.get('multi_method_with_get_total')
+    mm_uncov = summary.get('multi_method_with_get_uncovered')
+    mm_list = (doc or {}).get('uncovered_multi_method_with_get')
+    mm_len = len(mm_list) if isinstance(mm_list, list) else None
+    mm_ok = (isinstance(mm_total, int) and isinstance(mm_uncov, int)
+             and mm_total == MULTI_METHOD_TOTAL and mm_uncov == MULTI_METHOD_UNCOVERED
+             and mm_len == mm_uncov and mm_uncov <= mm_total)
+    add('D-9', '多方法面：N(total) == %d 且 M(uncovered) == %d 且 M == len(列表)、M <= N'
+        % (MULTI_METHOD_TOTAL, MULTI_METHOD_UNCOVERED),
+        '== %d / == %d' % (MULTI_METHOD_TOTAL, MULTI_METHOD_UNCOVERED),
+        'N=%s M=%s len(list)=%s' % (mm_total, mm_uncov, mm_len),
+        'passed' if mm_ok else 'failed')
     return checks
 
 
@@ -230,7 +263,8 @@ def synthetic_doc():
     """自检用合成文档（**不读活体文件**，避免并发写入干扰阳性对照）。
 
     基线值 = V-06/C-05 有意更新（literal 108 / any 116 / uncovered 0）+ ALLOY-IMPORT-01 有意更新
-    （rules_total 273 / method_level_non_get_total 157 / writable_rules_non_get 155）后的实测值；
+    （rules_total 273 / method_level_non_get_total 157 / writable_rules_non_get 155）+ B17-14 新增
+    （多方法面 N 43 / M 37）后的实测值；
     阴性注入相对**该基线各降 1**（uncovered 是 `<=` 型 ⇒ 0 → 1 即漂移）。
     """
     return {
@@ -238,15 +272,19 @@ def synthetic_doc():
             'rules_total': 273, 'method_level_non_get_total': 157,
             'writable_rules_non_get': 155, 'writable_literal_covered_by_all': 108,
             'writable_any_covered_by_all': 116,
+            # B17-14：D-9 的两把锁（N=43 全量 / M=37 未命中子集）
+            'multi_method_with_get_total': 43, 'multi_method_with_get_uncovered': 37,
         },
         'uncovered_writable': [],
+        # B17-14：D-9 还要求 M == len(列表) ⇒ 合成列表必须正好 37 条
+        'uncovered_multi_method_with_get': [{'rule': '/mm/%d' % i} for i in range(37)],
         'smoke_test_plan': {'static_reproduction_targets': 148,
                             'static_reproduction_unresolved': 9},
     }
 
 
 def selftest():
-    """1 阳性 + 8 阴性注入：漂移必须被判失败（门禁敏感性）。"""
+    """1 阳性 + 10 阴性注入：漂移必须被判失败（门禁敏感性）。"""
     routes_ok = '[routes] total rules=273\nduplicate (method,path) registrations=0\n'
     results = []
 
@@ -275,6 +313,11 @@ def selftest():
     case('CD-N7 smoke 计划 148→147', d, routes_ok, True)
     case('CD-N8 路由清单 duplicate 0→1', synthetic_doc(),
          routes_ok.replace('registrations=0', 'registrations=1'), True)
+    # ---- B17-14：D-9 两条阴性（t6 现场用的正是这两个变异体）----
+    d = synthetic_doc(); d['summary']['multi_method_with_get_total'] = 99
+    case('CD-N9 多方法全量 N 43→99', d, routes_ok, True)
+    d = synthetic_doc(); d['summary']['multi_method_with_get_uncovered'] = 0   # 列表仍 37 条
+    case('CD-N10 多方法未命中 M 37→0（列表仍 37）', d, routes_ok, True)
 
     for r in results:
         print(f"  [{'PASS' if r['status'] == 'passed' else 'FAIL'}] {r['id']}"
@@ -295,7 +338,7 @@ def main(argv=None):
                          % DEFAULT_COVERAGE)
     ap.add_argument('--routes-stdout', default=None,
                     help='route_inventory.py 的 stdout 落盘文件（判 D-8）')
-    ap.add_argument('--selftest', action='store_true', help='对抗自检（1 阳性 + 8 阴性注入）')
+    ap.add_argument('--selftest', action='store_true', help='对抗自检（1 阳性 + 10 阴性注入）')
     ap.add_argument('--json', action='store_true', help='额外打印机读 JSON')
     args = ap.parse_args(argv)
 
@@ -369,8 +412,15 @@ def main(argv=None):
 
     failed = [c['id'] for c in checks if c['status'] == 'failed']
     code = 1 if (failed or reasons) else 0
-    print(f'[coverage_drift] 判据 {len(checks) - len(failed)}/{len(checks)} 通过'
-          f"  => exit {code}  原因={reasons if reasons else '无（全绿）'}")
+    # ⚠ 计数口径：`判据 8/8 通过` 只统计**既有** D-1…D-8（ci_gates.py 第 11 步 blocking 的 expects 指纹
+    #   钉的就是这个子串，纯子串匹配 ⇒ 改计数会连带改 out-of-scope 的门禁指纹）；B17-14 的 D-9
+    #   显式附在同行，且 exit 由**全部**判据决定（见 docstring「D-9 口径」）。
+    base = [c for c in checks if c['id'] != 'D-9']
+    d9 = next((c for c in checks if c['id'] == 'D-9'), None)
+    d9_tail = ('' if d9 is None
+               else '；另 D-9 多方法面判据 ' + ('OK' if d9['status'] == 'passed' else 'FAIL'))
+    print(f"[coverage_drift] 判据 {sum(1 for c in base if c['status'] == 'passed')}/{len(base)} 通过"
+          f"{d9_tail}  => exit {code}  原因={reasons if reasons else '无（全绿）'}")
     print('[e03] exit_code_semantics=' + json.dumps({
         'script': 'test-reports-2026-10/harness/coverage_drift.py',
         'class': '真闸门（报告型产物的判据层，TL-03 雏形）',

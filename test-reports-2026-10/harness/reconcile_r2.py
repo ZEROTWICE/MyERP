@@ -320,6 +320,30 @@ CI_G = 'test-reports-2026-10/harness/ci_gates.py'
 WS = 'test-reports-2026-10/harness/write_suite.py'
 UAT = 'test-reports-2026-10/harness/uat_chains.py'
 FIX = 'test-reports-2026-10/harness/fixtures.py'
+COVERAGE_DRIFT = 'test-reports-2026-10/harness/coverage_drift.py'
+
+
+def run_coverage_artifact():
+    """B17-11 / A-114：`coverage_drift.py` 必须显式 `--coverage <run 产物>`。
+
+    缺参 = **exit 2（用法错误，不是回归）**：`--coverage` 的 `default` 是冻结锚点
+    （`evidence/harness/coverage.json`，与 `LOCKED 108/116/0` 语义互斥）。
+    取值顺序：`HARNESS_COVERAGE` 环境变量 → `evidence/harness/*/coverage.json` 中 mtime 最新者
+    → 不可变归档快照 `ci-run-20261009-054416/coverage.json`（A-114：不读 live 路径）。
+    """
+    explicit = os.environ.get('HARNESS_COVERAGE')
+    if explicit:
+        return explicit
+    base = os.path.join(REPORTS, 'evidence', 'harness')
+    cands = []
+    for name in (sorted(os.listdir(base)) if os.path.isdir(base) else []):
+        p = os.path.join(base, name, 'coverage.json')
+        if os.path.isfile(p):
+            cands.append((os.path.getmtime(p), p))
+    if cands:
+        return max(cands)[1]
+    return os.path.join(base, 'ci-run-20261009-054416', 'coverage.json')
+
 
 ITEM_CHECKS = [
     # ============================== W0 可信度前置（captain 已复核 HIT）
@@ -554,7 +578,8 @@ ITEM_CHECKS = [
      '文件名: harness/coverage_drift.py；内容: ci_gates.py 第 11 步（blocking）；行为: 实跑 exit 0',
      [chk_file('test-reports-2026-10/harness/coverage_drift.py', '漂移门禁'),
       chk_content(CI_G, r"'id': 'coverage_drift', 'group': 'blocking'", '已进 blocking'),
-      chk_subprocess([PY, '-B', 'test-reports-2026-10/harness/coverage_drift.py'], '漂移判据 exit 0')]),
+      chk_subprocess([PY, '-B', COVERAGE_DRIFT, '--coverage', run_coverage_artifact()],
+                     '漂移判据 exit 0（B17-11：显式 --coverage <run 产物>；缺参 = exit 2 用法错误）')]),
 
     ('TL-04', 'W7',
      '文件名+内容: harness/evidence_hash.py；内容: ci_gates.py 接入位是否启用',

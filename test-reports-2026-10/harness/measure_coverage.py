@@ -3,7 +3,9 @@
 口径（`00b` 增补纪律 13：任何计数必须给「工具 + 口径 + 值」）：
 
 * **分母（路由）**：`app.url_map.iter_rules()` **重算**（工具：Flask `url_map` 内省）；
-  * 规则总数 **271**（含 `static` 1 条）= GET 无参 104 + GET 带参 56 + 非 GET 110 + `static` 1；
+  * 规则总数 **273**（含 `static` 1 条）= GET 无参 104 + GET 带参 56 + 非 GET 112 + `static` 1
+    （A-70 同步：271 → 273 / 非 GET 110 → 112，与 `scripts/route_inventory.py` 现场读数、
+    `harness/run_gates.py` `EXPECTED['routes_total_rules']` 三处一致；触发项 = B17-14）；
   * 方法级（一条规则可有多方法）：GET **161**（`url_map` 重算；⚠ `08` §2 记 160 —— A-25 分歧已登记）
     / POST 123 / DELETE 20 / PUT 12；**非 GET 方法级 155（两法一致）**。
 * **分子（覆盖）**：AST 扫测试脚本里的 HTTP 调用字面量 URL（工具：`ast` 解析源码）；
@@ -447,7 +449,9 @@ def main():
         'isolation': {'db_copy': copy_path, 'uri': app.config['SQLALCHEMY_DATABASE_URI']},
         'conventions': {
             'route_denominator': 'app.url_map.iter_rules() 重算（工具=Flask url_map 内省）',
-            'rule_count': '271 = GET 无参 104 + GET 带参 56 + 非 GET 110 + static 1',
+            'rule_count': ('273 = GET 无参 104 + GET 带参 56 + 非 GET 112 + static 1'
+                           '（A-70：271/110 → 273/112，源 = 现场 route_inventory 读数 + '
+                           "run_gates.EXPECTED['routes_total_rules']）"),
             'method_level_GET': 'url_map 重算 = 161；08 §2 记 160（A-25 分歧，须写方法与口径）',
             'method_level_POST_DELETE_PUT': 'url_map 重算 = 123 / 20 / 12',
             'reference_155': ('08 §2 / 06 §4.2 的「非 GET 方法级端点 155」：本工具按'
@@ -495,6 +499,13 @@ def main():
         'matches_B': summary['method_level_non_get_via_multi_method_rules'] == 155,
     }
 
+    # ---- B17-14：多方法（GET+写）face 的显式计数键（供 `coverage_drift.py` 判据消费）----
+    # `uncovered_writable` 按构造**排除**了 GET+写的规则 ⇒ 这些规则原是漂移门禁的盲区；
+    # 故给出一对可钉的数：全部 GET+写 规则数 N（= route_inventory 的同名 face）与未命中子集 M（≤ N）。
+    summary['multi_method_with_get_total'] = len(
+        [r for r in rules if 'GET' in r['methods'] and r['methods'] != ['GET']])
+    summary['multi_method_with_get_uncovered'] = len(out['uncovered_multi_method_with_get'])
+
     ensure_dir(os.path.dirname(args.out))
     with open(args.out, 'w', encoding='utf-8', newline='\n') as fh:
         json.dump(out, fh, ensure_ascii=False, indent=2)
@@ -519,6 +530,18 @@ def main():
     print(f'[coverage] 未被任何 AST 命中的写端点 {len(out["uncovered_writable"])} 条，'
           f'仅 GET 端点 {len(out["uncovered_get_only"])} 条，'
           f'GET+其他方法端点 {len(out["uncovered_multi_method_with_get"])} 条')
+
+    # ---- B17-14：「GET+写」多方法**未命中**面（报告型：只度量、恒 exit 0；判据由 coverage_drift 消费）----
+    # 口径：同一条 path 上 GET 与写方法并存 ⇒「GET 页面面被覆盖」不代表写面被执法（门禁盲区）。
+    # 与 `scripts/route_inventory.py` 的同名 face 配对：那边列**全部** GET+写 规则（N），
+    # 这边列其中**未被任何探针 AST 命中**的子集（M ≤ N，逐条列名以便漂移时定位）。
+    multi_uncovered = out['uncovered_multi_method_with_get']
+    print(f'[coverage][multi] GET+写 多方法**未命中**面 = {len(multi_uncovered)} 条'
+          f'（route_inventory 同名 face 记全部 GET+写 规则 N={s["multi_method_with_get_total"]}，'
+          f'本 face = 未命中子集 M={s["multi_method_with_get_uncovered"]} ≤ N）')
+    for r in multi_uncovered:
+        print(f'  MULTI-UNCOVERED {"+".join(r["methods"])} {r["rule"]} -> {r["endpoint"]}'
+              f'  [{r["reason"]}]')
     print(f'[coverage] JSON -> {args.out}；real.db unchanged = {out["real_db"]["unchanged"]}')
     return 0
 

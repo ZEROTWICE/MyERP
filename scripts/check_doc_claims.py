@@ -62,6 +62,19 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 REPORTS_ROOT = os.path.join(REPO_ROOT, 'test-reports-2026-10')
 HARNESS_DIR = os.path.join(REPORTS_ROOT, 'harness')
 COVERAGE_JSON = os.path.join(REPORTS_ROOT, 'evidence', 'harness', 'coverage.json')
+
+#: 归档锚点留档读数（A-70 第①步留档 / B17-16）：本 run 的 coverage 产物缺失时打印，
+#: 用来把「锚点没传/没生成」与「口径真的漂移了」区分开（缺产物仍判 hard fail）。
+#: 来源：`test-reports-2026-10/evidence/harness/ci-run-20261009-054416/coverage.json`
+#: （246076 B，sha256 58BF844628402AE6D87F6A0F0336049D313463E83C28DFA448BBEFD9DB21E055）。
+COVERAGE_ANCHOR_READINGS = {
+    'anchor': 'test-reports-2026-10/evidence/harness/ci-run-20261009-054416/coverage.json',
+    'sha256': '58BF844628402AE6D87F6A0F0336049D313463E83C28DFA448BBEFD9DB21E055',
+    'values': {'rules_total': 273, 'method_level_GET': 161, 'method_level_non_get_total': 157,
+               'writable_rules_non_get': 155, 'writable_any_covered_by_all': 118,
+               'writable_literal_covered_by_all': 110, 'uncovered_writable': 0,
+               'smoke_targets': 148, 'smoke_unresolved': 9},
+}
 RUN_GATES = os.path.join(HARNESS_DIR, 'run_gates.py')
 COVERAGE_DRIFT = os.path.join(HARNESS_DIR, 'coverage_drift.py')
 GH_WORKFLOW = os.path.join(REPO_ROOT, '.github', 'workflows', 'docker-deploy.yml')
@@ -70,24 +83,26 @@ DEFAULT_REQUIREMENTS = os.path.join(REPO_ROOT, 'requirements.txt')
 DEFAULT_DOC_GLOBS = ('test-reports-2026-10/5*.md', 'test-reports-2026-10/6*.md')
 
 #: 口径键登记表：键 -> (钉值, 权威源说明, 备注)。**值由 `_verify_sources()` 逐条实读复核**。
+#: B17-16（A-70 三步）：14 条陈旧钉值按现场重取更新；改前值留档在
+#: `test-reports-2026-10/B17-登记.md` §B17-16（改前 = violations=16 / selftest 15/16）。
 PINNED = {
-    'rules_total': (271, 'coverage.json:summary.rules_total ∥ coverage_drift.LOCKED.rules_total',
+    'rules_total': (273, 'coverage.json:summary.rules_total ∥ coverage_drift.LOCKED.rules_total',
                     '路由规则总数（route_inventory / coverage_drift 判据钉值）'),
     'method_level_GET': (161, 'coverage.json:summary.method_level_GET',
                          '方法级 GET（`08` §2 记 160 已作废，A-25）'),
-    'method_level_non_get_total': (155, 'coverage.json:summary.method_level_non_get_total',
+    'method_level_non_get_total': (157, 'coverage.json:summary.method_level_non_get_total',
                                    '方法级非 GET 端点总数'),
-    'writable_rules_non_get': (153, 'coverage.json:summary.writable_rules_non_get',
+    'writable_rules_non_get': (155, 'coverage.json:summary.writable_rules_non_get',
                                '可写（非 GET）规则数'),
-    'writable_any_covered_by_all': (14, 'coverage.json:summary.writable_any_covered_by_all',
+    'writable_any_covered_by_all': (118, 'coverage.json:summary.writable_any_covered_by_all',
                                     '可写规则含动态命中的覆盖数'),
-    'writable_literal_covered_by_all': (6, 'coverage.json:summary.writable_literal_covered_by_all',
+    'writable_literal_covered_by_all': (110, 'coverage.json:summary.writable_literal_covered_by_all',
                                         '可写规则字面量命中数'),
-    'uncovered_writable_rules': (101, 'coverage.json:uncovered_writable 长度 ∥ '
-                                      'coverage_drift.UNCOVERED_WRITABLE_MAX',
+    'uncovered_writable_rules': (0, 'coverage.json:uncovered_writable 长度 ∥ '
+                                    'coverage_drift.UNCOVERED_WRITABLE_MAX',
                                  '无任何命中的可写规则数（A-31 的规则级权威值）'),
-    'non_get_uncovered_method_level': (141, '派生：method_level_non_get_total − '
-                                            'writable_any_covered_by_all（155 − 14）',
+    'non_get_uncovered_method_level': (39, '派生：method_level_non_get_total − '
+                                           'writable_any_covered_by_all（157 − 118）',
                                        '无任何命中的非 GET 方法级端点（A-31 权威值；135/139 作废）'),
     'smoke_targets': (148, 'coverage.json:smoke_test_plan.static_reproduction_targets',
                       'smoke 静态复现目标数'),
@@ -95,16 +110,17 @@ PINNED = {
                          'smoke 静态复现未解析数'),
     'templates_files': (87, 'run_gates.EXPECTED.templates_files', '模板文件数'),
     'capabilities_declared': (44, 'run_gates.EXPECTED.capabilities_declared', '已登记能力数'),
-    'properties_files': (23, 'run_gates.EXPECTED.properties_files',
-                         'check_properties 扫描文件数（TL-05 不得漂移）'),
+    'properties_files': (25, 'run_gates.EXPECTED.properties_files',
+                         'check_properties 扫描文件数（TL-05 不得漂移；'
+                         'B17-16 重基线 26→25 = B17-01 删 app/main/sales_routes.py 的后效）'),
     'model_classes': (74, 'run_gates.EXPECTED.model_classes',
                       '模型类数（TL-05 不得漂移）'),
     'migration_revisions': (35, 'run_gates.EXPECTED.migration_revisions', '迁移修订数'),
     'routes_get_no_arg': (104, 'run_gates.EXPECTED.routes_get_no_arg', '无参 GET 规则数'),
     'routes_get_with_arg': (56, 'run_gates.EXPECTED.routes_get_with_arg', '带参 GET 规则数'),
-    'routes_non_get': (110, 'run_gates.EXPECTED.routes_non_get', '非 GET 规则数'),
-    'functional_passed': (109, 'run_gates.EXPECTED.functional_passed', 'functional_test 通过数'),
-    'gh_workflow_lines': (83, '.github/workflows/docker-deploy.yml splitlines() 行数',
+    'routes_non_get': (112, 'run_gates.EXPECTED.routes_non_get', '非 GET 规则数'),
+    'functional_passed': (127, 'run_gates.EXPECTED.functional_passed', 'functional_test 通过数'),
+    'gh_workflow_lines': (161, '.github/workflows/docker-deploy.yml splitlines() 行数',
                           'GH 工作流行数（28 §5-4：行数用 splitlines）'),
 }
 
@@ -126,7 +142,10 @@ EXEMPT_MARKERS = ('作废', '不得出现', '禁止', '已更正', '更正', '�
                   '反例', '错例', 'retired', '口径注记', '已改')
 
 #: 声明但未安装于 canonical env 的包 → 依赖钉版校验里降级为 WARN（不阻塞）
-DEFAULT_ENV_EXCEPTIONS = ('psycopg2-binary',)
+#: `pywin32`（B17-16）：win32 专有依赖，Linux 构建镜像装不上；`Dockerfile:44-56` 已在构建期
+#: 过滤并明令「不改 lock 本体」，而写进 lock 头会被下一次 `--write-lock` 抹掉 ⇒ 走本表，
+#: `requirements.lock` 保持字节不变（`git status --porcelain requirements.lock` 为空是硬判据）。
+DEFAULT_ENV_EXCEPTIONS = ('psycopg2-binary', 'pywin32')
 
 #: 未安装于本环境的**声明**依赖 → 生成 lock 时的版本兜底（来源：`pip download --no-deps`）
 PYPI_FALLBACK = {'psycopg2-binary': '2.9.12'}
@@ -169,12 +188,18 @@ def _literal_assign(path, name):
 
 
 # ------------------------------------------------------------------ 权威源复核
-def read_sources():
-    """实读全部权威源；返回 (values, errors)。缺失/不可解析 ⇒ errors。"""
+def read_sources(coverage_path=None):
+    """实读全部权威源；返回 (values, errors)。缺失/不可解析 ⇒ errors。
+
+    coverage 面：默认读归档锚点 ``COVERAGE_JSON``；**本 run 的产物必须用 ``--coverage``
+    显式传入**（A-89/A-114 挂点与产物分离：默认路径是历史冻结锚点，不得被原地覆盖写）。
+    产物缺失 ⇒ hard fail（不静默降级），并打印 `COVERAGE_ANCHOR_READINGS` 留档读数。
+    """
     vals, errors = {}, []
-    if os.path.isfile(COVERAGE_JSON):
+    cov = coverage_path or COVERAGE_JSON
+    if os.path.isfile(cov):
         try:
-            with open(COVERAGE_JSON, encoding='utf-8') as fh:
+            with open(cov, encoding='utf-8') as fh:
                 doc = json.load(fh)
             s = doc.get('summary') or {}
             for k in ('rules_total', 'method_level_GET', 'method_level_non_get_total',
@@ -186,12 +211,19 @@ def read_sources():
             plan = doc.get('smoke_test_plan') or {}
             vals['smoke_targets'] = plan.get('static_reproduction_targets')
             vals['smoke_unresolved'] = plan.get('static_reproduction_unresolved')
-            vals['_coverage_sha256'] = sha256_file(COVERAGE_JSON)
-            vals['_coverage_bytes'] = os.path.getsize(COVERAGE_JSON)
+            vals['_coverage_sha256'] = sha256_file(cov)
+            vals['_coverage_bytes'] = os.path.getsize(cov)
+            vals['_coverage_path'] = _rel(cov)
         except Exception as e:
             errors.append('coverage.json 不可解析：%s: %s' % (type(e).__name__, e))
     else:
-        errors.append('权威源缺失：%s' % _rel(COVERAGE_JSON))
+        errors.append('权威源缺失：%s（coverage 判据输入；本 run 产物请 `--coverage <path>` '
+                      '显式传入）' % _rel(cov))
+        errors.append('锚点留档读数（%s，sha256 %s…）：%s'
+                      % (COVERAGE_ANCHOR_READINGS['anchor'],
+                         COVERAGE_ANCHOR_READINGS['sha256'][:12],
+                         '、'.join('%s=%s' % kv
+                                   for kv in sorted(COVERAGE_ANCHOR_READINGS['values'].items()))))
     if os.path.isfile(RUN_GATES):
         exp = _literal_assign(RUN_GATES, 'EXPECTED')
         if isinstance(exp, dict):
@@ -230,9 +262,9 @@ def read_sources():
     return vals, errors
 
 
-def verify_sources():
+def verify_sources(coverage_path=None):
     """钉常量 vs 权威源：返回 (checks, errors)。任一不等 ⇒ 该键 violation（口径源已漂移）。"""
-    vals, errors = read_sources()
+    vals, errors = read_sources(coverage_path)
     checks = []
     for key, (value, source, note) in sorted(PINNED.items()):
         got = vals.get(key)
@@ -562,6 +594,8 @@ def main(argv=None):
                     help='钉常量 vs 权威源逐条复核（默认开）')
     ap.add_argument('--no-check-sources', dest='check_sources', action='store_false')
     ap.add_argument('--skip-lock', action='store_true', help='只跑口径面')
+    ap.add_argument('--coverage', default=None,
+                    help='coverage.json 判据输入（缺省 = 归档锚点；本 run 产物请显式传入）')
     ap.add_argument('--list-constants', action='store_true')
     ap.add_argument('--write-lock', action='store_true', help='生成/刷新 requirements.lock')
     ap.add_argument('--selftest', action='store_true')
@@ -578,7 +612,7 @@ def main(argv=None):
         return selftest(args.lock, args.requirements)
 
     if args.list_constants:
-        checks, errors = verify_sources()
+        checks, errors = verify_sources(args.coverage)
         print('[check_doc_claims] 口径键登记表（%d 条；权威源逐条实读复核）' % len(PINNED))
         for c in checks:
             print('  %-32s 钉值=%-8s 源值=%-8s %s  %s'
@@ -604,7 +638,7 @@ def main(argv=None):
     violations, warnings, info = [], [], {}
     # ① 钉常量 vs 权威源
     if args.check_sources:
-        checks, errors = verify_sources()
+        checks, errors = verify_sources(args.coverage)
         info['pinned_checks'] = len(checks)
         info['pinned_ok'] = sum(1 for c in checks if c['ok'])
         for e in errors:

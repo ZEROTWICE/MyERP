@@ -15,7 +15,7 @@ CI 配置只调用它（配置薄、逻辑可离线验证）。
 
 | 组 | 成员 | 说明 |
 | --- | --- | --- |
-| **blocking** | `check_templates` / `check_migration_heads` / `check_properties` / `check_db_bootstrap`(shim) / `functional_test`(shim) / `permission_matrix --no-dump`(shim) / `coverage_drift.py` / **`run_gates.py` 的非环境依赖部分** / **`check_model_refs`（TL-01）** / **`check_http_contract`（TL-02）** / **`chain_count_consistency`（B15-07，件数守恒对拍）** | permx 判据单一确定（匿名可访问 = 0）⇒ 直接 blocking |
+| **blocking** | `check_templates` / `check_migration_heads` / `check_properties` / `check_db_bootstrap`(shim) / `functional_test`(shim) / `permission_matrix --no-dump`(shim) / `coverage_drift.py` / **`run_gates.py` 的非环境依赖部分** / **`check_model_refs`（TL-01）** / **`check_http_contract`（TL-02）** / **`chain_count_consistency`（B15-07，件数守恒对拍）** / **`negative_matrix`（B17-15，四类必交 + 阳性对照）** / **`check_is_archived_policy`（B17-07）** / **`check_doc_claims`（B17-16，口径守卫）** | permx 判据单一确定（匿名可访问 = 0）⇒ 直接 blocking |
 | **report-only** | `smoke_test --no-dump`(shim)（A-63 第一步先观测 1 轮）/ `route_inventory` 与 `measure_coverage` 的**退出码**（报告型 A-30）/ `route_inventory_native_probe`（**环境依赖探针，A-62 明令不得重基线化**）/ **`evidence_hash`（TL-04：白名单制）** | 二者失败只记录、不阻塞；晋升方式见 `--phase second` |
 
 **A-85 接线（B1：把 W7 三个「预留接入位」由注释变实装）**
@@ -56,9 +56,9 @@ CI 配置只调用它（配置薄、逻辑可离线验证）。
 
 | 机制 | 含义 | 落在哪些步 |
 | --- | --- | --- |
-| `real_input` | 把该步读的**输入树/产物路径**指向受控合成坏树（脚本副本按原脚本的相对深度放置，故其自解析 ROOT = 合成树根） | `check_templates` / `check_migration_heads` / `check_properties` / `coverage_drift` / `check_model_refs` / `check_http_contract` / `evidence_hash` / `check_notification_triggers` / `chain_count_consistency`（`--perturb` 合成件数偏差声明） |
+| `real_input` | 把该步读的**输入树/产物路径**指向受控合成坏树（脚本副本按原脚本的相对深度放置，故其自解析 ROOT = 合成树根） | `check_templates` / `check_migration_heads` / `check_properties` / `coverage_drift` / `check_model_refs` / `check_http_contract` / `evidence_hash` / `check_notification_triggers` / `chain_count_consistency`（`--perturb` 合成件数偏差声明） / `check_is_archived_policy`（`--root` 合成树 + 1 处未登记读点） / `check_doc_claims`（`--coverage` 归档锚点副本，口径源 −1） |
 | `judge_artifact` | 把该步**判据层读的机读产物**换成合成的降级产物（本步程序照常真跑） | `run_gates`（`gates.json`） |
-| `script_fixture` | 该步的脚本**无任何输入路径参数**（跑真 app/真库）⇒ 把「要跑的程序」这一输入路径换成合成夹具（故意打印与期望值不符的行 + 非 0 退出） | `check_db_bootstrap` / `functional_test` / `permission_matrix` / `smoke_test` / `route_inventory` / `measure_coverage` |
+| `script_fixture` | 该步的脚本**无任何输入路径参数**（跑真 app/真库）⇒ 把「要跑的程序」这一输入路径换成合成夹具（故意打印与期望值不符的行 + 非 0 退出） | `check_db_bootstrap` / `functional_test` / `permission_matrix` / `smoke_test` / `route_inventory` / `measure_coverage` / `negative_matrix`（后者默认即跑四类必交 + 阳性对照，无参数可指） |
 
 **判据未变是机检的**：注入前后各算一次 `criterion_fingerprint`（`expects` / `expect_absent` /
 `expect_exit` / `known_bad_absent` / `mode` / `hook` 的 SHA256），两值必须相等并作为一条 `checks`
@@ -153,6 +153,9 @@ FIXTURE_LINES = {
     'route_inventory': ['[routes] total rules=270',
                         'duplicate (method,path) registrations=1'],
     'measure_coverage': ['[measure_coverage] FAIL: coverage probe aborted (v01 注入夹具)'],
+    'negative_matrix': ['[negative_matrix] 合计 3 条：passed=1 failed=2 blocked=0',
+                        '[negative_matrix] 真实库异常？ 是——立即停止',
+                        '[negative_matrix] 基础设施级问题：副本库 bootstrap 失败'],
 }
 
 #: 合成夹具模板（ASCII 安全：控制台只回显夹具自己的行，由 run_child 以 utf-8 解码）
@@ -603,6 +606,65 @@ def _inj_chain_count_consistency(ctx):
                                         '指名侧别 report（台账一字未动：只改判据输入）'}}
 
 
+#: B17-16/B17-19：`check_doc_claims.py --coverage` 的注入源 = **不可变归档锚点**。
+#: A-114（挂点与产物分离）：判据必须从归档快照读，`evidence/harness/coverage.json` 是会被
+#: 「原地写出」的活路径 ⇒ 注入夹具以归档 run 目录里的那份为源（缺失即夹具准备失败）。
+COVERAGE_ARCHIVE_ANCHOR = os.path.join(REPORTS_ROOT, 'evidence', 'harness',
+                                       'ci-run-20261009-054416', 'coverage.json')
+
+
+def _inj_check_is_archived(ctx):
+    """合成 `app/` 树 = 真树里**本脚本扫描面**（`*.py` / `*.html`）的副本 + 1 处**未登记**读取点。
+
+    只改 `--root`（判据不动）⇒ 合成树比真树多 1 处 `BARE_FALSE` 读点，登记表必须报「未登记读取点」
+    并以 exit 1 转红。
+    """
+    syn = _inj_fresh(ctx, 'check_is_archived')
+    copied = 0
+    for dirpath, dirnames, filenames in os.walk(os.path.join(REPO_ROOT, 'app')):
+        dirnames[:] = [d for d in dirnames if d != '__pycache__']
+        for name in filenames:
+            if not name.endswith(('.py', '.html')):
+                continue
+            src = os.path.join(dirpath, name)
+            _inj_copy(src, os.path.join(syn, os.path.relpath(src, REPO_ROOT)))
+            copied += 1
+    dst = os.path.join(syn, 'app', 'main', 'routes.py')
+    with open(dst, 'a', encoding='utf-8', newline='\n') as fh:
+        fh.write('\n_zz_v01_probe = RawMaterial.query.filter('
+                 'RawMaterial.is_archived == False).count()\n')
+    return {'kind': 'real_input', 'append_argv': ['--root', syn], 'fixtures': [_rel(dst)],
+            'evidence': {'tree': _rel(syn), 'files_copied': copied,
+                         'degradation': '合成树 %s 末尾追加 1 处未登记读取点（BARE_FALSE：裸 '
+                                        'is_archived == False）⇒ 登记表必须报 exit 1' % _rel(dst)}}
+
+
+def _inj_check_doc_claims(ctx):
+    """`--coverage` 指向归档锚点副本（`summary.writable_any_covered_by_all` 下调 1）⇒ 必红。
+
+    只改输入路径（argv 里 `--coverage` 的后一个值）：该键漂移 1 会同时打断派生键
+    `non_get_uncovered_method_level` ⇒ 「钉常量 vs 权威源」至少报 2 条 violation。
+    """
+    src = COVERAGE_ARCHIVE_ANCHOR
+    if not os.path.isfile(src):
+        raise RuntimeError('注入夹具准备失败：找不到归档锚点 coverage.json：%s' % src)
+    with open(src, encoding='utf-8') as fh:
+        doc = json.load(fh)
+    summary = doc.get('summary') or {}
+    key = 'writable_any_covered_by_all'
+    if key not in summary:
+        raise RuntimeError('注入夹具准备失败：锚点 coverage.json summary 无 %s' % key)
+    before = summary[key]
+    summary[key] = before - 1
+    syn = _inj_fresh(ctx, 'check_doc_claims')
+    path = _inj_write(os.path.join(syn, 'coverage_drifted.json'),
+                      json.dumps(doc, ensure_ascii=False, indent=1))
+    return {'kind': 'real_input', 'set_flag': ('--coverage', path), 'fixtures': [_rel(path)],
+            'evidence': {'source': _rel(src), 'degraded': {key: [before, before - 1]},
+                         'degradation': '口径源被下调 1（%s %s => %s）⇒ 钉常量 vs 权威源必报漂移'
+                                        % (key, before, before - 1)}}
+
+
 #: 每步 1 次注入（形态 ⑦：只改输入路径，不动判据）——判据 ② 的机读依据
 INJECTIONS = {
     'check_templates': {'kind': 'real_input', 'builder': _inj_check_templates,
@@ -648,6 +710,18 @@ INJECTIONS = {
         'kind': 'real_input', 'builder': _inj_chain_count_consistency,
         'how': '--perturb 合成「报工链件数合计 +1」的判据输入声明（不碰判据/不写库）⇒ '
                'C-B15-07.a 必红、exit 1、指名侧别 report'},
+    # ---- B17-15 / B17-07 / B17-16（2026-10-09，追加末位 17/18/19）----------------------
+    'negative_matrix': {
+        'kind': 'script_fixture',
+        'builder': lambda ctx: _inj_script_fixture(ctx, 'negative_matrix'),
+        'how': '换掉被跑的脚本为不合规夹具（该步无输入路径参数：默认就跑四类必交 + 阳性对照）'},
+    'check_is_archived_policy': {
+        'kind': 'real_input', 'builder': _inj_check_is_archived,
+        'how': '--root 指向合成 app 树（真树扫描面副本 + 末尾 1 处未登记 is_archived 读取点）'},
+    'check_doc_claims': {
+        'kind': 'real_input', 'builder': _inj_check_doc_claims,
+        'how': '--coverage 指向归档锚点副本（summary.writable_any_covered_by_all 下调 1）'
+               '⇒ 口径源漂移、exit 1'},
 }
 
 
@@ -701,10 +775,16 @@ def spec_steps(python_exe, check_templates_script=None,
          'argv': [exe, '-B', os.path.join('scripts', 'check_migration_heads.py')],
          'expect_exit': 0,
          'expects': ["HEADS=['p1nonctarget']", 'head_count=1', 'revisions=35']},
+        # 【B17-16 重基线（A-70 三步，2026-10-09）】needle 26 → 25：B17-01 删掉死文件
+        # app/main/sales_routes.py（1 字节空文件，无模型类）⇒ check_properties 扫到的文件数 26 → 25，
+        # 模型类 74 不变。四处同改（run_gates.EXPECTED.properties_files / 本 needle /
+        # check_doc_claims.PINNED / AGENTS.md 门禁表），改前/改后与阴性对照读数见
+        # test-reports-2026-10/B17-登记.md §B17-16。
         {'id': 'check_properties', 'group': 'blocking',
-         'argv': [exe, '-B', os.path.join('scripts', 'check_properties.py')],
+         'argv': [exe, '-B', os.path.join('scripts', 'check_properties.py'), '--selftest'],
          'expect_exit': 0,
-         'expects': ['已扫描 26 个文件，模型类 74 个', 'RESULT: OK']},
+         # [G] 加性 --selftest：自检统计行必须出现，且**扫描面判据一字未动**（`--root` 注入仍有效）。
+         'expects': ['已扫描 25 个文件，模型类 74 个', 'RESULT: OK', '[check_properties] 自检 22/22 通过']},
         # B14-R1（2026-10-09）：回退 ALLOY-IMPORT-02 真库导入造成的期望漂移 —— 导入期曾把本步
         # 期望串与 run_gates 的 bootstrap_copied_rows 一起抬到 10172（真库 +1080 产品 / +1728 BOM
         # 明细等）。真实库已还原为导入前锚点（2531328 B / F5DA2306…0F065），故两处一起回退到
@@ -840,6 +920,63 @@ def spec_steps(python_exe, check_templates_script=None,
          'note': 'B15-07 / I5：双链 fg 件数守恒（件数合计口径，禁止行数）。判据语义与退出码'
                  '（0=6 条全过 / 1=判据不满足 / 2=用法或参数错）见脚本 docstring；'
                  '注入形态 ⑦：`--perturb` 合成「一侧件数 ±1」的输入声明 ⇒ 必红并指名侧别。'},
+        # ================= B17（批次17，2026-10-09）：追加末位 17/18/19 =====================
+        # 为什么追加**末位**：既有 16 步的 id/顺序/判据一字不动（A-70「只增步」），新步只能加在
+        # 尾部；`--list` 是步骤表的机器可读源，改完必须重取原文对照。
+        # 【B17-15】negative_matrix 原先只在 test-reports 里裸跑、**不在任何门禁链**。
+        # 分组理由：四类必交阴性用例是全链的**元判据**（真实库防误写 / 假开关差分 / 门禁阴性
+        # 与阳性对照 / 夹具尺度），确定性、不依赖环境探针（t1 实测 28 条全 passed、7.5 s、
+        # 真库 SHA256 未变）⇒ 进 blocking。
+        # 判据口径（**勿改**）：该脚本**只在基础设施级问题**时才非 0（自跑完 = 0）⇒ 退出码不足以
+        # 表示「全绿」，必须钉 `failed=0` 这条汇总行；`blocked=0` 一并钉（阻断=未真正执行）。
+        # `合计 28 条`是**计数钉值**：用例族增减 ⇒ 本步报红并按 A-70 三步重基线
+        # （登记见 test-reports-2026-10/B17-登记.md §B17-15）。
+        {'id': 'negative_matrix', 'group': 'blocking',
+         'argv': [exe, '-B', os.path.join(REPORTS_ROOT, 'harness', 'negative_matrix.py')],
+         'extra_argv': [{'tail': ['--out', '{json}'], 'json_name': 'negative_matrix.json'}],
+         'expect_exit': 0,
+         'expects': ['[negative_matrix] 合计 28 条：passed=28 failed=0 blocked=0',
+                     '[negative_matrix] 真实库异常？ 否（SHA256 未变）',
+                     '[negative_matrix] 基础设施级问题：无'],
+         'expect_absent': ['[FAILED ]'],
+         'note': 'B17-15：阴性矩阵（四类必交 + 阳性对照）进链，blocking。范围 = 脚本默认族 '
+                 'NV-1.x/NV-2.x/NV-3.x/NV-4.x/NV-5.x；`--out` 落本 run 目录（不写仓库根）。'
+                 '⛔ 不得只靠退出码判绿：该脚本自跑完即 0，判据靠 `failed=0` / `blocked=0` 汇总行。'
+                 '注入形态 ⑦：脚本无输入路径参数 ⇒ 换程序为不合规夹具（合计 3 条 failed=2 + '
+                 '真库异常「是」）。'},
+        # 【B17-07】is_archived 统一谓词的执法脚本：全仓读取点逐个登记
+        # （UNIFIED = `or_(X.is_archived.is_(False), X.is_archived.is_(None))` / EXCEPTION = 带
+        # 盘点快照与理由的非统一读法）。未登记的新增读点 ⇒ exit 1。
+        # 扫描面写死在脚本头：`<root>/app/**/*.py` + `<root>/app/**/*.html`（模板面 10 处真值读）。
+        {'id': 'check_is_archived_policy', 'group': 'blocking',
+         'argv': [exe, '-B', os.path.join('scripts', 'check_is_archived_policy.py')],
+         'expect_exit': 0,
+         'expects': ['[is_archived] 登记表与现场逐组一致（无未登记新增、无计数漂移、无陈旧登记）',
+                     'RESULT: OK'],
+         'note': 'B17-07：`is_archived` 读取点逐个登记为 UNIFIED / EXCEPTION（带理由）；'
+                 'EXCEPTION 必须带盘点快照（`app/services/mes_service.py` 加料预警 3 处裸 '
+                 '`filter_by(is_archived=False)` = 唯一例外，真库无 NULL 行、行为不变）。'
+                 '判据 = 未登记新增 / 组内计数漂移 / 陈旧登记（现场 0 处）/ 缺理由 / EXCEPTION 缺快照 '
+                 '⇒ exit 1；行号漂移只 WARN（防行号漂移造成假红）。'
+                 '注入形态 ⑦：`--root` 指向「真树扫描面副本 + 1 处未登记读点」的合成树 ⇒ 必红。'},
+        # 【B17-16】口径守卫进链（blocking）：钉常量 ↔ 权威源 ↔ 报告口径表三级对拍的唯一消费者。
+        # 判据输入：`--coverage <本 run 的 coverage.json>`（第 10 步 measure_coverage --out 的产物）
+        # —— A-114 挂点与产物分离：**不得**改默认路径、**不得**读 live 覆盖写路径。
+        # `--selftest` 不并在本步（该开关提前 return，会把口径面短路）⇒ 由验证命令单独跑 16/16。
+        {'id': 'check_doc_claims', 'group': 'blocking',
+         'argv': [exe, '-B', os.path.join('scripts', 'check_doc_claims.py')],
+         'extra_argv': [{'tail': ['--coverage', '{json}'], 'json_name': 'coverage.json'}],
+         'expect_exit': 0,
+         'expects': ['[check_doc_claims] 钉常量 vs 权威源：20/20 相等',
+                     '[check_doc_claims] 文档：扫描 4 份、带口径表 1 份',
+                     '[check_doc_claims] RESULT: OK（violations=0）'],
+         'expect_absent': ['[check_doc_claims] [VIOLATION]'],
+         'note': 'B17-16：TL-06 口径守卫 + TL-07 依赖钉版一致性。判据 = ① 20 条钉常量逐条与权威源'
+                 '实读相等（9 条 coverage 派生键从本 run 产物读）；② 扫描面 `5*.md`/`6*.md` 的口径表'
+                 '逐键相等；③ `requirements.lock` 精确钉版 / 锁头 sha256 / 环境匹配（'
+                 '`DEFAULT_ENV_EXCEPTIONS` = psycopg2-binary + pywin32）。'
+                 '计数钉值（20/20、扫描 4 份带口径表 1 份）增减 ⇒ 本步报红并按 A-70 三步重基线。'
+                 '注入形态 ⑦：`--coverage` 指向归档锚点副本（writable_any_covered_by_all −1）⇒ 必红。'},
     ]
 
 

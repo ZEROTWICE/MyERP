@@ -45,7 +45,7 @@ EXPECTED = {
     'migration_heads': ['p1nonctarget'],
     'migration_head_count': 1,
     'migration_revisions': 35,
-    'properties_files': 26,
+    'properties_files': 25,
     'model_classes': 74,
     'routes_total_rules': 273,
     'routes_get_no_arg': 104,

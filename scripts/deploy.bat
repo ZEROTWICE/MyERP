@@ -175,8 +175,10 @@ if %errorlevel% neq 0 (
 echo 配置环境变量...
 echo FLASK_APP=main.py > .env
 echo FLASK_ENV=production >> .env
-echo SECRET_KEY=your-secret-key-here >> .env
-echo DATABASE_URL=sqlite:///app.db >> .env
+:: SECRET_KEY 部署时现生成，仓库里不落占位值/真实值；回滚：删掉 .env 里这行，即回落 config.py 的 dev 默认
+python -c "import secrets;open('.env','a').write('SECRET_KEY='+secrets.token_urlsafe(48)+chr(10))"
+:: DATABASE_URL 一律由运行环境提供；未提供就不写 .env（应用回落 config.py 默认 sqlite 库），并提示显式设置
+if defined DATABASE_URL (echo DATABASE_URL=%DATABASE_URL% >> .env) else (echo 警告: 未设置 DATABASE_URL，生产部署请显式设置数据库连接)
 
 :: 创建启动脚本
 echo 创建启动脚本...

@@ -54,6 +54,20 @@ def main():
     print('--- non-GET ---')
     for p in post_only:
         print(f'  ---  {p}')
+
+    # ---- B17-14：GET+写 多方法 face（报告型：只度量，不改退出码；判据由 coverage_drift 消费）----
+    # 同一 path 上 GET 与写方法并存 ⇒ 「GET 页面面通过」不代表写面被执法（门禁盲区 face 补位）。
+    write_methods = sorted(r.methods - {'GET', 'HEAD', 'OPTIONS'})
+    multi_method = sorted(
+        (str(r), r.endpoint, sorted(r.methods - {'GET', 'HEAD', 'OPTIONS'}))
+        for r in rules
+        if r.endpoint != 'static' and 'GET' in r.methods
+        and (r.methods - {'GET', 'HEAD', 'OPTIONS'}))
+    print(f'[multi] GET+写 多方法规则={len(multi_method)}'
+          f'（判据由 harness/coverage_drift.py 消费本段计数与逐条列表；'
+          f'measure_coverage 的同名 face 是其中「未被任何探针命中」的子集）')
+    for p, ep, ms in multi_method:
+        print(f'  MULTI {"+".join(["GET"] + ms)} {p} -> {ep}')
     print('[e03] exit_code_semantics=' + json.dumps({
         'script': 'scripts/route_inventory.py',
         'class': '报告型（无判据语义 => 恒 exit 0，E-03/A-30）',
