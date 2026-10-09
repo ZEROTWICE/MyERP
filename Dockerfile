@@ -2,6 +2,8 @@
 #
 # 交付路径：GitHub Actions（.github/workflows/docker-deploy.yml，context=.）构建 →
 #           push 到私有 Docker Hub（zerotwice/myerp）；不在 Windows/Linux 主机上直接部署。
+# 触发：push 到 main → 构筑 + 推送（tag: sha / latest）；pull_request → 只构筑（push=false），
+#       故「每次 push 前 Dockerfile 可被 GH Actions 自动构筑」由 PR 上的 build-check job 保证。
 # 行尾：本文件必须为 LF（.gitattributes 已钉 `* text=auto eol=lf`）。
 #       CRLF 会破坏 RUN 的 `\` 续行，导致构建在解析阶段就失败。
 
@@ -11,6 +13,10 @@
 # requirements.lock 的全套钉版在该解释器上实测跑通全量门禁
 # （functional_test / permission_matrix / smoke_test 全部 exit 0），
 # 故镜像解释器与「已实测通过」的解释器同为 3.11.x；bookworm 亦是 python:3.11-slim 的稳定标签。
+# ⚠ 基底不能降级、也不能换 musl：lock 里 pandas==2.3.3 的 cp311 Linux wheel 只带
+#   manylinux_2_24/manylinux_2_28 标签（本机 /opt/wage-venv 的 pandas dist-info/WHEEL 可证），
+#   即要求 **glibc ≥ 2.28**。bookworm=2.36 ✓、bullseye=2.31 ✓；更老基底或 Alpine 会失去 wheel。
+#   已实测：Debian12/glibc2.36 上 `pip install --only-binary=:all: -r <过滤后 lock>` 全绿（45 包全部命中 wheel）。
 FROM python:3.11-slim-bookworm
 
 # 统一容器内 Python 行为：
@@ -86,18 +92,36 @@ ENV HOME=/app
 
 USER app
 
-ENV FLASK_APP=main.py
+# FLASK_APP 写成 <模块>:<属性>，不是 `main.py`：
+#   main.py 里只有 `app = create_app()`（wsgi.py 同构同义，仓库无 run.py），故应用对象就是 main:app。
+#   写 `main.py` 时 Flask 3.x 走文件名自动探测，只有 `flask run` 稳；`flask db` / `flask shell` 等
+#   需要确定性拿到 app 对象，写成 main:app 与 CMD 里 gunicorn 的 `main:app` 才是同一个对象。
+ENV FLASK_APP=main:app
 
 EXPOSE 5000
 
 # ---- 健康检查 ----
 # 探测路径是 /auth/login，**不是** /login：auth 蓝图在 app/__init__.py:251 注册时带了
 # url_prefix='/auth'（app/auth/routes.py:7 的 @bp.route('/login') ⇒ 真实路径 /auth/login）。
-# 实测（本地起真实 gunicorn）：GET /login → 404、GET /auth/login → 200、GET / → 302 跟随到 /auth/login。
+# 实测（本地起真实 gunicorn，Python 3.11.2 + lock 钉版）：GET /login → 404、GET /auth/login → 200、
+#      GET /health → 404（不存在该路由）、GET / → 302 且 Location: /auth/?next=http://<host>/
+#      （未登录被 login_required 弹到登录页并带 next，**不是** 302 到 /auth/login）。
 # 若按 /login 探测，容器会永久 unhealthy。
 # 基底镜像无 curl/wget，故用 python 标准库；写成单行避免 HEALTHCHECK 里 `\` 续行与 shell 语义的歧义。
 # 非 2xx/3xx 时 urllib 抛异常 ⇒ 命令非 0 退出 ⇒ 容器标记 unhealthy。
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 CMD python -c "import os,urllib.request;urllib.request.urlopen('http://127.0.0.1:'+os.environ.get('PORT','5000')+'/auth/login',timeout=4)" || exit 1
+
+# ---- 数据库不进镜像（运行期挂卷）----
+# 真实业务库 app.db（2.53 MB）与 app.db.bak-* / app.db.evidence-* 一律被 .dockerignore 挡在构建上下文外，
+# 镜像里不存在任何真实数据 ⇒ 容器必须靠 env 指到挂载卷，例如：
+#   -v /srv/myerp/data:/data  -e DATABASE_URL=sqlite:////data/app.db
+#   （或 PostgreSQL：-e DATABASE_URL=postgresql+psycopg2://user:pw@db:5432/myerp，lock 已含 psycopg2-binary）
+# 建表口径：**不要用 `flask db migrate`**（本项目 31 张表不在迁移历史里，自动生成迁移会与线上库冲突）。
+#   create_app() 内已做启动自愈：db.create_all()（app/__init__.py:107）+ _ENSURED_COLUMNS（:21）的
+#   _ensure_schema()，故空库首次启动即自动建表；老库/新库统一走 `flask db stamp p1nonctarget`。
+#   容器内手动打标：`docker compose exec app flask db stamp p1nonctarget`（FLASK_APP=main:app 已就位）。
+# 可选的首次自举（app/db_bootstrap.py:78）只认 SEED_SQLITE_PATH 或 /app/seed.db，本仓库两者都不存在
+#   ⇒ 自举实际处于关闭态；需要种子数据时把它挂到 /app/seed.db（只读）而非打进镜像。
 
 # ---- 启动 ----
 # entrypoint 做生产 fail-fast 前置检查（DATABASE_URL / SECRET_KEY），随后 exec 到 CMD。

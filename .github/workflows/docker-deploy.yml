@@ -1,11 +1,28 @@
 # 仅构建并推送到 Docker Hub 私有仓库，不部署到服务器。
 # 需要仓库 Secrets：DOCKERHUB_USERNAME、DOCKERHUB_TOKEN
+#
+# 触发与职责：
+#   push → main        ：gate（report-only 门禁）+ build-and-push（构筑并推送 :latest / :<sha>）
+#   pull_request → main：gate + build-check（**只构筑，push: false**，不推送任何 tag）
+#   workflow_dispatch  ：手动触发，走与 push 相同的路径
+#   ⇒ 「每次 push 前先证明 Dockerfile 可被 GH Actions 构筑」由 PR 上的 build-check 保证。
 name: Docker publish
 
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
+
+# 最小权限：只读仓库内容。推送镜像用的是 Docker Hub Secrets，不需要 GITHUB_TOKEN 的写权限。
+permissions:
+  contents: read
+
+# 同一 ref 上重复触发排队而非互相取消；不 cancel-in-progress，避免推送中途被打断。
+concurrency:
+  group: docker-publish-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
 
 env:
   IMAGE_NAME: zerotwice/myerp
@@ -56,7 +73,10 @@ jobs:
 
   build-and-push:
     # 第二阶段：在此加 `needs: gate`（当前不加 ⇒ gate 不阻塞发布）
+    # 只处理 push / 手动触发；PR 走下面的 build-check（只构筑），避免 PR 覆盖 :latest。
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: read
     steps:
@@ -79,5 +99,32 @@ jobs:
           tags: |
             ${{ env.IMAGE_NAME }}:latest
             ${{ env.IMAGE_NAME }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ---------------------------------------------------------------- PR 构筑校验
+  # 与 build-and-push 的唯一区别：push: false —— 只证明 Dockerfile 能在 GH Actions 上构筑成功。
+  # 两个 job 的 if 条件互斥（PR vs 非 PR），故不会同时运行。
+  # tag 用 pr-<sha> 仅为本地标识，不会被推送。
+  build-check:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: 构筑校验（不推送）
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          platforms: linux/amd64
+          provenance: false
+          sbom: false
+          tags: ${{ env.IMAGE_NAME }}:pr-${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
