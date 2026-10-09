@@ -157,7 +157,7 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
                 {% if can('quality.view') %}
-                <button type="button" class="btn btn-primary" onclick="printRecord()">打印</button>
+                <button type="button" class="btn btn-primary" onclick="printRecord(currentRecordId)">打印</button>
                 {% endif %}
             </div>
         </div>
@@ -326,8 +326,12 @@ function loadInspectors() {
         });
 }
 
+// B16-03：记录当前查看的记录 id，供详情弹窗 footer 的「打印」按钮传实参
+let currentRecordId = null;
+
 // 查看记录详情
 function viewRecord(id) {
+    currentRecordId = id;
     fetch("{{ url_for('main.get_inspection_records') }}" + '/' + id)
         .then(response => response.json())
         .then(data => {

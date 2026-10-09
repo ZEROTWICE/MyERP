@@ -441,7 +441,7 @@ function submitProduct() {
 // 编辑产品
 function editProduct(id) {
     // 先加载编码规则列表
-    fetch('/code_rules/available/product')
+    fetch("{{ url_for('main.get_available_product_rules') }}")
         .then(response => response.json())
         .then(codeRulesData => {
             const editCodeRuleSelect = document.getElementById('editCodeRule');
@@ -606,7 +606,7 @@ function deleteProduct(id) {
 
 // 加载编码规则列表
 function loadCodeRules() {
-    fetch('/code_rules/available/product')
+    fetch("{{ url_for('main.get_available_product_rules') }}")
         .then(response => response.json())
         .then(data => {
             if (data.success) {
@@ -667,7 +667,7 @@ function importProducts(input) {
             loadingAlert.style.right = '20px';
             loadingAlert.style.zIndex = '9999';
             
-            fetch('/products/import', {
+            apiFetch("{{ url_for('main.import_products') }}", {
                 method: 'POST',
                 body: formData,
                 credentials: 'same-origin'
@@ -716,7 +716,7 @@ function submitImportProducts() {
         }
     }, 100);
     
-    fetch('/products/import', {
+    fetch("{{ url_for('main.import_products') }}", {
         method: 'POST',
         body: formData,
         headers: {
@@ -781,7 +781,7 @@ function submitExportProducts() {
     // 创建隐藏的表单来提交POST请求
     const hiddenForm = document.createElement('form');
     hiddenForm.method = 'POST';
-    hiddenForm.action = '/products/export';
+    hiddenForm.action = "{{ url_for('main.export_products') }}";
     hiddenForm.style.display = 'none';
     
     // 添加CSRF令牌

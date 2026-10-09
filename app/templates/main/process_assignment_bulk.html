@@ -104,7 +104,7 @@ async function saveAll() {
     payload[pid] = { strategy, is_active: isActive, members };
   });
 
-  const res = await fetch("{{ url_for('main.save_process_assignment_bulk') }}", {
+  const res = await apiFetch("{{ url_for('main.save_process_assignment_bulk') }}", {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
   });
   const json = await res.json();

@@ -286,7 +286,7 @@ function saveBatches() {
     }
     
     // 发送保存请求
-    fetch(`/sales_order_item/${orderItem.id}/delivery_batches`, {
+    apiFetch(`/sales_order_item/${orderItem.id}/delivery_batches`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'

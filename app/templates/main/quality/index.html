@@ -31,7 +31,9 @@
                 <div class="card-body">
                     <h5 class="card-title">质检模板</h5>
                     <p class="card-text display-4">{{ templates_count }}</p>
+                    {% if can('quality.template.manage') %}
                     <a href="{{ url_for('main.quality_templates') }}" class="btn btn-info">管理模板</a>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -47,9 +49,12 @@
                         <a href="{{ url_for('main.quality_tasks') }}" class="btn btn-outline-primary">
                             <i class="fas fa-tasks"></i> 质检任务
                         </a>
+                        {# B16-04 入口守卫：能力名与目标路由门禁一致（app/main/quality.py:60 @require_capability('quality.template.manage')） #}
+                        {% if can('quality.template.manage') %}
                         <a href="{{ url_for('main.quality_templates') }}" class="btn btn-outline-success">
                             <i class="fas fa-file-alt"></i> 质检模板
                         </a>
+                        {% endif %}
                         <a href="{{ url_for('main.quality_records') }}" class="btn btn-outline-info">
                             <i class="fas fa-history"></i> 质检记录
                         </a>

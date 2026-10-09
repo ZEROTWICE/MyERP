@@ -158,16 +158,20 @@
                         {% for category, results in search_results.results.items() %}
                         {% if results.total > 0 %}
                         <div class="mb-4">
+                            {% set category_meta = {
+                                'employees': ('fas fa-users', '员工信息'),
+                                'process_prices': ('fas fa-cogs', '工序价格'),
+                                'production_records': ('fas fa-clipboard-check', '生产记录'),
+                                'products': ('fas fa-box', '产品管理'),
+                                'inventory': ('fas fa-warehouse', '库存'),
+                                'customers': ('fas fa-building', '客户管理'),
+                                'sales_orders': ('fas fa-file-invoice', '销售订单'),
+                                'production_orders': ('fas fa-industry', '生产订单')
+                            } %}
+                            {# B16-06：覆盖 SEARCH_TYPE_CAPABILITIES 全部 8 个 key，未登记的分类走兜底，不再直出英文 key #}
+                            {% set meta = category_meta.get(category, ('fas fa-search', '其他类型')) %}
                             <h6 class="text-secondary">
-                                {% if category == 'employees' %}
-                                <i class="fas fa-users me-2"></i>员工信息
-                                {% elif category == 'process_prices' %}
-                                <i class="fas fa-cogs me-2"></i>工序价格
-                                {% elif category == 'products' %}
-                                <i class="fas fa-box me-2"></i>产品管理
-                                {% elif category == 'customers' %}
-                                <i class="fas fa-building me-2"></i>客户管理
-                                {% endif %}
+                                <i class="{{ meta[0] }} me-2"></i>{{ meta[1] }}
                                 <span class="badge bg-secondary">{{ results.total }}</span>
                             </h6>
                             
@@ -207,7 +211,7 @@
                             </div>
                             {% else %}
                             <div class="alert alert-info">
-                                找到 {{ results.total }} 条{{ category }}记录
+                                找到 {{ results.total }} 条{{ meta[1] }}
                             </div>
                             {% endif %}
                         </div>

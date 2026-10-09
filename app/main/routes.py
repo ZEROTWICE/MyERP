@@ -422,9 +422,11 @@ def index():
     这里不能重定向到任何可能再跳回 index 的端点，否则会形成重定向死循环
     （hr/accountant/sales 曾因此完全无法登录）。
     """
+    # 契约豁免(B16-08)：落地页分流的内联 role（非能力判定），见 B16-00 §3③
     if current_user.role in ('admin', 'manager'):
         return render_template('main/admin_dashboard.html')
 
+    # 契约豁免(B16-08)：落地页路由表查表（非授权判定），见 B16-00 §3③
     endpoint = ROLE_LANDING_ENDPOINTS.get(current_user.role)
     if endpoint:
         return redirect(url_for(endpoint))
@@ -435,6 +437,7 @@ def index():
 @login_required
 def user_dashboard():
     current_app.logger.debug(
+        # 契约豁免(B16-08)：日志字段（非授权判定），见 B16-00 §3③
         f'user_dashboard accessed by user {current_user.id} ({current_user.username}) role={current_user.role}'
     )
 
@@ -739,6 +742,7 @@ def edit_employee(id):
                 employee.user.set_password(form.password.data)
             
             # 更新用户角色
+            # 契约豁免(B16-08)：admin 内联角色校验（表单入口），见 B16-00 §3③
             if current_user.role == 'admin':
                 employee.user.role = 'admin' if form.is_admin.data else 'user'
             
@@ -6608,6 +6612,7 @@ def get_task_details(id):
         task = TaskAssignment.query.get_or_404(id)
         
         # 检查权限：管理员可以查看所有任务，普通用户只能查看自己的任务
+        # 契约豁免(B16-08)：admin/hr 内联角色校验，见 B16-00 §3③
         if current_user.role not in ['admin', 'hr']:
             # 获取当前用户的员工记录
             employee = Employee.query.filter_by(user_id=current_user.id).first()
@@ -6660,6 +6665,7 @@ def get_available_raw_materials():
     
     Query Parameters:
         only_available (bool): 是否只返回有库存的原材料
+        search (str): 品名/内部编号/炉号/供应商 模糊匹配
     """
     try:
         query = RawMaterial.query
@@ -6668,6 +6674,20 @@ def get_available_raw_materials():
         if request.args.get('only_available', 'false').lower() == 'true':
             query = query.filter(RawMaterial.quantity > 0)
             
+        # 服务端搜索（Select2 发 search）：品名在品类表，必须 join 才能按品名模糊
+        search = (request.args.get('search') or '').strip()
+        if search:
+            like = f'%{search}%'
+            query = query.join(
+                RawMaterialCategory, RawMaterial.category_id == RawMaterialCategory.id
+            ).filter(or_(
+                RawMaterialCategory.name.ilike(like),
+                RawMaterial.internal_number.ilike(like),
+                RawMaterial.melt_number.ilike(like),
+                RawMaterial.supplier.ilike(like),
+                RawMaterial.supplier_number.ilike(like),
+            ))
+
         raw_materials = query.all()
         materials_list = [{
                 'id': material.id,
@@ -6698,6 +6718,7 @@ def get_available_finished_products():
     
     Query Parameters:
         only_available (bool): 是否只返回有库存的成品
+        search (str): 产品编号/流水号/图号/型号 模糊匹配
     """
     try:
         query = FinishedProduct.query
@@ -6706,6 +6727,17 @@ def get_available_finished_products():
         if request.args.get('only_available', 'false').lower() == 'true':
             query = query.filter(FinishedProduct.status == 'in_stock')
             
+        # 服务端搜索（Select2 发 search）：name=product_number、specification=图号-型号
+        search = (request.args.get('search') or '').strip()
+        if search:
+            like = f'%{search}%'
+            query = query.filter(or_(
+                FinishedProduct.product_number.ilike(like),
+                FinishedProduct.serial_number.ilike(like),
+                FinishedProduct.drawing_number.ilike(like),
+                FinishedProduct.model.ilike(like),
+            ))
+
         finished_products = query.all()
         # 成品表没有 specification/unit 列：规格按 raw-materials 同一风格用自身列拼，
         # 单位取关联产品（一次批量查，避免逐行懒加载打 N+1）
@@ -6747,12 +6779,28 @@ def get_available_finished_products():
 @login_required
 @require_capability('inventory.manage')
 def get_available_consumables():
-    """获取可用的易耗品列表，结构与原材料接口一致。"""
+    """获取可用的易耗品列表，结构与原材料接口一致。
+
+    Query Parameters:
+        search (str): 品名/内部编号/规格 模糊匹配
+    """
     try:
         from app.models import Consumable
         query = Consumable.query.filter_by(is_archived=False)
         if request.args.get('only_available', 'false').lower() == 'true':
             query = query.filter(Consumable.quantity > 0, Consumable.status == 'in_stock')
+        # 服务端搜索（Select2 发 search）：品名在品类表，specification 为本表列
+        search = (request.args.get('search') or '').strip()
+        if search:
+            like = f'%{search}%'
+            query = query.join(
+                ConsumableCategory, Consumable.category_id == ConsumableCategory.id
+            ).filter(or_(
+                ConsumableCategory.name.ilike(like),
+                Consumable.internal_number.ilike(like),
+                Consumable.specification.ilike(like),
+            ))
+
         rows = query.all()
         data = [{
             'id': c.id,

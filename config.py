@@ -19,6 +19,9 @@ class Config:
     PERMANENT_SESSION_LIFETIME = timedelta(minutes=60)
     # 两地部署时给流水号加站点前缀，避免切主后撞号。空串表示单站点兼容旧 8 位号。
     SITE_CODE = (os.environ.get('SITE_CODE') or '').strip().upper()[:2]
+    # Bootstrap 核心 css/js 本地供给（flask_bootstrap 蓝图静态目录，前缀 /bootstrap/static/）。
+    # 必须在 bootstrap.init_app() 之前经 from_object 写入才生效（见 app/__init__.py）。
+    BOOTSTRAP_SERVE_LOCAL = True
     
     # 修改上传文件夹路径
     UPLOAD_FOLDER = os.path.join(basedir, 'uploads')

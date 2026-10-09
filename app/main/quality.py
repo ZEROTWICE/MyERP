@@ -43,6 +43,7 @@ def quality_management():
     
     # 获取质检任务统计信息
     query = InspectionTask.query
+    # 契约豁免(B16-08)：inspector 归属过滤，can() 无法表达，见 B16-00 §3③
     if current_user.role == 'inspector':
         query = query.filter(InspectionTask.inspector_id == current_user.id)
     
@@ -79,6 +80,7 @@ def quality_records():
     
     # 获取质检任务统计信息
     query = InspectionTask.query
+    # 契约豁免(B16-08)：inspector 归属过滤，can() 无法表达，见 B16-00 §3③
     if current_user.role == 'inspector':
         query = query.filter(InspectionTask.inspector_id == current_user.id)
     
@@ -101,6 +103,7 @@ def quality_task_detail(task_id):
     task = InspectionTask.query.get_or_404(task_id)
     
     # 检查权限
+    # 契约豁免(B16-08)：inspector 归属校验，can() 无法表达，见 B16-00 §3③
     if current_user.role == 'inspector' and task.inspector_id != current_user.id:
         flash('只能查看分配给自己的质检任务', 'danger')
         return redirect(url_for('main.quality_tasks'))
@@ -117,6 +120,7 @@ def quality_inspection(record_id):
     record = InspectionRecord.query.get_or_404(record_id)
     
     # 检查权限
+    # 契约豁免(B16-08)：inspector 归属校验，can() 无法表达，见 B16-00 §3③
     if current_user.role == 'inspector' and record.inspector_id != current_user.id:
         flash('只能执行分配给自己的质检任务', 'danger')
         return redirect(url_for('main.quality_tasks'))
@@ -526,6 +530,7 @@ def get_tasks():
         query = query.filter(InspectionTask.status == status)
 
     # 根据角色过滤
+    # 契约豁免(B16-08)：inspector 归属过滤，can() 无法表达，见 B16-00 §3③
     if current_user.role == 'inspector':
         query = query.filter(InspectionTask.inspector_id == current_user.id)
 
@@ -845,6 +850,7 @@ def start_inspection(task_id):
             }), 400
         
         # 检查是否是指定的检验员
+        # 契约豁免(B16-08)：inspector 归属校验，can() 无法表达，见 B16-00 §3③
         if current_user.role == 'inspector' and task.inspector_id != current_user.id:
             return jsonify({'success': False, 'message': '只能执行分配给自己的质检任务'}), 403
         
@@ -934,6 +940,7 @@ def submit_inspection_record(record_id):
         
         
         # 检查是否是指定的检验员
+        # 契约豁免(B16-08)：inspector 归属校验，can() 无法表达，见 B16-00 §3③
         if current_user.role == 'inspector' and record.inspector_id != current_user.id:
             return jsonify({'success': False, 'message': '只能提交分配给自己的质检记录'}), 403
         
@@ -1252,6 +1259,7 @@ def get_inspection_records():
                 pass
         
         # 权限控制
+        # 契约豁免(B16-08)：inspector 归属过滤，can() 无法表达，见 B16-00 §3③
         if current_user.role == 'inspector':
             query = query.filter(InspectionRecord.inspector_id == current_user.id)
         
@@ -1312,6 +1320,7 @@ def get_inspection_record_detail(record_id):
         record = InspectionRecord.query.get_or_404(record_id)
         
         # 权限控制
+        # 契约豁免(B16-08)：inspector 归属校验，can() 无法表达，见 B16-00 §3③
         if current_user.role == 'inspector' and record.inspector_id != current_user.id:
             return jsonify({'success': False, 'message': '权限不足'}), 403
         
@@ -1405,6 +1414,7 @@ def print_inspection_record(record_id):
         
         # 权限控制
         
+        # 契约豁免(B16-08)：inspector 归属校验，can() 无法表达，见 B16-00 §3③
         if current_user.role == 'inspector' and record.inspector_id != current_user.id:
             return jsonify({'success': False, 'message': '权限不足'}), 403
         

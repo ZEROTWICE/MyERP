@@ -10,7 +10,7 @@
             <a href="{{ url_for('main.quality_tasks') }}" class="btn btn-secondary">
                 返回任务列表
             </a>
-            {% if task.status == 'pending' and (current_user.role in ['admin', 'manager'] or (current_user.role == 'inspector' and task.inspector_id == current_user.id)) %}
+            {% if task.status == 'pending' and (current_user.role in ['admin', 'manager'] or (current_user.role == 'inspector' and task.inspector_id == current_user.id)) %} {# B16-08 契约豁免：此为「角色+对象归属」复合条件，can() 只表达纯角色能力、无法表达归属 ⇒ 保留内联角色判断 #}
             <button class="btn btn-success" data-task-id="{{ task.id }}" onclick="startInspection(this.dataset.taskId)">
                 开始质检
             </button>
@@ -430,7 +430,7 @@ function confirmStartInspection() {
     }
     
     // 发送开始质检请求
-    fetch("{{ url_for('main.get_tasks') }}" + '/' + taskId + '/start-inspection', {
+    apiFetch("{{ url_for('main.get_tasks') }}" + '/' + taskId + '/start-inspection', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
@@ -472,14 +472,14 @@ function editTask(id) {
 function deleteTask(id) {
     if (!confirm('确定要删除这个任务吗？')) return;
     
-    fetch("{{ url_for('main.get_tasks') }}" + '/' + id, {
+    apiFetch("{{ url_for('main.get_tasks') }}" + '/' + id, {
         method: 'DELETE'
     })
     .then(response => response.json())
     .then(data => {
         if (data.success) {
             showToast('success', data.message);
-            window.location.href = '/quality/tasks';
+            window.location.href = "{{ url_for('main.quality_tasks') }}";
         } else {
             showToast('error', data.message);
         }

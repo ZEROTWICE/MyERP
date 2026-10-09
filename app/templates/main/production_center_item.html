@@ -168,7 +168,7 @@ async function saveDecomposition() {
     return;
   }
   try {
-    const res = await fetch("{{ url_for('main.api_save_tech_decomposition', item_id=item.id) }}", {
+    const res = await apiFetch("{{ url_for('main.api_save_tech_decomposition', item_id=item.id) }}", {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -201,7 +201,7 @@ async function executeOperation() {
     materials: mats
   };
   try {
-    const res = await fetch("{{ url_for('main.api_execute_operation', item_id=item.id) }}", {
+    const res = await apiFetch("{{ url_for('main.api_execute_operation', item_id=item.id) }}", {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)

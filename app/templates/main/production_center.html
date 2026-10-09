@@ -89,7 +89,7 @@ async function createInstances() {
   const notes = document.getElementById('notesInput').value.trim();
   if (!orderId || !qty) { toastr.warning('请输入订单ID与数量'); return; }
   try {
-    const res = await fetch("{{ url_for('main.api_create_instances') }}", {
+    const res = await apiFetch("{{ url_for('main.api_create_instances') }}", {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ production_order_id: parseInt(orderId), quantity: parseInt(qty), notes })

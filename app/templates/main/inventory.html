@@ -261,7 +261,7 @@ function importInventory(input) {
         "{{ url_for('main.import_raw_materials') }}" : 
         "{{ url_for('main.import_finished_products') }}";
     
-    fetch(url, {
+    apiFetch(url, {
         method: 'POST',
         body: formData
     })
@@ -934,7 +934,7 @@ function executeAutoArchive() {
     button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 执行中...';
     button.disabled = true;
     
-    fetch('/inventory/auto-archive', {
+    fetch("{{ url_for('main.auto_archive_inventory') }}", {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',

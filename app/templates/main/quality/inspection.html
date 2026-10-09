@@ -269,7 +269,7 @@ function submitInspectionResult() {
     submitBtn.textContent = '提交中...';
     
     // 提交数据
-    fetch("{{ url_for('main.get_inspection_records') }}" + '/' + recordId + '/submit', {
+    apiFetch("{{ url_for('main.get_inspection_records') }}" + '/' + recordId + '/submit', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
@@ -281,7 +281,7 @@ function submitInspectionResult() {
         if (data.success) {
             showToast('success', data.message);
             setTimeout(() => {
-                window.location.href = '/quality/tasks';
+                window.location.href = "{{ url_for('main.quality_tasks') }}";
             }, 2000);
         } else {
             showToast('error', data.message || '提交失败');
