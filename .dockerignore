@@ -1,16 +1,62 @@
+# 构建上下文排除清单（GitHub Actions: docker/build-push-action, context=. ）
+# 原则：镜像内只需要「运行 MyERP 的源码」，一切证据/临时/备份/密钥/运行时数据都不进上下文。
+# 必须保留：app/（含 static、templates）、main.py、wsgi.py、config.py、migrations/、scripts/。
+
+# ---- 版本控制 / CI / 编辑器 ----
 .git
 .github
 .cursor
+.cursorignore
+.cursorindexingignore
+.vscode
+
+# ---- 文档与部署编排（容器内运行时不需要；编排在宿主机/CI 侧）----
 docs
 Jenkinsfile
 deploy.config.yml
 docker-compose.yml
 docker-compose.prod.yml
+
+# ---- 环境与密钥（一律不进镜像；config.py 只认环境变量）----
 .env
 .env.*
+
+# ---- Python 缓存 / 字节码 ----
 __pycache__
 *.pyc
+*.pyo
+.pytest_cache
+
+# ---- 本地开发与遗留工具目录（无运行时代码引用）----
+xnotes
+工具
+
+# ---- 数据库与运行时数据（镜像内由 Dockerfile 自建）----
 app.db
+app.db*
 *.db
 uploads
+instance
+test_data
+
+# ---- 大体积证据/临时目录 ----
+# test-reports-2026-10 本地约 3.6G（入库部分 7.0M）：混进构建上下文会显著拖慢 build/push
+test-reports-2026-10/
+.analysis-scratch/
+.tmp/
+.agent-teams/
+@eaDir/
+bootstrap-5.3.3-dist/
+captain-perm-probe/
+captain-perm-crib/
+c02604883c72
+
+# ---- 备份 / 探针产物 / 日志 / 虚拟环境 ----
+*.bak*
+_smoke_results.json
+_permission_matrix.json
+*.log
+.venv/
+
+# ---- 脚本：只排除一次性下划线脚本，scripts/ 其余（含 scripts/check_doc_claims.py 等）保留 ----
 scripts/_*.py
