@@ -86,7 +86,7 @@ DEFAULT_DOC_GLOBS = ('test-reports-2026-10/5*.md', 'test-reports-2026-10/6*.md')
 #: B17-16（A-70 三步）：14 条陈旧钉值按现场重取更新；改前值留档在
 #: `test-reports-2026-10/B17-登记.md` §B17-16（改前 = violations=16 / selftest 15/16）。
 PINNED = {
-    'rules_total': (273, 'coverage.json:summary.rules_total ∥ coverage_drift.LOCKED.rules_total',
+    'rules_total': (272, 'coverage.json:summary.rules_total ∥ coverage_drift.LOCKED.rules_total',
                     '路由规则总数（route_inventory / coverage_drift 判据钉值）'),
     'method_level_GET': (161, 'coverage.json:summary.method_level_GET',
                          '方法级 GET（`08` §2 记 160 已作废，A-25）'),

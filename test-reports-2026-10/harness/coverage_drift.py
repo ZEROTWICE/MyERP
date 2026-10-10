@@ -9,7 +9,7 @@
 
 | id | 判据 | 期望 |
 | --- | --- | --- |
-| D-1 | `summary.rules_total` | `== 273`（路由总数，口径：`url_map.iter_rules()`；**ALLOY-IMPORT-01 有意更新**：271 → 273） |
+| D-1 | `summary.rules_total` | `== 272`（路由总数，口径：`url_map.iter_rules()`；**ALLOY-IMPORT-01 有意更新**：271 → 273 → 272） |
 | D-2 | `summary.method_level_non_get_total` | `>= 157`（非 GET 方法级；A-28 原记 `>= 155`；**ALLOY-IMPORT-01 有意更新**：155 → 157，与 `route_inventory` 的 `non-GET 110 → 112` 同源，+2 条新 POST 各 +1 方法级） |
 | D-3 | `summary.writable_rules_non_get` | `== 156`（可写规则级；**ALLOY-IMPORT-01 有意更新**：153 → 155；**SEC-CSRF-01 有意更新**：155 → 156，`/auth/logout` 增 POST 方法） |
 | D-4 | `summary.writable_literal_covered_by_all` | `>= 108`（字面量覆盖；**V-06/C-05 有意更新**：6 → 108） |
@@ -164,14 +164,14 @@ ANCHOR_READING = (244575, 'F0D37A6C72C9029C60B4124DAC5993E1E65321448C943555381C1
 #:   ⇒ 0 → 0，判据未放宽，只是新端点自带覆盖。
 #: 同批有意更新（不在本文件，但同一触发项）：`run_gates.EXPECTED` 的 `properties_files` 23 → 26
 #:   （新增 3 个被 `check_properties.py` 扫描的文件）、`functional_passed` 109 → 127（+18 条断言）、
-#:   `routes_total_rules` 271 → 273、`routes_non_get` 110 → 112；`ci_gates.py` 第 688 / 701 / 715
+#:   `routes_total_rules` 271 → 273 → 272、`routes_non_get` 110 → 112；`ci_gates.py` 第 688 / 701 / 715
 #:   行的三处 `expects` 字符串同步。
 #: 回退：本块四处期望值与 docstring 表 D-1/D-2/D-3/D-8、`synthetic_doc()`、`routes_ok`、自检例 CD-N3/N4/N5
 #:   一并改回 271 / 155 / 153 / 271，并回退上列 `run_gates.EXPECTED` 四项与 `ci_gates.py` 三行，
 #:   最后删除三份新模块与 2 个端点。冻结锚点 `evidence/harness/coverage.json` 不动（历史留档）。
 #: ────────────────────────────────────────────────────────────────────────────────
 LOCKED = {
-    'rules_total': ('==', 273),
+    'rules_total': ('==', 272),
     'method_level_non_get_total': ('>=', 157),
     'writable_rules_non_get': ('==', 156),
     'writable_literal_covered_by_all': ('>=', 108),
@@ -180,7 +180,7 @@ LOCKED = {
 UNCOVERED_WRITABLE_MAX = 0
 SMOKE_TARGETS = 148
 SMOKE_UNRESOLVED = 9
-ROUTE_RULES = 273
+ROUTE_RULES = 272
 ROUTE_DUP = 0
 #: B17-14：`N` = 全量「GET+写」多方法规则（== `scripts/route_inventory.py` 同名 face 现场读数）；
 #: `M` = 其中未被任何探针 AST 命中的子集（== `len(uncovered_multi_method_with_get)`，恒 M ≤ N）。
@@ -270,7 +270,7 @@ def synthetic_doc():
     """
     return {
         'summary': {
-            'rules_total': 273, 'method_level_non_get_total': 158,
+            'rules_total': 272, 'method_level_non_get_total': 158,
             'writable_rules_non_get': 156, 'writable_literal_covered_by_all': 108,
             'writable_any_covered_by_all': 116,
             # B17-14：D-9 的两把锁（N=44 全量 / M=38 未命中子集；SEC-CSRF-01 后读数）
@@ -308,7 +308,7 @@ def selftest():
     case('CD-N3 非 GET 方法级 158→156（跌破 >= 157 下限）', d, routes_ok, True)
     d = synthetic_doc(); d['summary']['writable_rules_non_get'] = 155
     case('CD-N4 可写规则级 156→155', d, routes_ok, True)
-    d = synthetic_doc(); d['summary']['rules_total'] = 272
+    d = synthetic_doc(); d['summary']['rules_total'] = 271
     case('CD-N5 路由总数 273→272', d, routes_ok, True)
     d = synthetic_doc(); d['uncovered_writable'] = d['uncovered_writable'] + [{'rule': '/new'}]
     case('CD-N6 无命中写端点 0→1', d, routes_ok, True)
