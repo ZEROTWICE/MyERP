@@ -1,23 +1,19 @@
 # requirements.lock — TL-07 依赖可复现钉版（全部 `==` 精确钉版 + 传递闭包）
 # 生成工具：python -B scripts/check_doc_claims.py --write-lock（勿手改）
-# 生成时点：2026-10-07 22:34:22 (+08:00)
-# 解释器：F:\Miniconda\envs\wage\python.exe
-# 平台：win32 / Python 3.9.21
+# 生成时点：2026-10-10 08:50:15 (+08:00)
+# 解释器：/opt/wage-venv/bin/python
+# 平台：linux / Python 3.11.2
 # 口径：requirements.txt 的全部声明 + importlib.metadata 递归（packaging 标记求值）；
-#       标记在**本平台**求值 ⇒ 本 lock 是平台相关件（Windows 交付/CI 用）。
-# requirements.txt sha256: 4BDA793697D6AEB2FAFE300B832A429131A9FCD8CEC88A6FC64D3393DD161478
-# env-exceptions: psycopg2-binary
-# 说明：`env-exceptions` 列出的包未安装于 canonical env（本机 SQLite-only 运行），
-#       按本 lock 安装后即满足；其版本来源：`pip download --no-deps` 实测。
+#       标记在**本平台**求值 ⇒ 本 lock 是平台相关件（随生成平台变化；现为 Linux / Docker 部署面）。
+# requirements.txt sha256: F2CEB9799F2D899CF54992A99428C472B5584E5867ECE46BFD7A5784C4B45846
+# env-exceptions: (none)
+# 说明：`env-exceptions` 列出的包不参与「lock ↔ 当前环境」版本对拍
+#       （canonical env 未安装，或按本 lock 干净安装后才满足）。
 
 alembic==1.16.5  # via flask-migrate
-beautifulsoup4==4.14.2
 blinker==1.9.0  # via flask
 bootstrap-flask==2.5.0
-certifi==2025.10.5  # via requests
-charset-normalizer==3.4.3  # via requests
 click==8.1.8
-colorama==0.4.6  # via click
 dnspython==2.7.0  # via email-validator
 email-validator==2.3.0
 et-xmlfile==2.0.0  # via openpyxl
@@ -30,7 +26,6 @@ flask-wtf==1.2.2
 greenlet==3.2.4  # via sqlalchemy
 gunicorn==23.0.0
 idna==3.10  # via email-validator
-importlib-metadata==8.7.0  # via flask
 itsdangerous==2.2.0  # via flask
 jinja2==3.1.6  # via flask
 mako==1.3.10  # via alembic
@@ -41,17 +36,10 @@ packaging==25.0  # via gunicorn
 pandas==2.3.3
 psycopg2-binary==2.9.12
 python-dateutil==2.9.0.post0
-python-magic==0.4.27
 pytz==2025.2  # via pandas
-pywin32==311
-requests==2.32.5
 six==1.17.0  # via python-dateutil
-soupsieve==2.8  # via beautifulsoup4
 sqlalchemy==2.0.44
-tomli==2.3.0  # via alembic
 typing-extensions==4.15.0
 tzdata==2025.2  # via pandas
-urllib3==2.5.0  # via requests
 werkzeug==3.1.3
 wtforms==3.2.1
-zipp==3.23.0  # via importlib-metadata

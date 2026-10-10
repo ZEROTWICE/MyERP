@@ -90,10 +90,11 @@ PINNED = {
                     '路由规则总数（route_inventory / coverage_drift 判据钉值）'),
     'method_level_GET': (161, 'coverage.json:summary.method_level_GET',
                          '方法级 GET（`08` §2 记 160 已作废，A-25）'),
-    'method_level_non_get_total': (157, 'coverage.json:summary.method_level_non_get_total',
-                                   '方法级非 GET 端点总数'),
-    'writable_rules_non_get': (155, 'coverage.json:summary.writable_rules_non_get',
-                               '可写（非 GET）规则数'),
+    'method_level_non_get_total': (158, 'coverage.json:summary.method_level_non_get_total',
+                                   '方法级非 GET 端点总数（SEC-CSRF-01 有意更新：157 → 158，'
+                                   '`/auth/logout` 增 POST 方法；规则级规则数不变）'),
+    'writable_rules_non_get': (156, 'coverage.json:summary.writable_rules_non_get',
+                               '可写（非 GET）规则数（SEC-CSRF-01 有意更新：155 → 156）'),
     'writable_any_covered_by_all': (118, 'coverage.json:summary.writable_any_covered_by_all',
                                     '可写规则含动态命中的覆盖数'),
     'writable_literal_covered_by_all': (110, 'coverage.json:summary.writable_literal_covered_by_all',
@@ -101,9 +102,10 @@ PINNED = {
     'uncovered_writable_rules': (0, 'coverage.json:uncovered_writable 长度 ∥ '
                                     'coverage_drift.UNCOVERED_WRITABLE_MAX',
                                  '无任何命中的可写规则数（A-31 的规则级权威值）'),
-    'non_get_uncovered_method_level': (39, '派生：method_level_non_get_total − '
-                                           'writable_any_covered_by_all（157 − 118）',
-                                       '无任何命中的非 GET 方法级端点（A-31 权威值；135/139 作废）'),
+    'non_get_uncovered_method_level': (40, '派生：method_level_non_get_total − '
+                                           'writable_any_covered_by_all（158 − 118）',
+                                       '无任何命中的非 GET 方法级端点（A-31 权威值；135/139 作废；'
+                                       'SEC-CSRF-01 有意更新 39 → 40）'),
     'smoke_targets': (148, 'coverage.json:smoke_test_plan.static_reproduction_targets',
                       'smoke 静态复现目标数'),
     'smoke_unresolved': (9, 'coverage.json:smoke_test_plan.static_reproduction_unresolved',
@@ -141,11 +143,11 @@ RETIRED = (
 EXEMPT_MARKERS = ('作废', '不得出现', '禁止', '已更正', '更正', '前稿', '推翻', '❌',
                   '反例', '错例', 'retired', '口径注记', '已改')
 
-#: 声明但未安装于 canonical env 的包 → 依赖钉版校验里降级为 WARN（不阻塞）
-#: `pywin32`（B17-16）：win32 专有依赖，Linux 构建镜像装不上；`Dockerfile:44-56` 已在构建期
-#: 过滤并明令「不改 lock 本体」，而写进 lock 头会被下一次 `--write-lock` 抹掉 ⇒ 走本表，
-#: `requirements.lock` 保持字节不变（`git status --porcelain requirements.lock` 为空是硬判据）。
-DEFAULT_ENV_EXCEPTIONS = ('psycopg2-binary', 'pywin32')
+#: 声明但未安装于 canonical env 的包 → 依赖钉版校验里降级为 WARN（不阻塞）。
+#: 现状为空（2026-10-10 依赖清理）：lock 在 Linux / Python 3.11 生成，`pywin32` 因
+#: `sys_platform == "win32"` 标记在本平台求值为假而不进 lock；`psycopg2-binary` 已实际安装于
+#: canonical env（PG16 目标）⇒ 两者都不再走例外表，一律参与「lock ↔ 当前环境」版本对拍。
+DEFAULT_ENV_EXCEPTIONS = ()
 
 #: 未安装于本环境的**声明**依赖 → 生成 lock 时的版本兜底（来源：`pip download --no-deps`）
 PYPI_FALLBACK = {'psycopg2-binary': '2.9.12'}
@@ -398,12 +400,26 @@ def check_lock(lock_path, requirements_path):
     elif sha != info['actual_sha256']:
         violations.append('lock 与 requirements.txt 不一致：锁头 %s… ≠ 实测 %s…'
                           % (sha[:12], info['actual_sha256'][:12]))
+    from packaging.requirements import Requirement as _Req
+    from packaging.markers import default_environment as _default_env
+    _env = _default_env()
     declared_names = set()
     for spec in declared:
         name = re.split(r'[\[<>=!;]', spec, 1)[0].strip()
         declared_names.add(canonical(name))
-        if canonical(name) not in {canonical(k) for k in pins}:
-            violations.append('声明依赖未进 lock：%s' % name)
+        if canonical(name) in {canonical(k) for k in pins}:
+            continue
+        # 与 build_lock_content 同口径：声明带环境标记且**在本平台求值为假** ⇒ lock 本就不该含它。
+        # 否则 `pywin32>=305; sys_platform == "win32"` 会让 Linux 生成的 lock 自判违规
+        # （生成器按标记跳过、校验器不认标记 ⇒ 工具产出物被工具自己判红，那是 bug 不是约束）。
+        try:
+            _marker = _Req(spec).marker
+        except Exception:
+            _marker = None
+        if _marker is not None and not _marker.evaluate(_env):
+            warnings.append('声明表环境标记在本平台为假，不进 lock：%s' % name)
+            continue
+        violations.append('声明依赖未进 lock：%s' % name)
     # 环境对拍
     env_ok, env_bad, env_skip = 0, [], []
     for name, ver in sorted(pins.items()):
@@ -477,11 +493,11 @@ def build_lock_content(requirements_path):
         '# 解释器：%s' % sys.executable,
         '# 平台：%s / Python %s' % (sys.platform, platform.python_version()),
         '# 口径：requirements.txt 的全部声明 + importlib.metadata 递归（packaging 标记求值）；',
-        '#       标记在**本平台**求值 ⇒ 本 lock 是平台相关件（Windows 交付/CI 用）。',
+        '#       标记在**本平台**求值 ⇒ 本 lock 是平台相关件（随生成平台变化；现为 Linux / Docker 部署面）。',
         '# requirements.txt sha256: %s' % sha256_file(requirements_path),
         '# env-exceptions: %s' % (', '.join(exceptions) if exceptions else '(none)'),
-        '# 说明：`env-exceptions` 列出的包未安装于 canonical env（本机 SQLite-only 运行），',
-        '#       按本 lock 安装后即满足；其版本来源：`pip download --no-deps` 实测。',
+        '# 说明：`env-exceptions` 列出的包不参与「lock ↔ 当前环境」版本对拍',
+        '#       （canonical env 未安装，或按本 lock 干净安装后才满足）。',
         '',
     ]
     body = []

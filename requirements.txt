@@ -30,15 +30,8 @@ Flask-Paginate>=2023.10.24
 # 命令行工具
 click>=8.1.0
 
-# Web请求（用于诊断工具）
-requests>=2.31.0
-beautifulsoup4>=4.12.0
-
 # WSGI服务器（生产环境）
 gunicorn>=21.0.0
-
-# 文件类型检测
-python-magic>=0.4.27
 
 # 日期时间处理
 python-dateutil>=2.8.0

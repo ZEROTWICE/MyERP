@@ -12,23 +12,37 @@ def _normalize_database_url(url):
     return url
 
 
+def _engine_options(uri):
+    """连接池参数按方言分派。
+
+    `connect_args` 里的 `connect_timeout` / `application_name` 是 psycopg2 专有参数；
+    无条件施加到 SQLite 回退路径（门禁与本地测试都走这条）会让 DBAPI 直接抛
+    `TypeError: 'connect_timeout' is an invalid keyword argument for Connection()`，
+    使每个需要启动 app 的门禁步崩溃。故 PG 池化参数仅在 PG 目标下注入。
+    """
+    opts = {'pool_pre_ping': True, 'pool_recycle': 1800}
+    if uri.startswith('postgresql'):
+        # 总连接上限 = gunicorn workers × (pool_size + max_overflow) < max_connections(100)
+        opts.update({
+            'pool_size': 5,
+            'max_overflow': 10,
+            'pool_timeout': 30,
+            'connect_args': {
+                'connect_timeout': 10,
+                'application_name': 'myerp',
+            },
+        })
+    return opts
+
+
+_DB_URI = _normalize_database_url(os.environ.get('DATABASE_URL'))
+
+
 class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev'
-    SQLALCHEMY_DATABASE_URI = _normalize_database_url(os.environ.get('DATABASE_URL'))
+    SQLALCHEMY_DATABASE_URI = _DB_URI
     SQLALCHEMY_TRACK_MODIFICATIONS = False
-    # PG 16 生产连接池（Flask-SQLAlchemy 3.x 原样传给 create_engine）
-    # 总连接上限 = gunicorn workers × (pool_size + max_overflow) < max_connections(100)
-    SQLALCHEMY_ENGINE_OPTIONS = {
-        'pool_size': 5,
-        'max_overflow': 10,
-        'pool_timeout': 30,
-        'pool_recycle': 1800,
-        'pool_pre_ping': True,
-        'connect_args': {
-            'connect_timeout': 10,
-            'application_name': 'myerp',
-        },
-    }
+    SQLALCHEMY_ENGINE_OPTIONS = _engine_options(_DB_URI)
     PERMANENT_SESSION_LIFETIME = timedelta(minutes=60)
     # CWE-614: HTTPS 部署后设 SESSION_COOKIE_SECURE=true 阻止会话 cookie 经明文 HTTP 传输
     SESSION_COOKIE_SECURE = os.environ.get('SESSION_COOKIE_SECURE', '').lower() in ('1', 'true', 'yes')

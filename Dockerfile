@@ -32,22 +32,20 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 # ---- 系统依赖 ----
-# libmagic1：python-magic 的运行时依赖（lock 内已钉 python-magic==0.4.27）。当前代码路径尚未
-#            import magic，但只有装上 libmagic1，这个已钉版的依赖才真正可用，否则是"装了用不了"。
-# tzdata   ：slim 基底不带 tz 数据库，pandas / dateutil 做本地时区换算会失真。
+# tzdata：slim 基底不带 tz 数据库，pandas / dateutil 做本地时区换算会失真。
 # 装完清 /var/lib/apt/lists/*，避免把 apt 索引留在镜像层里。
 RUN apt-get update \
- && apt-get install -y --no-install-recommends libmagic1 tzdata \
+ && apt-get install -y --no-install-recommends tzdata \
  && rm -rf /var/lib/apt/lists/*
 
 # ---- 依赖层（置于 COPY . . 之前：改源码不使依赖层缓存失效）----
-# requirements.lock 由 `python -B scripts/check_doc_claims.py --write-lock` 生成（其头部注明"勿手改"），
-# 但它的生成平台是 win32 / Python 3.9.21，因此含 pywin32==311 —— Linux 上无 wheel，装必然失败。
-# 处理方式：**不修改 lock 本体**，只在构建期过滤掉 pywin32 行。
+# requirements.lock 由 `python -B scripts/check_doc_claims.py --write-lock` 生成（头部注明"勿手改"）。
+# 该 lock 现于 Linux / Python 3.11 生成（与本基底同平台），本身不含 pywin32；但 `requirements.txt`
+# 声明了 `pywin32>=305; sys_platform == "win32"`，一旦有人在 Windows 上重新生成 lock，
+# pywin32==311 就会被烘进来（Linux 无 wheel，装必然失败）⇒ 构建期无条件过滤一次作为防御。
 # 同时加一道确定性完整性校验：lock 头部 `# requirements.txt sha256: …` 必须等于镜像内
-# requirements.txt 的 sha256。已实测该值 4BDA793697D6AEB2FAFE300B832A429131A9FCD8CEC88A6FC64D3393DD161478
-# 正是 **LF 版** requirements.txt 的摘要（.gitattributes 强制 eol=lf，任何平台 checkout 均为 LF），
-# 故校验不会误报；不一致即 fail-fast，拦截"改了 requirements.txt 忘了重新生成 lock"的静默漂移。
+# requirements.txt 的 sha256（.gitattributes 强制 eol=lf，任何平台 checkout 均为 LF，不会误报）；
+# 不一致即 fail-fast，拦截"改了 requirements.txt 忘了重新生成 lock"的静默漂移。
 COPY requirements.txt requirements.lock ./
 RUN set -eu; \
     grep -viE '^[[:space:]]*pywin32([[:space:]]|$|==)' requirements.lock > /tmp/requirements.lock.linux; \

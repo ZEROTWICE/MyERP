@@ -111,6 +111,9 @@ WRITE_PAYLOADS = (('/shipments/create', 'sales_order_id', 'SalesOrder'),)
 #: 每条 = `(相对路径, 行号, anchor)`；anchor = 该行去空白后的源码文本（行号可漂，文本改了要登记）；
 #: 行号只用于定位与漂移提示，判据本身不依赖行号（并发插行不会把 blocking 步判红）。
 INLINE_ROLE_WHITELIST = (
+    # SEC-CSRF-01/CWE-862 随行登记：/auth/register 加管理员闸门新增的内联角色判断
+    # （CAPABILITIES 无账号管理类能力，故保留内联；台账由本脚本 `--- 现场逐条台账 ---` 生成）
+    ('app/auth/routes.py', 31, "if current_user.role != 'admin':"),
     ('app/main/quality.py', 47, "if current_user.role == 'inspector':"),
     ('app/main/quality.py', 84, "if current_user.role == 'inspector':"),
     ('app/main/quality.py', 107, "if current_user.role == 'inspector' and task.inspector_id != current_user.id:"),
