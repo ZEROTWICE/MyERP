@@ -16,6 +16,19 @@ class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev'
     SQLALCHEMY_DATABASE_URI = _normalize_database_url(os.environ.get('DATABASE_URL'))
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    # PG 16 生产连接池（Flask-SQLAlchemy 3.x 原样传给 create_engine）
+    # 总连接上限 = gunicorn workers × (pool_size + max_overflow) < max_connections(100)
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        'pool_size': 5,
+        'max_overflow': 10,
+        'pool_timeout': 30,
+        'pool_recycle': 1800,
+        'pool_pre_ping': True,
+        'connect_args': {
+            'connect_timeout': 10,
+            'application_name': 'myerp',
+        },
+    }
     PERMANENT_SESSION_LIFETIME = timedelta(minutes=60)
     # CWE-614: HTTPS 部署后设 SESSION_COOKIE_SECURE=true 阻止会话 cookie 经明文 HTTP 传输
     SESSION_COOKIE_SECURE = os.environ.get('SESSION_COOKIE_SECURE', '').lower() in ('1', 'true', 'yes')
