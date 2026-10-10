@@ -17,6 +17,9 @@ class User(UserMixin, db.Model):
     # Postgres 上 VARCHAR(128) 会在改密码时直接拒写。
     password_hash = db.Column(db.String(255))
     role = db.Column(db.String(20), default='user')  # admin/hr/accountant
+    # Q1/CWE-521：为真时登录后只能停在 /auth/change-password（由 app/__init__.py
+    # 的全局 before_request 强制），改密成功即置回 False。列在 _ENSURED_COLUMNS 登记。
+    must_change_password = db.Column(db.Boolean, nullable=False, default=False, server_default='0')
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)

@@ -124,11 +124,25 @@ def _ro_templates(path):
         con.close()
 
 
+def _ro_user_cols(path):
+    """只读（mode=ro）取 user 表列名：引导会为老库补列（_ENSURED_COLUMNS），
+    补列同样改字节 ⇒ 指纹偏离也可由**结构**而非行数解释。"""
+    con = sqlite3.connect('file:' + path.replace(chr(92), '/') + '?mode=ro', uri=True)
+    try:
+        return [r[1] for r in con.execute('PRAGMA table_info("user")')]
+    finally:
+        con.close()
+
+
 _real_counts = _ro_counts(_env.REAL_DB)
 _copy_counts = _ro_counts(copy_path)
 out['seeding_deltas'] = {{t: _copy_counts[t] - _real_counts.get(t, 0)
                          for t in sorted(_copy_counts)
                          if _copy_counts[t] != _real_counts.get(t, 0)}}
+out['real_user_cols'] = _ro_user_cols(_env.REAL_DB)
+out['copy_user_cols'] = _ro_user_cols(copy_path)
+out['schema_deltas'] = {{'user': sorted(set(out['copy_user_cols']) - set(out['real_user_cols']))}}
+out['schema_deltas'] = {{k: v for k, v in out['schema_deltas'].items() if v}}
 out['seeding_tables_only_in_copy'] = sorted(set(_copy_counts) - set(_real_counts))
 out['real_db_templates'] = _ro_templates(_env.REAL_DB)
 out['copy_templates'] = _ro_templates(copy_path)
@@ -194,10 +208,17 @@ def case1_real_db_guard(before_hash):
     pre_sha = pre.get('sha256')
     post_sha = parsed.get('copy_path_sha256')
     deltas = parsed.get('seeding_deltas') or {}
+    schema_deltas = parsed.get('schema_deltas') or {}
     allowed_seed_tables = ('inspection_items', 'inspection_templates')
+    # 补列白名单钉到**表.列**（不是表）：_ENSURED_COLUMNS 逐条登记，副本上真正被补的
+    # 只能是本次登记过的那一列，否则判不许过（防白名单放宽成「任意 schema 漂移」）。
+    allowed_schema_cols = {('user', 'must_change_password')}
     unattributed = sorted(t for t in deltas if t not in allowed_seed_tables)
+    bad_schema = sorted(f'{t}.{c}' for t, cols in schema_deltas.items()
+                        for c in cols if (t, c) not in allowed_schema_cols)
     post_deviates = bool(post_sha) and post_sha != REAL_DB_SHA256_EXPECTED
-    deviation_explained = post_deviates == bool(deltas)   # 指纹变 ⇔ 有实测写入（不许无解释漂移）
+    # 指纹变 ⇔ 有实测写入 **或** 有实测补列（启动自愈，C1 的 schema 唯一来源）；无解释漂移仍不合格
+    deviation_explained = post_deviates == bool(deltas or schema_deltas)
     # RF-1 复标（2026-10-09，批次15 开工前项 I1，用户拍板「真库锚点重基线」）：真实库经 A-70 首启
     # 播种后**已自带**默认质检模板（inspection_templates=2 / inspection_items=7，见
     # test-reports-2026-10/RF1-真库锚点重基线登记.md），引导副本的 seed_defaults() 因此按 type 命中
@@ -206,15 +227,16 @@ def case1_real_db_guard(before_hash):
     # 在此形态下双双失效（前者恒 False，后者对空集恒 True 而失去约束力）。故复标为**双向等价**判据：
     # 「副本指纹偏离 ⇔ 有实测写入」＋「写入只允许落在 inspection_templates / inspection_items」。
     # 零净增（RF-1 后）与纯播种（RF-1 前）两种形态都合格；无解释漂移、越表写入一律不合格。
-    record('NV-1.5', '口径校准：引导前副本指纹 == 真实库钉死值；引导后偏离须由实测写入解释'
-                     '（B14-R3 复标 / RF-1 复标）',
+    record('NV-1.5', '口径校准：引导前副本指纹 == 真实库钉死值；引导后偏离须由实测写入或实测补列解释'
+                     '（B14-R3 复标 / RF-1 复标 / B18-Q1 二阶复标）',
            '两时点分开：①引导前字节副本 SHA256 == 钉死值 ⇒ 指纹不能当拒绝判据；'
-           '②引导后指纹若偏离，偏离必须与实测逐表净增**严格等价**（偏离 ⇔ 有写入），'
-           '且写入只能落在默认质检模板的两张表',
+           '②引导后指纹若偏离，偏离必须与实测逐表净增或实测补列**严格等价**'
+           '（偏离 ⇔ 有写入或补列），且写入只能落在默认质检模板的两张表、'
+           '补列只能是白名单钉死的 user.must_change_password',
            {'pre_bootstrap_sha256': REAL_DB_SHA256_EXPECTED,
             'copy_is_real_file': False,
             'post_bootstrap_sha256': '== 钉死值（RF-1 后真库已含默认模板，引导零净增）；'
-                                     '若偏离则必须与 seeding_deltas 严格等价',
+                                     '若偏离则必须与 seeding_deltas / schema_deltas 严格等价',
             'net_add_source': {'inspection_templates': 'RF-1 前 +2 / RF-1 后 +0'
                                                       '（SYS-QC-PROD-REC / SYS-QC-GOODS-REC）',
                                'inspection_items': 'RF-1 前 +7 / RF-1 后 +0'}},
@@ -225,6 +247,10 @@ def case1_real_db_guard(before_hash):
             'seeding_deltas': deltas,
             'seeding_delta_total': sum(deltas.values()),
             'unattributed_deltas': unattributed,
+            'schema_deltas': schema_deltas,
+            'bad_schema_deltas': bad_schema,
+            'real_user_cols': parsed.get('real_user_cols'),
+            'copy_user_cols': parsed.get('copy_user_cols'),
             'post_bootstrap_deviates': post_deviates,
             'deviation_explained': deviation_explained,
             'real_db_templates': parsed.get('real_db_templates'),
@@ -233,7 +259,8 @@ def case1_real_db_guard(before_hash):
             'real_db_sha256_after_probe': parsed.get('real_db_sha256_after_probe')},
            'passed' if (pre_sha == REAL_DB_SHA256_EXPECTED
                         and parsed.get('copy_is_real_file') is False
-                        and not unattributed and deviation_explained) else 'failed',
+                        and not unattributed and not bad_schema
+                        and deviation_explained) else 'failed',
            evidence=os.path.relpath(ev, REPO_ROOT),
            note='B14-R3 复标：原判据用**引导后**指纹 == 钉死值，B14-08 启动下发默认质检模板'
                 '（app/__init__.py:247 _seed_system_configs -> InspectionTemplate.seed_defaults()，'
@@ -242,6 +269,10 @@ def case1_real_db_guard(before_hash):
                 '指纹变 ⇔ 有写入，且写入只能落在 inspection_templates / inspection_items。'
                 'RF-1 复标：真库本身完成 A-70 首启播种后，副本不再新增模板 ⇒ 删去「必然偏离」硬条件，'
                 '把「偏离 ⇔ 写入」升格为唯一等价判据（零净增形态合格，越表/无解释漂移仍不合格）。'
+                'B18-Q1 二阶复标：_ensure_schema() 为老库补列（C1 的 schema 唯一来源）同样改字节，'
+                '故等价判据扩为「偏离 ⇔ 写入 或 补列」；补列白名单**钉到表.列**'
+                '（allowed_schema_cols = {(\'user\', \'must_change_password\')}，与 _ENSURED_COLUMNS 的'
+                '本次增量逐条对齐，不得写成按表放行），白名单外任何补列（bad_schema_deltas 非空）一律不合格。'
                 '**不得据此放宽隔离保证**：copy_is_real_file（samefile）仍是硬判据，NV-1.2/1.3/1.4 未动。')
 
 

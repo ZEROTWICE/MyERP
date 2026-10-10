@@ -150,7 +150,9 @@ if %errorlevel% neq 0 (
 :: 安装依赖
 echo 安装依赖包...
 python -m pip install --upgrade pip
-pip install -r requirements.lock
+:: requirements.txt 带平台标记（pywin32: sys_platform == "win32"），Windows 本地测试用；
+:: requirements.lock 是 Linux/Docker 平台相关件（Docker 是唯一部署路径）。
+pip install -r requirements.txt
 if %errorlevel% neq 0 (
     echo 错误: 依赖安装失败
     pause

@@ -1,7 +1,7 @@
 from flask import Flask, flash, jsonify, redirect, request, url_for
 from werkzeug.exceptions import HTTPException
 from flask_sqlalchemy import SQLAlchemy
-from flask_login import LoginManager
+from flask_login import LoginManager, current_user
 from flask_migrate import Migrate
 from flask_wtf.csrf import CSRFProtect
 from flask_bootstrap import Bootstrap5
@@ -56,6 +56,10 @@ _ENSURED_COLUMNS = {
         ('rubber_gasket_material', 'VARCHAR(100)'),
         ('turnout_rail', 'VARCHAR(100)'),
         ('using_unit', 'VARCHAR(100)'),
+    ],
+    'user': [
+        # Q1（CWE-521）：弱口令账户的强制改密标记；老库由启动自愈补列，默认 0。
+        ('must_change_password', 'BOOLEAN DEFAULT 0'),
     ],
     'products': [
         ('sellable_as_part', 'BOOLEAN'),
@@ -235,6 +239,22 @@ def create_app():
         return e.get_response()
 
     permissions.init_app(app)
+
+    @app.before_request
+    def _force_password_change():
+        """Q1/CWE-521：标记了的账户登录后只能停在改密页。
+
+        挂在应用级而非逐个端点，是因为 `@login_required` 在 265 条规则里的
+        装饰器顺序各不相同，逐个加会漏（同 `unauthorized_handler` 的理由）。
+        改密页自身放行，否则无限重定向。
+        """
+        if not current_user.is_authenticated or not current_user.must_change_password:
+            return None
+        if request.endpoint in ('auth.change_password', 'auth.logout', 'static'):
+            return None
+        if permissions._wants_json():
+            return jsonify({'success': False, 'message': '请先修改密码'}), 403
+        return redirect(url_for('auth.change_password', next=request.full_path))
 
     with app.app_context():
         # 首先导入并创建所有模型

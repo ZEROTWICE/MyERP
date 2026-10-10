@@ -7,7 +7,10 @@
     （A-70 同步：271 → 273 / 非 GET 110 → 112，与 `scripts/route_inventory.py` 现场读数、
     `harness/run_gates.py` `EXPECTED['routes_total_rules']` 三处一致；触发项 = B17-14）；
   * 方法级（一条规则可有多方法）：GET **161**（`url_map` 重算；⚠ `08` §2 记 160 —— A-25 分歧已登记）
-    / POST 123 / DELETE 20 / PUT 12；**非 GET 方法级 155（两法一致）**。
+    / POST 126 / DELETE 20 / PUT 12；**非 GET 方法级 158（方法级合计 319 = 161 + 126 + 20 + 12）**。
+    （B18-Q1 有意更新：`method_level_GET` 160 → 161、`method_level_POST` 123 → 126、
+    `method_level_non_get_total` 155 → 158；触发项 = 新增 `GET+POST /auth/change-password`
+    ⇒ 规则 +1、方法级 +2，且 `POST` 与 `non_get_total` 同源同增。）
 * **分子（覆盖）**：AST 扫测试脚本里的 HTTP 调用字面量 URL（工具：`ast` 解析源码）；
   * `literal` 口径 = URL 里不含插值/变量；`dynamic` 口径 = f-string / `%` 格式化 / 变量拼接，
     **只能匹配到前缀**，单独统计、不与 literal 合并。
@@ -453,9 +456,10 @@ def main():
                            '（A-70：271/110 → 273/112，源 = 现场 route_inventory 读数 + '
                            "run_gates.EXPECTED['routes_total_rules']）"),
             'method_level_GET': 'url_map 重算 = 161；08 §2 记 160（A-25 分歧，须写方法与口径）',
-            'method_level_POST_DELETE_PUT': 'url_map 重算 = 123 / 20 / 12',
-            'reference_155': ('08 §2 / 06 §4.2 的「非 GET 方法级端点 155」：本工具按'
-                              '「method ∈ rule.methods 的 (method, rule) 计数」得 155；'
+            'method_level_POST_DELETE_PUT': 'url_map 重算 = 126 / 20 / 12（B18-Q1：POST 123 → 126）',
+            'reference_155': ('08 §2 / 06 §4.2 的「非 GET 方法级端点 155」是历史值：本工具按'
+                              '「method ∈ rule.methods 的 (method, rule) 计数」现得 158'
+                              '（B18-Q1 由 155 升 158）；'
                               '本文件 summary.method_level_non_get_via_multi_method_rules '
                               '是同一事实的另一写法，两者必须同时引用（见 comparison）'),
             'coverage_numerator': ('ast 解析测试脚本里的 HTTP 调用字面量 URL；'

@@ -9,20 +9,20 @@
 
 | id | 判据 | 期望 |
 | --- | --- | --- |
-| D-1 | `summary.rules_total` | `== 272`（路由总数，口径：`url_map.iter_rules()`；**ALLOY-IMPORT-01 有意更新**：271 → 273 → 272） |
-| D-2 | `summary.method_level_non_get_total` | `>= 157`（非 GET 方法级；A-28 原记 `>= 155`；**ALLOY-IMPORT-01 有意更新**：155 → 157，与 `route_inventory` 的 `non-GET 110 → 112` 同源，+2 条新 POST 各 +1 方法级） |
-| D-3 | `summary.writable_rules_non_get` | `== 155`（可写规则级；**ALLOY-IMPORT-01 有意更新**：153 → 155；**SEC-CSRF-01 有意更新**：155 → 156，`/auth/logout` 增 POST 方法；**e057e81 有意更新**：删 `/auth/register` 后 156 → 155） |
+| D-1 | `summary.rules_total` | `== 273`（路由总数，口径：`url_map.iter_rules()`；**ALLOY-IMPORT-01 有意更新**：271 → 273 → 272；**B18-Q1 有意更新**：新增 `/auth/change-password`（GET+POST）后 272 → 273） |
+| D-2 | `summary.method_level_non_get_total` | `>= 158`（非 GET 方法级；A-28 原记 `>= 155`；**ALLOY-IMPORT-01 有意更新**：155 → 157，与 `route_inventory` 的 `non-GET 110 → 112` 同源，+2 条新 POST 各 +1 方法级；**B18-Q1 有意更新**：新增 1 个 POST 方法 157 → 158） |
+| D-3 | `summary.writable_rules_non_get` | `== 156`（可写规则级；**ALLOY-IMPORT-01 有意更新**：153 → 155；**SEC-CSRF-01 有意更新**：155 → 156，`/auth/logout` 增 POST 方法；**e057e81 有意更新**：删 `/auth/register` 后 156 → 155；**B18-Q1 有意更新**：新增可写规则 `/auth/change-password` 后 155 → 156） |
 | D-4 | `summary.writable_literal_covered_by_all` | `>= 108`（字面量覆盖；**V-06/C-05 有意更新**：6 → 108） |
 | D-5 | `summary.writable_any_covered_by_all` | `>= 116`（含动态覆盖；**V-06/C-05 有意更新**：14 → 116） |
 | D-6 | `len(uncovered_writable)` | `<= 0`（无命中写端点；**V-06/C-05 有意更新**：101 → 0） |
-| D-7 | `smoke_test_plan.static_reproduction_targets` / `_unresolved` | `== 148` / `== 9` |
-| D-8 | `--routes-stdout`：`total rules` / `duplicate (method,path) registrations` | `== 272` / `== 0` |
-| D-9 | 「GET+写」多方法面：`summary.multi_method_with_get_total` / `_uncovered` / `len(uncovered_multi_method_with_get)` | `== 43` / `== 37` / `== 37`（且 `M ≤ N`；**B17-14 新增**；**SEC-CSRF-01 有意更新**：43/37 → 44/38；**e057e81 有意更新**：删 GET+POST 的 `/auth/register` 后 44/38 → 43/37） |
+| D-7 | `smoke_test_plan.static_reproduction_targets` / `_unresolved` | `== 149` / `== 9`（**B18-Q1 有意更新**：targets 148 → 149，+1 条新 GET 无参规则；`_unresolved` 9 不变） |
+| D-8 | `--routes-stdout`：`total rules` / `duplicate (method,path) registrations` | `== 273` / `== 0` |
+| D-9 | 「GET+写」多方法面：`summary.multi_method_with_get_total` / `_uncovered` / `len(uncovered_multi_method_with_get)` | `== 44` / `== 38` / `== 38`（且 `M ≤ N`；**B17-14 新增**；**SEC-CSRF-01 有意更新**：43/37 → 44/38；**e057e81 有意更新**：删 GET+POST 的 `/auth/register` 后 44/38 → 43/37；**B18-Q1 有意更新**：新增 `/auth/change-password`（GET+POST）后 43/37 → 44/38） |
 
 **D-9 口径（B17-14：防「多方法 face 只打印不判」）**：`N` = 全量「GET+写」多方法规则（与
-`scripts/route_inventory.py` 同名 face **同源同值**，现场 43）；`M` = 其中**未被任何探针 AST 命中**
-的子集（现场 37），恒有 `M ≤ N`。两个口径**分开判、不得混算**：N 是规则面、M 是未命中子集面
-（`uncovered_writable` 按构造排除「GET+写」⇒ 这 37 条原是漂移门禁盲区，D-6 永远看不见它们）。
+`scripts/route_inventory.py` 同名 face **同源同值**，现场 44）；`M` = 其中**未被任何探针 AST 命中**
+的子集（现场 38），恒有 `M ≤ N`。两个口径**分开判、不得混算**：N 是规则面、M 是未命中子集面
+（`uncovered_writable` 按构造排除「GET+写」⇒ 这 38 条原是漂移门禁盲区，D-6 永远看不见它们）。
 `M` 还必须等于 `len(uncovered_multi_method_with_get)` —— 防 producer 自说自话（键写 37、列表给 0）。
 
 ⚠ **结算行的计数口径**：`判据 8/8 通过` 只统计**既有** D-1…D-8 —— `ci_gates.py` 第 11 步（blocking）
@@ -171,22 +171,22 @@ ANCHOR_READING = (244575, 'F0D37A6C72C9029C60B4124DAC5993E1E65321448C943555381C1
 #:   最后删除三份新模块与 2 个端点。冻结锚点 `evidence/harness/coverage.json` 不动（历史留档）。
 #: ────────────────────────────────────────────────────────────────────────────────
 LOCKED = {
-    'rules_total': ('==', 272),
-    'method_level_non_get_total': ('>=', 157),
-    'writable_rules_non_get': ('==', 155),
+    'rules_total': ('==', 273),
+    'method_level_non_get_total': ('>=', 158),
+    'writable_rules_non_get': ('==', 156),
     'writable_literal_covered_by_all': ('>=', 108),
     'writable_any_covered_by_all': ('>=', 116),
 }
 UNCOVERED_WRITABLE_MAX = 0
-SMOKE_TARGETS = 148
+SMOKE_TARGETS = 149
 SMOKE_UNRESOLVED = 9
-ROUTE_RULES = 272
+ROUTE_RULES = 273
 ROUTE_DUP = 0
 #: B17-14：`N` = 全量「GET+写」多方法规则（== `scripts/route_inventory.py` 同名 face 现场读数）；
 #: `M` = 其中未被任何探针 AST 命中的子集（== `len(uncovered_multi_method_with_get)`，恒 M ≤ N）。
 #: 两口径分开判、不得混算；`uncovered_writable` 按构造排除 GET+写 ⇒ D-6 看不见这 37 条。
-MULTI_METHOD_TOTAL = 43
-MULTI_METHOD_UNCOVERED = 37
+MULTI_METHOD_TOTAL = 44
+MULTI_METHOD_UNCOVERED = 38
 
 
 def _cmp(actual, op, expected):
@@ -226,7 +226,7 @@ def evaluate(doc, routes_text=None):
     plan = (doc or {}).get('smoke_test_plan') or {}
     t = plan.get('static_reproduction_targets')
     u = plan.get('static_reproduction_unresolved')
-    add('D-7', 'smoke_test_plan 静态复现 148 / 未解析 9',
+    add('D-7', 'smoke_test_plan 静态复现 149 / 未解析 9',
         f'== {SMOKE_TARGETS} / == {SMOKE_UNRESOLVED}', f'{t} / {u}',
         'passed' if (t == SMOKE_TARGETS and u == SMOKE_UNRESOLVED) else 'failed')
 
@@ -265,29 +265,31 @@ def synthetic_doc():
     基线值 = V-06/C-05 有意更新（literal 108 / any 116 / uncovered 0）+ ALLOY-IMPORT-01 有意更新
     （rules_total 273）+ SEC-CSRF-01 有意更新（method_level_non_get_total 158 / writable_rules_non_get
     156 / 多方法面 N 44、M 38）+ e057e81 有意更新（删 GET+POST 的 `/auth/register` 后回落：
-    method_level_non_get_total 157 / writable_rules_non_get 155 / N 43 / M 37）后的实测值；
-    阴性注入相对**该基线各降 1**，唯 `D-2`（`>= 157` 下限型）例外：基线 157 降 1 即跌破下限
+    method_level_non_get_total 157 / writable_rules_non_get 155 / N 43 / M 37）+ B18-Q1 有意更新
+    （新增 GET+POST 的 `/auth/change-password` 后回升：rules_total 273 / method_level_non_get_total
+    158 / writable_rules_non_get 156 / N 44 / M 38）后的实测值；
+    阴性注入相对**该基线各降 1**，唯 `D-2`（`>= 158` 下限型）例外：基线 158 降 1 即跌破下限
     （`uncovered` 是 `<=` 型 ⇒ 0 → 1 即漂移）。
     """
     return {
         'summary': {
-            'rules_total': 272, 'method_level_non_get_total': 157,
-            'writable_rules_non_get': 155, 'writable_literal_covered_by_all': 108,
+            'rules_total': 273, 'method_level_non_get_total': 158,
+            'writable_rules_non_get': 156, 'writable_literal_covered_by_all': 108,
             'writable_any_covered_by_all': 116,
-            # B17-14：D-9 的两把锁（N=43 全量 / M=37 未命中子集；e057e81 后读数）
-            'multi_method_with_get_total': 43, 'multi_method_with_get_uncovered': 37,
+            # B17-14：D-9 的两把锁（N=44 全量 / M=38 未命中子集；B18-Q1 后读数）
+            'multi_method_with_get_total': 44, 'multi_method_with_get_uncovered': 38,
         },
         'uncovered_writable': [],
-        # B17-14：D-9 还要求 M == len(列表) ⇒ 合成列表必须正好 37 条
-        'uncovered_multi_method_with_get': [{'rule': '/mm/%d' % i} for i in range(37)],
-        'smoke_test_plan': {'static_reproduction_targets': 148,
+        # B17-14：D-9 还要求 M == len(列表) ⇒ 合成列表必须正好 38 条
+        'uncovered_multi_method_with_get': [{'rule': '/mm/%d' % i} for i in range(38)],
+        'smoke_test_plan': {'static_reproduction_targets': 149,
                             'static_reproduction_unresolved': 9},
     }
 
 
 def selftest():
     """1 阳性 + 10 阴性注入：漂移必须被判失败（门禁敏感性）。"""
-    routes_ok = '[routes] total rules=272\nduplicate (method,path) registrations=0\n'
+    routes_ok = '[routes] total rules=273\nduplicate (method,path) registrations=0\n'
     results = []
 
     def case(cid, doc, routes, must_fail):
@@ -303,25 +305,25 @@ def selftest():
     case('CD-N1 字面量覆盖 基线-1', d, routes_ok, True)
     d = synthetic_doc(); d['summary']['writable_any_covered_by_all'] -= 1       # 基线 -> 基线-1
     case('CD-N2 含动态覆盖 基线-1', d, routes_ok, True)
-    # D-2 是 `>= 157` 下限型 ⇒ 阴性必须**跌破下限**才红：基线 157 降 1 得 156 已跌破，
-    # 故注入 156。（精确相等由 `check_doc_claims.PINNED.method_level_non_get_total` 另行钉死。）
-    d = synthetic_doc(); d['summary']['method_level_non_get_total'] = 156
-    case('CD-N3 非 GET 方法级 157→156（跌破 >= 157 下限）', d, routes_ok, True)
-    d = synthetic_doc(); d['summary']['writable_rules_non_get'] = 154
-    case('CD-N4 可写规则级 155→154', d, routes_ok, True)
-    d = synthetic_doc(); d['summary']['rules_total'] = 271
-    case('CD-N5 路由总数 272→271', d, routes_ok, True)
+    # D-2 是 `>= 158` 下限型 ⇒ 阴性必须**跌破下限**才红：基线 158 降 1 得 157 已跌破，
+    # 故注入 157。（精确相等由 `check_doc_claims.PINNED.method_level_non_get_total` 另行钉死。）
+    d = synthetic_doc(); d['summary']['method_level_non_get_total'] = 157
+    case('CD-N3 非 GET 方法级 158→157（跌破 >= 158 下限）', d, routes_ok, True)
+    d = synthetic_doc(); d['summary']['writable_rules_non_get'] = 155
+    case('CD-N4 可写规则级 156→155', d, routes_ok, True)
+    d = synthetic_doc(); d['summary']['rules_total'] = 272
+    case('CD-N5 路由总数 273→272', d, routes_ok, True)
     d = synthetic_doc(); d['uncovered_writable'] = d['uncovered_writable'] + [{'rule': '/new'}]
     case('CD-N6 无命中写端点 0→1', d, routes_ok, True)
-    d = synthetic_doc(); d['smoke_test_plan']['static_reproduction_targets'] = 147
-    case('CD-N7 smoke 计划 148→147', d, routes_ok, True)
+    d = synthetic_doc(); d['smoke_test_plan']['static_reproduction_targets'] = 148
+    case('CD-N7 smoke 计划 149→148', d, routes_ok, True)
     case('CD-N8 路由清单 duplicate 0→1', synthetic_doc(),
          routes_ok.replace('registrations=0', 'registrations=1'), True)
     # ---- B17-14：D-9 两条阴性（t6 现场用的正是这两个变异体）----
     d = synthetic_doc(); d['summary']['multi_method_with_get_total'] = 99
-    case('CD-N9 多方法全量 N 43→99', d, routes_ok, True)
+    case('CD-N9 多方法全量 N 44→99', d, routes_ok, True)
     d = synthetic_doc(); d['summary']['multi_method_with_get_uncovered'] = 0   # 列表仍 37 条
-    case('CD-N10 多方法未命中 M 37→0（列表仍 37）', d, routes_ok, True)
+    case('CD-N10 多方法未命中 M 38→0（列表仍 38）', d, routes_ok, True)
 
     for r in results:
         print(f"  [{'PASS' if r['status'] == 'passed' else 'FAIL'}] {r['id']}"

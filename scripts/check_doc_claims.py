@@ -22,7 +22,7 @@ A-31）、`「45 张」`（零行表，权威 `49 张`，A-2）已成**作废口
 
 ## 口径表格式（报告顶部，注释形式，渲染不可见）
     <!-- caliber-table
-    rules_total = 271
+    rules_total = 273
     method_level_GET = 161
     -->
 支持 `=` 或 `:`；值必须是整数或纯 ASCII 标识符。一份文档可有多块（合并，重复键以先见为准并告警）。
@@ -41,7 +41,8 @@ A-31）、`「45 张」`（零行表，权威 `49 张`，A-2）已成**作废口
 ## 边界（有意为之）
 - 作废值只按**行**判定；数字类作废值可用 `context` 限定「同行必须出现度量语境词」
   （路由/规则/端点/方法级/GET/覆盖/断言/rules…）。该机制现**无用例**：唯一使用者 `get160`
-  已随 `160` 恢复为当前值而退役（`DC-N2` 已改为阳性对照，防其被重新登记）。
+  已随 `160` 复原为历史值而退役、B18-Q1 又随 `160` 重成旧值而**复册**（`DC-N2` 阳性 /
+  `DC-N2b` 阴性成对，防其被误退役或误报）；`get160` 保留 **context 限定用法**作范本。
 - 默认扫描域 = **第2轮报告**（`5*.md` / `6*.md`）；第1轮语料（`0x`–`4x`）里大量「引用作废值」的
   历史段落不在默认域内（用 `--docs` 显式扫描；已知 `00` §6 仍有一处陈旧「45 张」，见交付登记）。
 - 口径表的**采用**由各报告作者完成（本脚本不改别人的文档）；`--require-caliber` 用于把
@@ -88,19 +89,23 @@ DEFAULT_DOC_GLOBS = ('test-reports-2026-10/5*.md', 'test-reports-2026-10/6*.md')
 #: B17-16（A-70 三步）：14 条陈旧钉值按现场重取更新；改前值留档在
 #: `test-reports-2026-10/B17-登记.md` §B17-16（改前 = violations=16 / selftest 15/16）。
 PINNED = {
-    'rules_total': (272, 'run_gates.EXPECTED.routes_total_rules（`_verify_sources()` 实读覆盖本键；'
+    'rules_total': (273, 'run_gates.EXPECTED.routes_total_rules（`_verify_sources()` 实读覆盖本键；'
                          '与 coverage.json:summary.rules_total / LOCKED.rules_total 同值）',
-                    '路由规则总数（route_inventory / coverage_drift 判据钉值）'),
-    'method_level_GET': (160, 'coverage.json:summary.method_level_GET',
-                         '方法级 GET（`08` §2 的 160 曾按 A-25 判作废；`e057e81` 删 `/auth/register`'
-                         '（GET+POST）后现场回到 160 ⇒ 160 恢复为当前值，RETIRED `get160` 同步退役）'),
-    'method_level_non_get_total': (157, 'coverage.json:summary.method_level_non_get_total',
+                    '路由规则总数（route_inventory / coverage_drift 判据钉值；B18-Q1 有意更新：'
+                    '272 → 273，新增 `GET+POST /auth/change-password` 1 条规则）'),
+    'method_level_GET': (161, 'coverage.json:summary.method_level_GET',
+                         '方法级 GET（B18-Q1 有意更新：160 → 161，新增 `/auth/change-password` 的 GET '
+                         '方法；`e057e81` 删 `/auth/register` 使其 161 → 160，本次 160 → 161 回到 A-25 '
+                         '原值 161 ⇒ RETIRED `get160` 因会把当前正确值 161 判违规而同步退役）'),
+    'method_level_non_get_total': (158, 'coverage.json:summary.method_level_non_get_total',
                                    '方法级非 GET 端点总数（SEC-CSRF-01 有意更新：157 → 158，'
                                    '`/auth/logout` 增 POST 方法；`e057e81` 删 `/auth/register` 的'
-                                   'POST 方法后回落 158 → 157；规则级规则数不变）'),
-    'writable_rules_non_get': (155, 'coverage.json:summary.writable_rules_non_get',
+                                   'POST 方法后回落 158 → 157；B18-Q1 有意更新：新增'
+                                   '`/auth/change-password` 的 POST 方法 157 → 158；规则级规则数不变）'),
+    'writable_rules_non_get': (156, 'coverage.json:summary.writable_rules_non_get',
                                '可写（非 GET）规则数（SEC-CSRF-01 有意更新：155 → 156；'
-                               '`e057e81` 删 `/auth/register` 后回落 156 → 155）'),
+                               '`e057e81` 删 `/auth/register` 后回落 156 → 155；B18-Q1 有意更新：'
+                               '新增可写规则 `/auth/change-password` 后 155 → 156）'),
     'writable_any_covered_by_all': (118, 'coverage.json:summary.writable_any_covered_by_all',
                                     '可写规则含动态命中的覆盖数'),
     'writable_literal_covered_by_all': (110, 'coverage.json:summary.writable_literal_covered_by_all',
@@ -108,17 +113,19 @@ PINNED = {
     'uncovered_writable_rules': (0, 'coverage.json:uncovered_writable 长度 ∥ '
                                     'coverage_drift.UNCOVERED_WRITABLE_MAX',
                                  '无任何命中的可写规则数（A-31 的规则级权威值）'),
-    'non_get_uncovered_method_level': (39, '派生：method_level_non_get_total − '
-                                           'writable_any_covered_by_all（157 − 118）',
+    'non_get_uncovered_method_level': (40, '派生：method_level_non_get_total − '
+                                           'writable_any_covered_by_all（158 − 118）',
                                        '无任何命中的非 GET 方法级端点（A-31 权威值；135/139 作废；'
                                        'SEC-CSRF-01 有意更新 39 → 40；`e057e81` 删 `/auth/register`'
-                                       '后回落 40 → 39）'),
-    'smoke_targets': (148, 'coverage.json:smoke_test_plan.static_reproduction_targets',
-                      'smoke 静态复现目标数'),
+                                       '后回落 40 → 39；B18-Q1 有意更新：158 − 118 = 40 ⇒ 39 → 40）'),
+    'smoke_targets': (149, 'coverage.json:smoke_test_plan.static_reproduction_targets',
+                      'smoke 静态复现目标数（B18-Q1 有意更新：148 → 149）'),
     'smoke_unresolved': (9, 'coverage.json:smoke_test_plan.static_reproduction_unresolved',
                          'smoke 静态复现未解析数'),
-    'templates_files': (86, 'run_gates.EXPECTED.templates_files',
-                        '模板文件数（`e057e81` 删 `app/templates/auth/register.html` 后 87 → 86）'),
+    'templates_files': (87, 'run_gates.EXPECTED.templates_files',
+                        '模板文件数（`e057e81` 删 `app/templates/auth/register.html` 后 87 → 86；'
+                        'B18-Q1 有意更新：新增 `app/templates/auth/change_password.html` 后 86 → 87，'
+                        '回到 `e057e81` 之前的 87）'),
     'capabilities_declared': (44, 'run_gates.EXPECTED.capabilities_declared', '已登记能力数'),
     'properties_files': (25, 'run_gates.EXPECTED.properties_files',
                          'check_properties 扫描文件数（TL-05 不得漂移；'
@@ -126,8 +133,9 @@ PINNED = {
     'model_classes': (74, 'run_gates.EXPECTED.model_classes',
                       '模型类数（TL-05 不得漂移）'),
     'migration_revisions': (35, 'run_gates.EXPECTED.migration_revisions', '迁移修订数'),
-    'routes_get_no_arg': (103, 'run_gates.EXPECTED.routes_get_no_arg',
-                          '无参 GET 规则数（`e057e81` 删无参 GET `/auth/register` 后 104 → 103）'),
+    'routes_get_no_arg': (104, 'run_gates.EXPECTED.routes_get_no_arg',
+                          '无参 GET 规则数（`e057e81` 删无参 GET `/auth/register` 后 104 → 103；'
+                          'B18-Q1 有意更新：新增无参 GET `/auth/change-password` 后 103 → 104）'),
     'routes_get_with_arg': (56, 'run_gates.EXPECTED.routes_get_with_arg', '带参 GET 规则数'),
     'routes_non_get': (112, 'run_gates.EXPECTED.routes_non_get', '非 GET 规则数'),
     'functional_passed': (127, 'run_gates.EXPECTED.functional_passed', 'functional_test 通过数'),
@@ -141,9 +149,16 @@ RETIRED = (
      'why': '`≥135`：写端点无命中计数（A-31 已更正为 `≥141`）'},
     {'id': 'ge139', 'regex': r'[≥>=]{1,2}\s*139(?![0-9])',
      'why': '`≥139`：写端点无命中计数（同上，已作废）'},
-    # `get160`（`160`：方法级 GET，A-25 曾更正为 161）于 2026-10-10 **退役**（A-70 重基线随行动作）：
-    # `e057e81` 删 `/auth/register` 后 `method_level_GET` 现场即为 160（`PINNED` 亦钉 160）
-    # ⇒ 该 RETIRED 规则会把**当前正确值**判成违规。退役登记见 `RL-01-e057e81门禁重基线补正.md`。
+    # `get160`（`160` = 方法级 GET；A-25 曾更正为 161）**再次入册**（B18-Q1 · A-70 随行动作）：
+    # `e057e81` 删 `/auth/register` 后 `method_level_GET` 现场落到 160 ⇒ 当时该条退役（PINNED 钉 160）；
+    # B18-Q1 新增 `GET+POST /auth/change-password` 后现场回到 **161**（PINNED 同步钉 161）
+    # ⇒ 160 重又成为作废值，若不入册则含「160」的口径表与报告无人拦截。
+    # 判据带 `context`：窗口内（±12 字符）必须出现「方法级 / GET」等度量语境词才判违规 ⇒
+    # 行号、端口、行数等非度量语境的「160」不误伤（这也是 `context` 机制的常驻范本）。
+    # ⚠ 只匹配**裸 160**（前后非数字）⇒ `161` / `1160` 不被误判。
+    {'id': 'get160', 'regex': r'(?<![0-9])160(?![0-9])',
+     'context': r'方法级|GET|方法',
+     'why': '`160`：方法级 GET 的**旧值**（B18-Q1 起现值为 161；A-25 口径，出现须标「作废 / 已更正」）'},
     {'id': 'tables45', 'regex': r'(?<![0-9])45\s*张',
      'why': '「45 张」：零行表（A-2 已更正为 49 张）'},
 )
@@ -549,8 +564,10 @@ def selftest(lock_path=DEFAULT_LOCK, requirements_path=DEFAULT_REQUIREMENTS):
              'pass')
     doc_case('DC-N1 出现 ≥135', '<!-- caliber-table\n%s\n-->\n\n覆盖 ≥135 条。\n' % good_block,
              'fail')
-    doc_case('DC-N2（改：阳性对照）方法级 160 已恢复为当前值 ⇒ 不得再判违规',
-             '<!-- caliber-table\n%s\n-->\n\n方法级 GET 160 条。\n' % good_block, 'pass')
+    doc_case('DC-N2（B18-Q1 还原）方法级 GET 160 条 = 旧值 ⇒ 必须判违规',
+             '<!-- caliber-table\n%s\n-->\n\n方法级 GET 160 条。\n' % good_block, 'fail')
+    doc_case('DC-N2b（B18-Q1 新增阴性对照）方法级 GET 161 条 = 现值 ⇒ 不得判违规',
+             '<!-- caliber-table\n%s\n-->\n\n方法级 GET 161 条。\n' % good_block, 'pass')
     doc_case('DC-N3 出现「45 张」',
              '<!-- caliber-table\n%s\n-->\n\n零行表 45 张。\n' % good_block, 'fail')
     doc_case('DC-N4 口径表值写错（rules_total=270）',

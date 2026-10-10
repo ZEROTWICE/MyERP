@@ -37,7 +37,7 @@ from _env import (EVIDENCE_DIR, HARNESS_DIR, REPO_ROOT, SCRIPTS_DIR, ensure_dir,
 
 # 期望值单一存放点（GAP-29/30 的口径）：任何一项对不上即 fail。
 EXPECTED = {
-    'templates_files': 86,
+    'templates_files': 87,
     'capabilities_declared': 44,
     'capabilities_used_templates': 40,
     'capabilities_used_routes': 44,
@@ -47,8 +47,8 @@ EXPECTED = {
     'migration_revisions': 35,
     'properties_files': 25,
     'model_classes': 74,
-    'routes_total_rules': 272,
-    'routes_get_no_arg': 103,
+    'routes_total_rules': 273,
+    'routes_get_no_arg': 104,
     'routes_get_with_arg': 56,
     'routes_non_get': 112,
     'routes_static': 1,
