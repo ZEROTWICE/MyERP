@@ -17,6 +17,8 @@ class Config:
     SQLALCHEMY_DATABASE_URI = _normalize_database_url(os.environ.get('DATABASE_URL'))
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     PERMANENT_SESSION_LIFETIME = timedelta(minutes=60)
+    # CWE-614: HTTPS 部署后设 SESSION_COOKIE_SECURE=true 阻止会话 cookie 经明文 HTTP 传输
+    SESSION_COOKIE_SECURE = os.environ.get('SESSION_COOKIE_SECURE', '').lower() in ('1', 'true', 'yes')
     # 两地部署时给流水号加站点前缀，避免切主后撞号。空串表示单站点兼容旧 8 位号。
     SITE_CODE = (os.environ.get('SITE_CODE') or '').strip().upper()[:2]
     # Bootstrap 核心 css/js 本地供给（flask_bootstrap 蓝图静态目录，前缀 /bootstrap/static/）。

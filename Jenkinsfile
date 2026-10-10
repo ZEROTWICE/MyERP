@@ -248,7 +248,7 @@ pipeline {
                 python -m pip install --upgrade pip
                 
                 echo 安装项目依赖...
-                pip install -r requirements.txt
+                pip install -r requirements.lock
                 
                 echo 验证关键包安装...
                 pip show flask

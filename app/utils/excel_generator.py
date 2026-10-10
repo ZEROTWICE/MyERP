@@ -4,6 +4,16 @@ from datetime import datetime
 
 class ExcelGenerator:
     @staticmethod
+    def _sanitize_workbook(wb):
+        """CWE-1236: 将被 openpyxl 解析为公式（data_type='f'）的字符串单元格加 "'" 前缀，
+        阻止用户可控文本（物料名/备注/员工姓名等以 = + - @ 开头）在 Excel 打开时执行。"""
+        for ws in wb.worksheets:
+            for row in ws.iter_rows():
+                for cell in row:
+                    if cell.data_type == 'f' and isinstance(cell.value, str):
+                        cell.value = "'" + cell.value
+
+    @staticmethod
     def _apply_header_style(cell):
         """应用表头样式"""
         cell.font = Font(bold=True)
@@ -67,6 +77,7 @@ class ExcelGenerator:
                     pass
             ws.column_dimensions[col[0].column_letter].width = max_length + 2
         
+        ExcelGenerator._sanitize_workbook(wb)
         return wb
 
     @staticmethod
@@ -123,6 +134,7 @@ class ExcelGenerator:
                     pass
             ws.column_dimensions[col[0].column_letter].width = max_length + 2
         
+        ExcelGenerator._sanitize_workbook(wb)
         return wb
 
     @staticmethod
@@ -155,6 +167,7 @@ class ExcelGenerator:
                     pass
             ws.column_dimensions[col[0].column_letter].width = max_length + 2
         
+        ExcelGenerator._sanitize_workbook(wb)
         return wb
 
     @staticmethod
@@ -189,6 +202,7 @@ class ExcelGenerator:
                     pass
             ws.column_dimensions[col[0].column_letter].width = max_length + 2
         
+        ExcelGenerator._sanitize_workbook(wb)
         return wb
 
     @staticmethod
@@ -222,6 +236,7 @@ class ExcelGenerator:
                     pass
             ws.column_dimensions[col[0].column_letter].width = max_length + 2
         
+        ExcelGenerator._sanitize_workbook(wb)
         return wb
 
     @staticmethod
@@ -425,6 +440,7 @@ class ExcelGenerator:
                     pass
             ws.column_dimensions[col[0].column_letter].width = max_length + 2
 
+        ExcelGenerator._sanitize_workbook(wb)
         return wb
 
     @staticmethod
@@ -470,6 +486,7 @@ class ExcelGenerator:
                     pass
             ws.column_dimensions[col[0].column_letter].width = max_length + 2
 
+        ExcelGenerator._sanitize_workbook(wb)
         return wb
 
     @staticmethod
@@ -508,6 +525,7 @@ class ExcelGenerator:
                     pass
             ws.column_dimensions[col[0].column_letter].width = max_length + 2
 
+        ExcelGenerator._sanitize_workbook(wb)
         return wb
 
     @staticmethod
@@ -544,6 +562,7 @@ class ExcelGenerator:
                     pass
             ws.column_dimensions[col[0].column_letter].width = max_length + 2
 
+        ExcelGenerator._sanitize_workbook(wb)
         return wb
 
     @staticmethod
@@ -584,6 +603,7 @@ class ExcelGenerator:
                     pass
             ws.column_dimensions[col[0].column_letter].width = max_length + 2
 
+        ExcelGenerator._sanitize_workbook(wb)
         return wb
 
     @staticmethod
@@ -733,6 +753,7 @@ class ExcelGenerator:
                         pass
                 ws.column_dimensions[col[0].column_letter].width = max_length + 2
         
+        ExcelGenerator._sanitize_workbook(wb)
         return wb
 
     @staticmethod
@@ -1036,4 +1057,5 @@ class ExcelGenerator:
                         pass
                 ws.column_dimensions[col[0].column_letter].width = max_length + 2
 
+        ExcelGenerator._sanitize_workbook(wb)
         return wb 

@@ -1,3 +1,5 @@
+import secrets as _secrets
+
 from sqlalchemy.exc import SQLAlchemyError
 from flask import render_template, redirect, url_for, flash, request, jsonify, current_app, send_file
 from flask_login import login_required, current_user
@@ -634,7 +636,7 @@ def add_employee():
             username=form.employee_id.data,
             role='admin' if form.is_admin.data else 'user'
         )
-        user.set_password(form.password.data or form.employee_id.data)  # 如果没有设置密码，使用工号作为密码
+        user.set_password(form.password.data or _secrets.token_urlsafe(12))  # CWE-521: 密码未填时随机生成，不再用公开工号
         db.session.add(user)
         
         # 创建员工记录
@@ -2254,7 +2256,7 @@ def import_employees():
             try:
                 # 创建用户账号
                 user = User(username=data['employee_id'], role='user')
-                user.set_password(data['employee_id'])  # 初始密码与工号相同
+                user.set_password(_secrets.token_urlsafe(12))  # CWE-521: 初始密码随机生成，不再用公开工号
                 db.session.add(user)
                 db.session.flush()  # 获取用户ID
                 

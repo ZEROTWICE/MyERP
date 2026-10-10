@@ -150,7 +150,7 @@ if %errorlevel% neq 0 (
 :: 安装依赖
 echo 安装依赖包...
 python -m pip install --upgrade pip
-pip install -r requirements.txt
+pip install -r requirements.lock
 if %errorlevel% neq 0 (
     echo 错误: 依赖安装失败
     pause

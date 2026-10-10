@@ -503,11 +503,13 @@
                         </li>
                         <li class="nav-item d-flex align-items-center">
                             <span class="navbar-text me-3">欢迎，{{ current_user.username }}</span>
-                            <a class="nav-link" href="{{ url_for('auth.logout') }}">退出</a>
+                            <form method="post" action="{{ url_for('auth.logout') }}" style="display:inline">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="nav-link btn btn-link p-0">退出</button>
+                            </form>
                         </li>
                     {% else %}
                         <li class="nav-item"><a class="nav-link" href="{{ url_for('auth.login') }}">登录</a></li>
-                        <li class="nav-item"><a class="nav-link" href="{{ url_for('auth.register') }}">注册</a></li>
                     {% endif %}
                 </ul>
             </div>
@@ -554,14 +556,14 @@
             'home': url_for('main.index'),
             'notifications': url_for('main.manage_notifications'),
             'logout': url_for('auth.logout'),
+            'logout_csrf': csrf_token(),
             'username': current_user.username} | tojson }}
     </script>
     {% else %}
     <script type="application/json" id="mobileNavMeta">
         {{ {'authenticated': false,
             'home': url_for('main.index'),
-            'login': url_for('auth.login'),
-            'register': url_for('auth.register')} | tojson }}
+            'login': url_for('auth.login')} | tojson }}
     </script>
     {% endif %}
     <script src="{{ url_for('static', filename='js/mobile-optimization.js') }}"></script>

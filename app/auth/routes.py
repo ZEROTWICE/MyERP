@@ -1,5 +1,5 @@
 from flask import render_template, redirect, url_for, flash
-from flask_login import login_user, logout_user, current_user
+from flask_login import login_user, logout_user, current_user, login_required
 from app import db
 from .forms import LoginForm, RegistrationForm
 from . import bp
@@ -20,14 +20,16 @@ def login():
         return redirect(url_for('main.index'))
     return render_template('auth/login.html', title='登录', form=form)
 
-@bp.route('/logout')
+@bp.route('/logout', methods=['GET', 'POST'])
 def logout():
     logout_user()
     return redirect(url_for('main.index'))
 
 @bp.route('/register', methods=['GET', 'POST'])
+@login_required
 def register():
-    if current_user.is_authenticated:
+    if current_user.role != 'admin':
+        flash('仅管理员可创建新账号', 'danger')
         return redirect(url_for('main.index'))
     form = RegistrationForm()
     if form.validate_on_submit():
