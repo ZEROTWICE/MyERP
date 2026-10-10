@@ -24,7 +24,10 @@ fi
 
 case "${SECRET_KEY}" in
     ''|'dev')
-        echo "[WARN] SECRET_KEY 未设置或仍是默认值 'dev'（config.py:16 的兜底值）：会话/CSRF 签名密钥可预测，生产环境必须用 Secret 覆盖。" >&2
+        echo "[FATAL] SECRET_KEY 未设置或仍是默认值 'dev'（config.py:16 的兜底值）：会话/CSRF 签名密钥可预测，生产环境禁止启动。" >&2
+        echo "        请注入 SECRET_KEY=$(python -c 'import secrets;print(secrets.token_urlsafe(48))')；" >&2
+        echo "        本地调试请设置任意非 'dev' 值（如 SECRET_KEY=local-debug）。" >&2
+        exit 1
         ;;
 esac
 
