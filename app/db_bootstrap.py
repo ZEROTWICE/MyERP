@@ -83,13 +83,22 @@ def seed_path_for(app):
 
 
 def bootstrap_if_empty(app):
-    """首次启动导入：仅在库里没有任何账号时执行，之后每次启动都是空操作。"""
+    """首次启动初始化：库里没有任何账号时执行，之后每次启动都是空操作。
+
+    两条路径（按优先级）：
+    1. 种子库文件存在（SEED_SQLITE_PATH 或 <repo 根>/seed.db）⇒ 整体导入
+    2. 种子库不存在但 INIT_ADMIN_PASSWORD 已设置 ⇒ 创建一个 admin 账号，
+       用户名取 INIT_ADMIN_USERNAME（默认 'admin'），密码取 INIT_ADMIN_PASSWORD。
+       用于全新部署（如云服务器空 PG），不需要上传种子数据。
+    两者都不满足 ⇒ 空操作（应用能启动但无账号可登录，日志里有告警）。
+    """
     from app import db
     from app.models import User
 
     seed_path = seed_path_for(app)
     # 宿主机路径不存在时 Docker 会把挂载点建成目录，所以必须判 isfile
     if not os.path.isfile(seed_path):
+        _init_admin_if_empty(app, User)
         return
 
     try:
@@ -125,3 +134,43 @@ def _import_seed(app, engine, seed_path):
     app.logger.warning(f'初始化导入完成，共 {copied} 行；跳过 {len(skipped)} 张表')
     for name, err in skipped:
         app.logger.error(f'初始化导入跳过表 {name}: {err}')
+
+
+def _init_admin_if_empty(app, User):
+    """种子库不存在时的回退：用 INIT_ADMIN_PASSWORD 创建一个 admin 账号。
+
+    用于全新部署（如云服务器空 PG），不需要上传种子数据。
+    两个环境变量：
+      INIT_ADMIN_USERNAME — 用户名，默认 'admin'
+      INIT_ADMIN_PASSWORD — 密码（必填；未设则不创建，日志告警）
+    """
+    from app import db
+
+    try:
+        if db.session.query(User.id).first() is not None:
+            return
+
+        password = os.environ.get('INIT_ADMIN_PASSWORD', '').strip()
+        if not password:
+            app.logger.warning(
+                '目标库为空且无种子库（SEED_SQLITE_PATH），INIT_ADMIN_PASSWORD 也未设置 ⇒ '
+                '不创建任何账号。要初始化：在 .env 加 INIT_ADMIN_PASSWORD=<你的密码> 后重启，'
+                '或挂载种子库（./app.db:/app/seed.db:ro）。'
+            )
+            return
+
+        username = os.environ.get('INIT_ADMIN_USERNAME', 'admin').strip() or 'admin'
+        if User.query.filter_by(username=username).first() is not None:
+            return
+
+        user = User(username=username, role='admin')
+        user.set_password(password)
+        db.session.add(user)
+        db.session.commit()
+        app.logger.warning(
+            f'目标库为空：已创建管理员账号 {username!r}（INIT_ADMIN_PASSWORD），'
+            '请登录后立即修改密码。'
+        )
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f'创建初始管理员失败: {e}')
