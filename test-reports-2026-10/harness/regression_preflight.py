@@ -6,11 +6,18 @@
   阶段 1（preflight）：把 evidence/** 全量归档到 evidence/_phaseB-prefreeze/<stamp>/，
                        并写出 manifest（路径 + 字节 + SHA256）。归档本身不删除、不改写原件。
   阶段 2（verify）    ：与 manifest 比对，报告 modified / deleted / added，
-                       任一 modified/deleted 即 exit 1。
+                       任一 modified/deleted 即 exit 1（白名单内见下）。
+
+**有意复跑白名单（N-5 / B18-08）**：`verify --whitelist <文件>` 把「本来就该被复跑改写」
+的产物列为 `expected_modified`，它们不再计入 verdict ⇒ verify 的 exit 可直接读。
+白名单只接受**精确相对路径**（相对 ``evidence/``，一行一条，`#` 注释）——**通配一律拒绝**
+（40- §8-C-2：归档排除与白名单不得成为两套并存机制；`_phaseB-prefreeze/**` 由 ``iter_files``
+在复制阶段整体排除，不进 manifest）。**不给默认白名单**：不传参 = 与旧行为完全一致。
 
 用法（仓库根）：
   python -B test-reports-2026-10/harness/regression_preflight.py preflight
   python -B test-reports-2026-10/harness/regression_preflight.py verify
+  python -B test-reports-2026-10/harness/regression_preflight.py verify --whitelist <白名单文件>
 只读原件；仅写归档目录与 manifest。
 """
 import hashlib
@@ -62,6 +69,29 @@ def preflight():
     return 0
 
 
+def load_whitelist(path):
+    """读「有意复跑白名单」：**精确相对路径**一行一条，``#`` 注释、空行忽略。
+
+    含通配符（``*`` / ``?`` / ``[``）的行**一律拒绝**（usage error）：白名单是逐文件登记，
+    不许退化成「通配一开、整类放行」的第二套机制（40- §8-C-2）。
+    """
+    if not path:
+        return set()
+    if not os.path.isfile(path):
+        print("[verify] 白名单文件不存在：%s" % path)
+        return None
+    out = set()
+    for lineno, raw in enumerate(open(path, encoding="utf-8"), 1):
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        if any(ch in line for ch in "*?["):
+            print("[verify] 白名单第 %d 行含通配符（本工具只接受精确路径）：%s" % (lineno, line))
+            return None
+        out.add(line.replace("\\", "/").lstrip("./"))
+    return out
+
+
 def latest_manifest():
     ptr = os.path.join(ARCHIVE_ROOT, "LATEST.txt")
     if not os.path.isfile(ptr):
@@ -71,26 +101,32 @@ def latest_manifest():
     return man if os.path.isfile(man) else None
 
 
-def verify():
+def verify(whitelist=None):
     man = latest_manifest()
     if not man:
         print("NO MANIFEST：请先跑 preflight")
         return 2
+    whitelist = whitelist or set()
     doc = json.load(open(man, encoding="utf-8"))
     old = doc["files"]
     buf = io.StringIO()
-    modified, deleted = [], []
+    modified, deleted, expected = [], [], []
     for rel, meta in old.items():
         p = os.path.join(BASE, rel)
         if not os.path.isfile(p):
             deleted.append(rel)
             continue
         if os.path.getsize(p) != meta["bytes"] or sha256_file(p) != meta["sha256"].upper():
-            modified.append(rel)
+            (expected if rel in whitelist else modified).append(rel)
     now = set(iter_files(BASE))
     added = sorted(now - set(old))
     print("[verify] 基线 %s（%d 文件）" % (doc["stamp"], doc["file_count"]))
-    print("[verify] modified=%d deleted=%d added=%d" % (len(modified), len(deleted), len(added)))
+    print("[verify] modified=%d（白名单内 %d）deleted=%d added=%d"
+          % (len(modified), len(expected), len(deleted), len(added)))
+    print("[verify] 白名单 = %s" % ("（未提供：判定与旧行为一致）" if not whitelist
+                                    else "%d 条精确路径" % len(whitelist)))
+    for r in expected:
+        print("   W %s（白名单：有意复跑改写，不计入判定）" % r)
     for r in modified:
         print("   M %s" % r)
     for r in deleted:
@@ -105,10 +141,22 @@ def verify():
 
 
 if __name__ == "__main__":
-    cmd = (sys.argv[1] if len(sys.argv) > 1 else "").lower()
+    argv = sys.argv[1:]
+    wl_path = None
+    if "--whitelist" in argv:
+        i = argv.index("--whitelist")
+        wl_path = argv[i + 1] if len(argv) > i + 1 else None
+        if not wl_path:
+            print("[verify] --whitelist 需要文件路径")
+            sys.exit(2)
+        argv = argv[:i] + argv[i + 2:]
+    cmd = (argv[0] if argv else "").lower()
     if cmd == "preflight":
         sys.exit(preflight())
     if cmd == "verify":
-        sys.exit(verify())
+        wl = load_whitelist(wl_path)
+        if wl is None:
+            sys.exit(2)
+        sys.exit(verify(whitelist=wl))
     print(__doc__)
     sys.exit(2)

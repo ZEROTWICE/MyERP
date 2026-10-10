@@ -141,7 +141,8 @@ def guard_write(path, run_id=None):
     return alt, True
 
 
-def _append_journal(directory, requested, written, renamed, text, run_id=None):
+def _append_journal(directory, requested, written, renamed, text, run_id=None,
+                    reused_identical=False):
     """落盘审计：一行一条 JSON（只追加）。"""
     row = {
         'ts': time.strftime('%Y-%m-%d %H:%M:%S'),
@@ -149,6 +150,7 @@ def _append_journal(directory, requested, written, renamed, text, run_id=None):
         'requested': requested,
         'written': os.path.basename(written),
         'renamed_by_guard': bool(renamed),
+        'reused_identical': bool(reused_identical),
         'bytes': len(text.encode('utf-8')),
         'sha256': hashlib.sha256(text.encode('utf-8')).hexdigest().upper(),
     }
@@ -321,19 +323,31 @@ def save_evidence(filename, text, subdir=None, run_id=None, guard=True, journal=
     返回**实际写入路径**（发生改名时是改名后的路径，不是请求路径）。
 
     * ``subdir``：显式域目录（相对 ``EVIDENCE_ROOT``）；缺省即本 run 目录。
-    * ``guard``：默认开——目标已存在则改名保留（``<name>.<run_id><ext>``），绝不覆盖。
+    * ``guard``：默认开——目标已存在**且内容逐字相同** ⇒ **原样复用该路径**（幂等：
+      不产生 ``<name>.<run_id>.n`` 修订版，journal 记 ``reused_identical=true``）；
+      内容不同才改名保留（``<name>.<run_id><ext>``），绝不覆盖。
+      B18-08 / V-17：同族病史是「同 run 51 个修订版产物」（N-14）与两处 `guard_write`
+      同内容重复件 —— 治本点就在这里，**判据不变**（仍然绝不覆盖既有不同内容）。
     * ``journal``：默认开——向同目录 ``evidence_journal.jsonl`` 追加一行审计记录。
     """
     directory = evidence_dir(subdir=subdir, run_id=run_id)
     requested = os.path.join(directory, filename)
     path = requested
-    renamed = False
+    renamed = reused = False
     if guard:
-        path, renamed = guard_write(requested, run_id=run_id)
+        if os.path.exists(requested):
+            try:
+                with open(requested, encoding='utf-8') as fh:
+                    reused = fh.read() == text
+            except (OSError, UnicodeDecodeError):
+                reused = False
+        if not reused:
+            path, renamed = guard_write(requested, run_id=run_id)
     with open(path, 'w', encoding='utf-8', newline='\n') as fh:
         fh.write(text)
     if journal:
-        _append_journal(directory, requested, path, renamed, text, run_id=run_id)
+        _append_journal(directory, requested, path, renamed, text, run_id=run_id,
+                        reused_identical=reused)
     return path
 
 
@@ -365,3 +379,23 @@ def line_count(path):
         text = fh.read()
     lines = text.splitlines()
     return {'total_lines': len(lines), 'nonempty_lines': sum(1 for l in lines if l.strip())}
+
+
+if __name__ == '__main__':
+    # B18-08 自检（⑧ 同内容幂等分支）：**不碰 evidence/**，只把 EVIDENCE_ROOT 指到临时目录。
+    # 判据：同内容两次 ⇒ 同一路径（复用一个文件）；异内容 ⇒ 改名保留，原件一字不动。
+    import tempfile
+    EVIDENCE_ROOT = tempfile.mkdtemp(prefix='env_save_evidence_selftest_')
+    a1 = save_evidence('same.txt', 'A\n')
+    a2 = save_evidence('same.txt', 'A\n')
+    b1 = save_evidence('same.txt', 'B\n')
+    assert a1 == a2, ('同内容应复用同一路径', a1, a2)
+    assert b1 != a1 and os.path.basename(b1) != 'same.txt', ('异内容应改名保留', b1)
+    assert open(a1, encoding='utf-8').read() == 'A\n', a1
+    assert open(b1, encoding='utf-8').read() == 'B\n', b1
+    journal = os.path.join(os.path.dirname(a1), EVIDENCE_JOURNAL_NAME)
+    rows = [json.loads(l) for l in open(journal, encoding='utf-8')]
+    assert [r['reused_identical'] for r in rows] == [False, True, False], rows
+    assert [r['renamed_by_guard'] for r in rows] == [False, False, True], rows
+    print('save_evidence 幂等自检：OK（3 次写入 → 2 个文件；journal 3 行，'
+          'reused_identical=[False,True,False]）')

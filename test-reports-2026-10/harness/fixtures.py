@@ -16,7 +16,7 @@ import os
 
 from _env import (REAL_DB, assert_real_db_untouched, db_copy, tmp_dir,
                   sha256_file, RUN_ID, REAL_DB_SHA256_EXPECTED, TMP_ROOT,
-                  save_evidence, real_db_status)
+                  save_evidence, real_db_status, evidence_dir, _append_journal)
 
 _APP = None
 _COPY_PATH = None
@@ -988,11 +988,64 @@ def isolation_evidence(path=None):
             'real_db_unchanged': real['sha256'] == REAL_DB_SHA256_EXPECTED}
 
 
+#: 同一 RUN_ID 内跨进程**必然漂移**的字段（实测两跑 diff）：时间戳与随机 ``mkdtemp`` 副本路径。
+#: 幂等复用判据 = 剥离这些键后的「稳定投影」相等（B18-08 ① / N-14 同族治本）。
+_STABLE_VOLATILE_KEYS = ('generated_at', 'captured_at', 'copy_path_uri',
+                         'copy_path_uri_sha256', 'artifact')
+
+
+def _stable_view(value, volatile=_STABLE_VOLATILE_KEYS):
+    """递归剥离漂移键后的稳定投影（**只用于复用判据**，不改落盘内容，不伪造时间戳）。"""
+    if isinstance(value, dict):
+        return {k: _stable_view(v, volatile) for k, v in value.items() if k not in volatile}
+    if isinstance(value, list):
+        return [_stable_view(v, volatile) for v in value]
+    return value
+
+
+def _stable_digest(payload):
+    import hashlib as _hashlib
+    import json as _json
+    return _hashlib.sha256(_json.dumps(_stable_view(payload), ensure_ascii=False,
+                                       sort_keys=True).encode('utf-8')).hexdigest().upper()
+
+
+def _reuse_stable_artifact(filename, payload):
+    """同 run 幂等复用（B18-08 ①）：本 run 的 evidence 目录里已有「稳定投影」相同的产物
+    ⇒ 复用现有路径、**不写新文件**（从而不产生 ``<name>.<run_id>.n`` 修订版）。
+
+    命中：记 journal（``reused_identical=true`` + 现有文件指纹）并返回 ``(path, text)``；
+    未命中 / 无既有文件：返回 ``None``，调用方走 ``save_evidence`` 正常写入（异内容仍改名，
+    append-only 语义不变）。漂移字段仅限时间戳与随机副本路径（见 ``_STABLE_VOLATILE_KEYS``）。
+    """
+    import glob as _glob
+    import json as _json
+    directory = evidence_dir()
+    stem = filename.rsplit('.', 1)[0]
+    mine = _stable_view(payload)
+    for cand in sorted(_glob.glob(os.path.join(directory, stem + '*.json'))):
+        try:
+            with open(cand, encoding='utf-8') as fh:
+                existing_text = fh.read()
+            if _stable_view(_json.loads(existing_text)) == mine:
+                try:                       # 审计留痕：复用也是一次写入决策，记现有文件指纹
+                    _append_journal(directory, os.path.join(directory, filename), cand,
+                                    False, existing_text, reused_identical=True)
+                except OSError:
+                    pass
+                return cand, existing_text
+        except (OSError, ValueError):       # 读不了 / 解析不了的候选直接跳过，不阻塞正常写入
+            continue
+    return None
+
+
 def _build_manifest(app=None, write=True, filename='fixtures_manifest.json', extra=None):
     """组装台账（逐表对拍 + 隔离自证），并可选**落盘为产物**（E-10.3）。
 
     落盘走 ``_env.save_evidence``：目标已存在则改名保留（``<name>.<run_id>.json``）+ 追加
     ``evidence_journal.jsonl`` 一行；**内容哈希与上次写入相同时不重复落盘**（记 ``skipped_identical``）。
+    同 run 复跑：时间戳/随机副本路径导致全文哈希必变 ⇒ 先按 ``_stable_view`` 找**稳定投影相同**
+    的既有产物复用（不新增修订版，B18-08 ①）；没有才落新文件。
     """
     import hashlib as _hashlib
     import json as _json
@@ -1030,18 +1083,32 @@ def _build_manifest(app=None, write=True, filename='fixtures_manifest.json', ext
     if write:
         text = _json.dumps(payload, ensure_ascii=False, indent=1)
         digest = _hashlib.sha256(text.encode('utf-8')).hexdigest().upper()
+        sdigest = _stable_digest(payload)
         if _LAST_WRITE.get('sha256') == digest:
             payload['artifact'] = {'written': _LAST_WRITE.get('path'), 'skipped_identical': True,
-                                   'sha256': digest, 'bytes': len(text.encode('utf-8'))}
+                                   'sha256': digest, 'sha256_stable': sdigest,
+                                   'bytes': len(text.encode('utf-8'))}
         else:
-            try:
-                art = save_evidence(filename, text, journal=True)
-                _LAST_WRITE.update({'sha256': digest, 'path': art})
-                payload['artifact'] = {'written': art, 'skipped_identical': False,
-                                       'sha256': digest, 'bytes': len(text.encode('utf-8'))}
-            except Exception as exc:      # 落盘失败必须留痕（不得静默当成功）
-                payload['artifact'] = {'written': None,
-                                       'error': '%s: %s' % (exc.__class__.__name__, exc)}
+            reuse = _reuse_stable_artifact(filename, payload)
+            if reuse:                       # 同 run 复跑：稳定投影相同 ⇒ 复用，不新增修订版
+                reused_path, existing_text = reuse
+                payload['artifact'] = {
+                    'written': reused_path, 'skipped_identical': True,
+                    'skipped_reason': 'stable_projection_match（同 run 复跑，仅时间戳/随机副本路径漂移）',
+                    'sha256': _hashlib.sha256(existing_text.encode('utf-8')).hexdigest().upper(),
+                    'sha256_stable': sdigest,
+                    'bytes': len(existing_text.encode('utf-8'))}
+                _LAST_WRITE.update({'sha256': digest, 'path': reused_path})
+            else:
+                try:
+                    art = save_evidence(filename, text, journal=True)
+                    _LAST_WRITE.update({'sha256': digest, 'path': art})
+                    payload['artifact'] = {'written': art, 'skipped_identical': False,
+                                           'sha256': digest, 'sha256_stable': sdigest,
+                                           'bytes': len(text.encode('utf-8'))}
+                except Exception as exc:      # 落盘失败必须留痕（不得静默当成功）
+                    payload['artifact'] = {'written': None,
+                                           'error': '%s: %s' % (exc.__class__.__name__, exc)}
     return payload
 
 
@@ -1189,7 +1256,8 @@ def selftest(report_path=None):
     apath = art.get('written')
     chk('E-10.3.a_artifact_written',
         bool(apath) and os.path.exists(apath) and os.path.getsize(apath) > 0,
-        'path=%s bytes=%s sha16=%s' % (apath, art.get('bytes'), (art.get('sha256') or '')[:16]))
+        'path=%s bytes=%s sha16=%s' % (apath, art.get('bytes'),
+                                       (art.get('sha256_stable') or art.get('sha256') or '')[:16]))
     loaded = {}
     try:
         loaded = _json.loads(open(apath, encoding='utf-8').read())
@@ -1235,10 +1303,15 @@ def selftest(report_path=None):
         os.makedirs(os.path.dirname(os.path.abspath(report_path)), exist_ok=True)
     # 自检报告也走 E-01 的落盘 API（guard_write + 审计流水）；存档件里**不含** evidence_artifact 字段
     # （S-2 自引用约束：写入即改变自身），带该字段的副本另落 .tmp 供本次对拍使用。
+    # 同 run 复跑：与 fixtures_manifest 同一套稳定投影复用（漂移仅 copy_path_uri）⇒ 不新增修订版。
     archived = None
     try:
-        archived = save_evidence('fixtures_selftest_report.json',
-                                 _json.dumps(report, ensure_ascii=False, indent=1), journal=True)
+        reuse = _reuse_stable_artifact('fixtures_selftest_report.json', report)
+        if reuse:
+            archived = reuse[0]
+        else:
+            archived = save_evidence('fixtures_selftest_report.json',
+                                     _json.dumps(report, ensure_ascii=False, indent=1), journal=True)
     except Exception as exc:
         report['evidence_artifact_error'] = '%s: %s' % (exc.__class__.__name__, exc)
     report['evidence_artifact'] = archived

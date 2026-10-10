@@ -73,7 +73,8 @@ CI 配置只调用它（配置薄、逻辑可离线验证）。
    并把探针的 `native_exit` 与 `expected` **同时打印**（让「环境变了」可见）。
 
 退出码：`0` = 全部 blocking 通过；`1` = 有 blocking 失败；`2` = 无 blocking 失败但有 report-only 失败
-（便于第一阶段在 Jenkins 记 `UNSTABLE` 而不阻塞）。
+（便于第一阶段在 Jenkins 记 `UNSTABLE` 而不阻塞）；`4` = **运行锁等待超时**（N-6/A-98：另一并发运行
+仍在进行，本进程未执行任何步骤 —— 不是判据失败，重跑即可）。
 
 用法（仓库根目录）：
 
@@ -91,6 +92,7 @@ import os
 import re
 import shutil
 import sys
+import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPORTS_ROOT = os.path.dirname(HERE)
@@ -962,20 +964,22 @@ def spec_steps(python_exe, check_templates_script=None,
         # 【B17-16】口径守卫进链（blocking）：钉常量 ↔ 权威源 ↔ 报告口径表三级对拍的唯一消费者。
         # 判据输入：`--coverage <本 run 的 coverage.json>`（第 10 步 measure_coverage --out 的产物）
         # —— A-114 挂点与产物分离：**不得**改默认路径、**不得**读 live 覆盖写路径。
-        # `--selftest` 不并在本步（该开关提前 return，会把口径面短路）⇒ 由验证命令单独跑 16/16。
+        # `--selftest` 不并在本步（该开关提前 return，会把口径面短路）⇒ 由验证命令单独跑 25/25。
         {'id': 'check_doc_claims', 'group': 'blocking',
          'argv': [exe, '-B', os.path.join('scripts', 'check_doc_claims.py')],
          'extra_argv': [{'tail': ['--coverage', '{json}'], 'json_name': 'coverage.json'}],
          'expect_exit': 0,
-         'expects': ['[check_doc_claims] 钉常量 vs 权威源：20/20 相等',
-                     '[check_doc_claims] 文档：扫描 4 份、带口径表 1 份',
+         'expects': ['[check_doc_claims] 钉常量 vs 权威源：28/28 相等',
+                     '[check_doc_claims] 文档：扫描 5 份、带口径表 1 份',
                      '[check_doc_claims] RESULT: OK（violations=0）'],
          'expect_absent': ['[check_doc_claims] [VIOLATION]'],
-         'note': 'B17-16：TL-06 口径守卫 + TL-07 依赖钉版一致性。判据 = ① 20 条钉常量逐条与权威源'
-                 '实读相等（9 条 coverage 派生键从本 run 产物读）；② 扫描面 `5*.md`/`6*.md` 的口径表'
-                 '逐键相等；③ `requirements.lock` 精确钉版 / 锁头 sha256 / 环境匹配（'
+         'note': 'B17-16：TL-06 口径守卫 + TL-07 依赖钉版一致性。判据 = ① 28 条钉常量逐条与权威源'
+                 '实读相等（9 条 coverage 派生键从本 run 产物读）；② 扫描面 `5*.md`/`6*.md`/`80-*.md` 的'
+                 '口径表逐键相等；③ `requirements.lock` 精确钉版 / 锁头 sha256 / 环境匹配（'
                  '`DEFAULT_ENV_EXCEPTIONS` = psycopg2-binary + pywin32）。'
-                 '计数钉值（20/20、扫描 4 份带口径表 1 份）增减 ⇒ 本步报红并按 A-70 三步重基线。'
+                 '计数钉值（28/28、扫描 5 份带口径表 1 份）增减 ⇒ 本步报红并按 A-70 三步重基线。'
+                 '（B18-03：20→28 键 / 4→5 份 / selftest 17→25；改前值 20/20·4 份·17/17 留档于 '
+                 'B18-登记.md §B18-03。）'
                  '注入形态 ⑦：`--coverage` 指向归档锚点副本（writable_any_covered_by_all −1）⇒ 必红。'},
     ]
 
@@ -987,6 +991,63 @@ def root_json_state():
         state[name] = {'exists': os.path.exists(p),
                        'sha256': sha256_file(p) if os.path.exists(p) else None}
     return state
+
+
+# --------------------------------------------------------------- N-6/A-98 运行锁
+def acquire_run_lock(lock_path, wait_s=900.0, poll_s=5.0):
+    """取运行锁，返回 ``(fd, state)``，``state ∈ {'locked','timeout','unavailable'}``。
+
+    N-6/A-98：并发跑两次 ``ci_gates`` 会踩同一批 run 目录/报告型产物，产生**伪 blocking
+    失败**。锁是**咨询锁**（``fcntl.flock``；Windows 用 ``msvcrt.locking``），进程退出即
+    自动释放（fd 关闭），因此不需要显式解锁，也不会留下死锁。原语不可用 ⇒ 返回
+    ``'unavailable'``，调用方**告警后继续**（不新增失败模式）。
+    """
+    try:
+        os.makedirs(os.path.dirname(lock_path), exist_ok=True)
+        fd = open(lock_path, 'a+', encoding='utf-8')
+    except OSError as ex:
+        print('[ci_gates] [WARN] 运行锁不可用（%s）⇒ 不阻塞并发，请人工确认没有并发跑'
+              % ex.__class__.__name__)
+        return None, 'unavailable'
+    try:
+        import fcntl
+    except ImportError:
+        fcntl = None
+    msvcrt = None
+    if fcntl is None:
+        try:
+            import msvcrt
+        except ImportError:
+            msvcrt = None
+    if fcntl is None and msvcrt is None:
+        print('[ci_gates] [WARN] 本机无 fcntl/msvcrt ⇒ 运行锁退化为「不可用」，不阻塞并发')
+        return None, 'unavailable'
+    deadline = time.time() + float(wait_s)
+    announced = False
+    while True:
+        try:
+            if fcntl is not None:
+                fcntl.flock(fd.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            else:
+                msvcrt.locking(fd.fileno(), msvcrt.LK_NBLCK, 1)
+            fd.seek(0)
+            fd.truncate()
+            fd.write('pid=%d ts=%s\n' % (os.getpid(), time.strftime('%Y-%m-%d %H:%M:%S')))
+            fd.flush()
+            return fd, 'locked'
+        except OSError:
+            if not announced:
+                holder = ''
+                try:
+                    holder = (open(lock_path, encoding='utf-8').read().strip() or '?')
+                except OSError:
+                    pass
+                print('[ci_gates] 已有并发运行持有运行锁 %s（%s）⇒ 等待中，最多 %.0fs'
+                      % (lock_path, holder, wait_s))
+                announced = True
+            if time.time() >= deadline:
+                return None, 'timeout'
+            time.sleep(min(poll_s, max(0.5, deadline - time.time())))
 
 
 # ------------------------------------------------------------------ --selfcheck
@@ -1136,6 +1197,8 @@ def main(argv=None):
     ap.add_argument('--evidence-whitelist', default=DEFAULT_EVIDENCE_WHITELIST,
                     help='TL-04 白名单登记件路径（默认 harness/t8-evidence-whitelist.json）')
     ap.add_argument('--list', action='store_true', help='只打印命令清单与分组')
+    ap.add_argument('--lock-wait', type=float, default=900.0,
+                    help='N-6/A-98 运行锁：被并发运行占用时最多等待秒数（0 = 不等；超时 exit 4）')
     args = ap.parse_args(argv)
 
     for stream in (sys.stdout, sys.stderr):
@@ -1200,6 +1263,31 @@ def main(argv=None):
 
     before = root_json_state()
     inj_ctx = _inj_ctx(exe) if args.inject_step else None
+
+    # N-6/A-98 运行锁：本进程持有到退出（fd 关闭即释放），并发运行在此排队而不是互踩产物。
+    lock_path = os.path.join(REPORTS_ROOT, '.tmp', 'ci_gates.lock')
+    lock_fd, lock_state = acquire_run_lock(lock_path, wait_s=args.lock_wait)
+    if lock_state == 'timeout':
+        print('[ci_gates] 运行锁等待超时（--lock-wait %.0fs）：另一并发运行仍在进行，本进程未执行任何步骤'
+              % args.lock_wait)
+        print('[ci_gates] exit = 4  phase=%s' % args.phase)
+        print('[ci_gates] exit_code_semantics={"code": 4, "rule": '
+              '"4 = 运行锁等待超时（并发运行未结束；未执行任何步骤、不算判据失败）"}')
+        return 4
+    if lock_state == 'locked':
+        print('[ci_gates] 运行锁已获取：%s（pid=%d）' % (lock_path, os.getpid()))
+    lock_info = {'path': lock_path, 'state': lock_state, 'wait_s': args.lock_wait}
+    # 同一秒启动的第二个进程会算出同名 run 目录：拿到锁后让名，保证「一个 run 目录 = 一次运行」
+    # （否则串行执行仍会互相改名产物 ⇒ 伪失败）。
+    if os.path.exists(os.path.join(run_dir, 'gates.json')):
+        base, n, cand = run_dir, 2, '%s-2' % run_dir
+        while os.path.exists(os.path.join(cand, 'gates.json')):
+            n += 1
+            cand = '%s-%d' % (base, n)
+        run_dir = cand
+        os.makedirs(run_dir, exist_ok=True)
+        print('[ci_gates] run 目录同名（%s 已有产物）⇒ 本次改用 %s' % (os.path.basename(base),
+                                                                       run_dir))
 
     results = []
     ineffective = []
@@ -1424,6 +1512,7 @@ def main(argv=None):
         },
         'promotion_note': SMOKE_PROMOTION_NOTE,
         'gaps': [BUILD_LAYER_BLOCKED],
+        'run_lock': lock_info,
     }
 
     print('[ci_gates] steps=%d blocking 失败 = %s' % (len(results), blocking_fail or '无'))

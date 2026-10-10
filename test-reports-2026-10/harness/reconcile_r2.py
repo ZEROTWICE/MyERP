@@ -546,8 +546,19 @@ ITEM_CHECKS = [
      'fixtures_manifest 台账产物）',
      [chk_content(FIX, r'RUN_ID', '幂等面：夹具库按 <RUN_ID> 命名',
                   kind='content_implementation', pre=True),
-      chk_content(FIX, r"internal_number=f'_hvRAW\{i \+ 1\}'",
-                  'T-04 未修：料账仍用固定编号（无 RUN_ID/序号后缀）'),
+      # B18-08 / §10.5：原判据「T-04 未修」用**子串**正则
+      # （`internal_number=f'_hvRAW{i + 1}'`），而 9cab2fa（C-10）已在该行末尾追加 `+ _tag`
+      # ⇒ 子串仍命中 ⇒ 这条判据永远报「未修」，把**已修**的实况读成缺口（假绿）。
+      # 改为一对判据：正向断后缀存在 + 负向断「裸固定编号」回归。
+      # 依据：`app/models.py:533` 只有 `internal_number` 带 UNIQUE
+      # （`uq_raw_material_internal_number`）⇒ 只有它需要 RUN_ID 后缀；
+      # `melt_number` / `supplier_number` 无唯一约束，不改。
+      chk_content(FIX, r"internal_number=f'_hvRAW\{i \+ 1\}' \+ _tag",
+                  'T-04 已修：料账 internal_number 带 RUN_ID/序号后缀（B18-08 复算）',
+                  kind='content_implementation', pre=True),
+      chk_content(FIX, r"internal_number=f'_hvRAW\{i \+ 1\}'\s*[,)]",
+                  'T-04 回归：料账退回固定编号（无 RUN_ID/序号后缀）', expect=False,
+                  kind='content_implementation', pre=True),
       chk_glob('test-reports-2026-10/**/fixtures_manifest*.json', 'manifest 台账**产物**'),
       chk_content(UAT, r"RAW\['fixtures_manifest'\]", 'manifest 只是 RAW 键（pre-existing）',
                   kind='content_mention', pre=True)]),

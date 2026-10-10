@@ -750,6 +750,19 @@ def csrf_matrix(app, facts):
         admin = _model_admin()
     login_as(c, admin.username, 'test_pw_123')
 
+    # B18-08 / A-69：CSRF 判据**不再断文案**（统一 errorhandler 已换掉 CSRFError 文案，
+    # 旧文案判据漏判了 24 条真被拦下的请求）。稳定标记：CSRFProtect 的 ``csrf_protect``
+    # 在 ``create_app`` 时注册，本哨兵**追加在 before_request 链尾** ⇒ ``CSRF 拦下时哨兵
+    # 不执行``（Flask ``preprocess_request`` 遇非 None 返回值/异常即短路）。判据改为
+    # ``code == 400 且哨兵未执行``；视图被触达的 400 一律不算 CSRF 拦截。
+    seen = {'ran': False}
+
+    def _csrf_sentinel():
+        seen['ran'] = True
+        return None
+
+    app.before_request_funcs.setdefault(None, []).append(_csrf_sentinel)
+
     out = {'enabled_original': orig, 'enabled_during_probe': True,
            'rows': [], 'violations': [], 'positive_control': {}, 'get_control': {},
            'note': '同一 app 内临时打开 WTF_CSRF_ENABLED（请求时读取），测完还原'}
@@ -798,6 +811,7 @@ def csrf_matrix(app, facts):
                     url = re.sub(r'<(?:path|any)?:?\w+>', SENTINEL_STR, url)
             for meth in methods:
                 n_w += 1
+                seen['ran'] = False
                 try:
                     r = c.open(url, method=meth, data={}, follow_redirects=False)
                 except Exception as ex:
@@ -805,10 +819,10 @@ def csrf_matrix(app, facts):
                                         'exempt': exempt, 'exc': ex.__class__.__name__})
                     continue
                 body = r.get_data(as_text=True)
-                csrf_blocked = r.status_code == 400 and ('csrf' in body.lower()
-                                                         or '令牌' in body or 'Token' in body)
+                csrf_blocked = bool(r.status_code == 400 and not seen['ran'])
                 row = {'rule': str(rule), 'endpoint': rule.endpoint, 'method': meth, 'url': url,
                        'exempt': exempt, 'code': r.status_code, 'csrf_blocked': csrf_blocked,
+                       'sentinel_ran': seen['ran'],
                        'body_head': body[:160].replace('\n', ' ')}
                 out['rows'].append(row)
                 if exempt or csrf_blocked:
@@ -821,9 +835,27 @@ def csrf_matrix(app, facts):
                     'why': f'非 GET 端点未声明 @csrf.exempt 却未在缺 token 时被 CSRF 拦'
                            f'（code={r.status_code}）', 'severity': 'high'})
         out['summary'] = {'probed': n_w, 'enforced_or_exempt': n_ok, 'not_enforced': n_bad}
+        # 判据可观测性守卫（B18-08）：哨兵一次都没跑过 ⇒ 「400 且哨兵未执行」会把**所有**
+        # 请求都算成被拦，是典型假绿场景。至少要有 exempt 行证明哨兵真的能跑到。
+        n_seen = sum(1 for r in out['rows'] if r.get('sentinel_ran'))
+        out['summary'].update({'sentinel_ran_rows': n_seen,
+                               'code_400_rows': sum(1 for r in out['rows']
+                                                    if r.get('code') == 400)})
+        if n_w and not n_seen:
+            out['violations'].append({
+                'id': 'F-CSRF-SENTINEL-NOT-OBSERVED', 'rule': '-', 'method': '-', 'code': None,
+                'severity': 'high',
+                'why': '链尾 before_request 哨兵在所有探针上都没执行 ⇒ CSRF 判据不可观测'
+                       '（会把 400 全算成被拦的假绿），须先修探针再采信读数'})
+        out['criterion'] = ('B18-08/A-69 重指：csrf_blocked = (code==400 且链尾 before_request '
+                            '哨兵未执行)，不断文案；同一 CSRF 面分母 = 非 GET 方法级 155 '
+                            '= 拦 133 + 豁免 22')
         log(f'  [F] 非 GET 探针 {n_w} 条：期望被拒/豁免命中 {n_ok} 条，未拦 {n_bad} 条')
     finally:
         app.config['WTF_CSRF_ENABLED'] = orig
+        _funcs = app.before_request_funcs.get(None) or []
+        if _csrf_sentinel in _funcs:
+            _funcs.remove(_csrf_sentinel)
     return out
 
 

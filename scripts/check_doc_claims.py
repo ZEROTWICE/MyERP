@@ -81,9 +81,16 @@ COVERAGE_ANCHOR_READINGS = {
 RUN_GATES = os.path.join(HARNESS_DIR, 'run_gates.py')
 COVERAGE_DRIFT = os.path.join(HARNESS_DIR, 'coverage_drift.py')
 GH_WORKFLOW = os.path.join(REPO_ROOT, '.github', 'workflows', 'docker-deploy.yml')
+# ---- B18-03：80-§5.3 静态面权威源（全部只读：AST 字面量 / splitlines / 文件指纹）
+PERMISSIONS_PY = os.path.join(REPO_ROOT, 'app', 'permissions.py')
+APP_INIT_PY = os.path.join(REPO_ROOT, 'app', '__init__.py')
+REAL_DB_PATH = os.path.join(REPO_ROOT, 'app.db')
 DEFAULT_LOCK = os.path.join(REPO_ROOT, 'requirements.lock')
 DEFAULT_REQUIREMENTS = os.path.join(REPO_ROOT, 'requirements.txt')
-DEFAULT_DOC_GLOBS = ('test-reports-2026-10/5*.md', 'test-reports-2026-10/6*.md')
+#: B18-03：`80-*.md` 纳入默认扫描面（其 §5.3 数字对账表交机检：作废值逐行扫 +
+#: 新增 8 键经 52-V13 口径表对拍）。历史段落（`00` §6 等）仍不在默认域内。
+DEFAULT_DOC_GLOBS = ('test-reports-2026-10/5*.md', 'test-reports-2026-10/6*.md',
+                     'test-reports-2026-10/80-*.md')
 
 #: 口径键登记表：键 -> (钉值, 权威源说明, 备注)。**值由 `_verify_sources()` 逐条实读复核**。
 #: B17-16（A-70 三步）：14 条陈旧钉值按现场重取更新；改前值留档在
@@ -141,6 +148,28 @@ PINNED = {
     'functional_passed': (127, 'run_gates.EXPECTED.functional_passed', 'functional_test 通过数'),
     'gh_workflow_lines': (161, '.github/workflows/docker-deploy.yml splitlines() 行数',
                           'GH 工作流行数（28 §5-4：行数用 splitlines）'),
+    # ---- B18-03（2026-10-10）：80-§5.3 数字对账表机检 —— 8 键入册（20 → 28）。
+    # 改前值留档（A-70 ①）：80-§5.3 历史读数 = routes 12155 / models 2983 / .gitignore 42 /
+    # _ENSURED_COLUMNS 10 表 43 列 / 真库 F5DA2306…0E0F065（2026-09-18 时点）；逐键阴性对照
+    # = --selftest DC-N9[*]（注入错值必红）+ .tmp 口径表副本逐键翻转实测，读数见
+    # `test-reports-2026-10/B18-登记.md` §B18-03。
+    'roles_count': (7, 'app/permissions.py ROLES 元组长度（AST 实读）',
+                    '系统角色数（80-§5.3「角色数」行；ROLES 七角色口径）'),
+    'routes_py_lines': (12761, 'app/main/routes.py splitlines() 行数',
+                        'routes.py 行数（80-§5.3 该行历史漂移 5 次：11557/12214/12126/12127/12155 均过时）'),
+    'models_py_lines': (3246, 'app/models.py splitlines() 行数',
+                        'models.py 行数（80-§5.3 旧值 2983 已过时）'),
+    'gitignore_lines': (53, '.gitignore splitlines() 行数',
+                        '.gitignore 行数（80-§5.3 旧值 42 已过时）'),
+    'ensured_columns_tables': (11, 'app/__init__.py _ENSURED_COLUMNS 键数（AST 实读）',
+                               '启动自愈登记表数（80-§5.3 旧值 10 已过时）'),
+    'ensured_columns_total': (44, 'app/__init__.py _ENSURED_COLUMNS 各表列数合计（AST 实读）',
+                              '启动自愈登记列数合计（80-§5.3 旧值 43 已过时）'),
+    'real_db_bytes': (2531328, 'app.db os.path.getsize（真库只读）',
+                      '真库字节数（80-§5.3「真库不变量」行）'),
+    'real_db_sha256': ('B4FB980C5D1B25B3C3A0EADC12ECF01C75B36EBD213B109E5DD190C617EEAABE',
+                       'app.db sha256（真库只读不变量；read_sources 只读实算）',
+                       '真库指纹（80-§5.3 旧值 F5DA2306…0E0F065 已过时；库变更必须走 A-70 三步）'),
 }
 
 #: 作废口径值（G-14 / A-25 / A-31 / A-2）
@@ -280,6 +309,39 @@ def read_sources(coverage_path=None):
             vals['gh_workflow_lines'] = len(fh.read().splitlines())
     else:
         errors.append('权威源缺失：%s' % _rel(GH_WORKFLOW))
+    # ---- B18-03：80-§5.3 静态面（只读实读，不导入、不写库）
+    if os.path.isfile(PERMISSIONS_PY):
+        roles = _literal_assign(PERMISSIONS_PY, 'ROLES')
+        if isinstance(roles, (tuple, list)):
+            vals['roles_count'] = len(roles)
+        else:
+            errors.append('权威源不可解析：%s ROLES' % _rel(PERMISSIONS_PY))
+    else:
+        errors.append('权威源缺失：%s' % _rel(PERMISSIONS_PY))
+    if os.path.isfile(APP_INIT_PY):
+        ensured = _literal_assign(APP_INIT_PY, '_ENSURED_COLUMNS')
+        if isinstance(ensured, dict):
+            vals['ensured_columns_tables'] = len(ensured)
+            vals['ensured_columns_total'] = sum(len(v) for v in ensured.values()
+                                                if isinstance(v, (list, tuple, set)))
+        else:
+            errors.append('权威源不可解析：%s _ENSURED_COLUMNS' % _rel(APP_INIT_PY))
+    else:
+        errors.append('权威源缺失：%s' % _rel(APP_INIT_PY))
+    for key, rel in (('routes_py_lines', 'app/main/routes.py'),
+                     ('models_py_lines', 'app/models.py'),
+                     ('gitignore_lines', '.gitignore')):
+        p = os.path.join(REPO_ROOT, rel)
+        if os.path.isfile(p):
+            with open(p, encoding='utf-8', errors='replace') as fh:
+                vals[key] = len(fh.read().splitlines())
+        else:
+            errors.append('权威源缺失：%s' % rel)
+    if os.path.isfile(REAL_DB_PATH):
+        vals['real_db_bytes'] = os.path.getsize(REAL_DB_PATH)
+        vals['real_db_sha256'] = sha256_file(REAL_DB_PATH)     # 只读指纹，写库须走 A-70
+    else:
+        errors.append('权威源缺失：%s（真库只读不变量）' % _rel(REAL_DB_PATH))
     # 派生值
     if (isinstance(vals.get('method_level_non_get_total'), int)
             and isinstance(vals.get('writable_any_covered_by_all'), int)):
@@ -583,6 +645,17 @@ def selftest(lock_path=DEFAULT_LOCK, requirements_path=DEFAULT_REQUIREMENTS):
     p_n8 = doc_case('DC-N8b 无口径表但不要求', '正文，无口径表。\n', 'pass', False)
     cases.append(('DC-N8-b 同形态文档不带 --require-caliber ⇒ 放行', 'pass',
                   'pass' if not check_doc(p_n8)[0] else 'fail', None))
+
+    # ---- B18-03：80-§5.3 新增 8 键逐键阴性对照（口径表只把该键写错 ⇒ 必须转红）
+    for key in ('roles_count', 'routes_py_lines', 'models_py_lines', 'gitignore_lines',
+                'ensured_columns_tables', 'ensured_columns_total', 'real_db_bytes',
+                'real_db_sha256'):
+        pin = PINNED[key][0]
+        wrong = ('0' * 64) if isinstance(pin, str) else pin + 1
+        blk = '\n'.join('%s = %s' % (k, wrong if k == key else v[0])
+                        for k, v in sorted(PINNED.items()))
+        doc_case('DC-N9[%s] 口径表写错值 ⇒ 必红' % key,
+                 '<!-- caliber-table\n%s\n-->\n\n正文。\n' % blk, 'fail')
 
     # ---- lock 四类
     v, w, i = check_lock(lock_path, requirements_path)

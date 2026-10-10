@@ -310,10 +310,8 @@ def machine_claims(artifacts=None):
         add("api 违规合计", 71, al.get("api_violations_total"), "assertion_ledger.json")
     cv = load("coverage_verdict")
     if cv:
-        for key, exp in (("method_level_non_get_recount", 155), ("literal_covered_recount", 6),
-                         ("covered_any_recount", 14), ("dynamic_only", 8),
-                         ("non_get_without_any_hit", 141), ("rules_non_get", 153),
-                         ("uncovered_writable", 101), ("method_level_get", 161)):
+        # B18-08：期望值不再写字面量（见 coverage_pins() 的绑定式与改前值留档）。
+        for key, exp in coverage_pins().items():
             add("覆盖度 " + key, exp, cv.get(key), "coverage_verdict.json")
         add("literal ⊂ any", True, cv.get("literal_is_subset_of_any"), "coverage_verdict.json")
         cs = cv.get("csrf", {})
@@ -383,8 +381,13 @@ def machine_claims(artifacts=None):
             add("t7 实测 " + key, exp, n, "improve_plan.json." + key)
         d = ip.get("derived", {})
         if isinstance(d, dict):
-            for key, exp in (("no_hit_method_level_ge", 141), ("uncovered_writable_rules_len", 101),
-                             ("non_get_method_level", 155), ("literal_covered", 6), ("covered_any", 14)):
+            # B18-08：同上，期望值一律绑定权威源（改前 141/101/155/6/14 留档见 82- 登记件）。
+            _p = coverage_pins()
+            for key, exp in (("no_hit_method_level_ge", _p["non_get_without_any_hit"]),
+                             ("uncovered_writable_rules_len", _p["uncovered_writable"]),
+                             ("non_get_method_level", _p["method_level_non_get_recount"]),
+                             ("literal_covered", _p["literal_covered_recount"]),
+                             ("covered_any", _p["covered_any_recount"])):
                 add("t7 派生 " + key, exp, d.get(key), "improve_plan.json.derived")
     am = MACHINE["api_matrix"]
     if os.path.isfile(am):
@@ -442,11 +445,64 @@ def machine_claims(artifacts=None):
     return out
 
 
+def coverage_pins():
+    """覆盖度期望值**从唯一权威源绑定**（B18-08 / G-12）。
+
+    改前：本文件自持 `155/6/14/8/141/153/101/161` —— 那是 **V-06 之前**的读数，
+    与现行权威源（`coverage_drift.LOCKED` = 108/116/0、`check_doc_claims.PINNED`）
+    互斥，属「覆盖分母抬升未同步下游产物」。
+    改后：一律从 `scripts/check_doc_claims.py:PINNED` 绑定（ci_gates 第 19 步 blocking
+    逐条对同一张表执法），本文件不再有可漂移的字面量。
+    改前值留档：`test-reports-2026-10/82-数字对账表机检登记.md`。
+
+    键 ↔ 产出方公式（`harness/analysis_ledger.py:605-613`）一一对应：
+      method_level_get             = summary.method_level_GET
+      method_level_non_get_recount = len(non_get)
+      literal_covered_recount      = len(lit)
+      covered_any_recount          = len(anyc)
+      dynamic_only                 = len(any_ids - lit_ids)
+      non_get_without_any_hit      = len(non_get) - len(anyc)
+      rules_non_get                = summary.writable_rules_non_get
+      uncovered_writable           = len(coverage.uncovered_writable)
+    """
+    import importlib.util
+    path = os.path.join(ROOT, "scripts", "check_doc_claims.py")
+    spec = importlib.util.spec_from_file_location("_b18_doc_claims", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    p = {k: v[0] for k, v in mod.PINNED.items()}
+    lit = p["writable_literal_covered_by_all"]
+    anyc = p["writable_any_covered_by_all"]
+    return {
+        "method_level_non_get_recount": p["method_level_non_get_total"],
+        "literal_covered_recount": lit,
+        "covered_any_recount": anyc,
+        "dynamic_only": anyc - lit,
+        "non_get_without_any_hit": p["non_get_uncovered_method_level"],
+        "rules_non_get": p["writable_rules_non_get"],
+        "uncovered_writable": p["uncovered_writable_rules"],
+        "method_level_get": p["method_level_GET"],
+    }
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--finalize", action="store_true", help="写 artifact_hashes.json（定稿口径）")
     ap.add_argument("--run-id", default=None)
+    ap.add_argument("--print-pins", action="store_true",
+                    help="只打印覆盖度绑定表（B18-08 自检；不读产物、不落盘）")
     args = ap.parse_args()
+
+    if args.print_pins:
+        pins = coverage_pins()
+        for k, v in pins.items():
+            print(f"  {k} = {v}")
+        # 自检 1：PINNED 的派生键必须与同表内两键之差自洽（B18-08 绑定式）。
+        assert pins["dynamic_only"] == pins["covered_any_recount"] - pins["literal_covered_recount"], pins
+        assert pins["non_get_without_any_hit"] == (
+            pins["method_level_non_get_recount"] - pins["covered_any_recount"]), pins
+        print("覆盖度绑定表自检：OK（%d 键，无字面量）" % len(pins))
+        return 0
     run_id = args.run_id or ("t8-final-20261006" if args.finalize else "t8-pre-20261006")
 
     started = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
