@@ -94,14 +94,41 @@ _ENSURED_COLUMNS = {
 
 
 def _sql_type(coltype, dialect):
+    """把 SQLite 口径的列类型翻成目标方言的合法 DDL 片段。
+
+    PostgreSQL 是强类型：`ADD COLUMN x BOOLEAN DEFAULT 0` 会抛
+    `DatatypeMismatch`（boolean 与 integer 不同型），必须写 FALSE/TRUE，
+    而 SQLite 只认 0/1（2026-10-11 一次性 PG 测试库实测）。
+    """
     if dialect != 'postgresql':
         return coltype
     return {
         'DATETIME': 'TIMESTAMP',
         'BOOLEAN': 'BOOLEAN',
+        'BOOLEAN DEFAULT 0': 'BOOLEAN DEFAULT FALSE',
+        'BOOLEAN DEFAULT 1': 'BOOLEAN DEFAULT TRUE',
         'FLOAT': 'DOUBLE PRECISION',
         'INTEGER': 'INTEGER',
     }.get(coltype, coltype)
+
+
+def _build_alter_add_column(engine, table, name, coltype, dialect):
+    """构造补列 DDL（B18）。独立成函数有两个原因：
+
+    1. SQL 标识符必须按方言加引号 —— ``user`` 是 PostgreSQL 保留字，裸写成
+       ``ALTER TABLE user ...`` 会抛 ``SyntaxError``，而调用方的 except 只记日志、
+       不阻断启动，于是老库在生产上永远补不上这一列，SQLite 上又永远测不出来。
+    2. 它让「有没有漏引号」可以被离线检查（``scripts/check_table_parity.py`` 只扫
+       本函数体，注释里的示例串因此不会被误判）。
+    """
+    preparer = engine.dialect.identifier_preparer
+    # quote() 自身带引号（PG 下 user -> "user"），模板里不要再手写引号，
+    # 否则会拼出 ""user"" 这种零长度定界标识符。
+    return 'ALTER TABLE {tbl} ADD COLUMN {col} {typ}'.format(
+        tbl=preparer.quote(table),
+        col=preparer.quote(name),
+        typ=_sql_type(coltype, dialect),
+    )
 
 
 def _ensure_schema(app):
@@ -123,7 +150,7 @@ def _ensure_schema(app):
             with engine.begin() as conn:
                 for name, coltype in missing:
                     conn.execute(text(
-                        f'ALTER TABLE {table} ADD COLUMN {name} {_sql_type(coltype, dialect)}'
+                        _build_alter_add_column(engine, table, name, coltype, dialect)
                     ))
                     app.logger.info(f'已为 {table} 添加缺失列：{name}')
 

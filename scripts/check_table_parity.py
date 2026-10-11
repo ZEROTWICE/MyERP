@@ -37,9 +37,27 @@ import re
 import sys
 import tempfile
 
+from sqlalchemy.dialects import postgresql, sqlite
+
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 VERSIONS = ROOT / 'migrations' / 'versions'
 IDEMPOTENT = VERSIONS / 'p0p2messtables_add_create_all_tables.py'
+
+
+class _MockEngine:
+    """只给 `_build_alter_add_column()` 用：它只需要 `engine.dialect`。
+
+    自带一个最小 dialect 垫片，避免为「离线拼 SQL」真的去 create_engine
+    （那会连带 mock 策略弃用告警与连接对象，本检查一条都不需要）。
+    """
+
+    def __init__(self, name):
+        base = postgresql.dialect() if name == 'postgresql' else sqlite.dialect()
+        self.dialect = base
+
+
+def _mock_engine(name):
+    return _MockEngine(name)
 
 # 冻结基线（B17-00 契约冻结 §2-B17-05 / A-12），现场重测于批次17。
 FROZEN = {
@@ -168,6 +186,104 @@ def heads():
     return ScriptDirectory.from_config(cfg).get_heads()
 
 
+def check_alter_quoting():
+    """B18 回归：_ensure_schema() 的补列 SQL 必须给标识符加方言引号。
+
+    病史（2026-10-11 生产库只读探针实测）：`user` 是 PG 保留字，裸写成
+    ``ALTER TABLE user ADD COLUMN …`` 会抛 ``psycopg2.errors.SyntaxError``，
+    而该异常在 `_ensure_schema()` 里被 except 吞成一行日志、不阻断启动
+    ⇒ 生产库列永远补不上，而 SQLite 上永远测不出来（安全区不报错的缺陷）。
+
+    判据（正则，不实际建应用、不碰库）：`_ensure_schema()` 函数体里出现的每条
+    ``ALTER TABLE`` 都必须写成 ``ALTER TABLE "``（带引号）。
+    """
+    src = (ROOT / 'app' / '__init__.py').read_text(encoding='utf-8')
+    return scan_alter_quoting(src)
+
+
+def scan_alter_quoting(src):
+    """扫 ``app/__init__.py`` 两个函数的源码文本，判补列 SQL 的标识符有没有加引号。
+
+    覆盖两条路径：① 构造点 ``_build_alter_add_column()`` 必须写出带引号的模板；
+    ② 自愈流程 ``_ensure_schema()`` 自己不许再出现任何裸 ``ALTER TABLE`` 字面量
+    （绕开构造函数的写法要在这里被拦下）。只看字符串字面量 ⇒ 注释里的示例串不误判。
+    """
+    tree = ast.parse(src)
+    targets = {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef):
+            targets[node.name] = node
+    if ('_build_alter_add_column' not in targets
+            or '_ensure_schema' not in targets):
+        return ('找不到 _build_alter_add_column()/_ensure_schema()'
+                '（B18 引号回归检查无法执行）')
+
+    rx_bad = re.compile(r'ALTER TABLE (?!")')
+    # 模板里表名/列名必须是**未被手写引号包裹**的占位符：quote() 自带引号，
+    # 手写成 "\"{tbl}\"" 会拼出 ""user""（零长度定界标识符），2026-10-11 实测踩过。
+    rx_placeholder = re.compile(r'ALTER TABLE \{')
+    problems = []
+    builder = targets['_build_alter_add_column']
+    builder_strs = [n.value for n in ast.walk(builder)
+                    if isinstance(n, ast.Constant) and isinstance(n.value, str)]
+    if not any('ADD COLUMN' in s and rx_placeholder.search(s) for s in builder_strs):
+        problems.append('_build_alter_add_column() 未写出占位符模板 '
+                        '（应形如 ALTER TABLE {tbl} ADD COLUMN {col} …）')
+
+    # 粒度取「函数体内是否调用 quote()」：够挡住整个写法（含本次修复前的 f-string
+    # 版本），但挡不住「只给表名加引号、漏了列名」这种半吊子改动。
+    # ponytail: 不做数据流追踪，真要覆盖半吊子写法就升级成模板变量逐一对账。
+    if not any(isinstance(n, ast.Attribute) and n.attr == 'quote'
+               for n in ast.walk(builder)):
+        problems.append('_build_alter_add_column() 未调用 '
+                        'identifier_preparer.quote() 给表名/列名加引号')
+
+    for n in ast.walk(targets['_ensure_schema']):
+        if not isinstance(n, ast.Constant) or not isinstance(n.value, str):
+            continue
+        if rx_bad.search(n.value):
+            problems.append('_ensure_schema() 里有未加引号的 ALTER TABLE 字面量：%r'
+                            % n.value[:80])
+    if problems:
+        return '；'.join(problems) + '（PG 保留字如 user 会 SyntaxError 且被吞）'
+    return None
+
+
+def check_ensured_ddl():
+    """B18 回归：`_ENSURED_COLUMNS` 每条都必须在 SQLite/PG 两种方言下生成合法补列 DDL。
+
+    病史（2026-10-11 一次性 PG 测试库实测）：
+    `BOOLEAN DEFAULT 0` 在 PG 上抛 DatatypeMismatch（boolean vs integer 不同型），
+    而异常在 `_ensure_schema()` 里被 except 吞成一行日志 ⇒ 生产库列补不上，
+    SQLite 上永远测不出来。这里用 `_build_alter_add_column()` 按方言实算 DDL，只读。
+    """
+    sys.path.insert(0, str(ROOT))
+    try:
+        from app import _ENSURED_COLUMNS, _build_alter_add_column
+    except Exception as e:  # 导入失败要报出来，不许静默跳过
+        return '无法导入 _ENSURED_COLUMNS/_build_alter_add_column：%r' % (e,)
+
+    problems = []
+    for dialect in ('sqlite', 'postgresql'):
+        engine = _mock_engine(dialect)
+        # 布尔默认值两种方言写法不同：PG 强类型只认 FALSE/TRUE，SQLite 只认 0/1。
+        rx_ok = re.compile(r' BOOLEAN DEFAULT (0|1)$') if dialect == 'sqlite' \
+            else re.compile(r' BOOLEAN DEFAULT (FALSE|TRUE)$')
+        for table, columns in sorted(_ENSURED_COLUMNS.items()):
+            for name, coltype in columns:
+                ddl = _build_alter_add_column(engine, table, name, coltype, dialect)
+                if ' BOOLEAN DEFAULT ' in ddl and not rx_ok.search(ddl):
+                    problems.append('%s：%s（该方言不接受这个默认值写法）' % (dialect, ddl))
+                    break
+            if problems:
+                break
+        if problems:
+            break
+    if problems:
+        return problems[0]
+    return None
+
+
 def main():
     parser = argparse.ArgumentParser(description='31 张 create_all 表 vs 迁移 create_table 对拍（B17-05）')
     parser.add_argument('--quiet', action='store_true', help='只打印结论行')
@@ -246,6 +362,12 @@ def main():
         problems.append('未登记来源的迁移多出名字 %d 个：%s' % (len(unknown_extras), unknown_extras))
     if ensured_bad:
         problems.append('_ENSURED_COLUMNS 与 metadata 不一致 %d 处：%s' % (len(ensured_bad), ensured_bad))
+    quoting_problem = check_alter_quoting()
+    if quoting_problem:
+        problems.append(quoting_problem)
+    ddl_problem = check_ensured_ddl()
+    if ddl_problem:
+        problems.append('_ENSURED_COLUMNS DDL 方言不合规：%s' % ddl_problem)
     if len(head_list) != 1:
         problems.append('head 数量 %d：%s' % (len(head_list), head_list))
     if os.path.exists(guard):

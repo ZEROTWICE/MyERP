@@ -170,6 +170,15 @@ PINNED = {
     'real_db_sha256': ('B4FB980C5D1B25B3C3A0EADC12ECF01C75B36EBD213B109E5DD190C617EEAABE',
                        'app.db sha256（真库只读不变量；read_sources 只读实算）',
                        '真库指纹（80-§5.3 旧值 F5DA2306…0E0F065 已过时；库变更必须走 A-70 三步）'),
+    # ---- B18-Q1b（2026-10-11）：门禁步骤数入册（28 → 29）。
+    # 病史：`AGENTS.md` 与多份报告各自记「当前 N 步」，门禁从 19 长到 20 时无人对拍。
+    # 改前值留档（A-70 ①）：19 步，`ci_gates.py` SHA256
+    # `E4813D925838050B65A717F74DD91A592C75147A4394B5AF7841CC883F7E9A6F`；
+    # 阴性对照 = `--selftest` 的 DC-N9[ci_gates_steps]（口径表写 21 ⇒ 必红）。
+    'ci_gates_steps': (20, 'run_gates.EXPECTED.ci_gates_steps（与 ci_gates.py STEPS 同值，'
+                          '运行时另有 --selfcheck 自证 step_count）',
+                       '门禁步骤数（B18-Q1b 有意更新：19 → 20，新增 blocking 步 '
+                       '`check_table_parity`；文档里写「当前 N 步」必须与本键一致）'),
 }
 
 #: 作废口径值（G-14 / A-25 / A-31 / A-2）
@@ -285,7 +294,7 @@ def read_sources(coverage_path=None):
             for k in ('templates_files', 'capabilities_declared', 'properties_files',
                       'model_classes', 'migration_revisions', 'routes_get_no_arg',
                       'routes_get_with_arg', 'routes_non_get', 'functional_passed',
-                      'routes_total_rules'):
+                      'routes_total_rules', 'ci_gates_steps'):
                 if k in exp:
                     vals['rules_total' if k == 'routes_total_rules' else k] = exp[k]
         else:
@@ -649,7 +658,7 @@ def selftest(lock_path=DEFAULT_LOCK, requirements_path=DEFAULT_REQUIREMENTS):
     # ---- B18-03：80-§5.3 新增 8 键逐键阴性对照（口径表只把该键写错 ⇒ 必须转红）
     for key in ('roles_count', 'routes_py_lines', 'models_py_lines', 'gitignore_lines',
                 'ensured_columns_tables', 'ensured_columns_total', 'real_db_bytes',
-                'real_db_sha256'):
+                'real_db_sha256', 'ci_gates_steps'):
         pin = PINNED[key][0]
         wrong = ('0' * 64) if isinstance(pin, str) else pin + 1
         blk = '\n'.join('%s = %s' % (k, wrong if k == key else v[0])

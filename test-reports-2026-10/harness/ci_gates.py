@@ -15,7 +15,7 @@ CI 配置只调用它（配置薄、逻辑可离线验证）。
 
 | 组 | 成员 | 说明 |
 | --- | --- | --- |
-| **blocking** | `check_templates` / `check_migration_heads` / `check_properties` / `check_db_bootstrap`(shim) / `functional_test`(shim) / `permission_matrix --no-dump`(shim) / `coverage_drift.py` / **`run_gates.py` 的非环境依赖部分** / **`check_model_refs`（TL-01）** / **`check_http_contract`（TL-02）** / **`chain_count_consistency`（B15-07，件数守恒对拍）** / **`negative_matrix`（B17-15，四类必交 + 阳性对照）** / **`check_is_archived_policy`（B17-07）** / **`check_doc_claims`（B17-16，口径守卫）** | permx 判据单一确定（匿名可访问 = 0）⇒ 直接 blocking |
+| **blocking** | `check_templates` / `check_migration_heads` / **`check_table_parity`（B18-Q1b，补列 DDL 方言与引号）** / `check_properties` / `check_db_bootstrap`(shim) / `functional_test`(shim) / `permission_matrix --no-dump`(shim) / `coverage_drift.py` / **`run_gates.py` 的非环境依赖部分** / **`check_model_refs`（TL-01）** / **`check_http_contract`（TL-02）** / **`chain_count_consistency`（B15-07，件数守恒对拍）** / **`negative_matrix`（B17-15，四类必交 + 阳性对照）** / **`check_is_archived_policy`（B17-07）** / **`check_doc_claims`（B17-16，口径守卫）** | permx 判据单一确定（匿名可访问 = 0）⇒ 直接 blocking |
 | **report-only** | `smoke_test --no-dump`(shim)（A-63 第一步先观测 1 轮）/ `route_inventory` 与 `measure_coverage` 的**退出码**（报告型 A-30）/ `route_inventory_native_probe`（**环境依赖探针，A-62 明令不得重基线化**）/ **`evidence_hash`（TL-04：白名单制）** | 二者失败只记录、不阻塞；晋升方式见 `--phase second` |
 
 **A-85 接线（B1：把 W7 三个「预留接入位」由注释变实装）**
@@ -436,6 +436,41 @@ def _inj_check_migration_heads(ctx):
             'evidence': {'tree': _rel(syn), 'degradation': '2 个独立 head（aaaa0001 / bbbb0002）'}}
 
 
+def _inj_check_table_parity(ctx):
+    """合成树 = 真脚本副本 + 一份**故意写坏的 `app/__init__.py`**（B18-Q1b）。
+
+    坏在病史的两处：`_ensure_schema()` 里直接写裸 `ALTER TABLE {table} …`（PG 保留字
+    `user` 会 SyntaxError），构造点也没有 `identifier_preparer.quote()`。判据不含
+    「正确实现」的任何字符串，只有「格式违规必须被报出来」⇒ 注入后该步必红。
+    """
+    syn = _inj_fresh(ctx, 'check_table_parity')
+    _inj_copy(os.path.join(SCRIPTS_DIR, 'check_table_parity.py'),
+              os.path.join(syn, 'scripts', 'check_table_parity.py'))
+    bad_src = (
+        '"""注入用最小 app 包：只有被检查的两个函数，故意写成未加引号的旧写法。"""\n'
+        '\n'
+        'import ast\n'
+        'import os\n'
+        'import re\n'
+        '\n'
+        '\n'
+        'def _build_alter_add_column(engine, table, name, coltype, dialect):\n'
+        "    return f'ALTER TABLE {table} ADD COLUMN {name} BOOLEAN'\n"
+        '\n'
+        '\n'
+        'def _ensure_schema(app):\n'
+        '    for table, name in (("user", "must_change_password"),):\n'
+        "        app.logger.info(f'ALTER TABLE {table} ADD COLUMN {name} BOOLEAN')\n"
+    )
+    bad = _inj_write(os.path.join(syn, 'app', '__init__.py'), bad_src)
+    return {'kind': 'real_input', 'replace_script':
+            os.path.join(syn, 'scripts', 'check_table_parity.py'),
+            'fixtures': [_rel(syn), _rel(bad)],
+            'evidence': {'tree': _rel(syn), 'broken_file': _rel(bad),
+                         'degradation': '合成 app/__init__.py 缺 quote() 且含裸 '
+                                        'ALTER TABLE 字面量 ⇒ check_table_parity RESULT=FAIL'}}
+
+
 def _inj_check_properties(ctx):
     """合成树 = 真 app/models.py 副本 + 1 个类级访问 @property 的文件（A 类违规）。"""
     syn = _inj_fresh(ctx, 'check_properties')
@@ -673,6 +708,10 @@ INJECTIONS = {
                         'how': '合成树副本（真 templates + permissions + 7 route 文件）+ 1 个模板注入未登记能力'},
     'check_migration_heads': {'kind': 'real_input', 'builder': _inj_check_migration_heads,
                               'how': '脚本副本按原相对深度放置 + 2 个独立 head 的合成 migrations/versions'},
+    'check_table_parity': {
+        'kind': 'real_input', 'builder': _inj_check_table_parity,
+        'how': '脚本副本按原相对深度放置 + 合成 app/__init__.py（补列 DDL 未加引号）'
+               '⇒ 方言/引号判据必红'},
     'check_properties': {'kind': 'real_input',
                          'builder': lambda ctx: _inj_check_properties(ctx),
                          'how': '--root 指向合成树（models.py 副本 + 类级访问 @property 的违规文件）'},
@@ -777,6 +816,14 @@ def spec_steps(python_exe, check_templates_script=None,
          'argv': [exe, '-B', os.path.join('scripts', 'check_migration_heads.py')],
          'expect_exit': 0,
          'expects': ["HEADS=['p1nonctarget']", 'head_count=1', 'revisions=35']},
+        # 【B18-Q1b（2026-10-11）追加：步骤数 19 → 20】病史 = 生产库只读探针实测
+        # `ALTER TABLE user …` 在 PG 上 SyntaxError，而 `_ensure_schema()` 的 except 只记日志
+        # ⇒ 启动自愈静默失败、列永远补不上，SQLite 上永远测不出来。本步把「补列 DDL 的
+        # 方言合法性」变成 blocking 判据（引号 + BOOLEAN 默认值写法）。注入见 INJECTIONS。
+        {'id': 'check_table_parity', 'group': 'blocking',
+         'argv': [exe, '-B', os.path.join('scripts', 'check_table_parity.py'), '--quiet'],
+         'expect_exit': 0,
+         'expects': ['RESULT=OK']},
         # 【B17-16 重基线（A-70 三步，2026-10-09）】needle 26 → 25：B17-01 删掉死文件
         # app/main/sales_routes.py（1 字节空文件，无模型类）⇒ check_properties 扫到的文件数 26 → 25，
         # 模型类 74 不变。四处同改（run_gates.EXPECTED.properties_files / 本 needle /
@@ -964,12 +1011,14 @@ def spec_steps(python_exe, check_templates_script=None,
         # 【B17-16】口径守卫进链（blocking）：钉常量 ↔ 权威源 ↔ 报告口径表三级对拍的唯一消费者。
         # 判据输入：`--coverage <本 run 的 coverage.json>`（第 10 步 measure_coverage --out 的产物）
         # —— A-114 挂点与产物分离：**不得**改默认路径、**不得**读 live 覆盖写路径。
-        # `--selftest` 不并在本步（该开关提前 return，会把口径面短路）⇒ 由验证命令单独跑 25/25。
+        # `--selftest` 不并在本步（该开关提前 return，会把口径面短路）⇒ 由验证命令单独跑 26/26（B18-Q1b：26 例，含新增 DC-N9[ci_gates_steps]）。
         {'id': 'check_doc_claims', 'group': 'blocking',
          'argv': [exe, '-B', os.path.join('scripts', 'check_doc_claims.py')],
          'extra_argv': [{'tail': ['--coverage', '{json}'], 'json_name': 'coverage.json'}],
          'expect_exit': 0,
-         'expects': ['[check_doc_claims] 钉常量 vs 权威源：28/28 相等',
+         # 【B18-Q1b】钉常量 28 → 29（新增 ci_gates_steps：门禁步骤数入册，
+         # 使「文档写当前 N 步」与门禁本体对拍；改前值留档见 B18-登记.md §B18-Q1b）。
+         'expects': ['[check_doc_claims] 钉常量 vs 权威源：29/29 相等',
                      '[check_doc_claims] 文档：扫描 5 份、带口径表 1 份',
                      '[check_doc_claims] RESULT: OK（violations=0）'],
          'expect_absent': ['[check_doc_claims] [VIOLATION]'],

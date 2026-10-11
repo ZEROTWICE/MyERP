@@ -53,6 +53,10 @@ EXPECTED = {
     'routes_non_get': 112,
     'routes_static': 1,
     'routes_dup_method_path': 0,
+    # B18-Q1b（2026-10-11）：门禁步骤数入册（A-70 三步：19 → 20，新增 blocking 步
+    # `check_table_parity`）。权威源 = `ci_gates.py` 的 `STEPS`（其 `--selfcheck` 自身
+    # 打印 `step_count` 自证），本键供 `check_doc_claims.PINNED['ci_gates_steps']` 对拍。
+    'ci_gates_steps': 20,
     'bootstrap_accounts': 64,
     # RF-1（2026-10-09，批次15 I1，用户拍板）真库锚点重基线：真库完成一次正常首启播种
     # （`inspection_templates` +2 / `inspection_items` +7，共 +9 行）⇒ 直接拷贝行数随之前移
