@@ -275,6 +275,28 @@ def match_whitelist(violation_pairs, reg, rules):
     }
 
 
+def whitelist_retired_ok(reg, rules, wdoc, report):
+    """白名单「全 stale 的合法特例」判定（纯函数，hook 与 --selfcheck 共用）。
+
+    合法条件三条同时成立 —— 缺一即回落到常规失败语义（不许用退休旗标洗白）：
+
+    1. 白名单文件里**没有任何条目/规则**（``reg``/``rules`` 都空）；
+    2. 文件带 ``whitelist_retired.mode == 'baseline-frozen'``；
+    3. evidence_hash 报告里 ``counts.baseline_files > 0``（基线**真的存在**）。
+
+    返回 ``(ok, reason)``。
+    """
+    retired = (wdoc or {}).get('whitelist_retired') or {}
+    baseline = (report.get('counts') or {}).get('baseline_files') or 0
+    if retired.get('mode') != 'baseline-frozen':
+        return False, 'no baseline-frozen flag'
+    if reg or rules:
+        return False, 'whitelist still has entries (reg=%d rules=%d)' % (len(reg), len(rules))
+    if not baseline:
+        return False, 'baseline_files=0（基线丢失 ⇒ 退休特例失效）'
+    return True, 'baseline-frozen（空白名单 + baseline_files=%d）' % baseline
+
+
 def evidence_hash_whitelist(res, step, run_dir):
     """TL-04 的判据：把 evidence_hash 的违规集与白名单对拍（只登记既有违规，不洗白）。
 
@@ -336,12 +358,21 @@ def evidence_hash_whitelist(res, step, run_dir):
             json.dump(wdoc, fh, ensure_ascii=False, indent=1)
         extra['whitelist']['manifest'] = _rel(mpath)
 
+    # B18（2026-10-11）：白名单**全 stale 的合法特例** —— evidence_hash 建了真基线
+    # （`--freeze`，evidence/artifact_hashes.json 存在且 baseline_files>0）之后，白名单里
+    # 那些「无基线世界」的既有违规按定义全部消失。此时两个 stale 判据不再表达「有人偷偷
+    # 放宽了约束」，只表达「约束已经不需要了」。判定与守死的三条见 whitelist_retired_ok()。
+    fully_retired, retired_reason = whitelist_retired_ok(reg, rules, wdoc, rep)
+    if fully_retired:
+        extra['whitelist']['retired_mode'] = retired_reason + '；两个 stale 判据按特例通过'
+    else:
+        extra['whitelist']['retired_mode'] = '不适用：' + retired_reason
     checks.append({'kind': 'whitelist', 'needle': 'no unregistered violation',
                    'status': 'passed' if not m['unregistered'] else 'failed'})
     checks.append({'kind': 'whitelist', 'needle': 'whitelist has no stale exact entry',
-                   'status': 'passed' if not m['stale_exact'] else 'failed'})
+                   'status': 'passed' if (not m['stale_exact'] or fully_retired) else 'failed'})
     checks.append({'kind': 'whitelist', 'needle': 'wildcard rule(s) match >=1 violation',
-                   'status': 'passed' if not m['stale_rules'] else 'failed'})
+                   'status': 'passed' if (not m['stale_rules'] or fully_retired) else 'failed'})
     checks.append({'kind': 'pinned', 'needle': 'real_db_matches_pinned == true',
                    'status': 'passed' if pinned else 'failed'})
     return checks, extra
@@ -1135,11 +1166,32 @@ def selfcheck(python_exe, whitelist=DEFAULT_EVIDENCE_WHITELIST, run_dir=None):
 
     reg, rules, reason, wdoc = load_whitelist(whitelist)
     counts = registration_counts(wdoc)
-    add('whitelist loads with exact 33 base entries (appended block reported separately)',
-        counts['registered'] == 33 and not reason,
-        'registered=%d registered_appended=%d registered_total=%d reason=%s'
-        % (counts['registered'], counts['registered_appended'], counts['registered_total'],
-           reason or '-'))
+    retired = (wdoc or {}).get('whitelist_retired') or {}
+    add('whitelist retired to tombstone (blank + baseline-frozen flag) after B18 baseline freeze',
+        counts['registered'] == 0 and counts['registered_appended'] == 0
+        and retired.get('mode') == 'baseline-frozen' and not reason,
+        'registered=%d appended=%d reason=%s retired=%s'
+        % (counts['registered'], counts['registered_appended'], reason or '-',
+           retired.get('mode') or '-'))
+
+    # 退休不得丢条目：存档副本必须仍是退休前的 33（精确）+ 5（追加）+ 1（通配），
+    # 且存档 sha256 与 tombstone 记录一致 —— 证明「条目是搬走了，不是删掉了」。
+    arch_reg, arch_rules, arch_reason, arch_doc = load_whitelist(
+        os.path.join(REPO_ROOT, retired.get('archived_copy') or '__missing__'))
+    arch_counts = registration_counts(arch_doc)
+    arch_sha = ''
+    if not arch_reason:
+        with open(os.path.join(REPO_ROOT, retired['archived_copy']), 'rb') as fh:
+            arch_sha = hashlib.sha256(fh.read()).hexdigest()
+    add('retired entries are archived, not deleted (33+5 exact / 1 rule + sha256 match)',
+        arch_counts['registered'] == 33 and arch_counts['registered_appended'] == 5
+        and len(arch_rules) == 1 and not arch_reason
+        and arch_sha == (retired.get('archived_sha256') or ''),
+        'arch registered=%d appended=%d rules=%d sha=%s' % (
+            arch_counts['registered'], arch_counts['registered_appended'], len(arch_rules),
+            arch_sha[:16] or '-'))
+    # 下 4 例用**存档副本**作夹具（活白名单已退休为空，没有条目可供对抗）
+    reg, rules = arch_reg, arch_rules
 
     # 通配规则的 4 个对抗用例（证明「任意 stamp 覆盖」+「陈旧即失败」+「精确集不缩水」+「不越界」）
     reg_list = sorted(reg)
@@ -1165,6 +1217,21 @@ def selfcheck(python_exe, whitelist=DEFAULT_EVIDENCE_WHITELIST, run_dir=None):
     add('W-4 look-alike dir outside the archive root is still a violation (glob not over-broad)',
         len(m_look['unregistered']) == 1, 'unregistered=%s'
         % ['%s|%s' % kp for kp in m_look['unregistered']])
+
+    # 退休特例的 4 例：正面 + 3 组阴性（无旗标 / 留条目 / 基线丢失 ⇒ 一律不得放行）
+    tomb = {'whitelist_retired': {'mode': 'baseline-frozen'}}
+    ok_t, why_t = whitelist_retired_ok(set(), [], tomb, {'counts': {'baseline_files': 1316}})
+    add('W-5 retired tombstone passes only with a real baseline (baseline_files>0)',
+        ok_t, why_t)
+    ok_n, why_n = whitelist_retired_ok(set(), [], tomb, {'counts': {'baseline_files': 0}})
+    add('W-6 retired tombstone FAILS when baseline_files=0 (baseline lost ⇒ no whitewash)',
+        not ok_n, why_n)
+    ok_e, why_e = whitelist_retired_ok(reg_list, rules, tomb, {'counts': {'baseline_files': 1316}})
+    add('W-7 retired tombstone FAILS when entries remain (must be blank)',
+        not ok_e, why_e)
+    ok_f, why_f = whitelist_retired_ok(set(), [], {}, {'counts': {'baseline_files': 1316}})
+    add('W-8 retired tombstone FAILS without the baseline-frozen flag',
+        not ok_f, why_f)
 
     # 追加块（V-01）：登记后不算未登记；但同样纳入陈旧判定（只登记不裁决，不改变对称差集语义）
     base_list = sorted((it.get('kind'), it['path'])

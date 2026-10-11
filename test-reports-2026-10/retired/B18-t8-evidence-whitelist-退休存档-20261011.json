@@ -1,0 +1,322 @@
+{
+  "schema": "t8-evidence-whitelist/1",
+  "generated_by": "t8（B1 三接入位实装）",
+  "registered_count": 33,
+  "registered_kinds": {
+    "deleted": 20,
+    "modified": 9,
+    "phantom_entry": 4
+  },
+  "registered_source": "2026-10-07 17:35:45",
+  "wildcard_rule_count": 1,
+  "appended_by": "V-01（三接入位验收与逐步注入破坏）/ 2026-10-07",
+  "appended_trigger": "B0 的 regression_preflight preflight 归档 stamp 20261007-220640 一次引入 8 条未登记违规（5 deleted + 2 modified + 1 phantom_entry），与既有的 3 个 stamp 同形；逐条枚举必然追不上（每跑一次 preflight 再加 N 条）",
+  "a89_root_cause_fix": {
+    "defect": "regression_preflight.py 把归档写进 evidence/_phaseB-prefreeze/<stamp>/（BASE=evidence/），而 evidence_hash 索引 evidence/** ⇒ 每次 preflight 都在给 evidence_hash 制造新文件",
+    "note": "本文件的 wildcard_rules[0] 是正解 (a)「evidence_hash 默认排除 _phaseB-prefreeze/**」的**白名单侧等效实现**（A-89）",
+    "canonical_fixes": [
+      "(a) evidence_hash.py 默认排除 _phaseB-prefreeze/**（属 W7，不在 V-01 inScope）",
+      "(b) 把归档移出 evidence/（如 test-reports-2026-10/archives/）（属 W7，不在 V-01 inScope）"
+    ],
+    "sync_requirement": "若将来实现 (a) 或 (b)，本 wildcard_rules[0] 必须同步删除或简化 —— 不得留下两套互相覆盖的机制"
+  },
+  "measured_from": "evidence_hash.py verify --no-strict-coverage",
+  "counts_at_registration": {
+    "baseline_files": 2747,
+    "current_files": 2781,
+    "modified": 9,
+    "deleted": 20,
+    "journal_broken": 0,
+    "added": 54,
+    "index_missing": 5,
+    "coverage_gap": 1,
+    "phantom_entry": 4,
+    "baseline_tampered": 0,
+    "dirs_conform": 415,
+    "dirs_total": 421
+  },
+  "semantics": [
+    "白名单 = 「已知且已登记的既有违规」，只登记、不洗白：ci_gates 对拍后",
+    "  ① 出现**未登记**违规 ⇒ TL-04 步骤失败（report-only ⇒ 整体 exit 2）；",
+    "  ② 白名单条目在当前报告中**缺失**（stale）⇒ 同样失败，防悄悄缩小约束。",
+    "源：captain 侧既有违规（A-52 删除类 / A-55 及同类原地改写），非产品代码产物。",
+    "不含 index_missing（本轮新 run 目录未 --freeze 的正常形态，另用 --strict-index 控制）。",
+    "【V-01 追加】精确 33 条**不得删改**（A-95 的对称差集语义：条目在报告里消失即 stale ⇒ 失败）；",
+    "  「每次 preflight 新增的归档内容」改用 wildcard_rules 表达，**不再逐条枚举**；",
+    "  wildcard 规则自身同样纳入「陈旧即失败」：匹配到 0 条违规即 stale（防有人删掉归档后偷偷放宽）。"
+  ],
+  "violations": [
+    {
+      "kind": "deleted",
+      "path": "_phaseB-prefreeze/20261007-132253/baseline-prefix/e01-ab-compare.txt"
+    },
+    {
+      "kind": "deleted",
+      "path": "_phaseB-prefreeze/20261007-132253/baseline-prefix/e01-verify.txt"
+    },
+    {
+      "kind": "deleted",
+      "path": "_phaseB-prefreeze/20261007-132253/baseline-prefix/idx-conflict-check.txt"
+    },
+    {
+      "kind": "deleted",
+      "path": "_phaseB-prefreeze/20261007-132253/baseline-prefix/idx-gap-check.txt"
+    },
+    {
+      "kind": "deleted",
+      "path": "_phaseB-prefreeze/20261007-132253/baseline-prefix/idx-gap-detail.txt"
+    },
+    {
+      "kind": "deleted",
+      "path": "_phaseB-prefreeze/20261007-142403/baseline-prefix/e01-ab-compare.txt"
+    },
+    {
+      "kind": "deleted",
+      "path": "_phaseB-prefreeze/20261007-142403/baseline-prefix/e01-verify.txt"
+    },
+    {
+      "kind": "deleted",
+      "path": "_phaseB-prefreeze/20261007-142403/baseline-prefix/idx-conflict-check.txt"
+    },
+    {
+      "kind": "deleted",
+      "path": "_phaseB-prefreeze/20261007-142403/baseline-prefix/idx-gap-check.txt"
+    },
+    {
+      "kind": "deleted",
+      "path": "_phaseB-prefreeze/20261007-142403/baseline-prefix/idx-gap-detail.txt"
+    },
+    {
+      "kind": "deleted",
+      "path": "_phaseB-prefreeze/20261007-172654/baseline-prefix/e01-ab-compare.txt"
+    },
+    {
+      "kind": "deleted",
+      "path": "_phaseB-prefreeze/20261007-172654/baseline-prefix/e01-verify.txt"
+    },
+    {
+      "kind": "deleted",
+      "path": "_phaseB-prefreeze/20261007-172654/baseline-prefix/idx-conflict-check.txt"
+    },
+    {
+      "kind": "deleted",
+      "path": "_phaseB-prefreeze/20261007-172654/baseline-prefix/idx-gap-check.txt"
+    },
+    {
+      "kind": "deleted",
+      "path": "_phaseB-prefreeze/20261007-172654/baseline-prefix/idx-gap-detail.txt"
+    },
+    {
+      "kind": "deleted",
+      "path": "baseline-prefix/e01-ab-compare.txt"
+    },
+    {
+      "kind": "deleted",
+      "path": "baseline-prefix/e01-verify.txt"
+    },
+    {
+      "kind": "deleted",
+      "path": "baseline-prefix/idx-conflict-check.txt"
+    },
+    {
+      "kind": "deleted",
+      "path": "baseline-prefix/idx-gap-check.txt"
+    },
+    {
+      "kind": "deleted",
+      "path": "baseline-prefix/idx-gap-detail.txt"
+    },
+    {
+      "kind": "modified",
+      "path": "_phaseB-prefreeze/20261007-132253/captain-verification/p01-namespace-probe.txt"
+    },
+    {
+      "kind": "modified",
+      "path": "_phaseB-prefreeze/20261007-132253/harness/captain-e01-audit.json"
+    },
+    {
+      "kind": "modified",
+      "path": "_phaseB-prefreeze/20261007-142403/captain-verification/p01-namespace-probe.txt"
+    },
+    {
+      "kind": "modified",
+      "path": "_phaseB-prefreeze/20261007-142403/harness/captain-e01-audit.json"
+    },
+    {
+      "kind": "modified",
+      "path": "_phaseB-prefreeze/20261007-172654/captain-verification/p01-namespace-probe.txt"
+    },
+    {
+      "kind": "modified",
+      "path": "_phaseB-prefreeze/20261007-172654/harness/captain-e01-audit.json"
+    },
+    {
+      "kind": "modified",
+      "path": "_phaseB-prefreeze/LATEST.txt"
+    },
+    {
+      "kind": "modified",
+      "path": "captain-verification/p01-namespace-probe.txt"
+    },
+    {
+      "kind": "modified",
+      "path": "harness/captain-e01-audit.json"
+    },
+    {
+      "kind": "phantom_entry",
+      "path": "_phaseB-prefreeze/20261007-132253/baseline-prefix"
+    },
+    {
+      "kind": "phantom_entry",
+      "path": "_phaseB-prefreeze/20261007-142403/baseline-prefix"
+    },
+    {
+      "kind": "phantom_entry",
+      "path": "_phaseB-prefreeze/20261007-172654/baseline-prefix"
+    },
+    {
+      "kind": "phantom_entry",
+      "path": "baseline-prefix"
+    }
+  ],
+  "wildcard_rules": [
+    {
+      "id": "prefreeze-archive-any-stamp",
+      "glob": "_phaseB-prefreeze/**",
+      "kinds": "*",
+      "reason": "regression_preflight 的归档目录 _phaseB-prefreeze/<stamp>/** 落在 evidence/** 之内，每跑一次 preflight 就新增一批（stamp 名不可预知、内容与历史归档同形：5 deleted + 2 modified + 1 phantom_entry）。逐条枚举必然永远追不上。",
+      "stale_semantics": "本规则匹配到的违规数为 0 时判 stale ⇒ 该步失败（防「归档被删掉后约束被悄悄放宽」）",
+      "added_by": "V-01 / 三接入位验收与逐步注入破坏",
+      "added_at": "2026-10-07",
+      "trigger": "B0 preflight stamp 20261007-220640（8 条未登记违规）",
+      "attribution": "A-89（captain 裁定：白名单语义从「逐条枚举」改为「按归档 stamp 通配」）"
+    }
+  ],
+  "violations_appended": [
+    {
+      "kind": "modified",
+      "path": "uat/uat_chains.json",
+      "problem": "基线哈希被原地改写（冻结锚点 1：33318 B / 360A8570BC0080A2984A59AD945B2C837AD96ACF7B55E6242AE7E2C6417DD23A ⇒ 46051 B，2026-10-07 22:18:31）",
+      "attribution": "非 V-01 产物：UAT 链任务（35 §9.2 V-12 一线）在 evidence/uat/ 原地重写；V-01 只是检出者"
+    },
+    {
+      "kind": "modified",
+      "path": "uat/uat_chains.out.txt",
+      "problem": "基线哈希被原地改写（⇒ 14469 B，2026-10-07 22:18:31）",
+      "attribution": "同上：UAT 链任务的原地重写"
+    },
+    {
+      "kind": "modified",
+      "path": "api/write_suite.json",
+      "problem": "锚点 4「写断言套件 54」被 **V-14 有意复跑原地覆盖**：旧 73293 B / B608117EBDCA2A6F74595F0DB4A010187D8834715CD5E70D5C1AAD85F4A3F403 ⇒ 新 73318 B / 3844E9C2B898A53743CA31DC56FD860A68AD5AAE7005D4779157FBBDC6ED8B01（2026-10-07 22:45:45；口径不变，仅 run_id/时间戳字段刷新）",
+      "attribution": "V-14（t15 / r2-exec-b5-v14）有意复跑；V-19 只按 captain 授权作 append-only 登记，不裁决",
+      "batch": "V-19 / F-V13-9",
+      "intentional_update": {
+        "old": {"bytes": 73293, "sha256": "B608117EBDCA2A6F74595F0DB4A010187D8834715CD5E70D5C1AAD85F4A3F403"},
+        "new": {"bytes": 73318, "sha256": "3844E9C2B898A53743CA31DC56FD860A68AD5AAE7005D4779157FBBDC6ED8B01"},
+        "trigger": "V-14 本 run 有意复跑（口径不变，仅 run_id/时间戳字段刷新）",
+        "command": "F:\\Miniconda\\envs\\wage\\python.exe -B test-reports-2026-10\\harness\\write_suite.py",
+        "ledger": "test-reports-2026-10/evidence/regression-r2/r2-exec-b5-v14-ledger.json（30844 B / SHA256 26B8F2ED9332D288A7E2B9CBFF1EB0927C716A4E491E5662E0B35DB76C17BE19）anchor_readings[anchor=「写断言套件 54」].intentional_update —— old/new/trigger/command 四项逐字相等"
+      },
+      "recompute_command": "& 'F:\\Miniconda\\envs\\wage\\python.exe' -B -c \"import hashlib;d=open(r'test-reports-2026-10/evidence/api/write_suite.json','rb').read();print(len(d),hashlib.sha256(d).hexdigest().upper())\"   # 期望 73318 / 3844E9C2B898A53743CA31DC56FD860A68AD5AAE7005D4779157FBBDC6ED8B01",
+      "rollback": "① 判定回退 ⇒ `git checkout -- test-reports-2026-10/harness/t8-evidence-whitelist.json`（本批 2 条随之消失），并由 V-14 决定是否把锚点复跑回 73293 B / B608117E…；② 若后续按 A-70 把本 run 新值**推进为基线** ⇒ 本批 2 条必须同步移除（否则 stale ⇒ TL-04 失败）"
+    },
+    {
+      "kind": "modified",
+      "path": "api/write_suite.out.txt",
+      "problem": "同一次有意复跑的 stdout 落盘件被原地覆盖：旧 23028 B / 0665253451A6FA4F657AB40683BC0CBD3D31A1D1655B7E3780A81209E3C09CA1 ⇒ 新 22643 B / 99B7B12F52415EF5F7DE08BE2B8CBDAFC8FDC35F2FB4BC12A11DAD1E3B86B0ED（2026-10-07 22:45:45，与 write_suite.json 同一 mtime）",
+      "attribution": "同上（V-14 有意复跑）；台账 anchor_readings 只登记 7 个锚点、**不含 .out.txt** ⇒ 成对依据 = 同一 run 的 mtime 一致 + harness/r2_anchor_drift.py:66-67 的 INTENTIONAL_RERUN 集合（成对登记 'api/write_suite.json','api/write_suite.out.txt'）",
+      "batch": "V-19 / F-V13-9",
+      "intentional_update": {
+        "old": {"bytes": 23028, "sha256": "0665253451A6FA4F657AB40683BC0CBD3D31A1D1655B7E3780A81209E3C09CA1"},
+        "new": {"bytes": 22643, "sha256": "99B7B12F52415EF5F7DE08BE2B8CBDAFC8FDC35F2FB4BC12A11DAD1E3B86B0ED"},
+        "trigger": "V-14 本 run 有意复跑（write_suite.py 的 stdout 落盘件，与 write_suite.json 成对）",
+        "command": "F:\\Miniconda\\envs\\wage\\python.exe -B test-reports-2026-10\\harness\\write_suite.py",
+        "ledger": "台账无独立条目（.out.txt 非 7 锚点之一）；成对依据见 harness/r2_anchor_drift.py:66-67 的 INTENTIONAL_RERUN"
+      },
+      "recompute_command": "& 'F:\\Miniconda\\envs\\wage\\python.exe' -B -c \"import hashlib;d=open(r'test-reports-2026-10/evidence/api/write_suite.out.txt','rb').read();print(len(d),hashlib.sha256(d).hexdigest().upper())\"   # 期望 22643 / 99B7B12F52415EF5F7DE08BE2B8CBDAFC8FDC35F2FB4BC12A11DAD1E3B86B0ED",
+      "rollback": "同 api/write_suite.json（同一批次、同一触发）"
+    },
+    {
+      "kind": "modified",
+      "path": "harness/coverage.json",
+      "problem": "冻结覆盖档按 A-70 三步有意重基线：旧 236893 B / 5E2C9D4315971B31C83AFD7833C310501199C34F61BFD868EF07A6AEEF7BF1F0（读数 6/14/101）⇒ 新 244575 B / F0D37A6C72C9029C60B4124DAC5993E1E65321448C943555381C15ECD6BDB42D（读数 108/116/0）",
+      "attribution": "B13-00（t1 / gate-dev）用户授权的前置重基线；LOCKED 与路由锁一字未改；旧字节归档于 evidence/harness/_anchor-history/frozen-anchor-pre-b13-00.236893.5E2C9D43.json，登记册 evidence/harness/_anchor-history/coverage-anchor-history.json entry no=1/2",
+      "intentional_update": {
+        "old": {"bytes": 236893, "sha256": "5E2C9D4315971B31C83AFD7833C310501199C34F61BFD868EF07A6AEEF7BF1F0"},
+        "new": {"bytes": 244575, "sha256": "F0D37A6C72C9029C60B4124DAC5993E1E65321448C943555381C15ECD6BDB42D"},
+        "trigger": "批次12 结项登记事项 ①：冻结档仍是 A-70 之前的旧读数，与源码 LOCKED 108/116/0 互斥 ⇒ 直喂必假红",
+        "command": "HARNESS_RUN_ID=b13-00-rebaseline-20261008 F:\\Miniconda\\envs\\wage\\python.exe -B scripts/_sandbox_compat.py test-reports-2026-10/harness/measure_coverage.py --no-request-probes --out \"<仓库根>/test-reports-2026-10/evidence/harness/coverage.json\""
+      },
+      "recompute_command": "& 'F:\\Miniconda\\envs\\wage\\python.exe' -B -c \"import hashlib;d=open(r'test-reports-2026-10/evidence/harness/coverage.json','rb').read();print(len(d),hashlib.sha256(d).hexdigest().upper())\"",
+      "rollback": "① 若要回退：把 ANCHOR_READING 与 uat_chains.py 的 V12_ANCHORS 项改回 236893 / 5E2C9D43…BF1F0，并用归档副本恢复冻结档字节（_anchor-history 条目仍须保留）；② 若采纳本重基线：本批 1 条随之保留，但后续任何对 coverage.json 的再次原地重写必须再走 A-70 三步并追加登记（否则再次变红）。"
+    }
+  ],
+  "violations_appended_meta": {
+    "count": 2,
+    "appended_by": "V-01（三接入位验收与逐步注入破坏）",
+    "appended_at": "2026-10-07 22:2x",
+    "trigger": "V-01 复跑 TL-04 时检出 2 条未登记违规（modified|uat/uat_chains.json、modified|uat/uat_chains.out.txt），使 ci_gates --phase first 由 exit 0 变 exit 2",
+    "only_registered_not_adjudicated": "只登记、不裁决：这两条的合法性由 V-14 的 7 锚点比对裁定（28 §4：有意更新者必须留「旧值 + 新值 + 触发 ID + 命令」）。TL-04 的登记只表示「该违规已知且已归属」，**不表示它被接受**。",
+    "stale_semantics": "若这两条违规消失（锚点被回滚、或比对基线推进），本块条目即 stale ⇒ TL-04 失败（防悄悄放宽约束）；届时由 captain 决定是否移除本块。",
+    "captain_action": "① 若判定该原地改写应回退 ⇒ 回退后删除本块两条；② 若判定为有意更新 ⇒ 在 V-14 台账登记三要素并保留本块；③ 未拍板前，本块只让「已知违规」不再当成「未知篡改」。",
+    "exact_33_untouched": "本块不改动上面的 violations[33]（A-95 对称差集语义保持），registered 与 registered_appended 分开报数"
+  },
+  "violations_appended_meta_v19": {
+    "count": 2,
+    "appended_by": "V-19（修复 F-V13-9：write_suite 2 条有意更新的 append-only 登记）/ 2026-10-07",
+    "appended_at": "2026-10-07 23:1x",
+    "authorization": "captain 立项授权（t20 / V-19 任务书）：这 2 条是 V-14 已按 A-70 声明的「有意更新」——本就不是违规，只是尚未登记；V-13 未擅自动该文件（V-01 独占件、不在其 inScope）是正确处置，故由 captain 立项授权",
+    "trigger": "V-13（t14）的 F-V13-9：`ci_gates --phase first` 整体 exit 2 的**唯一障碍** = report-only TL-04 检出这 2 条未登记（`blocking_failed=[]`，其余 10 个 blocking 全绿）",
+    "appended_total_note": "本文件 violations_appended 累计 **4** 条 = 2 条（V-01 / uat 对，见 violations_appended_meta）+ 2 条（V-19 / write_suite 对，见本块）；`registered` 仍只计主块 **33** 条、`registered_rules` 仍 **1** 条",
+    "ledger_cross_reference": {
+      "ledger": "test-reports-2026-10/evidence/regression-r2/r2-exec-b5-v14-ledger.json",
+      "bytes": 30844,
+      "sha256": "26B8F2ED9332D288A7E2B9CBFF1EB0927C716A4E491E5662E0B35DB76C17BE19",
+      "rows": [
+        "api/write_suite.json：台账 anchor_readings[anchor=「写断言套件 54」].intentional_update 的 old(73293/B608117E…)、new(73318/3844E9C2…)、trigger、command 与本批第 1 条**逐字相等**",
+        "api/write_suite.out.txt：台账 anchor_readings **无独立条目**（.out.txt 不是 7 锚点之一）；成对依据 = 同一 run 同一 mtime（2026-10-07 22:45:45）+ `harness/r2_anchor_drift.py:66-67` 的 `INTENTIONAL_RERUN = {'api/write_suite.json','api/write_suite.out.txt', …}`（把两者**成对**判为 `intentional_rerun`）"
+      ]
+    },
+    "recompute_commands": [
+      "& 'F:\\Miniconda\\envs\\wage\\python.exe' -B -c \"import hashlib;d=open(r'test-reports-2026-10/evidence/api/write_suite.json','rb').read();print(len(d),hashlib.sha256(d).hexdigest().upper())\"   # 期望 73318 / 3844E9C2…",
+      "& 'F:\\Miniconda\\envs\\wage\\python.exe' -B -c \"import hashlib;d=open(r'test-reports-2026-10/evidence/api/write_suite.out.txt','rb').read();print(len(d),hashlib.sha256(d).hexdigest().upper())\"   # 期望 22643 / 99B7B12F…",
+      "& 'F:\\Miniconda\\envs\\wage\\python.exe' -B test-reports-2026-10\\harness\\ci_gates.py --phase first   # 期望 exit 0（14 步）",
+      "& 'F:\\Miniconda\\envs\\wage\\python.exe' -B test-reports-2026-10\\harness\\ci_gates.py --selfcheck   # 期望 12/12（W-1..W-5 未被削弱）"
+    ],
+    "rollback_steps": [
+      "① 整体回退：`git checkout -- test-reports-2026-10/harness/t8-evidence-whitelist.json`（本批 2 条随之消失；主块 33 条与通配规则本就未动）",
+      "② 仅删本批：手工删除 violations_appended 末尾 2 条（api/write_suite.json / api/write_suite.out.txt）与 violations_appended_meta_v19",
+      "③ 回退后预期：TL-04 回到「未登记 2 条 ⇒ report-only 失败 ⇒ ci_gates 整体 exit 2」（这是设计口径，不是回归）"
+    ],
+    "stale_semantics": "若这 2 条违规消失（锚点被回滚、或按 A-70 把本 run 新值推进为比对基线），本批条目即 stale ⇒ TL-04 失败（防悄悄放宽约束）；届时由 captain 决定移除本块",
+    "architecture_handoff": {
+      "symptom": "`harness/write_suite.py` **缺 `--out`** ⇒ 每次复跑都原地覆盖 `evidence/api/write_suite.json`（锚点 4）⇒「复跑」与「保锚点」**不可兼得**（A-110 发现②）",
+      "canonical_fix": "给 write_suite.py 加 `--out`，产物落**新 run 目录**（如 `evidence/api/<run_id>/write_suite.json`，A-40/E-01），锚点判定一律从**不可变归档快照**读取",
+      "discipline": "captain 通用纪律「**锚点与产物分离**」（见 AGENTS.md：凡既作冻结基线又被脚本原地写出的文件，判据必须读归档快照、不得读 live 路径）",
+      "explicit_statement": "**白名单是缓解、不是根治**：本块登记只让「已知的有意更新」不再被当成未知篡改；根治必须靠 `--out`（新 run 目录）+ 从归档快照读判据。同族病史：A-89（preflight 归档在 evidence/ 内）、N-1（锚点与 LOCKED 语义互斥）、F1（锚点被下游覆盖）。",
+      "owner": "后续项，**不在 V-19 inScope**（`harness/write_suite.py` 与 `evidence/**` 均禁改）"
+    },
+    "exact_main_block_untouched": "本块不删改主块 violations[33] 与 wildcard_rules[1]（A-89 通配语义 / A-95 对称差集语义保持）；V-01 的 violations_appended_meta 亦未动"
+  },
+  "violations_appended_meta_b13_00": {
+    "count": 1,
+    "appended_by": "B13-00b（t15 / gate-dev）—— B13-00 重基线的必然收尾（report-only evidence_hash 由 exit 2 回到 exit 0）",
+    "appended_at": "2026-10-08 20:26",
+    "authorization": "用户已在 m00394 批准「批次13 前先做重基线化前置项」（captain 据此新立 t15）；补丁 JSON 逐字来源 = test-reports-2026-10/evidence/harness/b13-00-rebaseline-report.md §6「精确补丁」",
+    "trigger": "B13-00（t1）按 A-70 步骤① 有意重基线冻结覆盖档（236893 B / 5E2C9D43…BF1F0 → 244575 B / F0D37A6C…BDB42D）⇒ evidence_hash 冻结索引仍钉旧哈希 ⇒ 1 条未登记违规 modified|harness/coverage.json ⇒ `ci_gates --phase first --only evidence_hash` = checks 3/4、needle「whitelist no unregistered violation」FAIL、exit 2（追加前实测：unregistered_count=1、unregistered_first10=['modified|harness/coverage.json']、stale_count=0、stale_exact_count=0；机读报告 test-reports-2026-10/evidence/harness/ci-run-20261008-202545/evidence_hash.gate.json）",
+    "appended_total_note": "本批追加 1 条 ⇒ violations_appended 累计 5 条 = 2（V-01 / uat 对）+ 2（V-19 / write_suite 对）+ 1（本批 / coverage.json）。`registered_count` 仍只计主块 33 条、`wildcard_rules` 仍 1 条。主块 violations[33]、wildcard_rules[1]、violations_appended 前 4 条与两个既有 meta 块**逐字未改**（append-only）；本块是追加后唯一权威计数——既有 meta 块里的「累计 4 条」是其登记时点的历史快照，按 append-only 纪律不改写。",
+    "anti_laundering": "重跑 `evidence_hash.py --freeze` 不能洗白本条（EH-N7：`--freeze` 只补缺失索引、绝不覆盖既有索引）；唯一合法路径是本 append-only 登记。",
+    "recompute_commands": [
+      "& 'F:\\Miniconda\\envs\\wage\\python.exe' -B -c \"import hashlib;d=open(r'test-reports-2026-10/evidence/harness/coverage.json','rb').read();print(len(d),hashlib.sha256(d).hexdigest().upper())\"   # 期望 244575 / F0D37A6C72C9029C60B4124DAC5993E1E65321448C943555381C15ECD6BDB42D",
+      "& 'F:\\Miniconda\\envs\\wage\\python.exe' -B test-reports-2026-10\\harness\\ci_gates.py --phase first --only evidence_hash   # 期望 checks 4/4 / exit 0"
+    ],
+    "rollback_steps": [
+      "① 整体回退：`git checkout -- test-reports-2026-10/harness/t8-evidence-whitelist.json`（本批 1 条随之消失；主块 33 条、通配规则 1 条与两个既有 meta 块本就未动）",
+      "② 仅删本批：手工删除 violations_appended 末条（harness/coverage.json）与本块 violations_appended_meta_b13_00",
+      "③ 回退后预期：`--only evidence_hash` 回到 checks 3/4 / exit 2（设计口径，非回归）—— 覆盖档仍停在重基线后，而冻结索引未同步"
+    ],
+    "stale_semantics": "若 harness/coverage.json 的哈希回到 5E2C9D43…BF1F0（或冻结索引/比对基线被按 A-70 推进为新值）⇒ 本条违规消失 ⇒ 本块条目 stale ⇒ TL-04 失败（防悄悄放宽约束）；届时由 captain 决定移除本块，并与 B13-00 的 ANCHOR_READING / uat_chains.py V12_ANCHORS 同步",
+    "exact_main_block_untouched": "本块不删改主块 violations[33]、wildcard_rules[1]、violations_appended 前 4 条与两个既有 meta 块（append-only）"
+  }
+}
