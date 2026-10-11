@@ -155,7 +155,7 @@ PINNED = {
     # `test-reports-2026-10/B18-登记.md` §B18-03。
     'roles_count': (7, 'app/permissions.py ROLES 元组长度（AST 实读）',
                     '系统角色数（80-§5.3「角色数」行；ROLES 七角色口径）'),
-    'routes_py_lines': (12761, 'app/main/routes.py splitlines() 行数',
+    'routes_py_lines': (12806, 'app/main/routes.py splitlines() 行数',
                         'routes.py 行数（80-§5.3 该行历史漂移 5 次：11557/12214/12126/12127/12155 均过时）'),
     'models_py_lines': (3246, 'app/models.py splitlines() 行数',
                         'models.py 行数（80-§5.3 旧值 2983 已过时）'),

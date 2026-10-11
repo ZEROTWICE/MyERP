@@ -24,19 +24,32 @@
 用法：
     python -B scripts/_remediate_b13_02_audit_log.py --check          # 只读复核（默认）
     python -B scripts/_remediate_b13_02_audit_log.py --apply ...      # 需全部前置
-    python -B scripts/_remediate_b13_02_audit_log.py --revert ...     # 逆向还原
+    python -B scripts/_remediate_b13_02_audit_log.py --revert ...     # 逆向还原（锚点式）
+    python -B scripts/_remediate_b13_02_audit_log.py --rollback <before.json> ...
+                                       # 按 before 快照还原（B18-C 裁决：对称 b18 脚本形态）
+B18-C（2026-10 批次18 队 t3）新增的 b18 对称形态三件：
+    ① 写前落 before 快照（--out 可指定；默认落 test-reports-2026-10/evidence/b18c/）；
+       快照只经 sqlite3 mode=ro 直连（绝不经 create_app——否则 _ensure_schema 补列 DDL 先跑，
+       「只读」就变成写库，见 _remediate_b18_pg_weak_accounts.py docstring 的同坑订正）；
+    ② --apply 在同一事务内 UPDATE + 插入一条 audit_log 审计留痕行（action='update'，
+       details 以「B13-02 存量整治」开头；append-only：--revert/--rollback 只还原 10 行
+       的 can_rollback，不删审计行）；
+    ③ --rollback <before.json> 按 before 快照还原（只还原快照记录为 can_rollback=1
+       且当前为 0 的行——「本来就被前人清过的行不误动」）。
 退出码：0=OK / 1=只读核对不一致 / 2=环境或文件错误 / 3=前置拒绝（授权·闸门·备份·目标库）
         / 4=目标行断言失败（id 清单或计数不符）
 """
 
 import argparse
 import hashlib
+import json
 import os
 import re
 import sqlite3
 import subprocess
 import sys
 import time
+from datetime import datetime
 
 sys.stdout.reconfigure(encoding='utf-8', errors='backslashreplace')
 
@@ -76,6 +89,19 @@ REMEDIATION_SQL = ('UPDATE audit_log SET can_rollback = 0 WHERE id IN (%s) AND %
                    % (', '.join(str(i) for i in TARGET_IDS), _EXEMPT_CLAUSE))
 REVERT_SQL = ('UPDATE audit_log SET can_rollback = 1 WHERE id IN (%s) AND target_id IS NULL AND can_rollback = 0'
               % ', '.join(str(i) for i in TARGET_IDS))
+# B18-C（t3）新增：before 快照默认落点 + 审计留痕行识别
+EVIDENCE_DIR = os.path.join(REPO_ROOT, 'test-reports-2026-10', 'evidence', 'b18c')
+AUDIT_MARKER = 'B13-02 存量整治'
+AUDIT_COUNT_SQL = ("SELECT COUNT(*) FROM audit_log WHERE action = 'update' AND details LIKE ?")
+AUDIT_COUNT_ARG = (AUDIT_MARKER + '%',)
+# --apply 审计留痕行落库后的全表期望（73+1 行 / 40+1 个 target_id NULL——留痕行自身 target_id IS NULL
+# 且 can_rollback=0，不污染 count 口径）
+POST_TOTAL = EXPECTED_TOTAL + 1
+POST_NULLS = EXPECTED_NULL + 1
+AUDIT_INSERT_SQL = ('INSERT INTO audit_log (user_id, action, timestamp, details, can_rollback, '
+                    'rollback_type, target_model, target_id, old_data, new_data, rolled_back, '
+                    'rolled_back_by, rolled_back_at) '
+                    "VALUES (NULL, 'update', ?, ?, 0, NULL, NULL, NULL, NULL, ?, 0, NULL, NULL)")
 
 
 def out(msg):
@@ -128,7 +154,59 @@ def read_state(con):
         'OR can_rollback IS NULL)').fetchone()[0]
     state['rollback_types'] = list(cur.execute(
         'SELECT rollback_type, COUNT(*) FROM audit_log GROUP BY rollback_type ORDER BY rollback_type'))
+    state['audit_rows'] = cur.execute(AUDIT_COUNT_SQL, AUDIT_COUNT_ARG).fetchone()[0]
     return state
+
+
+def take_snapshot(db):
+    """before 快照（只读）：全表指纹 + 10 个目标行的整行转储。
+
+    只经 sqlite3 mode=ro 直连——**绝不经 create_app**（其 _ensure_schema 会先跑补列 DDL，
+    「只读快照」就变成写库；同坑订正见 _remediate_b18_pg_weak_accounts.py docstring）。
+    """
+    con = connect_ro(db)
+    try:
+        cur = con.cursor()
+        columns = [r[1] for r in cur.execute('PRAGMA table_info(audit_log)')]
+        state = read_state(con)
+        target_rows = {}
+        for r in cur.execute('SELECT %s FROM audit_log WHERE id IN (%s) ORDER BY id'
+                             % (', '.join(columns), ', '.join(str(i) for i in TARGET_IDS))):
+            target_rows[r[0]] = dict(zip([c for c in columns if c != 'id'], r[1:]))
+        fp = hashlib.sha256()
+        for r in cur.execute('SELECT * FROM audit_log ORDER BY id'):
+            fp.update(repr(r).encode('utf-8'))
+        table_fingerprint = fp.hexdigest().upper()
+    finally:
+        con.close()
+    return {
+        'script': 'scripts/_remediate_b13_02_audit_log.py',
+        'taken_at_utc': datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f'),
+        'db': os.path.realpath(db),
+        'db_sig': file_sig(db),
+        'snapshot_mode': 'sqlite3 mode=ro + PRAGMA query_only（不经 create_app，不触发 _ensure_schema）',
+        'columns': columns,
+        'total': state['total'],
+        'target_id_null': state['nulls'],
+        'null_and_can_rollback_1': state['count'],
+        'ids': state['ids'],
+        'audit_marker_rows': state['audit_rows'],
+        'target_rows': target_rows,
+        'table_fingerprint': table_fingerprint,
+    }
+
+
+def persist_snapshot(path, snap):
+    d = os.path.dirname(os.path.abspath(path))
+    os.makedirs(d, exist_ok=True)
+    with open(path, 'w', encoding='utf-8') as f:
+        json.dump(snap, f, ensure_ascii=False, indent=2)
+    out('snapshot_written=%s' % os.path.abspath(path))
+
+
+def default_snapshot_path():
+    return os.path.join(EVIDENCE_DIR, 't3-b13-02-before-%s.json'
+                        % datetime.utcnow().strftime('%Y%m%d-%H%M%S'))
 
 
 def assert_target_rows(state):
@@ -235,6 +313,9 @@ def check_mode(args):
     finally:
         con.close()
 
+    if args.out:
+        persist_snapshot(args.out, take_snapshot(db))
+
     out('audit_log columns=%d %s' % (len(state['columns']), ','.join(state['columns'])))
     out('audit_log total=%d target_id_null=%d null_and_can_rollback_1=%d null_and_can_rollback_0=%d'
         % (state['total'], state['nulls'], state['count'], state['null_can0']))
@@ -264,10 +345,32 @@ def check_mode(args):
             if state['can'].get(tid) != 0:
                 problems.append('post row id=%d can_rollback = %r, expected 0'
                                 % (tid, state['can'].get(tid)))
-    if state['total'] != EXPECTED_TOTAL:
-        problems.append('audit_log total = %d, expected %d' % (state['total'], EXPECTED_TOTAL))
-    if state['nulls'] != EXPECTED_NULL:
-        problems.append('target_id IS NULL = %d, expected %d' % (state['nulls'], EXPECTED_NULL))
+    # 全表口径（B18-C t3 起 --apply 会插入一条 append-only 审计留痕行，须按状态分别断言）：
+    #   pre  允许两种：从未整治（73/40/无留痕行）或 整治后已还原（74/41/恰好 1 条留痕行
+    #   且 10 行 can_rollback 全部回到 1）；
+    #   post 必须：74/41/恰好 1 条留痕行（B18-C 裁决形态）。
+    if args.expect_state == 'pre':
+        pristine = (state['total'] == EXPECTED_TOTAL and state['nulls'] == EXPECTED_NULL
+                    and state['audit_rows'] == 0)
+        restored = (state['total'] == POST_TOTAL and state['nulls'] == POST_NULLS
+                    and state['audit_rows'] == 1
+                    and all(state['can'].get(i) == 1 for i in TARGET_IDS))
+        if not (pristine or restored):
+            problems.append('pre table state = total %d / null %d / audit-marker %d / flags %s '
+                            '(expected pristine 73/40/0 or restored %d/%d/1 with flags=1)'
+                            % (state['total'], state['nulls'], state['audit_rows'],
+                               [state['can'].get(i) for i in TARGET_IDS],
+                               POST_TOTAL, POST_NULLS))
+        out('pre table state: total=%d nulls=%d audit_marker_rows=%d (pristine=%s restored=%s)'
+            % (state['total'], state['nulls'], state['audit_rows'], pristine, restored))
+    else:
+        if state['total'] != POST_TOTAL:
+            problems.append('audit_log total = %d, expected %d (+1 audit trail row)' % (state['total'], POST_TOTAL))
+        if state['nulls'] != POST_NULLS:
+            problems.append('target_id IS NULL = %d, expected %d (+1 audit trail row)' % (state['nulls'], POST_NULLS))
+        if state['audit_rows'] != 1:
+            problems.append('audit marker rows = %d, expected exactly 1' % state['audit_rows'])
+        out('post table state: total=%d nulls=%d audit_marker_rows=%d' % (state['total'], state['nulls'], state['audit_rows']))
 
     refs = ci_gates_refs()
     out('precondition 4 (not-in-ci-gates) self-check: ci_gates_refs=%s (must be 0)' % refs)
@@ -308,6 +411,9 @@ def apply_mode(args):
     problems = assert_target_rows(state)
     if state['total'] != EXPECTED_TOTAL or state['nulls'] != EXPECTED_NULL:
         problems.append('audit_log total/null mismatch: %d / %d' % (state['total'], state['nulls']))
+    if state['audit_rows'] != 0:
+        problems.append('audit marker rows = %d, expected 0 (already remediated before? '
+                        'restore from backup instead of re-applying)' % state['audit_rows'])
     if problems:
         for p in problems:
             out('MISMATCH: %s' % p)
@@ -315,17 +421,35 @@ def apply_mode(args):
     out('precondition 6 OK: pre count=%d ids=%s row-identity all match' % (state['count'], state['ids']))
     out('planned_sql=%s' % REMEDIATION_SQL)
 
+    # B18-C t3（b18 对称形态①）：写库前先落 before 快照（只读直连，不经 create_app）
+    snap_path = args.out or default_snapshot_path()
+    snap = take_snapshot(db)
+    persist_snapshot(snap_path, snap)
+    snap_sha = file_sig(snap_path)['sha256']
+
+    authorizer, when = args.authorization
+    audit_details = ('%s：置 can_rollback=0（诚实标记，不回填 target_id），%d 行 id=%s；授权=%r @ %r'
+                     % (AUDIT_MARKER, len(TARGET_IDS), TARGET_IDS, authorizer, when))
+    audit_new_data = json.dumps({'ids': TARGET_IDS, 'change': 'can_rollback: 1 -> 0',
+                                 'target_id': '保持 NULL（不回填，B18-C 裁决）',
+                                 'authorization': [authorizer, when]}, ensure_ascii=False)
+
     con = sqlite3.connect(db)
     try:
         con.execute('PRAGMA foreign_keys = OFF')
         cur = con.cursor()
         cur.execute(REMEDIATION_SQL)
         changed = cur.rowcount  # 本语句命中行数（不可用 Connection.total_changes：它累计本连接全部 DML）
+        # B18-C t3（b18 对称形态②）：同一事务内追加审计留痕行（append-only，还原动作不删它）
+        cur.execute(AUDIT_INSERT_SQL, (datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f'),
+                                       audit_details, audit_new_data))
         con.commit()
         post = cur.execute(COUNT_SQL).fetchone()[0]
         post_rows = {r[0]: r[1] for r in cur.execute(
             'SELECT id, can_rollback FROM audit_log WHERE id IN (%s)'
             % ', '.join(str(i) for i in TARGET_IDS))}
+        post_audit = cur.execute(AUDIT_COUNT_SQL, AUDIT_COUNT_ARG).fetchone()[0]
+        post_total = cur.execute('SELECT COUNT(*) FROM audit_log').fetchone()[0]
         integrity = cur.execute('PRAGMA integrity_check').fetchone()[0]
     finally:
         con.close()
@@ -333,14 +457,19 @@ def apply_mode(args):
     out('rows_changed=%d expected=%d' % (changed, PRE_COUNT))
     out('post_count=%d expected=%d' % (post, POST_COUNT))
     out('post_can_rollback=%s' % post_rows)
+    out('post_audit_marker_rows=%d expected=1' % post_audit)
+    out('post_total=%d expected=%d' % (post_total, POST_TOTAL))
     out('integrity_check=%s' % integrity)
     ok = (changed == PRE_COUNT and post == POST_COUNT and integrity == 'ok'
-          and all(v == 0 for v in post_rows.values()))
+          and all(v == 0 for v in post_rows.values())
+          and post_audit == 1 and post_total == POST_TOTAL)
     new_sig = file_sig(db)
     out('PRE_ANCHOR (append-only, must be preserved as 整治前) %s' % fmt_sig(PRE_ANCHOR))
     out('PREVIOUS_SIG %s' % fmt_sig(cur_sig))
+    out('before_snapshot=%s sha256=%s' % (os.path.abspath(snap_path), snap_sha))
     out('NEW_ANCHOR (register as 整治后, append-only) %s' % fmt_sig(new_sig))
     out('executed_sql=%s' % REMEDIATION_SQL)
+    out('audit_trail_row: action=update details=%r' % audit_details)
     out('executor=%s authorized_by=%r at=%r' % (os.environ.get('USERNAME', '?'), args.authorization[0],
                                                 args.authorization[1]))
     if not ok:
@@ -405,6 +534,80 @@ def revert_mode(args):
     return 0
 
 
+def rollback_mode(args):
+    """B18-C t3（b18 对称形态③）：按 before 快照还原。
+
+    只还原「快照记录为 can_rollback=1 且当前为 0」的目标行——若某行在本脚本整治之前
+    就已被前人置 0（快照里本来就是 0），不误动（b18 --rollback 同款防误清逻辑）。
+    审计留痕行是 append-only 历史，不删除。
+    """
+    write_guards(args, '--rollback')
+    db = os.path.abspath(args.db)
+    snap_path = os.path.abspath(args.rollback)
+    if not os.path.exists(snap_path):
+        fail('--rollback refused: before snapshot not found: %s' % snap_path, 2)
+    try:
+        with open(snap_path, 'r', encoding='utf-8') as f:
+            snap = json.load(f)
+    except (OSError, ValueError) as exc:
+        fail('--rollback refused: cannot read snapshot %s: %r' % (snap_path, exc), 2)
+    for key in ('script', 'ids', 'target_rows', 'table_fingerprint'):
+        if key not in snap:
+            fail('--rollback refused: snapshot missing key %r (not a before-snapshot?)' % key, 2)
+    snap_ids = sorted(int(i) for i in snap['ids'])
+    if snap_ids != sorted(TARGET_IDS):
+        fail('--rollback refused: snapshot ids %s != expected target ids %s'
+             % (snap_ids, sorted(TARGET_IDS)), 4)
+    # 防误清：只还原快照中 can_rollback=1（= 本脚本整治动作真实翻过的行）的目标
+    to_restore = [i for i in TARGET_IDS
+                  if snap['target_rows'].get(str(i), {}).get('can_rollback') == 1]
+    out('before_snapshot=%s (ids=%s, restore=%s)' % (snap_path, snap_ids, to_restore))
+    if not to_restore:
+        out('nothing to restore (snapshot shows no can_rollback=1 targets) — no write performed')
+        out('RESULT: OK (0 rows)')
+        return 0
+
+    con = connect_ro(db)
+    try:
+        state = read_state(con)
+    finally:
+        con.close()
+    for i in to_restore:
+        if state['can'].get(i) != 0:
+            fail('--rollback refused: row id=%d currently can_rollback=%r, expected 0 '
+                 '(not in remediated state?)' % (i, state['can'].get(i)), 4)
+    if state['audit_rows'] != 1:
+        fail('--rollback refused: audit marker rows = %d, expected 1 (was --apply really run?)'
+             % state['audit_rows'], 4)
+
+    restore_sql = ('UPDATE audit_log SET can_rollback = 1 WHERE id IN (%s) '
+                   'AND target_id IS NULL AND can_rollback = 0'
+                   % ', '.join(str(i) for i in to_restore))
+    out('planned_sql=%s' % restore_sql)
+    con = sqlite3.connect(db)
+    try:
+        cur = con.cursor()
+        cur.execute(restore_sql)
+        changed = cur.rowcount
+        con.commit()
+        back = cur.execute(COUNT_SQL).fetchone()[0]
+        integrity = cur.execute('PRAGMA integrity_check').fetchone()[0]
+    finally:
+        con.close()
+    new_sig = file_sig(db)
+    out('rows_changed=%d expected=%d' % (changed, len(to_restore)))
+    out('restored_count=%d expected=%d' % (back, len(to_restore)))
+    out('integrity_check=%s' % integrity)
+    out('audit_marker_rows=1 (append-only: the --apply audit trail row is preserved, not deleted)')
+    out('NEW_ANCHOR (register as 还原后, append-only) %s' % fmt_sig(new_sig))
+    ok = (changed == len(to_restore) and back == len(to_restore) and integrity == 'ok')
+    if not ok:
+        out('RESULT: FAIL (rollback post-conditions not satisfied)')
+        return 1
+    out('RESULT: OK (restored %d rows)' % changed)
+    return 0
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(
         description='B13-02 audit_log 存量污染整治（默认只读；写库需显式授权 + B17-02 闸门生效 + 先备份）')
@@ -412,8 +615,13 @@ def main(argv=None):
     ap.add_argument('--check', action='store_true', help='只读复核（默认动作）')
     ap.add_argument('--expect-state', dest='expect_state', choices=('pre', 'post'), default='pre',
                     help='--check 的期望状态：pre=整治前（10 行待整治，默认）/ post=整治后（0 行待整治）')
-    ap.add_argument('--apply', action='store_true', help='执行整治（置 can_rollback=0）')
-    ap.add_argument('--revert', action='store_true', help='逆向还原（置 can_rollback=1）')
+    ap.add_argument('--apply', action='store_true', help='执行整治（置 can_rollback=0；同一事务追加审计留痕行）')
+    ap.add_argument('--revert', action='store_true', help='逆向还原（锚点式，见 --from-anchor）')
+    ap.add_argument('--rollback', metavar='BEFORE_JSON',
+                    help='按 before 快照还原（B18-C b18 对称形态；只还原快照记录为 1 的行，不删审计留痕行）')
+    ap.add_argument('--out', metavar='PATH',
+                    help='before 快照落盘路径（--apply 必落，默认 test-reports-2026-10/evidence/b18c/；'
+                         '--check 可选加 --out 落只读快照）')
     ap.add_argument('--backup', help='整治前的 app.db 备份（SHA256 必须等于当前库）')
     ap.add_argument('--i-have-authorization', dest='authorization', nargs=2, metavar=('AUTHORIZER', 'WHEN'),
                     help='显式授权（授权人 + 时点）；未传则拒绝任何写库动作')
@@ -421,16 +629,18 @@ def main(argv=None):
     ap.add_argument('--from-anchor', help='--revert 用：整治后库的 SHA256（防还原错镜像）')
     args = ap.parse_args(argv)
 
-    actions = [a for a in ('check', 'apply', 'revert') if getattr(args, a)]
+    actions = [a for a in ('check', 'apply', 'revert', 'rollback') if getattr(args, a)]
     if len(actions) > 1:
-        fail('choose exactly one of --check / --apply / --revert', 2)
+        fail('choose exactly one of --check / --apply / --revert / --rollback', 2)
     action = actions[0] if actions else 'check'
 
     if action == 'check':
         return check_mode(args)
     if action == 'apply':
         return apply_mode(args)
-    return revert_mode(args)
+    if action == 'revert':
+        return revert_mode(args)
+    return rollback_mode(args)
 
 
 if __name__ == '__main__':

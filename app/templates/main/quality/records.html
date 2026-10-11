@@ -258,9 +258,23 @@ function getRecordTypeName(type) {
         'production_record': '生产记录质检',
         'product': '成品质检',
         'material': '原材料质检',
-        'goods_receipt': '来料质检'
+        'goods_receipt': '来料质检',
+        'workpiece': '工件质检',
+        'heat_lot': '炉次质检'
     };
     return types[type] || type;
+}
+
+// 不合格处理方式的枚举中文化（P7：英文枚举不进入 DOM 可见文案，
+// 与 print_record.html 的 NC_TYPE_LABELS、stock/nonconformities.html 的 B14-01 同一约定）
+function getNcTypeName(type) {
+    const names = {
+        'rework': '返工',
+        'scrap': '报废',
+        'accept': '让步接收',
+        'return': '退货'
+    };
+    return names[type] || type;
 }
 
 // 渲染分页
@@ -420,7 +434,7 @@ function renderRecordDetail(record) {
             <div class="row">
                 <div class="col-md-4">
                     <p class="mb-1"><strong>处理方式</strong></p>
-                    <p>${nc.type || '无'}</p>
+                    <p>${nc.type ? getNcTypeName(nc.type) : '无'}</p>
                 </div>
                 <div class="col-md-4">
                     <p class="mb-1"><strong>处理人</strong></p>

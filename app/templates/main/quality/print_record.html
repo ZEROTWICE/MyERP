@@ -47,6 +47,12 @@
 {% endblock %}
 
 {% block content %}
+{# P7/B14-07：枚举值中文化（与 stock/nonconformities.html 的 B14-01 同一约定）。
+   英文枚举仅作为映射键存在于模板源码中，不进入 DOM 可见文案。 #}
+{% set TASK_TYPE_LABELS = {'product': '成品质检', 'production_record': '生产记录质检',
+                           'material': '原材料质检', 'goods_receipt': '来料质检',
+                           'workpiece': '工件质检', 'heat_lot': '炉次质检'} %}
+{% set NC_TYPE_LABELS = {'rework': '返工', 'scrap': '报废', 'accept': '让步接收', 'return': '退货'} %}
 <div class="container mt-4">
     <!-- 打印按钮 -->
     <div class="text-end mb-4 no-print">
@@ -67,7 +73,7 @@
             <div class="row info-row">
                 <div class="col-md-3">
                     <span class="info-label">检验类型：</span>
-                    {{ record.task.target_type }}
+                    {{ TASK_TYPE_LABELS.get(record.task.target_type, record.task.target_type) }}
                 </div>
                 <div class="col-md-3">
                     <span class="info-label">检验对象：</span>
@@ -175,7 +181,7 @@
             <div class="row info-row">
                 <div class="col-md-3">
                     <span class="info-label">处理方式：</span>
-                    {{ nonconformity.type }}
+                    {{ NC_TYPE_LABELS.get(nonconformity.type, nonconformity.type) }}
                 </div>
                 <div class="col-md-3">
                     <span class="info-label">处理人：</span>

@@ -760,7 +760,7 @@ class ExcelGenerator:
     def parse_product_data(file_path):
         """解析产品（含BOM和工序）导入数据"""
         from openpyxl import load_workbook
-        from app.models import RawMaterial, FinishedProduct, ProcessPrice, CodeRule
+        from app.models import RawMaterial, FinishedProduct, CodeRule
         
         wb = load_workbook(file_path)
         result = {
@@ -893,9 +893,13 @@ class ExcelGenerator:
                     
                 try:
                     process_code = str(row[1]).strip() if row[1] else None
-                    
-                    # 查找工序
-                    process = ProcessPrice.query.filter_by(process_code=process_code, is_current=True).first()
+
+                    # 查找工序：取价单点统一（B18-C §1.3 裁决）——复用 routes.pick_process_price
+                    # 的唯一口径（effective_date<=业务日+1d，降序取最新），不再另留 is_current
+                    # 第三口径。产品导入无业务日期列 ⇒ 业务日=导入当日。延迟导入避免
+                    # utils→main 模块级环（本函数仅在请求期被 routes.import_products 调用）。
+                    from app.main.routes import pick_process_price
+                    process = pick_process_price(process_code, datetime.now().date())
                     if not process:
                         result['errors'].append(f'工序第{row_num}行：找不到工序编号为"{process_code}"的工序')
                         continue

@@ -3,6 +3,11 @@
 {% block title %}质检执行{% endblock %}
 
 {% block content %}
+{# P7/B14-07：枚举值中文化（与 stock/nonconformities.html 的 B14-01 同一约定）。
+   英文枚举仅作为映射键存在于模板源码中，不进入 DOM 可见文案。 #}
+{% set TASK_TYPE_LABELS = {'product': '成品质检', 'production_record': '生产记录质检',
+                           'material': '原材料质检', 'goods_receipt': '来料质检',
+                           'workpiece': '工件质检', 'heat_lot': '炉次质检'} %}
 <div class="container mt-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2>质检执行</h2>
@@ -26,7 +31,7 @@
                 </div>
                 <div class="col-md-3">
                     <p class="mb-1"><strong>检验类型</strong></p>
-                    <p>{{ record.task.target_type }}</p>
+                    <p>{{ TASK_TYPE_LABELS.get(record.task.target_type, record.task.target_type) }}</p>
                 </div>
                 <div class="col-md-3">
                     <p class="mb-1"><strong>检验员</strong></p>

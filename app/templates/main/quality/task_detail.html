@@ -3,6 +3,15 @@
 {% block title %}质检任务详情{% endblock %}
 
 {% block content %}
+{# P7/B14-07：枚举值中文化（与 stock/nonconformities.html 的 B14-01 同一约定）。
+   英文枚举仅作为映射键存在于模板源码中，不进入 DOM 可见文案。
+   workpiece/heat_lot 是自动创建任务（mes_service）的 target_type，同样给中文名。 #}
+{% set TASK_TYPE_LABELS = {'product': '成品质检', 'production_record': '生产记录质检',
+                           'material': '原材料质检', 'goods_receipt': '来料质检',
+                           'workpiece': '工件质检', 'heat_lot': '炉次质检'} %}
+{% set TASK_STATUS_LABELS = {'pending': '待处理', 'in_progress': '进行中',
+                             'completed': '已完成', 'failed': '不合格', 'cancelled': '已取消'} %}
+{% set RESULT_LABELS = {'pass': '合格', 'fail': '不合格'} %}
 <div class="container mt-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2>质检任务详情</h2>
@@ -31,17 +40,7 @@
                 </div>
                 <div class="col-md-3">
                     <p class="mb-1"><strong>检验类型</strong></p>
-                    <p>
-                        {% if task.target_type == 'production_record' %}
-                        生产记录质检
-                        {% elif task.target_type == 'product' %}
-                        成品质检
-                        {% elif task.target_type == 'material' %}
-                        原材料质检
-                        {% else %}
-                        {{ task.target_type }}
-                        {% endif %}
-                    </p>
+                    <p>{{ TASK_TYPE_LABELS.get(task.target_type, task.target_type) }}</p>
                 </div>
                 <div class="col-md-3">
                     <p class="mb-1"><strong>任务状态</strong></p>
@@ -55,7 +54,7 @@
                         {% elif task.status == 'failed' %}
                         <span class="badge bg-danger">不合格</span>
                         {% else %}
-                        <span class="badge bg-secondary">{{ task.status }}</span>
+                        <span class="badge bg-secondary">{{ TASK_STATUS_LABELS.get(task.status, task.status) }}</span>
                         {% endif %}
                     </p>
                 </div>
@@ -215,6 +214,42 @@
                 {% else %}
                 <p class="text-danger">原材料不存在或已删除</p>
                 {% endif %}
+            {% elif task.target_type == 'goods_receipt' %}
+                {# B18-C-02/t9：来料检的检验对象是到货单（B14-07 方案 A）。
+                   到货单号与打印页 get_inspection_target_name（app/main/quality.py）同一数据源；
+                   不渲染 receipt.status（英文枚举，purchase 模板亦无现成中文映射，不新造表）。 #}
+                {% if goods_receipt %}
+                <div class="row">
+                    <div class="col-md-3">
+                        <p class="mb-1"><strong>到货单号</strong></p>
+                        <p>{{ goods_receipt.receipt_no }}</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p class="mb-1"><strong>采购订单</strong></p>
+                        <p>{{ goods_receipt.purchase_order.po_no if goods_receipt.purchase_order else '无' }}</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p class="mb-1"><strong>供应商</strong></p>
+                        <p>{{ goods_receipt.purchase_order.supplier.name if goods_receipt.purchase_order and goods_receipt.purchase_order.supplier else '无' }}</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p class="mb-1"><strong>到货时间</strong></p>
+                        <p>{{ goods_receipt.received_at.strftime('%Y-%m-%d %H:%M') if goods_receipt.received_at else '无' }}</p>
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-md-3">
+                        <p class="mb-1"><strong>收货明细</strong></p>
+                        <p>{{ goods_receipt.items.count() }} 行</p>
+                    </div>
+                    <div class="col-md-9">
+                        <p class="mb-1"><strong>备注</strong></p>
+                        <p>{{ goods_receipt.notes or '无' }}</p>
+                    </div>
+                </div>
+                {% else %}
+                <p class="text-danger">到货单不存在或已删除</p>
+                {% endif %}
             {% endif %}
         </div>
     </div>
@@ -237,7 +272,7 @@
                 </div>
                 <div class="col-md-3">
                     <p class="mb-1"><strong>模板类型</strong></p>
-                    <p>{{ task.template.type }}</p>
+                    <p>{{ TASK_TYPE_LABELS.get(task.template.type, task.template.type) }}</p>
                 </div>
                 <div class="col-md-3">
                     <p class="mb-1"><strong>状态</strong></p>
@@ -286,7 +321,7 @@
                         {% elif task.record.result == 'fail' %}
                         <span class="badge bg-danger">不合格</span>
                         {% else %}
-                        <span class="badge bg-secondary">{{ task.record.result }}</span>
+                        <span class="badge bg-secondary">{{ RESULT_LABELS.get(task.record.result, task.record.result) }}</span>
                         {% endif %}
                     </p>
                 </div>

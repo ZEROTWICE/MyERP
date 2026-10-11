@@ -3,9 +3,10 @@ from flask_login import login_required, current_user
 from app import db, csrf
 from app.models import (
     InspectionTemplate, InspectionBaseItem, InspectionItem,
-    InspectionTask, InspectionRecord, InspectionBaseItemRecord, 
+    InspectionTask, InspectionRecord, InspectionBaseItemRecord,
     InspectionItemRecord, NonconformityRecord, AuditLog, User, Employee,
-    SerialNumber, ProcessPrice, FinishedProduct, RawMaterial, ProductionRecord
+    SerialNumber, ProcessPrice, FinishedProduct, RawMaterial, ProductionRecord,
+    GoodsReceipt
 )
 from app.permissions import require_capability
 from datetime import datetime, timedelta
@@ -107,8 +108,14 @@ def quality_task_detail(task_id):
     if current_user.role == 'inspector' and task.inspector_id != current_user.id:
         flash('只能查看分配给自己的质检任务', 'danger')
         return redirect(url_for('main.quality_tasks'))
-    
-    return render_template('main/quality/task_detail.html', task=task)
+
+    # 检验对象（B18-C-02/t9）：来料检任务的检验对象是到货单（B14-07 方案 A），
+    # 与打印页 get_inspection_target_name 同一数据源，供详情页检验对象卡片渲染
+    goods_receipt = (GoodsReceipt.query.get(task.target_id)
+                     if task.target_type == 'goods_receipt' else None)
+
+    return render_template('main/quality/task_detail.html', task=task,
+                           goods_receipt=goods_receipt)
 
 @bp.route('/quality/inspection/<int:record_id>')
 @login_required
@@ -1576,6 +1583,8 @@ _TASK_TYPE_NAMES = {
     'production_record': '生产记录质检',
     'material': '原材料质检',
     'goods_receipt': '来料质检',
+    'workpiece': '工件质检',
+    'heat_lot': '炉次质检',
 }
 _VALID_TASK_TYPES = ('product', 'production_record', 'material', 'goods_receipt')
 

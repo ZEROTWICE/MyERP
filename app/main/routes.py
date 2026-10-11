@@ -2927,14 +2927,14 @@ def import_production_records():
     if not file.filename.endswith('.xlsx'):
         return jsonify({'success': False, 'message': '请上传Excel文件(.xlsx)'})
     
+    temp_path = None  # B18-C t2(g)：上传件清理统一移到函数末 finally
     try:
         filename = secure_filename(file.filename)
         temp_path = os.path.join(current_app.config['TEMP_FOLDER'], filename)
         file.save(temp_path)
-        
+
         record_data = ExcelGenerator.parse_production_record_data(temp_path)
-        os.remove(temp_path)  # 删除临时文件
-        
+
         success_count = 0
         error_messages = []
         
@@ -2943,9 +2943,10 @@ def import_production_records():
                 # 查找员工
                 employee = Employee.query.filter_by(employee_id=data['employee_id']).first()
                 if not employee:
-                    error_messages.append(f"员工工号 {data['employee_id']} 不存在")
+                    # B18-C t2(f)：坏行提示补行号（第 N 行 = Excel 行号），口径同 import_tasks
+                    error_messages.append(f"第 {index + 2} 行：员工工号 {data['employee_id']} 不存在")
                     continue
-                
+
                 # B13-10：日期兜底 —— xlsx 文本日期单元格（str）会被 SQLite 方言拒绝
                 # （StatementError: SQLite Date type only accepts Python date objects as input），
                 # 统一走仓库既有 _coerce_excel_date（口径同奖惩导入 routes.py:4019-4023）。
@@ -3015,6 +3016,14 @@ def import_production_records():
         db.session.rollback()
         current_app.logger.error(f'生产记录导入失败：{str(e)}')
         return jsonify({'success': False, 'message': '导入失败，请稍后重试或联系管理员'})
+    finally:
+        # B18-C t2(g)：上传件清理 —— 解析失败/行级坏行/成功/异常各出口都落在这里
+        # （原先 os.remove 只在解析成功那条直线上 ⇒ 解析失败必然残留上传件）
+        if temp_path and os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except OSError:
+                pass
 
 @bp.route('/production_records/export', methods=['GET', 'POST'])
 @login_required
@@ -3906,34 +3915,50 @@ def update_task_status(id):
                         
                         current_app.logger.info(f'生产批次 {batch.batch_number} 状态自动更新：{old_status} -> {batch.status}')
                 
-                # 更新生产状态层次结构
-                update_production_status_hierarchy()
-                
+                # 更新生产状态层次结构（B18-C t12：savepoint 包裹被调方——它内部对 session
+                # 做 commit/rollback（会话级，SQLAlchemy 2.0 仍作用于根事务，t12-semantics.py
+                # 场景 A/B 实测），savepoint 只兜不经被调方 except 的故障；防「谎报成功」的主力
+                # 是本块 except 里的事务健康检查，见下。）
+                with db.session.begin_nested():
+                    update_production_status_hierarchy()
+
             except Exception as e:
                 current_app.logger.error(f'同步更新生产批次状态失败：{str(e)}')
-                # 不影响主流程，继续执行
+                # 不影响主流程，继续执行——前提是事务仍健康（本块自身可被隔离的故障）。
+                if not db.session().in_transaction():
+                    # 被调方 except 的会话级 rollback 已掀翻整个事务，连同未提交的报工主写入
+                    # 一并丢弃；继续走 ⑥⑦/外层 commit 只会提交空事务、谎报成功（t12 compound
+                    # 改前实测 200 + 全 Δ=0）。⇒ 上抛交外层统一 500。
+                    # （db.session 是 scoped_session，不代理 in_transaction 属性，须 () 取底层
+                    # Session 再查——直呼 db.session.in_transaction() 会 AttributeError。）
+                    raise
         
         # 同步生产中心：若任务关联实例/批次则更新实例或批次下各实例的可视状态
         # 注意：ProductionBatchItem 由模块顶部统一 import；这里绝不能再用函数内 import，
         # 否则 Python 会把该名字视为整个函数的局部变量，函数前部的替用分析（L3557 附近）
         # 会抛 UnboundLocalError 并被 except 吞掉，导致实例任务的替用通知发不出。
+        # B18-C t2(h)：块⑥改 savepoint 范式（同块①口径）——可视状态同步是附属事件，
+        # 失败只回滚本块半写、不阻断报工主事件；本块写入全在调用方会话内，无 RF-5
+        # 被调方事务边界问题。同时兜住会话中毒：DB 级错误以前被吞后会污染会话，
+        # 外层 commit 必抛 PendingRollbackError ⇒ 报工被可视同步整体拖死。
         try:
-            if task.batch_item_id:
-                bi = ProductionBatchItem.query.get(task.batch_item_id)
-                if bi:
-                    if (bi.status or '') == 'scrapped':
-                        # DEC-1 §1.3：报废是**终态** —— 后续报工不得把它改回 completed/in_progress
-                        # （否则 quality_status 复位成 pass 后该产出会被放行，违反 RC-5/RC-11）
-                        current_app.logger.warning(
-                            f'实例 {bi.product_code} 已报废（终态），本次报工不同步实例状态')
-                    elif task.status == 'completed' and bi.status != 'completed':
-                        bi.status = 'completed'
-                    elif task.status in ['in_progress', 'pending'] and bi.status == 'pending':
-                        bi.status = 'in_progress'
-            elif task.production_batch_id:
-                # 批次级任务：当有任务进行中或完成，推进该批次下所有 pending 实例为 in_progress（轻量同步）
-                if task.status in ['in_progress', 'completed']:
-                    ProductionBatchItem.query.filter_by(batch_id=task.production_batch_id, status='pending').update({'status': 'in_progress'})
+            with db.session.begin_nested():
+                if task.batch_item_id:
+                    bi = ProductionBatchItem.query.get(task.batch_item_id)
+                    if bi:
+                        if (bi.status or '') == 'scrapped':
+                            # DEC-1 §1.3：报废是**终态** —— 后续报工不得把它改回 completed/in_progress
+                            # （否则 quality_status 复位成 pass 后该产出会被放行，违反 RC-5/RC-11）
+                            current_app.logger.warning(
+                                f'实例 {bi.product_code} 已报废（终态），本次报工不同步实例状态')
+                        elif task.status == 'completed' and bi.status != 'completed':
+                            bi.status = 'completed'
+                        elif task.status in ['in_progress', 'pending'] and bi.status == 'pending':
+                            bi.status = 'in_progress'
+                elif task.production_batch_id:
+                    # 批次级任务：当有任务进行中或完成，推进该批次下所有 pending 实例为 in_progress（轻量同步）
+                    if task.status in ['in_progress', 'completed']:
+                        ProductionBatchItem.query.filter_by(batch_id=task.production_batch_id, status='pending').update({'status': 'in_progress'})
         except Exception as sync_err:
             current_app.logger.warning(f'同步生产中心状态失败: {str(sync_err)}')
 
@@ -4002,6 +4027,11 @@ def update_task_status(id):
                         ))
             except Exception as inbound_err:
                 current_app.logger.error(f'报工末道入库失败: {str(inbound_err)}')
+                # B18-C t2(h)：块⑦改上抛范式（同块②③口径）——业务性拒绝走 (None, reason)
+                # 返回值不进这里，进这里的都是基础设施故障；吞掉会留下「任务 completed +
+                # 生产记录已写 + 正品库无行」的部分提交，且重复报工被幂等闸拒绝 ⇒ 库存
+                # 差异永久无法补录。上抛由外层统一 rollback ⇒ 各目标表 Δ=0，可整体重试。
+                raise
 
         db.session.commit()
         return jsonify({'success': True, 'message': '更新成功'})
@@ -4111,14 +4141,14 @@ def import_bonus_penalties():
     if not file.filename.endswith('.xlsx'):
         return jsonify({'success': False, 'message': '请上传Excel文件(.xlsx)'})
     
+    temp_path = None  # B18-C t2(g)：上传件清理统一移到函数末 finally
     try:
         filename = secure_filename(file.filename)
         temp_path = os.path.join(current_app.config['TEMP_FOLDER'], filename)
         file.save(temp_path)
-        
+
         record_data = ExcelGenerator.parse_bonus_penalty_data(temp_path)
-        os.remove(temp_path)  # 删除临时文件
-        
+
         success_count = 0
         error_messages = []
         
@@ -4127,7 +4157,8 @@ def import_bonus_penalties():
                 # 查找员工
                 employee = Employee.query.filter_by(employee_id=data['employee_id']).first()
                 if not employee:
-                    error_messages.append(f"员工工号 {data['employee_id']} 不存在")
+                    # B18-C t2(f)：坏行提示补行号（第 N 行 = Excel 行号），口径同 import_tasks
+                    error_messages.append(f"第 {index + 2} 行：员工工号 {data['employee_id']} 不存在")
                     continue
                 
                 # 日期兜底：文本日期单元格（str）会被 SQLite 方言拒绝，统一解析
@@ -4170,18 +4201,26 @@ def import_bonus_penalties():
         )
         db.session.add(log)
         db.session.commit()
-        
+
         message = f'成功导入 {success_count} 条记录'
         if error_messages:
             message += f'，{len(error_messages)} 条记录导入失败：\n' + '\n'.join(error_messages)
-        
+
         return jsonify({
             'success': True,
             'message': message
         })
-        
+
     except Exception as e:
         return jsonify({'success': False, 'message': '导入失败，请稍后重试或联系管理员'})
+    finally:
+        # B18-C t2(g)：上传件清理 —— 解析失败/行级坏行/成功/异常各出口都落在这里
+        # （原先 os.remove 只在解析成功那条直线上 ⇒ 解析失败必然残留上传件）
+        if temp_path and os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except OSError:
+                pass
 
 @bp.route('/tasks/template')
 @login_required
@@ -9533,9 +9572,12 @@ def update_batch_item(item_id):
         
         db.session.commit()
         
-        # 更新生产状态层次结构
-        update_production_status_hierarchy()
-        
+        # 更新生产状态层次结构（B18-C t12：savepoint 包裹被调方——其内部会话级
+        # commit/rollback 与调用方事务边界错位；此处调用方已 commit、无 pending 写入，
+        # 包裹语义中性（t12-semantics.py 场景 C/D），与 update_task_status 调用点统一范式。）
+        with db.session.begin_nested():
+            update_production_status_hierarchy()
+
         return jsonify({'success': True, 'message': '批次项目更新成功'})
         
     except Exception as e:
@@ -9589,9 +9631,12 @@ def update_batch_status(batch_id):
         
         db.session.commit()
         
-        # 更新生产状态层次结构
-        update_production_status_hierarchy()
-        
+        # 更新生产状态层次结构（B18-C t12：savepoint 包裹被调方——其内部会话级
+        # commit/rollback 与调用方事务边界错位；此处调用方已 commit、无 pending 写入，
+        # 包裹语义中性（t12-semantics.py 场景 C/D），与 update_task_status 调用点统一范式。）
+        with db.session.begin_nested():
+            update_production_status_hierarchy()
+
         status_text = {
             'in_progress': '已开始生产',
             'completed': '批次已完成',
