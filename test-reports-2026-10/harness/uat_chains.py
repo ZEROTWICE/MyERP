@@ -1177,6 +1177,10 @@ def chain_c_requisition(app, client, ctx):
 V12_TAG = re.sub(r'[^0-9A-Za-z]', '', RUN_ID)[-12:]
 
 #: 冻结基线（改动前 r2-exec-b4-v12-pre2 全量读数）：40 条的 id 顺序 + (id,desc,expected) 摘要
+#: [t8 / A-70 重基线 2026-10-11] 旧值 C9FAD00E…D9C 冻结于 V-12，而批次15 d809e68（RF-1）
+#: 已把真库锚 F5DA2306…→B4FB980C…，基线成员 ISO.3 的 expected 内嵌该锚变量 ⇒ 摘要随
+#: 之漂移（口径漂移，非判据内容漂移；t3 代换实验：仅把 ISO.3.expected 换回旧锚即可
+#: 逐字节复现 C9FAD00E…D9C）。A-70 三步留档/阴性对照/复跑见 B18-登记.md §t8。
 BASELINE40_IDS = (
     'ISO.1', 'ISO.2',
     'P0-1.1', 'P0-1.2', 'P0-1.3', 'P0-1.4', 'P0-1.5', 'P0-1.6', 'P0-1.7', 'P0-1.8', 'P0-1.9',
@@ -1187,7 +1191,7 @@ BASELINE40_IDS = (
     'P0-5.1', 'P0-5.2', 'P0-5.3', 'P0-5.4', 'P0-5.5', 'P0-5.6', 'P0-5.7',
     'ISO.3', 'ISO.4',
 )
-BASELINE40_DIGEST = 'C9FAD00E20050A3D5C2A96E9D24957E243EBD197588BE22604A79C375B5CDD9C'
+BASELINE40_DIGEST = 'D82423A90EF13F77DAA06C5BD4F85EC83C9002F31FA78BAF5D7482968DD46F2C'
 
 #: t1 冻结的另外 6 个锚点（bytes, sha256）——本 run 只读复核，不改动
 V12_ANCHORS = (
@@ -1505,7 +1509,9 @@ def v12_chain_a(app, client, seed):
           dict(a2, po_rows_delta=0, audit_rows_delta=0, conv_req_status='approved'),
           'app/main/purchase.py:190-280（convert_purchase_requisition）')
 
-    # A4 前置：先造一张 type='material' 模板（04 2.1 A4 的字面前置），再造来料检模板
+    # A4 前置：先造一张 type='material' 模板 —— 方案A（B14-07）后它不再是来料检的
+    # 正确前置，仅作 CA4N 阴性对照（错型模板开始来料检须 400）使用；04 需求文档 A4
+    # 行仍写 type='material'，其订正移交批次18（见文件尾 loose-end 注记）。
     mtpl_code = f'_V12MT{tag}'
     r_mtpl = call(client, 'post', '/api/quality/templates',
                   json={'template_code': mtpl_code, 'name': f'_V12 原材料质检模板 {tag}',
@@ -1524,19 +1530,24 @@ def v12_chain_a(app, client, seed):
     out['templates'] = {'material_template_id': mtpl_id, 'material_http': r_mtpl.status_code,
                         'gr_template_id': grtpl_id, 'gr_http': r_grtpl.status_code,
                         'ui_options': ui_opts}
-    _crit('CA4a', 'A4a 质检模板可按 API 建档（含 type=goods_receipt）；界面类型下拉只提供 product/production_record/material（来料检模板界面不可达）',
+    # N-2（2026-10-11）：期望已按 B14-07 方案A 订正 —— goods_receipt 是一等检验类型，
+    # UI 类型下拉必须可选。旧期望 ui_goods_receipt_option=False 与方案A 直接冲突（恒红）。
+    _crit('CA4a', 'A4a 质检模板可按 API 建档（含 type=goods_receipt）；界面类型下拉提供一等类型 goods_receipt（B14-07 方案A：来料检 UI 可选）',
           {'material_http': 200, 'gr_http': 200, 'gr_template_id': 'non-null',
-           'ui_goods_receipt_option': False},
+           'ui_goods_receipt_option': True},
           {'material_http': r_mtpl.status_code, 'gr_http': r_grtpl.status_code,
            'gr_template_id': grtpl_id,
            'ui_goods_receipt_option': ui_opts.get('goods_receipt_in_ui'),
            'ui_options': ui_opts.get('options')},
           lambda o: o['material_http'] == 200 and o['gr_http'] == 200
-          and o['gr_template_id'] is not None and o['ui_goods_receipt_option'] is False,
+          and o['gr_template_id'] is not None and o['ui_goods_receipt_option'] is True
+          and {'product', 'production_record', 'material', 'goods_receipt'} <= set(o['ui_options'] or ()),
           {'material_http': 200, 'gr_http': 200, 'gr_template_id': None,
-           'ui_goods_receipt_option': True},
+           'ui_goods_receipt_option': False,
+           'ui_options': ['production_record', 'product', 'material']},
           'app/main/quality.py:233-337（无类型白名单）；'
-          'app/templates/main/quality/templates.html:103-106（下拉仅三类）')
+          'app/templates/main/quality/templates.html:104-109 + :29（模态框与筛选下拉均含 goods_receipt，'
+          'B14-07 方案A；test-reports-2026-10/B14-07-口径登记-goods_receipt-A.md §4）')
 
     # ------------------------------------------------------------ A3 到货登记
     def _receive(qty, note):
@@ -1609,7 +1620,8 @@ def v12_chain_a(app, client, seed):
           and o['inspection_records_for_task'] == 0,
           dict(a4n, status=200, inspection_records_for_task=1),
           'app/main/quality.py:837-839（template.type != task.target_type => 400）；'
-          'app/services/mes_service.py:90-94（无 goods_receipt 模板时回退 material）')
+          'mes_service.py:85-121（B14-07 方案A + RF-2 类型守卫：pick_template 只返回同型或 None，'
+          '错型模板只能由显式传参进来，此处即为阴性对照注入点）')
     r_si_gr = call(client, 'post', f"/api/quality/tasks/{rec1['task_id']}/start-inspection",
                    json={'template_id': grtpl_id, 'notes': '_V12 用来料检模板开始'})
     si_gr_body = jbody(r_si_gr) or {}
@@ -1812,12 +1824,26 @@ def v12_chain_a(app, client, seed):
 
     # ------------------------------------------------------------ A5a pass 路径（入库）
     rec4 = _receive(10, f'_V12 到货#4 {RUN_ID}')
+    # N-2 同族订正（2026-10-11）：B14-08 的 create_app seed 会先下发默认质检模板（含
+    # type='goods_receipt'），pick_template 按主键序取首个启用 goods_receipt 模板 ⇒
+    # 自动绑定的可能是 seed 模板而非本探针自建 id。旧判据「task_template_id == 自建
+    # grtpl_id」的前提（探针模板是唯一/首个 goods_receipt 模板）已被 seed 下发取代。
+    # 按 B14-07 方案A 口径收窄为「绑到任一启用的 type=goods_receipt 模板」。
+    with app.app_context():
+        bound_tpl = (M.InspectionTemplate.query.get(rec4['task_template_id'])
+                     if rec4['task_template_id'] is not None else None)
     a5a_bind = {'task_template_id': rec4['task_template_id'], 'gr_template_id': grtpl_id,
-                'auto_bound': rec4['task_template_id'] == grtpl_id}
-    _crit('CA5a-bind', 'A5a 到货任务自动绑来料检模板（pick_template("goods_receipt") 命中启用模板；缺模板时才回退 material）',
-          {'auto_bound': True, 'task_template_id': '== gr_template_id'}, a5a_bind,
-          lambda o: o['auto_bound'] is True and o['task_template_id'] == grtpl_id,
-          dict(a5a_bind, auto_bound=False), 'mes_service.py:85-94（pick_template）')
+                'bound_template_type': bound_tpl.type if bound_tpl is not None else None,
+                'bound_template_active': bool(bound_tpl.is_active) if bound_tpl is not None else False,
+                'auto_bound': rec4['task_template_id'] is not None}
+    _crit('CA5a-bind', 'A5a 到货任务自动绑来料检模板（B14-07 方案A：pick_template("goods_receipt") 绑定任一启用的 type=goods_receipt 模板）',
+          {'auto_bound': True, 'bound_template_type': 'goods_receipt',
+           'bound_template_active': True}, a5a_bind,
+          lambda o: o['auto_bound'] is True and o['bound_template_type'] == 'goods_receipt'
+          and o['bound_template_active'] is True,
+          dict(a5a_bind, auto_bound=True, bound_template_type='material'),
+          'mes_service.py:85-121（_TEMPLATE_TYPE_CHAIN + RF-2 类型守卫：只返回同型或 None）；'
+          'app/__init__.py:174-201（B14-08 默认模板 seed，先于探针建）')
     call(client, 'post', f"/api/quality/tasks/{rec4['task_id']}/start-inspection",
          json={'template_id': grtpl_id, 'notes': f'_V12 来料检 pass {RUN_ID}'})
     reset_session(app)
@@ -1918,13 +1944,19 @@ def v12_chain_a(app, client, seed):
           and abs(o['total_observed'] - 30.0) < 1e-9,
           dict(a7, per_step_exact=False, total_observed=total_observed + 1.0),
           '04 2.1 A7（三条路径件数守恒）；本段逐步观测见 steps[]')
+    # N-2（2026-10-11）：本条 loose-end 的实现侧冲突已由 B14-07 方案A 收口 —— UI 类型
+    # 下拉已含 goods_receipt（templates.html:104-109/:29），pick_template 优先同型模板。
+    # 原文（已过时）曾记「界面下拉只有 product/production_record/material => 界面无法为
+    # 来料检建可用模板」。余项仅剩 04 需求文档 A4 行的 type='material' 字面前置未订正。
     _v12_note_loose_end('来料检质检模板类型（04 2.1 A4 字面前置 type=material vs 实现要求 type==target_type）',
                         'asset_defect',
-                        'A4 前置写「启用的 type=material 质检模板」，但 quality.py:838 要求'
-                        '模板类型 == 任务类型（goods_receipt）；且界面下拉只有 product/production_record/material '
-                        '=> 界面无法为来料检建可用模板（CA4N 实测 400）',
-                        '登记为判据与实现的口径冲突：要么在界面补 goods_receipt 类型，要么放宽模板类型匹配；'
-                        '本轮不改判据、不改生产代码', '阶段B / C-04 后续（业务口径）')
+                        'B14-07 方案A（2026-10-08 拍板）已落实：goods_receipt 为一等检验类型，'
+                        'UI 下拉可选、pick_template 优先同型；CA4a 期望已按方案A 订正（N-2，'
+                        '2026-10-11）。余项：04 需求文档 A4 行仍写字面前置 type=material'
+                        '（docs/test-reports/2026-10/04-业务验收标准与端到端判据.md:75 及 '
+                        'phase1-snapshot 同名件 :75）',
+                        '实现侧已收口，不改生产代码；文档 A4 行订正移交批次18',
+                        '批次18（文档面）')
     V12['chain_a'] = out
     return out
 
@@ -3219,7 +3251,10 @@ def main():
     print(f'[summary] {summary}', flush=True)
     print(f'[evidence] {out_path}', flush=True)
     print(f'[evidence] {txt_path}', flush=True)
-    return 0 if summary['blocked'] == 0 else 1
+    # [t9 · B18 §t9] 退出码传播：failed>0 或 blocked>0 ⇒ exit 1；全绿 ⇒ exit 0。
+    # 旧实现只看 blocked ⇒ 断言失败仍 exit 0（t3 实测 n2-after failed=1 仍 EXIT=0），
+    # 与 t7 修复的 t4_n5_recompute c2/c3 同族（§B18-D-02 在册工具缺陷）。
+    return 1 if (summary['failed'] > 0 or summary['blocked'] > 0) else 0
 
 
 def save_text_report(result, summary):
@@ -3255,4 +3290,16 @@ if __name__ == '__main__':
     # [V-12 仅追加] 双跑/台账差分模式：--compare <runA-chains.json> <runB-chains.json>
     if len(sys.argv) >= 4 and sys.argv[1] == '--compare':
         sys.exit(v12_cli_compare(sys.argv[2], sys.argv[3]))
+    # [t9 · B18 §t9] 用法错误 ⇒ exit 2（旧实现静默吞掉未知参数）。
+    # --out 为「显式容忍的 no-op」（§B18-D-05：该 flag 无落盘效果，取证一律用
+    # run 目录产物 + cp 快照，勿依赖它）；其余未识别参数一律 usage + exit 2。
+    _argv = sys.argv[1:]
+    _i = 0
+    while _i < len(_argv):
+        if _argv[_i] == '--out' and _i + 1 < len(_argv):
+            _i += 2
+            continue
+        print(f'[usage] 未识别参数: {_argv[_i]!r} —— 用法: uat_chains.py '
+              f'[--out <path>(忽略, §B18-D-05)] | --compare <runA> <runB>', file=sys.stderr)
+        sys.exit(2)
     sys.exit(main())

@@ -1,8 +1,13 @@
 {% extends "base.html" %}
 {% block title %}采购单 {{ po.po_no }}{% endblock %}
 {% block content %}
+{# R-2：采购单/到货单状态枚举中文化（P7/B14-07 同款约定：英文枚举仅作映射键，
+   不进入 DOM 可见文案；键集 = 模型默认值 + 全部后端写入点，后端状态机与取值不变）。#}
+{% set PO_STATUS_LABELS = {'draft': '草稿', 'confirmed': '已确认', 'received': '已到货'} %}
+{% set RECEIPT_STATUS_LABELS = {'pending_inspection': '待检验', 'accepted': '已接收', 'rejected': '已拒收',
+                                'putaway': '已入库', 'returned': '已退货', 'scrapped': '已报废'} %}
 <div class="container mt-4">
-    <h2>采购单 {{ po.po_no }} <span class="badge bg-secondary">{{ po.status }}</span></h2>
+    <h2>采购单 {{ po.po_no }} <span class="badge bg-secondary">{{ PO_STATUS_LABELS.get(po.status, po.status) }}</span></h2>
     <p>供应商：{{ po.supplier.name if po.supplier else '-' }}　日期：{{ po.order_date }}</p>
     <table class="table">
         <thead><tr><th>物料</th><th>类型</th><th>数量</th><th>已收</th><th>单价</th></tr></thead>
@@ -26,7 +31,7 @@
     <h6>到货单</h6>
     <ul>
         {% for r in po.receipts %}
-        <li>{{ r.receipt_no }} {{ r.status }}
+        <li>{{ r.receipt_no }} {{ RECEIPT_STATUS_LABELS.get(r.status, r.status) }}
             {# 入库只对「来料检合格」的到货单开放（服务端 /goods_receipts/<id>/putaway 同样只放行 accepted） #}
             {% if r.status == 'accepted' %}
             <form class="d-inline" method="post" action="{{ url_for('main.putaway_goods_receipt', id=r.id) }}">

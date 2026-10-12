@@ -1,6 +1,9 @@
 {% extends "base.html" %}
 {% block title %}采购单{% endblock %}
 {% block content %}
+{# R-2：采购单状态枚举中文化；本表与 order_detail.html 的 PO_STATUS_LABELS 逐字相同
+   （同一模型两页各持一份：模板局部 set 是 B14-07 定稿形态，抽公共源需改视图层，超出渲染层约束）。#}
+{% set PO_STATUS_LABELS = {'draft': '草稿', 'confirmed': '已确认', 'received': '已到货'} %}
 <div class="container mt-4">
     <h2>采购单</h2>
     {% if full_workflow %}
@@ -39,7 +42,7 @@
             <tr>
                 <td><a href="{{ url_for('main.purchase_order_detail', id=po.id) }}"><code>{{ po.po_no }}</code></a></td>
                 <td>{{ po.supplier.name if po.supplier else '-' }}</td>
-                <td>{{ po.status }}</td>
+                <td>{{ PO_STATUS_LABELS.get(po.status, po.status) }}</td>
                 <td><a class="btn btn-sm btn-outline-primary" href="{{ url_for('main.purchase_order_detail', id=po.id) }}">到货</a></td>
             </tr>
         {% else %}

@@ -1,6 +1,9 @@
 {% extends "base.html" %}
 {% block title %}请购单{% endblock %}
 {% block content %}
+{# R-2：请购单状态枚举中文化（P7/B14-07 同款约定，键集 = 模型默认值 + 全部后端写入点）。#}
+{% set REQ_STATUS_LABELS = {'draft': '草稿', 'pending': '待审批', 'approved': '已审批',
+                            'rejected': '已驳回', 'converted': '已转采购单'} %}
 <div class="container mt-4">
     <h2>请购单</h2>
     <form method="post" action="{{ url_for('main.save_purchase_requisition') }}" class="card card-body mb-4">
@@ -18,7 +21,7 @@
         {% for r in items %}
             <tr>
                 <td><code>{{ r.req_no }}</code></td>
-                <td>{{ r.status }}</td>
+                <td>{{ REQ_STATUS_LABELS.get(r.status, r.status) }}</td>
                 <td>{% for i in r.items %}{{ i.material_name }}×{{ i.quantity }}{% if not loop.last %}；{% endif %}{% endfor %}</td>
                 <td>
                     {% if r.status == 'pending' %}

@@ -374,13 +374,14 @@ function getTaskTypeName(type) {
     return types[type] || type;
 }
 
-// 获取状态名称
+// 获取状态名称（cancelled = InspectionTask.status 声明域值；failed = 不可达既存键，保留备查）
 function getStatusName(status) {
     const statuses = {
         'pending': '待处理',
         'in_progress': '进行中',
         'completed': '已完成',
-        'failed': '不合格'
+        'failed': '不合格',
+        'cancelled': '已取消'
     };
     return statuses[status] || status;
 }
