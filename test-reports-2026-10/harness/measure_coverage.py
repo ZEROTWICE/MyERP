@@ -42,7 +42,7 @@ try:  # 中文/符号输出在 GBK 控制台下会直接抛 UnicodeEncodeError�
 except Exception:
     pass
 
-from _env import EVIDENCE_DIR, REPO_ROOT, ensure_dir, real_db_status
+from _env import EVIDENCE_DIR, REPO_ROOT, ensure_dir, real_db_status, save_evidence
 
 # 被量测的「探针脚本」（只读扫描，不执行）
 # `exit_code_credible` 为 **E-03 后的现状**（t4 修改：smoke_test / permission_matrix 已转正；报告型仍不可信）
@@ -250,14 +250,18 @@ def run_request_probes(do_run=True):
         record['exception_summary_present'] = '异常汇总' in text
         record['stdout_conclusion_tail'] = '\n'.join(
             [l for l in text.splitlines() if l.strip()][-40:])
-        # 原始输出落盘（人读证据，按 A-14 已按 utf-8 解码）
-        ev = os.path.join(EVIDENCE_DIR, f'probe_{name.replace(".py", "")}.txt')
-        with open(ev, 'w', encoding='utf-8', newline='\n') as fh:
-            fh.write(f'# command: {res["argv_display"]}\n# cwd: {res["cwd"]}\n'
-                     f'# exit_code: {res["exit_code"]}\n'
-                     f'# evidence_level: {res["evidence_level"]}\n'
-                     f'# real_db_unchanged: {res["real_db_unchanged"]}\n'
-                     '--- stdout ---\n' + res['stdout'] + '\n--- stderr ---\n' + res['stderr'])
+        # 原始输出落盘（人读证据，按 A-14 已按 utf-8 解码）。
+        # t8：改走 `_env.save_evidence()`（E-01 只追加）——裸 `open(ev, 'w')` 会**原地覆盖**
+        # 同 run 目录下的既有 probe 证据（2026-10-12 04:45 在 b17-verify/ 实测发生过一次，
+        # 导致 evidence_hash 报 2 条 modified）；守卫版同 run 复跑改名保留、原文件一字不动。
+        ev = save_evidence(f'probe_{name.replace(".py", "")}.txt',
+                           f'# command: {res["argv_display"]}\n# cwd: {res["cwd"]}\n'
+                           f'# exit_code: {res["exit_code"]}\n'
+                           f'# evidence_level: {res["evidence_level"]}\n'
+                           f'# real_db_unchanged: {res["real_db_unchanged"]}\n'
+                           '--- stdout ---\n' + res['stdout']
+                           + '\n--- stderr ---\n' + res['stderr'])
+        # 发生改名时这是**改名后**的实际落盘路径（守卫返回值），relpath 口径不变
         record['evidence_file'] = os.path.relpath(ev, REPO_ROOT).replace('\\', '/')
         out[name] = record
     return out

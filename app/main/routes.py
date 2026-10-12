@@ -2464,6 +2464,8 @@ def import_process_prices():
         success_count = 0
         error_messages = []
         warning_messages = []
+        pending_rows = []          # 阶段C t5/P3：(Excel行号, data)，验证通过的行
+        process_data_final = []    # 阶段C t5/P3：文件内去重后的行
         
         # 数据验证
         for i, data in enumerate(process_data, 1):
@@ -2528,28 +2530,28 @@ def import_process_prices():
                 row_errors.append('型号长度不能超过100个字符')
             
             if row_errors:
+                # 阶段C t5/P3：坏行只记「第 N 行：…」并跳过，好行继续（口径对齐 import_employees；
+                # 原实现此处整批拒绝 ⇒ 一行坏数据让 3 行好数据全部不入库）
                 error_messages.append(f'第{i+1}行数据错误：{"; ".join(row_errors)}')
-        
-        # 如果有验证错误，直接返回
-        if error_messages:
-            return jsonify({
-                'success': False, 
-                'message': f'数据验证失败，共发现{len(error_messages)}个错误：\n' + '\n'.join(error_messages[:10]) + 
-                          (f'\n... 还有{len(error_messages)-10}个错误未显示' if len(error_messages) > 10 else '')
-            })
-        
-        # 检查重复的工序编号
-        process_codes = [data['process_code'] for data in process_data]
-        duplicate_codes = [code for code in set(process_codes) if process_codes.count(code) > 1]
-        if duplicate_codes:
-            return jsonify({
-                'success': False, 
-                'message': f'Excel文件中存在重复的工序编号：{", ".join(duplicate_codes)}'
-            })
+            else:
+                pending_rows.append((i + 1, data))
+
+        # 文件内工序编号重复：只跳过重复行，不整单拒绝（口径同 import_employees 工号去重）
+        seen_row_by_code = {}
+        for row_no, data in pending_rows:
+            code = data['process_code']
+            if code in seen_row_by_code:
+                error_messages.append(
+                    f'第{row_no}行工序编号 {code} 在文件中重复（首次出现在第{seen_row_by_code[code]}行）'
+                )
+                continue
+            seen_row_by_code[code] = row_no
+            process_data_final.append((row_no, data))
+        # 后续两遍循环统一改吃 (row_no, data) 元组，行号口径 = Excel 实际行号
         
         # 检查数据库中已存在的工序编号
         existing_codes = []
-        for data in process_data:
+        for _, data in process_data_final:
             existing = ProcessPrice.query.filter_by(
                 process_code=data['process_code'], 
                 is_current=True
@@ -2560,10 +2562,10 @@ def import_process_prices():
         if existing_codes:
             warning_messages.append(f'以下工序编号在数据库中已存在，将创建新版本：{", ".join(existing_codes)}')
         
-        # 第一遍：处理普通工序
+        # 第一遍：处理普通工序（阶段C t5/P3：改吃 (row_no, data)，错误文案行号 = Excel 实际行号）
         normal_processes = {}  # 用于存储导入的普通工序，以便后续建立小计关联
         
-        for i, data in enumerate(process_data, 1):
+        for row_no, data in process_data_final:
             if data['price_type'] != 'subtotal':
                 try:
                     # 如果工序已存在，将现有版本设为非当前
@@ -2600,7 +2602,7 @@ def import_process_prices():
                     success_count += 1
                     
                 except Exception as e:
-                    error_messages.append(f"第{i+1}行普通工序 {data['process_code']} 处理失败: {str(e)}")
+                    error_messages.append(f"第{row_no}行普通工序 {data['process_code']} 处理失败: {str(e)}")
         
         # 提交普通工序，以便后续小计能找到
         try:
@@ -2609,8 +2611,8 @@ def import_process_prices():
             db.session.rollback()
             return jsonify({'success': False, 'message': '保存普通工序时发生错误，请稍后重试或联系管理员'})
         
-        # 第二遍：处理小计工序
-        for i, data in enumerate(process_data, 1):
+        # 第二遍：处理小计工序（阶段C t5/P3：改吃 (row_no, data)，同上）
+        for row_no, data in process_data_final:
             if data['price_type'] == 'subtotal':
                 try:
                     # 查找包含的普通工序
@@ -2634,11 +2636,11 @@ def import_process_prices():
                                 missing_processes.append(code)
                     
                     if missing_processes:
-                        error_messages.append(f"第{i+1}行小计工序 {data['process_code']} 包含的工序未找到：{', '.join(missing_processes)}")
+                        error_messages.append(f"第{row_no}行小计工序 {data['process_code']} 包含的工序未找到：{', '.join(missing_processes)}")
                         continue
                     
                     if not included_process_ids:
-                        error_messages.append(f"第{i+1}行小计工序 {data['process_code']} 没有找到有效的包含工序")
+                        error_messages.append(f"第{row_no}行小计工序 {data['process_code']} 没有找到有效的包含工序")
                         continue
                     
                     # 计算小计总价
@@ -2689,7 +2691,7 @@ def import_process_prices():
                     success_count += 1
                     
                 except Exception as e:
-                    error_messages.append(f"第{i+1}行小计工序 {data['process_code']} 处理失败: {str(e)}")
+                    error_messages.append(f"第{row_no}行小计工序 {data['process_code']} 处理失败: {str(e)}")
         
         # 最终提交
         try:
@@ -2732,7 +2734,7 @@ def import_process_prices():
             'success': success_count > 0,
             'message': final_message,
             'details': {
-                'total_processed': len(process_data),
+                'total_processed': len(process_data_final),
                 'success_count': success_count,
                 'error_count': len(error_messages),
                 'warning_count': len(warning_messages)
@@ -2953,14 +2955,16 @@ def import_production_records():
                 # 文本日期是业务上应当能导入的好行，只有确实无法解析的日期串才按坏行跳过。
                 business_date, date_error = _coerce_excel_date(data.get('date'), '日期')
                 if date_error or business_date is None:
-                    error_messages.append(f"{date_error}（原值：{data.get('date')}）")
+                    # B18-C t2(f)：坏行提示补行号（第 N 行 = Excel 行号），口径同 import_tasks
+                    error_messages.append(f"第 {index + 2} 行：{date_error}（原值：{data.get('date')}）")
                     continue
                 
                 # 查找工序价格（B12-01 取价单点：唯一口径见模块级 pick_process_price）
                 process_price = pick_process_price(data['process_code'], business_date)
                 
                 if not process_price:
-                    error_messages.append(f"未找到工序 {data['process_code']} 在 {data['date']} 的价格")
+                    # B18-C t2(f)：坏行提示补行号（第 N 行 = Excel 行号），口径同 import_tasks
+                    error_messages.append(f"第 {index + 2} 行：未找到工序 {data['process_code']} 在 {data['date']} 的价格")
                     continue
                 
                 # 创建生产记录
@@ -2982,7 +2986,8 @@ def import_production_records():
             except Exception as e:
                 db.session.rollback()
                 current_app.logger.error(f'生产记录导入：第 {index + 2} 行处理失败：{str(e)}')
-                error_messages.append(f"处理记录时出错: {str(e)}")
+                # B18-C t2(f)：坏行提示补行号（第 N 行 = Excel 行号），口径同 import_tasks
+                error_messages.append(f"第 {index + 2} 行：处理记录时出错: {str(e)}")
         
         if success_count > 0:
             # 记录审计日志（B13-10：生产记录已在循环内逐行提交，此处只提交审计行；
@@ -4189,7 +4194,8 @@ def import_bonus_penalties():
                 success_count += 1
                 
             except Exception as e:
-                error_messages.append(f"处理记录时出错: {str(e)}")
+                # B18-C t2(f)：坏行提示补行号（第 N 行 = Excel 行号），口径同 import_tasks
+                error_messages.append(f"第 {index + 2} 行：处理记录时出错: {str(e)}")
         
         if success_count > 0:
             db.session.commit()
@@ -5640,7 +5646,12 @@ def save_temp_file(file: FileStorage) -> str:
     """保存上传的文件到临时目录（TEMP_FOLDER 下的 mkdtemp 子目录，由 cleanup_temp_files 回收）"""
     temp_dir = tempfile.mkdtemp(dir=current_app.config['TEMP_FOLDER'])
     temp_path = os.path.join(temp_dir, secure_filename(file.filename))
-    file.save(temp_path)
+    try:
+        file.save(temp_path)
+    except Exception:
+        # 阶段C t5/P4：落盘失败也要回收半空的 mkdtemp 目录，不留残留
+        shutil.rmtree(temp_dir, ignore_errors=True)
+        raise
     return temp_path
 
 
@@ -8324,6 +8335,10 @@ def import_products():
         
         # 保存上传文件
         temp_path = save_temp_file(file)
+        # 阶段C t5/P4：save_temp_file 建的是 TEMP_FOLDER 下的 mkdtemp 子目录，
+        # 函数末 finally 里的 cleanup_temp_files() 只回收 mtime>300s 的旧目录，
+        # 对刚落盘的本次上传不产生清理效果 ⇒ 解析失败/校验早退/异常路径必然残留。
+        # 这里记录子目录，finally 里 rmtree 整个回收（形态同合金导入 :2799/:2848）。
         
         try:
             # 解析产品数据（含BOM和工序）
@@ -8529,6 +8544,10 @@ def import_products():
             
         finally:
             # 清理临时文件
+            # 阶段C t5/P4：本次上传的 mkdtemp 子目录无条件整个回收（解析失败/校验早退/
+            # 成功/异常所有出口都经过这里）；cleanup_temp_files() 仍保留，兜底回收历史残留
+            if temp_path:
+                shutil.rmtree(os.path.dirname(temp_path), ignore_errors=True)
             cleanup_temp_files()
             
     except Exception as e:

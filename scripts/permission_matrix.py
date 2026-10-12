@@ -70,24 +70,21 @@ ROUTE_FILES = ('app/main/routes.py', 'app/main/quality.py', 'app/main/production
 
 #: ---- C-06（V-07）：四模块权限断言面（口径 = 本脚本 classify，不新起工具）----
 #: `urls` 是该模块**页面面**的具名入口（含被通用 GET 扫因为带参而跳过的 `/stock/<kind>`）；
-#: `capability` 取自路由源码上的 `@require_capability`；允许角色由 `app.permissions.roles_for` 派生。
+#: `capability` 取自路由源码上的 `@require_capability`；允许角色由 `app.permissions.roles_for` 派生，
+#: deny 样本角色 = `app.permissions` 全角色表 − `roles_for(capability)`（G-19：不手写角色名单）。
 MODULE_FACE = (
     {'module': 'equipment', 'capability': 'equipment.manage',
      'urls': ('/equipment', '/work_centers', '/heat_lots', '/workpieces'),
-     'inject_endpoint': 'main.manage_equipment', 'write_expect': 9,
-     'deny_sample': ('hr', 'accountant', 'inspector', 'sales', 'user')},
+     'inject_endpoint': 'main.manage_equipment', 'write_expect': 9},
     {'module': 'purchase_orders', 'capability': 'purchase.manage',
      'urls': ('/purchase_orders', '/suppliers', '/purchase_requisitions'),
-     'inject_endpoint': 'main.manage_purchase_orders', 'write_expect': 8,
-     'deny_sample': ('hr', 'accountant', 'inspector', 'sales', 'user')},
+     'inject_endpoint': 'main.manage_purchase_orders', 'write_expect': 8},
     {'module': 'shipments', 'capability': 'shipment.manage',
      'urls': ('/shipments',),
-     'inject_endpoint': 'main.manage_shipments', 'write_expect': 4,
-     'deny_sample': ('hr', 'accountant', 'inspector', 'user')},
+     'inject_endpoint': 'main.manage_shipments', 'write_expect': 4},
     {'module': 'stock', 'capability': 'inventory.view',
      'urls': ('/stock/fg', '/stock/raw'),
-     'inject_endpoint': 'main.stock_by_kind', 'write_expect': 0,
-     'deny_sample': ('hr', 'accountant', 'inspector', 'sales', 'user')},
+     'inject_endpoint': 'main.stock_by_kind', 'write_expect': 0},
 )
 MODULES_DUMP_NAME = '_permission_matrix_modules.json'
 
@@ -383,12 +380,22 @@ def strip_capability(app, endpoint):
             'inner': getattr(inner, '__name__', '?')}
 
 
+def deny_roles_for(capability):
+    """C-06/G-19：deny 角色 = `app.permissions` 全角色表 − `roles_for(capability)`。
+
+    页面面与写端点面共用；deny 集与能力面同源派生，**不手写角色名单**（防台账漂移）。"""
+    from app.permissions import ROLES as APP_ROLES, roles_for
+    allow = set(roles_for(capability))
+    return tuple(r for r, _label in APP_ROLES if r not in allow)
+
+
 def run_module_face(clients, roles_for):
     """四模块 allow + deny 断言（**复用 `classify()` 的同一口径与同一批 client**）。
 
     判据分两层（缺一不可）：
     * **逐入口（可被注入证伪的那一层）**：每个 face URL 上 ① `capability` 允许的角色**至少一个**
-      `OK`（allow 面）② `deny_sample` 中**至少一个**未授权角色 `DENY`（deny 面）③ 无 5xx。
+      `OK`（allow 面）② deny 角色（`deny_roles_for` 派生）中**至少一个**未授权角色 `DENY`（deny 面）
+      ③ 无 5xx。
       ⇒ 「移除某端点的 `@require_capability`」必然让**该入口**的 deny 面塌掉 ⇒ 对应断言转红。
       （模块级只看「≥1」会**掩盖**同模块其它入口仍在拒绝，注入因此不红 —— 实测踩过，见 t8 证据。）
     * **模块级**：`35` §4 C-06 的口径 = 该模块 ≥1 allow + ≥1 deny + 5xx=0。
@@ -396,6 +403,7 @@ def run_module_face(clients, roles_for):
     rows, summary = {}, []
     for spec in MODULE_FACE:
         cap_roles = tuple(roles_for(spec['capability']))
+        deny_roles = deny_roles_for(spec['capability'])
         table = {url: {actor: classify(c, url) for actor, c in clients.items()}
                  for url in spec['urls']}
         rows[spec['module']] = table
@@ -403,7 +411,7 @@ def run_module_face(clients, roles_for):
         for url in spec['urls']:
             row = table[url]
             allow = [r for r in cap_roles if row[r] == 'OK']
-            deny = [r for r in spec['deny_sample'] if row[r] == 'DENY']
+            deny = [r for r in deny_roles if row[r] == 'DENY']
             five = sorted({v for v in row.values() if v.startswith('HTTP5')})
             problems = []
             if not allow:
@@ -415,7 +423,7 @@ def run_module_face(clients, roles_for):
             per_url.append({'url': url, 'allow': allow, 'deny': deny, 'fivexx': five,
                             'problems': problems, 'ok': not problems})
         allow_any = [r for r in cap_roles if any(table[u][r] == 'OK' for u in spec['urls'])]
-        deny_any = [r for r in spec['deny_sample']
+        deny_any = [r for r in deny_roles
                     if any(table[u][r] == 'DENY' for u in spec['urls'])]
         five_all = sorted({v for u in spec['urls'] for v in table[u].values()
                            if v.startswith('HTTP5')})
@@ -430,7 +438,7 @@ def run_module_face(clients, roles_for):
             problems.append('模块级 5xx 非空: %s' % ','.join(five_all))
         summary.append({'module': spec['module'], 'capability': spec['capability'],
                         'cap_roles': list(cap_roles), 'allow_ok': allow_any,
-                        'deny_sample': list(spec['deny_sample']), 'deny_ok': deny_any,
+                        'deny_sample': list(deny_roles), 'deny_ok': deny_any,
                         'fivexx': five_all, 'urls': list(spec['urls']), 'per_url': per_url,
                         'inject_endpoint': spec['inject_endpoint'],
                         'problems': problems, 'ok': not problems})
@@ -470,14 +478,16 @@ def run_write_face(found_by_module, clients, roles_for, ids):
     """四模块**写端点** deny 面（B17-13，方法参数化；同一 `classify()` 口径、同一批 client）。
 
     逐端点（与页面面同构 ⇒ 可被注入证伪）：① 允许角色**至少一个**通过守卫（`OK`/`HTTP404`）
-    ② `deny_sample` **至少一个** `DENY` ③ 无 5xx/EXC。模块级：写端点数 == `write_expect` 台账
+    ② deny 角色（`deny_roles_for` 派生）**至少一个** `DENY` ③ 无 5xx/EXC。模块级：写端点数 == `write_expect` 台账
     （**上下漂移都红** ⇒ 防「删端点/去装饰器 ⇒ face 静默缩小」）+ 全部 cap 角色 ≥1 allow
     + ≥1 deny + 5xx=0。返回 `(逐端点矩阵, 逐模块结论)`。
 
-    `found_by_module` 由调用方在**注入之前**用 `write_endpoints()` 派生（注入会摘掉能力 ⇒ 不能现算）。"""
+    `found_by_module` 由调用方在**注入之前**用 `write_endpoints()` 派生（注入会摘掉能力 ⇒ 不能现算）。
+    deny 角色 = `deny_roles_for()` 派生（G-19：与能力面同源，不手写名单）。"""
     rows, summary = {}, []
     for spec in MODULE_FACE:
         cap_roles = tuple(roles_for(spec['capability']))
+        deny_roles = deny_roles_for(spec['capability'])
         found = found_by_module.get(spec['module'], [])
         table, per_ep = {}, []
         for rule_str, endpoint, method in found:
@@ -488,7 +498,7 @@ def run_write_face(found_by_module, clients, roles_for, ids):
             table[f'{method} {rule_str} [{endpoint}]'] = row
             allow = [r for r in cap_roles
                      if row[r] not in ('DENY', 'LOGIN') and not row[r].startswith(('HTTP5', 'EXC'))]
-            deny = [r for r in spec['deny_sample'] if row[r] == 'DENY']
+            deny = [r for r in deny_roles if row[r] == 'DENY']
             bad = sorted({v for v in row.values() if v.startswith(('HTTP5', 'EXC'))})
             problems = []
             if not allow:
@@ -502,7 +512,7 @@ def run_write_face(found_by_module, clients, roles_for, ids):
                            'problems': problems, 'ok': not problems})
         rows[spec['module']] = table
         allow_any = [r for r in cap_roles if any(r in e['allow'] for e in per_ep)]
-        deny_any = [r for r in spec['deny_sample'] if any(r in e['deny'] for e in per_ep)]
+        deny_any = [r for r in deny_roles if any(r in e['deny'] for e in per_ep)]
         bad_all = sorted({v for e in per_ep for v in e['bad']})
         problems = ['%s: %s' % (e['rule'], '; '.join(e['problems'])) for e in per_ep if not e['ok']]
         if len(found) != spec['write_expect']:
@@ -518,7 +528,7 @@ def run_write_face(found_by_module, clients, roles_for, ids):
         summary.append({'module': spec['module'], 'capability': spec['capability'],
                         'cap_roles': list(cap_roles), 'expect_writes': spec['write_expect'],
                         'found_writes': len(found), 'allow_ok': allow_any,
-                        'deny_sample': list(spec['deny_sample']), 'deny_ok': deny_any,
+                        'deny_sample': list(deny_roles), 'deny_ok': deny_any,
                         'bad': bad_all, 'per_endpoint': per_ep,
                         'problems': problems, 'ok': not problems})
     return rows, summary

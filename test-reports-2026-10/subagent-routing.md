@@ -8,7 +8,7 @@
 ```
 子智能体约束（派发 subagent / AgentTeams 成员前必须遵守；写在系统提示里，不受上下文压缩影响）：
 1. 写代码的子智能体走【代码线】，最多 1 个并发：优先 provider=zai-coding-cn, model=glm-5.3（code plan）；仅当该 plan 的 5 小时额度**已激活且已用 >10%** 或周额度**已激活且已用 >90%** 时，才落 provider=p1234, model=cn:glm-5.3。**注意**：窗口读数显示 0 且 resetsAt 为空**不代表 plan 不可用**（实测：该读数下 plan 仍可用）⇒ 不得因「窗口未激活」而放弃 code plan。
-2. 其余一切子智能体走【非代码线】，最多 1 个并发：优先 provider=volcengine-code, model=deepseek-v4-1-flash-260910（火山方舟_code）；若其 5 小时额度已用 >10%，或 5h 窗口未激活，则落 provider=deepseek-official, model=deepseek-flash。
+2. 其余一切子智能体走【非代码线】，最多 1 个并发：优先 provider=volcengine-code, model=deepseek-v4-1-flash-260910（火山方舟_code）；仅当该 plan 的 5 小时额度**已激活且已用 >10%** 或周额度**已激活且已用 >90%** 时，才落 provider=deepseek-official, model=deepseek-flash。**注意**：其 5h 窗口常态读 0 且 resetsAt 为空，**不代表 plan 不可用**（2026-10-12 探针实测：该读数下 volcengine-code 正常执行 bash 任务）⇒ 不得因「5h 窗口未激活」而放弃它。
 3. 【规划线】复杂问题、规划、拆解等任务（recon / 方案设计 / 任务拆解 / 架构评审），最多 1 个并发：固定 provider=p1234, model=cn:kimi-k3-1。它不占代码线与非代码线的额度，可与两者并行。判「规划」的口径：产物是方案/清单/拆解表，不是可直接跑的代码；若是「既想又写」的混合任务，按写代码走代码线。
 4. 三条线【并行】、互不排斥（代码线 1 个 + 非代码线 1 个 + 规划线 1 个可同时跑）；同一线内超出的并发：代码线落 provider=p1234, model=cn:glm-5.3；非代码线落 provider=deepseek-official, model=deepseek-flash；规划线落 provider=p1234, model=cn:glm-5.3。
 5. reasoning_effort 一律显式传 max。
@@ -28,11 +28,12 @@
 | 不传 provider/model ≠ 继承主会话路由 | 2026-10-11 实测：不传参派出的子智能体在成本台账里落 `deepseek-official:deepseek-flash`（+3 次调用）= 配置文件 `agent-default-model`，而非主会话路由；显式传了就落指定位 ⇒ 写什么落什么 |
 | 子智能体被「自动停止」= 单次激活输出达 provider `maxTokens` | DSH 源码 `dsh-subagent/lib/index.js:618`：`case "max-tokens": return "<subject> ran out of room before it finished."`；`reasoning_effort=max` 的推理 token 与正文共享该预算 ⇒ 读大件后写长报告最容易触顶 |
 | `p1234` 不查额度 | 用户口径：p1234 为代理路由（聚合上游），没有可读的 plan 额度接口 ⇒ 规划线与代码回落**固定路由、不判窗口**（`route.mjs` 里 usage 记 `n/a`） |
+| 非代码线 5h 窗口「未激活」同样**不代表**不可用 | 2026-10-12 探针：刻意按旧规则该回落时，直接派 `volcengine-code/deepseek-v4-1-flash-260910` 执行 bash 探针任务 ⇒ 正常执行并回报（`VC-PROBE-OK` + UTC 时间）；同批读数 volcengine 周窗口活（0% / resetsAt 10-18）、月额度 28.7%。故删除旧规则「或 5h 窗口未激活 ⇒ 落 deepseek-official」，与规则 1 同口径（只按「已激活且超阈」回落，周>90% 仍守） |
 
 ## 三、自查
 
 ```bash
-node /root/.dsh/quota-check/route.mjs --selftest   # 9 例判据矩阵（含边界 10% / 90% 与窗口未激活）
+node /root/.dsh/quota-check/route.mjs --selftest   # 10 例判据矩阵（含边界 10% / 90% 与两侧窗口未激活）
 node /root/.dsh/quota-check/route.mjs             # 取真实额度并打印推荐路由表（三条线）
 ```
 
