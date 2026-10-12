@@ -115,7 +115,9 @@ def _write(path, obj):
 
 def run(args):
     url = _guard()
-    before_path = EVIDENCE_DIR / f'b18-pg-weak-before-{datetime.datetime.utcnow():%Y%m%d-%H%M%S}.json'
+    out_dir = pathlib.Path(args.out_dir) if args.out_dir else EVIDENCE_DIR
+    out_dir.mkdir(parents=True, exist_ok=True)
+    before_path = out_dir / f'b18-pg-weak-before-{datetime.datetime.utcnow():%Y%m%d-%H%M%S}.json'
 
     # ---- 阶段 1：只读快照（**新增：这里绝不碰 create_app**，否则补列 DDL 会先跑）----
     from sqlalchemy import create_engine
@@ -210,6 +212,7 @@ def main():
     ap.add_argument('--apply', action='store_true', help='真写（默认只读）')
     ap.add_argument('--usernames', default='admin', help='要打标的账号，逗号分隔（默认 admin）')
     ap.add_argument('--rollback', metavar='BEFORE_JSON', help='按 before 快照还原标记')
+    ap.add_argument('--out-dir', help='快照输出目录（默认 evidence/db；不想动证据基线时指向 .tmp）')
     args = ap.parse_args()
     args.usernames = [u.strip() for u in args.usernames.split(',') if u.strip()]
 

@@ -1,5 +1,5 @@
 from flask_wtf import FlaskForm
-from wtforms import StringField, FloatField, IntegerField, SelectField, TextAreaField, DateField, SubmitField, BooleanField, PasswordField, DecimalField, SelectMultipleField, HiddenField, MultipleFileField, DateTimeField
+from wtforms import StringField, FloatField, IntegerField, SelectField, TextAreaField, DateField, SubmitField, BooleanField, PasswordField, DecimalField, SelectMultipleField, HiddenField, FileField, DateTimeField
 from wtforms.validators import DataRequired, NumberRange, Optional, Length, ValidationError, Email, URL
 from datetime import datetime
 
@@ -215,7 +215,12 @@ class ExportProductForm(FlaskForm):
 
 class ProductImportForm(FlaskForm):
     """产品导入表单"""
-    file = MultipleFileField('Excel文件', validators=[DataRequired('请选择文件')])
+    # 单文件语义：import_products 把 form.file.data 当 FileStorage 用（读 .filename），
+    # 且一次只解析一个工作簿（ExcelGenerator.parse_product_data(temp_path)）。
+    # 原 MultipleFileField 的 data 是 list ⇒ 必走外层 except（B17-登记.md:187 在案）。
+    file = FileField('Excel文件', validators=[DataRequired('请选择文件')])
+    # 路由读 form.update_existing.data（前端 products.html:657 传 '1'）；此前该字段不存在 ⇒ AttributeError。
+    update_existing = BooleanField('更新已存在产品')
     submit = SubmitField('导入')
 
 class CustomerForm(FlaskForm):

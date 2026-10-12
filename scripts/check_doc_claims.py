@@ -78,6 +78,39 @@ COVERAGE_ANCHOR_READINGS = {
                'writable_literal_covered_by_all': 110, 'uncovered_writable': 0,
                'smoke_targets': 148, 'smoke_unresolved': 9},
 }
+
+
+def _anchor_readings_hint():
+    """归档锚点留档读数一行：把「锚点没传/没生成」与「口径真的漂移了」区分开。"""
+    return ('锚点留档读数（%s，sha256 %s…）：%s'
+            % (COVERAGE_ANCHOR_READINGS['anchor'], COVERAGE_ANCHOR_READINGS['sha256'][:12],
+               '、'.join('%s=%s' % kv
+                         for kv in sorted(COVERAGE_ANCHOR_READINGS['values'].items()))))
+
+
+def _newest_coverage_artifact():
+    """最新一份 run 产物 `evidence/harness/<run>/coverage.json`（按 mtime）；无 ⇒ None。"""
+    base = os.path.join(REPORTS_ROOT, 'evidence', 'harness')
+    names = os.listdir(base) if os.path.isdir(base) else []
+    cands = [os.path.join(base, n, 'coverage.json') for n in names]
+    cands = [p for p in cands if os.path.isfile(p)]
+    return max(cands, key=os.path.getmtime) if cands else None
+
+
+def resolve_coverage_path(coverage_path=None):
+    """coverage 输入解析：显式传入 > 默认路径 `COVERAGE_JSON` > 最新 run 产物。
+
+    返回 (path, auto)。**只在未显式传入、且默认路径不存在时才回落**——裸跑曾把
+    「没传产物」误报成 2 条源缺失 + 9 条口径漂移（exit 1 假红，见 O6/O10）。
+    """
+    if coverage_path:
+        return coverage_path, False
+    if os.path.isfile(COVERAGE_JSON):
+        return COVERAGE_JSON, False
+    cand = _newest_coverage_artifact()
+    return (cand, True) if cand else (COVERAGE_JSON, False)
+
+
 RUN_GATES = os.path.join(HARNESS_DIR, 'run_gates.py')
 COVERAGE_DRIFT = os.path.join(HARNESS_DIR, 'coverage_drift.py')
 GH_WORKFLOW = os.path.join(REPO_ROOT, '.github', 'workflows', 'docker-deploy.yml')
@@ -257,12 +290,13 @@ def _literal_assign(path, name):
 def read_sources(coverage_path=None):
     """实读全部权威源；返回 (values, errors)。缺失/不可解析 ⇒ errors。
 
-    coverage 面：默认读归档锚点 ``COVERAGE_JSON``；**本 run 的产物必须用 ``--coverage``
-    显式传入**（A-89/A-114 挂点与产物分离：默认路径是历史冻结锚点，不得被原地覆盖写）。
-    产物缺失 ⇒ hard fail（不静默降级），并打印 `COVERAGE_ANCHOR_READINGS` 留档读数。
+    coverage 面：显式 ``--coverage`` > 默认路径 ``COVERAGE_JSON`` > **最新 run 产物**
+    （`resolve_coverage_path()`；A-89/A-114 挂点与产物分离：默认路径是历史冻结锚点，
+    不得被原地覆盖写）。三处都没有 ⇒ errors + ``_coverage_missing``，由 ``main()``
+    判为用法错误（exit 2，非判据失败），并打印 `COVERAGE_ANCHOR_READINGS` 留档读数。
     """
     vals, errors = {}, []
-    cov = coverage_path or COVERAGE_JSON
+    cov, auto = resolve_coverage_path(coverage_path)
     if os.path.isfile(cov):
         try:
             with open(cov, encoding='utf-8') as fh:
@@ -280,16 +314,14 @@ def read_sources(coverage_path=None):
             vals['_coverage_sha256'] = sha256_file(cov)
             vals['_coverage_bytes'] = os.path.getsize(cov)
             vals['_coverage_path'] = _rel(cov)
+            vals['_coverage_auto'] = auto
         except Exception as e:
             errors.append('coverage.json 不可解析：%s: %s' % (type(e).__name__, e))
     else:
+        vals['_coverage_missing'] = True
         errors.append('权威源缺失：%s（coverage 判据输入；本 run 产物请 `--coverage <path>` '
                       '显式传入）' % _rel(cov))
-        errors.append('锚点留档读数（%s，sha256 %s…）：%s'
-                      % (COVERAGE_ANCHOR_READINGS['anchor'],
-                         COVERAGE_ANCHOR_READINGS['sha256'][:12],
-                         '、'.join('%s=%s' % kv
-                                   for kv in sorted(COVERAGE_ANCHOR_READINGS['values'].items()))))
+        errors.append(_anchor_readings_hint())
     if os.path.isfile(RUN_GATES):
         exp = _literal_assign(RUN_GATES, 'EXPECTED')
         if isinstance(exp, dict):
@@ -764,7 +796,20 @@ def main(argv=None):
     violations, warnings, info = [], [], {}
     # ① 钉常量 vs 权威源
     if args.check_sources:
-        checks, errors = verify_sources(args.coverage)
+        cov_path, cov_auto = resolve_coverage_path(args.coverage)
+        if not os.path.isfile(cov_path):
+            # 缺产物 = 用法错误（与 harness/coverage_drift.py 同口径：缺参 exit 2，不是回归）
+            print('[check_doc_claims] 缺少 coverage 产物：%s（用法错误，非判据失败）'
+                  % _rel(cov_path))
+            print('[check_doc_claims] %s' % _anchor_readings_hint())
+            print('[check_doc_claims] 修复：显式传 `--coverage <path>`，或先跑一次 '
+                  '`ci_gates.py --phase first` 生成 run 产物')
+            print('[check_doc_claims] RESULT: USAGE_ERROR（exit 2）')
+            return 2
+        if cov_auto:
+            print('[check_doc_claims] 未显式传 --coverage ⇒ 自动选用最新 run 产物：%s'
+                  % _rel(cov_path))
+        checks, errors = verify_sources(cov_path)
         info['pinned_checks'] = len(checks)
         info['pinned_ok'] = sum(1 for c in checks if c['ok'])
         for e in errors:

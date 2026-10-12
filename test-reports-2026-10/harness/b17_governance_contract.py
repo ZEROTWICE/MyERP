@@ -720,8 +720,15 @@ def b17_14():
     head_doc = '\n'.join(doc[:20])
     stale = [i + 1 for i, ln in enumerate(doc) if re.search(r'\b271\b', ln) and 'A-70' not in ln]
     doc_live = bool(re.search(r'\b273\b', head_doc))
-    ok = (c0 == 0 and face_line and s['multi_method_with_get_total'] == 43
-          and s['multi_method_with_get_uncovered'] == 37 and any(refs.values())
+    # ── A-70 重基线（O8 / B18-E-01，2026-10-12）────────────────────────────────────────────
+    # 钉值 `43` / `37` → `44` / `38`。**旧值留档**：本契约登记时点（B17-14）判据层 D-9 恰为
+    # `43/37`（`e057e81` 删除 GET+POST 的 `/auth/register` 之后的读数）；此后 `B18-Q1` 新增
+    # `GET+POST /auth/change-password` ⇒ `coverage_drift.py` 的 D-9 已升至 `44/38`，而本契约
+    # 未同步 ⇒ **恒 FAIL**（O8 在册）。本次按 A-70 三步重基线：① 旧值与落点留档于本注释 +
+    # `test-reports-2026-10/E-资产与口径收口.md` §1；② 改前阴性对照实测转红（`--only B17-14`
+    # ⇒ `PASS 0 / FAIL 1`，现场 `N=44 M=38` 而钉值 `43/37`）；③ 改值后复跑转绿。
+    ok = (c0 == 0 and face_line and s['multi_method_with_get_total'] == 44
+          and s['multi_method_with_get_uncovered'] == 38 and any(refs.values())
           and fails1 and doc_live and not stale)
     val = ('现场 exit=%d：规则 %d / GET+写 N=%d / 未命中 M=%d；判据层引用面键 %r；'
            '变异体（M=0,N=99,明细清空）⇒ drift exit=%d FAIL=%r（未变异 exit=%d FAIL=%r）；'
@@ -729,7 +736,7 @@ def b17_14():
                c0, s['rules_total'], s['multi_method_with_get_total'], s['multi_method_with_get_uncovered'],
                refs, d1, fails1, d0, fails0, doc_live, stale))
     contrast = ('阳（t13 返工后已闭环）：①「进判据层」= `harness/coverage_drift.py` 新增 D-9 读 '
-                '`multi_method_with_get_total/_uncovered/len(uncovered_…)`（N==43 / M==37 / M==len(list) / M<=N，'
+                '`multi_method_with_get_total/_uncovered/len(uncovered_…)`（N==44 / M==38 / M==len(list) / M<=N，'
                 '失败计入 `failed` ⇒ exit 1），我把 face 抹成 0/99/明细清空后 drift exit=%d FAIL=%r，未变异 exit=%d '
                 'FAIL=%r；② docstring 现场值 = 273/112（非 GET 110→112），残留 271 行=%r 且仅限 A-70 注记。'
                 '阴：t6 复验轮该处为「0 条判据读该键 + docstring 留 271」⇒ 判红。'
