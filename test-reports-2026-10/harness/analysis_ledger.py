@@ -40,7 +40,8 @@ OUTDIR = os.path.join(EVIDENCE, 'analysis')
 REAL_DB = os.path.join(ROOT, 'app.db')
 #: RF-1（2026-10-09，批次15 I1，用户拍板）：真库锚点重基线。本处 `unchanged = sha256_file(REAL_DB)
 #: == REAL_DB_PINNED` 读**现场**真库（见 :281 / :777），旧值不随前移即报 unchanged=False。
-REAL_DB_PINNED = 'B4FB980C5D1B25B3C3A0EADC12ECF01C75B36EBD213B109E5DD190C617EEAABE'
+#: B13-02（2026-10-12，用户拍板 m01505）：再前移到 `34E48E7A…9177E`（存量整治，2531328 B 不变）。
+REAL_DB_PINNED = '34E48E7A21163DB390EEBDA4F2030343F3609AFEDC65D8C6E909D6EB5A49177E'
 APP = os.path.join(ROOT, 'app')
 
 lines_out = []

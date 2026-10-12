@@ -63,7 +63,14 @@ EXPECTED = {
     # 6712 → 6721。与 `ci_gates.py` 的 `check_db_bootstrap` 期望串、`t6_ledger_check.py` 的
     # `PINNED_DB_SHA`、`_env.py` 的 `REAL_DB_SHA256_EXPECTED` 属同一触发项（A-70「必须同改」，
     # 见 `_env.py` 顶部说明）。前值 6712 系 B14-R1（2026-10-09）回退 ALLOY-IMPORT-02 导入期值 10172。
-    'bootstrap_copied_rows': 6721,
+    # 【B13-02 重基线（2026-10-12，用户拍板 m01505；append-only 订正上一条）】真库存量整治
+    # （`audit_log` 10 行 `can_rollback 1→0`）另追加 1 行 append-only 审计留痕 ⇒ 真库总行 +1
+    # ⇒ 自举「直接拷贝」行数 6721 → **6722**（与 `ci_gates.py` 的 `check_db_bootstrap` 期望串
+    # 属同一触发项，两侧必须同值）。A-70 三步：① 旧值 6721 留在本注释；② 阴性对照已实测转红 =
+    # run `ci-run-20261012-043017` 的 `!! bootstrap_copied_rows: 期望 6721  实际 6722`（本文件退出码 1）；
+    # ③ 改值后复跑绿。数值来源 = `python -B scripts/check_db_bootstrap.py` 自报
+    # `直接拷贝 6722 行，跳过 0 张表`。登记见 `test-reports-2026-10/B13-02-真库锚点重基线登记.md`。
+    'bootstrap_copied_rows': 6722,
     'bootstrap_skipped_tables': 0,
     'functional_passed': 127,
     'functional_failed': 0,

@@ -37,7 +37,10 @@ REPO_ROOT = os.path.dirname(REPORTS_ROOT)
 #: RF-1（2026-10-09，批次15 开工前项 I1，用户拍板）：随 `_env` 一并无条件前移到 `B4FB980C…EAABE`
 #: （**同为 2531328 B**）—— 真实库完成 A-70 首启播种（inspection_templates +2 / inspection_items +7）。
 #: 旧值 `F5DA2306…0F065` 自此**只作本注释里的历史记录**，不作生效期望。
-PINNED_DB_SHA = 'B4FB980C5D1B25B3C3A0EADC12ECF01C75B36EBD213B109E5DD190C617EEAABE'
+#: B13-02（2026-10-12，用户拍板 m01505）：随 `_env` 一并无条件前移到 `34E48E7A…9177E` —— 真实库
+#: 完成**唯一一次**存量整治（`audit_log` 10 行 `can_rollback 1→0`，目标库 2531328 B 不变）。
+#: 上句 `B4FB980C…EAABE` 转为历史记录。留档 `test-reports-2026-10/B13-02-真库锚点重基线登记.md`。
+PINNED_DB_SHA = '34E48E7A21163DB390EEBDA4F2030343F3609AFEDC65D8C6E909D6EB5A49177E'
 
 WEAK_KINDS = ('file_exists', 'content_mention')
 COVERAGE_CLASS_IDS = re.compile(r'^C-(0[1-9]|1[01])$')

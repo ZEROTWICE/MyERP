@@ -1181,6 +1181,11 @@ V12_TAG = re.sub(r'[^0-9A-Za-z]', '', RUN_ID)[-12:]
 #: 已把真库锚 F5DA2306…→B4FB980C…，基线成员 ISO.3 的 expected 内嵌该锚变量 ⇒ 摘要随
 #: 之漂移（口径漂移，非判据内容漂移；t3 代换实验：仅把 ISO.3.expected 换回旧锚即可
 #: 逐字节复现 C9FAD00E…D9C）。A-70 三步留档/阴性对照/复跑见 B18-登记.md §t8。
+#: [B13-02 / A-70 重基线 2026-10-12] 旧值 D82423A9…F46F2C 随真库存量整治（`audit_log` 10 行
+#: `can_rollback 1→0`）前移为 8D517515…ACA2A —— 机制同上（ISO.3 内嵌真库锚）。代换实验（本次）：
+#: 从 live `evidence/uat/uat_chains.json` 取 40 条 (id,desc,expected) 逐字节重算 ⇒ D82423A9…F46F2C；
+#: 仅把 ISO.3.expected 换回 F5DA2306… 即复现 C9FAD00E…D9C（双向可复现）。
+#: 留档见 test-reports-2026-10/B13-02-真库锚点重基线登记.md。
 BASELINE40_IDS = (
     'ISO.1', 'ISO.2',
     'P0-1.1', 'P0-1.2', 'P0-1.3', 'P0-1.4', 'P0-1.5', 'P0-1.6', 'P0-1.7', 'P0-1.8', 'P0-1.9',
@@ -1191,7 +1196,7 @@ BASELINE40_IDS = (
     'P0-5.1', 'P0-5.2', 'P0-5.3', 'P0-5.4', 'P0-5.5', 'P0-5.6', 'P0-5.7',
     'ISO.3', 'ISO.4',
 )
-BASELINE40_DIGEST = 'D82423A90EF13F77DAA06C5BD4F85EC83C9002F31FA78BAF5D7482968DD46F2C'
+BASELINE40_DIGEST = '8D5175152411BCD7CF76AE50A760A8769F8FDE86954E16C61B6EFFEDB90ACA2A'
 
 #: t1 冻结的另外 6 个锚点（bytes, sha256）——本 run 只读复核，不改动
 V12_ANCHORS = (

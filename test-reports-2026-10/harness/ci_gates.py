@@ -874,12 +874,18 @@ def spec_steps(python_exe, check_templates_script=None,
         # + inspection_items +7 ⇒ bootstrap business 行数 6712 → 6721。旧 needle 在新锚点下报红
         # （`!! expects 直接拷贝 6712 行，跳过 0 张表`，run cf. evidence rf1-before-red.txt），
         # 故按 A-70 三步重基线到 6721；数值来源 = 本步子进程自报的 `直接拷贝 6721 行，跳过 0 张表`。
-        # 【严禁】在此基础上再抬数：真库只此一次重基线（RF-1 经用户拍板），此后本 needle 与真库
-        # 字节锚定（real_db_sha256 B4FB980C…EABE / 2531328 B）同源。
+        # 【B13-02 重基线（2026-10-12，用户拍板 m01505；append-only 订正上一条）】真库存量整治
+        # （`audit_log` 10 行 `can_rollback 1→0`）追加 1 行 append-only 审计留痕 ⇒ 真库总行 +1
+        # ⇒ 本 needle 6721 → **6722**（与 `run_gates.EXPECTED['bootstrap_copied_rows']` 同值同改）。
+        # A-70 三步：① 旧值 6721 留在上文注释；② 阴性对照已实测转红 = run `ci-run-20261012-043017`
+        # 的 `!! bootstrap_copied_rows: 期望 6721  实际 6722`（连带 `run_gates` 步 blocking FAIL）；
+        # ③ 改值后复跑绿。数值来源 = 子进程自报 `直接拷贝 6722 行，跳过 0 张表`。
+        # 【严禁】在此基础上再抬数（真库只此一次重基线 RF-1 + 本次 B13-02）；
+        # 本 needle 与真库字节锚定（real_db_sha256 34E48E7A…9177E / 2531328 B）同源。
         {'id': 'check_db_bootstrap', 'group': 'blocking',
          'argv': [exe, '-B', shim, os.path.join('scripts', 'check_db_bootstrap.py')],
          'expect_exit': 0,
-         'expects': ['种子库账号数（经自举导入到空库）= 64', '直接拷贝 6721 行，跳过 0 张表',
+         'expects': ['种子库账号数（经自举导入到空库）= 64', '直接拷贝 6722 行，跳过 0 张表',
                      'OK: 空库自举、幂等、无种子库跳过、整表无遗漏 均通过']},
         {'id': 'run_gates', 'group': 'blocking', 'mode': 'run_gates',
          'argv': [exe, '-B', os.path.join('test-reports-2026-10', 'harness', 'run_gates.py')],

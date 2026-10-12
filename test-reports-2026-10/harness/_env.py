@@ -91,7 +91,28 @@ REAL_DB = os.path.join(REPO_ROOT, 'app.db')
 #: 幂等（A-70 第 1 步内实测）：同路径再跑一次首启 ⇒ 逐表 Δ 全 0，bytes 与 SHA256 **与首次完全相同**
 #:   （连 mtime 都未变）⇒ 本锚点可稳定复现。
 #: ────────────────────────────────────────────────────────────────────────────────────────
-REAL_DB_SHA256_EXPECTED = 'B4FB980C5D1B25B3C3A0EADC12ECF01C75B36EBD213B109E5DD190C617EEAABE'
+#: ── B13-02「存量 can_rollback 整治」（2026-10-12，用户拍板 m01505）──────────────────────────
+#: 【生效期望已前移】本行由 `B4FB980C…EAABE` 改写为 `34E48E7A…9177E`（**同为 2531328 B**，
+#:   mtime 2026-10-12 04:25:37.128430119 +0000）—— 因 B13-02 对本库做了**唯一一次**数据写入
+#:   （`audit_log` 10 行 `can_rollback 1→0`，均 `target_id IS NULL`，不回填），写库窗口与前置四证
+#:   见 `test-reports-2026-10/B13-02-真库锚点重基线登记.md`；整治前原始锚点 `F5DA2306…0F065`
+#:   与本次之前钉值 `B4FB980C…EAABE` 逐字留档于 `scripts/_remediate_b13_02_audit_log.py`
+#:   的 `PRE_ANCHOR` / `PREVIOUS_SIG`。
+#: 同批一并前移的处（同源，必须同改，否则交叉断言或门禁必红）：`harness/t6_ledger_check.py`
+#:   的 `PINNED_DB_SHA`、`harness/improve_plan.py`、`harness/analysis_ledger.py`、
+#:   `harness/final_recount.py`、`harness/reconcile_r2.py`（后四者读现场真库读数）、
+#:   `scripts/check_doc_claims.py` 的 `real_db_sha256` 钉值；**摘要耦合**：
+#:   `harness/uat_chains.py` 的 `BASELINE40_DIGEST`（基线成员 ISO.3 的 expected 内嵌本锚变量）
+#:   由 `D82423A9…F46F2C` 前移为 `8D517515…ACA2A`。
+#: 【本轮未改】`app.db` 字节数不变（2531328 B）；`evidence/**` 下的历史钉值字面量
+#:   （如 `evidence/b18c/*.py`、`evidence/d/*.py`）为 append-only 留档，一律不动。
+#: 判据（阴性对照，A-70 第 2 步，2026-10-12 本轮实测）：**保留旧值** `B4FB980C…EAABE` 而真库已整治 ⇒
+#:   ① `assert_real_db_untouched()` 抛 `RuntimeError: 真实库 app.db 已偏离钉死哈希`（期望/实测两值逐字打印）；
+#:   ② `check_doc_claims.py` 的副本（仅回退本钉值，其余同源）`--coverage <最新 run>` ⇒ `28/29`、
+#:   `violations=2`、exit 1 —— 两条 = `real_db_sha256 钉值漂移` + `52-V13-…md 口径值漂移`
+#:   （后者因口径表先前移；**两处必须同改，只改一处即为红**）。
+#: ────────────────────────────────────────────────────────────────────────────────────────
+REAL_DB_SHA256_EXPECTED = '34E48E7A21163DB390EEBDA4F2030343F3609AFEDC65D8C6E909D6EB5A49177E'
 
 _encode_fix = "import sys;sys.stdout.reconfigure(encoding='utf-8',errors='replace');sys.stderr.reconfigure(encoding='utf-8',errors='replace')\n"
 

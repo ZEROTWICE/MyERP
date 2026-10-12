@@ -40,7 +40,8 @@ PY_EXE = r"F:\Miniconda\envs\wage\python.exe"
 REAL_DB = os.path.join(ROOT, "app.db")
 #: RF-1（2026-10-09，批次15 I1，用户拍板）：真库锚点重基线。本处与 `analysis_ledger.py` 的
 #: `real_db_recount.json` 以及现场真库三处对拍（见 :332 / :457 / :491），两处钉值必须同源同值。
-REAL_DB_PINNED = "B4FB980C5D1B25B3C3A0EADC12ECF01C75B36EBD213B109E5DD190C617EEAABE"
+#: B13-02（2026-10-12，用户拍板 m01505）：与 `analysis_ledger.py` 同批前移到 `34E48E7A…9177E`。
+REAL_DB_PINNED = "34E48E7A21163DB390EEBDA4F2030343F3609AFEDC65D8C6E909D6EB5A49177E"
 
 # ---- 交付物清单（相对仓库根；POSIX 风格 key） -------------------------------
 STAGE2 = [
